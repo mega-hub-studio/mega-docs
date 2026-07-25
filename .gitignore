@@ -1,0 +1,9 @@
+bin/
+knowledge.db
+knowledge.db-*
+.env
+
+# Vendored CDN assets — fetch with `make vendor`, never commit (the .gitkeep is tracked
+# so //go:embed always has a match).
+web/vendor/*
+!web/vendor/.gitkeep

@@ -1,0 +1,21 @@
+# Front-end assets pinned by content, not just by version.
+#
+# One source of truth for two jobs:
+#   1. the `integrity="sha384-…"` attributes in web/index.html (browser-side), and
+#   2. `make vendor`, which refuses to write a file whose digest doesn't match.
+#
+# Every path is <package>@<version>/<path-inside-the-npm-tarball> — the same shape
+# jsDelivr and unpkg serve, so ASSET_BASE can flip between CDN and /vendor without
+# touching a URL. Digests are of the published npm bytes.
+#
+# To upgrade a dependency: change the version here and in web/index.html, run
+# `make vendor` to fetch it, then copy the digest it reports into both files.
+
+8bit-nes@0.5.0/all.min.css                sha384-HCXNMGpoqEivRE++SgiAw7C3sCDES+TbYEf4pVJV/dRV/41rXmAIxix0NmKRLKCV
+8bit-nes@0.5.0/elements.min.js            sha384-R8iVNERudea0ShszwfLSyCOlY0Erja6/RkdJneCVwyOjk4pSnGE+pXkzLJWDU1PS
+8bit-nes@0.5.0/fonts/nes-sans-var.woff2   sha384-V0mBCb70drfj6c4nrXQZzeA1f3+dMf1SmGx8rFxjAyLv3r9v6cyavyflVS9k1zN1
+8bit-nes@0.5.0/fonts/nes-mono-400.woff2   sha384-p6Np4maYb/lk6CQKeJUmaBCU24D3gGT+8t2Ig3kAFL4HwjBSFHIYyG1jImIRtJ2W
+8bit-nes@0.5.0/fonts/nes-mono-700.woff2   sha384-q6VJNasxQDFenQMkrxT3J6d7JywnbOPPkoBNgSKGcHZg0lUWYtiV9XcXGKTe9Wa1
+vue@3.5.40/dist/vue.global.prod.js        sha384-yjSqnKX+01fhYzLUMRlCkMrHMTdKxwYcGIk5HZ6ug+4nfJn10+F7YsKRuGR5kQac
+marked@18.0.7/lib/marked.umd.js           sha384-7njNzKcJUBdezPGfqUrIFizi2QkXJH0M6wF3o1h9GE/nce6X4YdecMwh31B19yTi
+dompurify@3.4.12/dist/purify.min.js       sha384-piCcpDdJ7qVeK4Tv8Z6Hpcr3ZBIgP16TxQTPVfsLFdZ5uDgwc3Y8Ho7oUnqf12qu

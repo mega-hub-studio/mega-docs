@@ -77,8 +77,44 @@ additive — no migration, no re-architecture.
   `internal/db/store.go`. This scaffold was not compiled in this environment.
 - **FTS5 build tag.** Uses `-tags sqlite_fts5`. If your `go-sqlite3` version
   wants `-tags fts5` instead, change it in the `Makefile`.
-- **Frontend uses CDN** (Vue/marked/DOMPurify). For an offline internal network,
-  download those three files into `web/` and switch the `<script src>` paths to
-  local — the embed picks them up automatically.
 - **No auth.** Run it behind your VPN/LAN. Auth/RBAC is a later phase.
+
+## Frontend assets (CDN, pinned)
+
+The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
+`marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
+design system (**0.5.0**). All of it is version-pinned *and* hash-pinned:
+
+| | pin |
+|---|---|
+| one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
+| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.5.0` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
+| `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
+| `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
+| font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
+
+Digests live in [`web/vendor.sha384`](web/vendor.sha384) — the same values the
+HTML carries. 8-BIT NES publishes its own at
+[`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
+
+> **Why pin so hard?** Because the floating spec broke this page: `marked` stopped
+> shipping `marked.min.js` at its package root after v4, so the old unpinned
+> `npm/marked/marked.min.js` began 404ing and answers silently stopped rendering.
+
+### Air-gapped / no egress
+
+Serve every asset from the binary instead:
+
+```bash
+make vendor      # fetch + sha384-verify into web/vendor/ (npm registry, not the CDN)
+make build       # whatever is in web/vendor/ gets embedded
+ASSET_BASE=/vendor ./bin/knowledge
+```
+
+`ASSET_BASE` is the only switch — the asset paths in `web/index.html` mirror the
+npm layout, so the same URLs work against a CDN or against `/vendor` (served with
+`Cache-Control: immutable`, since every path carries its version). Vendored files
+are gitignored; run `make vendor` on a machine that *does* have egress, then ship
+the binary. To upgrade a dependency, bump the version and digest in
+`web/vendor.sha384` and `web/index.html`, then re-run `make vendor`.
 ```

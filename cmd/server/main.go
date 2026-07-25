@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"knowledge-engine/internal/ai"
 	"knowledge-engine/internal/config"
@@ -24,17 +28,44 @@ func main() {
 	client := ai.New(cfg.BaseURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel)
 	engine := rag.New(store, client, cfg.TopK)
 
+	// The frontend is rendered once, for whichever asset base is configured.
+	index, err := web.Index(cfg.AssetBase)
+	if err != nil {
+		log.Fatalf("frontend: %v", err)
+	}
+	if cfg.AssetBase == "/vendor" && !web.HasVendor() {
+		log.Printf("warning: ASSET_BASE=/vendor but no assets are embedded — run `make vendor`, then rebuild")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"ok":true}`))
 	})
 	mux.HandleFunc("POST /api/chat", chatHandler(engine))
 
-	// Serve embedded Vue single-file frontend.
-	mux.Handle("/", http.FileServer(http.FS(web.FS)))
+	// Serve the embedded Vue single-file frontend. "/{$}" is an exact match, so
+	// the FileServer below only ever sees asset paths (/vendor/...).
+	indexETag := fmt.Sprintf(`"%x"`, sha256.Sum256(index))
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache") // revalidate: it pins the asset versions
+		w.Header().Set("ETag", indexETag)           // ...but a reload is a 304, not a re-download
+		http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(index))
+	})
+	mux.Handle("GET /vendor/", immutable(http.FileServer(http.FS(web.FS))))
 
-	log.Printf("Knowledge Engine on http://localhost:%s", cfg.Port)
+	log.Printf("Knowledge Engine on http://localhost:%s (assets: %s)", cfg.Port, cfg.AssetBase)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, mux))
+}
+
+// immutable marks vendored assets as cacheable forever. Safe because every path
+// carries its package version (vendor/vue@3.5.40/...), so an upgrade is a new URL
+// — the same contract that makes a pinned CDN URL immutable.
+func immutable(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		h.ServeHTTP(w, r)
+	})
 }
 
 func chatHandler(engine *rag.Engine) http.HandlerFunc {

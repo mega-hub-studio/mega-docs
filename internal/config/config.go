@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port       string
 	DBPath     string
+	AssetBase  string
 	BaseURL    string
 	APIKey     string
 	EmbedModel string
@@ -18,11 +19,17 @@ type Config struct {
 	TopK       int
 }
 
+// DefaultAssetBase is the CDN the frontend loads Vue / marked / DOMPurify /
+// 8bit-nes from. Set ASSET_BASE=/vendor to serve them out of the binary instead
+// (run `make vendor` first) — required on a network without egress.
+const DefaultAssetBase = "https://cdn.jsdelivr.net/npm"
+
 func Load() Config {
 	loadDotEnv(".env")
 	return Config{
 		Port:       env("PORT", "8080"),
 		DBPath:     env("DB_PATH", "knowledge.db"),
+		AssetBase:  env("ASSET_BASE", DefaultAssetBase),
 		BaseURL:    env("AI_BASE_URL", "https://api.openai.com/v1"),
 		APIKey:     env("AI_API_KEY", ""),
 		EmbedModel: env("EMBED_MODEL", "text-embedding-3-small"),
