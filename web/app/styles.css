@@ -1,0 +1,125 @@
+/* ══ App CSS — LAYOUT ONLY, mobile-first ══════════════════════════════════
+   Rule this file follows: if 8bit-nes ships a recipe, use the recipe. Nothing
+   here re-styles a component (no colours, borders, fonts or sizes of its own)
+   — it only positions the shell and adapts to a narrow, touch, on-screen-
+   keyboard viewport. Every value comes from a token in tokens.css.
+
+   Breakpoint: base styles are the phone. One min-width query upgrades to
+   desktop — never the reverse.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Local stacking scale. --z-overlay (100) stays reserved for the library's own
+   overlays, so a toast() is never trapped under the app chrome. */
+#app {
+  --z-bar: 10;
+  --z-dock: 20;
+  min-block-size: 100dvh;
+}
+
+/* Kills the 300ms tap delay and double-tap-to-zoom; pinch-zoom is untouched,
+   so the WCAG zoom affordance stays. (The library's own docs do the same.) */
+body { touch-action: manipulation; }
+
+/* Anchor jumps (a .cite marker → its .source row) must not land under the
+   sticky bar or the fixed prompt. */
+html {
+  scroll-padding-block-start: calc(var(--ctrl-h) + var(--sp-5));
+  scroll-padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-4));
+}
+
+/* ── touch ────────────────────────────────────────────────────────────────
+   components.css already grows .btn / .input / .suggest-item to a 44px tap zone
+   and floors .input/.textarea/.select at 16px on coarse pointers, so none of
+   that is repeated here. Exactly two things fall through its net: ── */
+@media (pointer: coarse) {
+  /* .chat-submit sizes off --ctrl-h and isn't in that touch list, so the send
+     button — the most-tapped control on a phone — would stay 36px. */
+  .chat-submit { --ctrl-h: var(--ctrl-h-lg); }
+
+  /* The 16px iOS focus-zoom floor targets .textarea; the textarea inside
+     <nes-chat-prompt> is a bare element with no class, so it misses it.
+     (Fixed upstream for the next 8bit-nes release — remove this on that bump.) */
+  .chat-prompt textarea { font-size: max(16px, var(--fs-body)); }
+}
+
+/* ── top bar ── */
+.bar {
+  position: sticky; inset-block-start: 0; z-index: var(--z-bar);
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3);
+  padding-block-start: max(var(--sp-3), env(safe-area-inset-top));
+  background: var(--bg);
+  border-block-end: var(--bw-2) solid var(--line);
+}
+.bar .grow { margin-inline-start: auto; }
+
+/* ── conversation column ── */
+main {
+  max-inline-size: 760px; margin-inline: auto;
+  padding: var(--sp-4) var(--sp-3);
+  /* clears the fixed prompt, which grows as the textarea grows — measured at
+     runtime into --dock-h rather than guessed */
+  padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
+}
+
+.empty { margin-block-start: var(--sp-6); }
+.turn + .turn { margin-block-start: var(--sp-6); }
+
+/* The question. No message-bubble recipe exists, so this is the one piece of
+   app-owned styling — a gold classifier bar mirroring .card's accent bar.
+   font-family is set explicitly because it's an <h2> (for the document outline
+   and screen-reader navigation) but it is *body* copy, and DESIGN.md is firm
+   that chrome is mono and body is sans — don't mix the roles. */
+.q {
+  font-family: var(--font-body);
+  font-size: var(--fs-body); font-weight: 700; line-height: var(--lh-body);
+  color: var(--ink);
+  border-inline-start: var(--accent-bar) solid var(--gold);
+  padding-inline-start: var(--sp-3);
+  margin-block-end: var(--sp-3);
+}
+
+/* A pasted identifier, path or URL must wrap, never widen the page — the one
+   thing a 390px viewport is unforgiving about. */
+.q, .prose, .source { overflow-wrap: anywhere; }
+.source { flex-wrap: wrap; }        /* long doc name + heading stack instead of overflowing */
+
+.a .head { justify-content: space-between; }
+
+/* .prose covers lists, quotes, links and images but not code *blocks* (base.css
+   styles inline code only) — the one recipe the app has to supply. */
+.prose pre {
+  background: var(--slot);
+  border: var(--bw-2) solid var(--line);
+  box-shadow: var(--sh-2);
+  padding: var(--sp-3);
+  overflow-x: auto;
+  font-size: var(--fs-chip);
+  line-height: var(--lh-body);
+}
+.prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
+
+/* ── the dock: fixed prompt, safe-area + keyboard aware ── */
+.dock {
+  position: fixed; inset-block-end: 0; inset-inline: 0; z-index: var(--z-dock);
+  padding: var(--sp-4) var(--sp-3);
+  padding-block-end: max(var(--sp-3), env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--screen) 40%);
+  /* iOS leaves fixed elements under the on-screen keyboard; --kb is the
+     overlap measured from visualViewport (0 whenever no keyboard is up). */
+  transform: translateY(calc(-1 * var(--kb, 0px)));
+}
+.dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+
+/* ── desktop upgrade ── */
+@media (min-width: 640px) {
+  .bar { padding-inline: var(--sp-4); }
+  main { padding: var(--sp-5) var(--sp-4) calc(var(--dock-h, 5rem) + var(--sp-6)); }
+  .empty { margin-block-start: 12vh; }
+  .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
+  .prose pre { padding: var(--sp-3) var(--sp-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}

@@ -16,10 +16,14 @@ import (
 //go:embed index.html
 var indexTmpl string
 
-// Vendored third-party assets, laid out exactly like the CDN paths
-// (vendor/<pkg>@<version>/<path>). Empty unless `make vendor` has been run; the
-// `all:` prefix keeps the embed valid when the directory holds only .gitkeep.
+// Static tree served straight to the browser:
 //
+//	app/     the app shell — styles.css + the ES modules (no build step)
+//	vendor/  third-party assets, laid out exactly like the CDN paths
+//	         (vendor/<pkg>@<version>/<path>). Empty unless `make vendor` has run;
+//	         the `all:` prefix keeps the embed valid when it holds only .gitkeep.
+//
+//go:embed app
 //go:embed all:vendor
 var FS embed.FS
 

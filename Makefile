@@ -2,10 +2,18 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps server ingest build vendor vendor-clean clean
+.PHONY: deps check test server ingest build vendor vendor-clean clean
 
 deps:
 	go mod tidy
+
+# Everything CI should gate on: formatting, vet, tests.
+check: test
+	@test -z "$$(gofmt -l .)" || { echo "gofmt needed in:"; gofmt -l .; exit 1; }
+	go vet -tags "$(TAGS)" ./...
+
+test:
+	go test -tags "$(TAGS)" ./...
 
 # Run the chat server (http://localhost:8080)
 server:

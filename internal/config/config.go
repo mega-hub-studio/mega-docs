@@ -22,7 +22,10 @@ type Config struct {
 // DefaultAssetBase is the CDN the frontend loads Vue / marked / DOMPurify /
 // 8bit-nes from. Set ASSET_BASE=/vendor to serve them out of the binary instead
 // (run `make vendor` first) — required on a network without egress.
-const DefaultAssetBase = "https://cdn.jsdelivr.net/npm"
+const (
+	DefaultAssetBase = "https://cdn.jsdelivr.net/npm"
+	VendorAssetBase  = "/vendor"
+)
 
 func Load() Config {
 	loadDotEnv(".env")

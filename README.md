@@ -39,6 +39,62 @@ Ship it as a single binary instead:
 make build && ./bin/knowledge
 ```
 
+## Architecture
+
+One binary, four layers, one direction of dependency — `cmd` → `internal` → nothing.
+No layer reaches back up, so each can be read (and tested) on its own.
+
+```
+cmd/server        wiring only: config in, deps constructed, handler served (~50 lines)
+cmd/ingest        the indexing CLI
+
+internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
+internal/rag      the domain: chunk → embed → retrieve → grounded answer
+internal/ai       one OpenAI-compatible client (embeddings + chat streaming)
+internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
+internal/config   env → Config, with defaults
+
+web/              index.html (a Go template) + embed.go
+web/app/          the app shell — native ES modules, no build step
+web/vendor/       `make vendor` output (gitignored)
+```
+
+**Where do I add…?**
+
+| …this | goes here | because |
+|---|---|---|
+| a new API endpoint | `internal/server` | routing and transport live in one place |
+| better retrieval / prompting | `internal/rag` | the domain never imports HTTP |
+| a new provider | `internal/ai` | one client, one seam |
+| a UI action | `web/app/app.js` | it's intent; plumbing lives in its own module |
+| a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
+| markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
+| a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
+| a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
+
+### The two seams that make it testable
+
+`internal/server` depends on a one-method interface, not on the engine:
+
+```go
+type Answerer interface {
+    Answer(ctx context.Context, question string, onToken func(string)) ([]rag.Citation, error)
+}
+```
+
+So the whole HTTP surface — SSE framing, cache headers, 400s — is covered by
+`go test` with a fake, needing no API key and no database. On the front end, the
+same idea: `app.js` never sees an `AbortController`, a `TextDecoder`, a
+`ResizeObserver` or `visualViewport`. It says
+
+```js
+const run = ask(question, { onToken, onCitations });   // chat.js
+run.stop();                                            // resolves, never throws
+view.scrollToEnd();                                    // viewport.js: follows, unless the reader scrolled up
+```
+
+`make check` runs the lot (`gofmt`, `go vet`, `go test`).
+
 ## Ingesting PDF / DOCX
 
 Go is weak at parsing binary docs — don't fight it. Convert to clean markdown
