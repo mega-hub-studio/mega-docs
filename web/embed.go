@@ -46,12 +46,30 @@ func Index(assetBase string) ([]byte, error) {
 		origin = scheme + "//" + host
 	}
 
+	p, err := parsePins(manifestSrc)
+	if err != nil {
+		return nil, err
+	}
+
 	// text/template, not html/template: the input is operator config, never user
 	// input, and html/template rewrites URL and <script> contexts.
 	//
 	// Delimiters are <% %> because the page is a Vue template — {{ }} belongs to
 	// Vue and Go must not touch it.
-	t, err := template.New("index").Delims("<%", "%>").Parse(indexTmpl)
+	//
+	// url/sri read web/vendor.sha384, so the page never spells out a version or a
+	// hash. Both return an error for anything unpinned, which Execute turns into a
+	// startup failure — the right time to find out.
+	t, err := template.New("index").Delims("<%", "%>").Funcs(template.FuncMap{
+		"url": func(pkg, file string) (string, error) {
+			path, err := p.path(pkg, file)
+			if err != nil {
+				return "", err
+			}
+			return base + "/" + path, nil
+		},
+		"sri": p.sri,
+	}).Parse(indexTmpl)
 	if err != nil {
 		return nil, err
 	}

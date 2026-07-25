@@ -233,3 +233,60 @@ func toFTSQuery(text string) string {
 	}
 	return strings.Join(quoted, " OR ")
 }
+
+// Document is one indexed source file, with how much of it is retrievable.
+type Document struct {
+	Path      string `json:"path"`
+	Title     string `json:"title"`
+	Chunks    int    `json:"chunks"`
+	Approved  int    `json:"approved"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// Corpus is what the engine actually knows — the answer to "is anything indexed,
+// and what?", which is otherwise indistinguishable from a broken retriever.
+type Corpus struct {
+	Documents []Document `json:"documents"`
+	Docs      int        `json:"docs"`
+	Chunks    int        `json:"chunks"`
+	Approved  int        `json:"approved"`
+}
+
+// Corpus lists indexed documents, newest first, capped at limit (<=0 means 200).
+func (s *Store) Corpus(limit int) (Corpus, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var c Corpus
+	if err := s.db.QueryRow(`
+		SELECT (SELECT COUNT(*) FROM documents),
+		       (SELECT COUNT(*) FROM chunks),
+		       (SELECT COUNT(*) FROM chunks WHERE status = 'approved')`,
+	).Scan(&c.Docs, &c.Chunks, &c.Approved); err != nil {
+		return c, fmt.Errorf("corpus totals: %w", err)
+	}
+
+	rows, err := s.db.Query(`
+		SELECT d.path, COALESCE(d.title, ''), d.updated_at,
+		       COUNT(c.id),
+		       COALESCE(SUM(c.status = 'approved'), 0)
+		FROM documents d
+		LEFT JOIN chunks c ON c.document_id = d.id
+		GROUP BY d.id
+		ORDER BY d.updated_at DESC, d.path
+		LIMIT ?`, limit)
+	if err != nil {
+		return c, fmt.Errorf("corpus list: %w", err)
+	}
+	defer rows.Close()
+
+	c.Documents = []Document{} // never nil: this is serialised straight to JSON
+	for rows.Next() {
+		var d Document
+		if err := rows.Scan(&d.Path, &d.Title, &d.UpdatedAt, &d.Chunks, &d.Approved); err != nil {
+			return c, err
+		}
+		c.Documents = append(c.Documents, d)
+	}
+	return c, rows.Err()
+}

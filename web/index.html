@@ -14,64 +14,63 @@
 <title>Knowledge Engine</title>
 
 <!-- ══ Front-end assets ═══════════════════════════════════════════════════════
-     Every asset URL below starts with ASSET_BASE (see internal/config), which
-     Go substitutes at startup: jsDelivr by default, or "/vendor" after
-     `make vendor` to serve every byte from the binary itself (air-gapped
-     installs). The vendor tree mirrors the npm layout, so these paths — and the
-     integrity digests — hold either way.
+     Nothing below spells out a version or a hash. Both come from
+     web/vendor.sha384, the one manifest that also drives `make vendor` — so
+     upgrading a dependency is one line in one file, and a half-finished bump
+     fails at startup instead of in someone's browser.
 
-     Every version is pinned *exactly*: a pinned jsDelivr URL is immutable and
-     cached for a year, and a floating spec is how this page previously broke —
+     ASSET_BASE (see internal/config) decides *where* they load from: jsDelivr by
+     default, or /vendor to serve every byte from the binary (air-gapped). The
+     vendor tree mirrors the npm layout, so the same paths work either way.
+
+     Versions are pinned exactly, on purpose: a pinned jsDelivr URL is immutable
+     and cached for a year, and a floating spec is how this page once broke —
      `npm/marked/marked.min.js` was dropped from the package after marked v4, so
      the unpinned URL started 404ing and answers silently stopped rendering.
-     To upgrade, bump the version AND its digest (both come from the tarball;
-     `make vendor` re-verifies them). 8-BIT NES publishes its own at /sri.json.
      ═══════════════════════════════════════════════════════════════════════ -->
 <%if .Remote%><link rel="preconnect" href="<%.Origin%>" crossorigin>
 <%end%>
-<!-- 8-BIT NES design system 0.5.0. All three faces are used on first paint, and
-     each href is the exact URL all.min.css resolves url() to — so preloading
-     starts them alongside the stylesheet instead of after it, and each file is
-     still fetched exactly once. (No integrity on these: a font pulled in by
-     url() carries no integrity metadata, so a mismatch would cost a 2nd fetch.) -->
+<!-- 8-BIT NES design system. All three faces are used on first paint, and each
+     href is the exact URL all.min.css resolves url() to — so preloading starts
+     them alongside the stylesheet instead of after it, and each file is still
+     fetched exactly once. (No integrity on these: a font pulled in by url()
+     carries no integrity metadata, so a mismatch would cost a 2nd fetch.) -->
 <link rel="preload" as="font" type="font/woff2" crossorigin
-  href="<%.Base%>/8bit-nes@0.5.0/fonts/nes-sans-var.woff2">
+  href="<%url "8bit-nes" "fonts/nes-sans-var.woff2"%>">
 <link rel="preload" as="font" type="font/woff2" crossorigin
-  href="<%.Base%>/8bit-nes@0.5.0/fonts/nes-mono-400.woff2">
+  href="<%url "8bit-nes" "fonts/nes-mono-400.woff2"%>">
 <link rel="preload" as="font" type="font/woff2" crossorigin
-  href="<%.Base%>/8bit-nes@0.5.0/fonts/nes-mono-700.woff2">
-<link rel="stylesheet" href="<%.Base%>/8bit-nes@0.5.0/all.min.css"
-  integrity="sha384-HCXNMGpoqEivRE++SgiAw7C3sCDES+TbYEf4pVJV/dRV/41rXmAIxix0NmKRLKCV"
-  crossorigin="anonymous">
-<script type="module" src="<%.Base%>/8bit-nes@0.5.0/elements.min.js"
-  integrity="sha384-R8iVNERudea0ShszwfLSyCOlY0Erja6/RkdJneCVwyOjk4pSnGE+pXkzLJWDU1PS"
-  crossorigin="anonymous"></script>
+  href="<%url "8bit-nes" "fonts/nes-mono-700.woff2"%>">
+<link rel="stylesheet" href="<%url "8bit-nes" "all.min.css"%>"
+  integrity="<%sri "8bit-nes" "all.min.css"%>" crossorigin="anonymous">
+<script type="module" src="<%url "8bit-nes" "elements.min.js"%>"
+  integrity="<%sri "8bit-nes" "elements.min.js"%>" crossorigin="anonymous"></script>
 
 <!-- App runtime. `defer` keeps ~240 kB of parser-blocking <script> out of the
      critical path; deferred scripts still run in order, before DOMContentLoaded,
      which is where the app boots (bottom of <body>).
-     Vue 3.5 global build — the isCustomElement API used below is unchanged in 3.6. -->
-<script defer src="<%.Base%>/vue@3.5.40/dist/vue.global.prod.js"
-  integrity="sha384-yjSqnKX+01fhYzLUMRlCkMrHMTdKxwYcGIk5HZ6ug+4nfJn10+F7YsKRuGR5kQac"
-  crossorigin="anonymous"></script>
-<script defer src="<%.Base%>/marked@18.0.7/lib/marked.umd.js"
-  integrity="sha384-7njNzKcJUBdezPGfqUrIFizi2QkXJH0M6wF3o1h9GE/nce6X4YdecMwh31B19yTi"
-  crossorigin="anonymous"></script>
-<script defer src="<%.Base%>/dompurify@3.4.12/dist/purify.min.js"
-  integrity="sha384-piCcpDdJ7qVeK4Tv8Z6Hpcr3ZBIgP16TxQTPVfsLFdZ5uDgwc3Y8Ho7oUnqf12qu"
-  crossorigin="anonymous"></script>
+     Vue 3.5 global build — the isCustomElement API used there is unchanged in 3.6. -->
+<script defer src="<%url "vue" "dist/vue.global.prod.js"%>"
+  integrity="<%sri "vue" "dist/vue.global.prod.js"%>" crossorigin="anonymous"></script>
+<script defer src="<%url "marked" "lib/marked.umd.js"%>"
+  integrity="<%sri "marked" "lib/marked.umd.js"%>" crossorigin="anonymous"></script>
+<script defer src="<%url "dompurify" "dist/purify.min.js"%>"
+  integrity="<%sri "dompurify" "dist/purify.min.js"%>" crossorigin="anonymous"></script>
 
 <!-- App shell: layout-only CSS (web/app/styles.css) and the conversation module
-     (web/app/app.js → chat.js · answer.js · viewport.js). Native ES modules, so
+     (web/app/app.js → chat.js · answer.js · viewport.js · library.js · session.js).
+     Native ES modules, so
      there is still no build step — the Go binary serves them from its embed FS. -->
 <link rel="stylesheet" href="/app/styles.css">
-<!-- the whole module graph, declared up front: without the three leaves listed
+<!-- the whole module graph, declared up front: without the leaves listed
      here they'd only be discovered once app.js has been fetched and parsed, which
      costs a second round trip on a phone -->
 <link rel="modulepreload" href="/app/app.js">
 <link rel="modulepreload" href="/app/chat.js">
 <link rel="modulepreload" href="/app/answer.js">
 <link rel="modulepreload" href="/app/viewport.js">
+<link rel="modulepreload" href="/app/library.js">
+<link rel="modulepreload" href="/app/session.js">
 </head>
 <body>
 <!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
@@ -93,12 +92,42 @@
     <div class="empty" v-if="!turns.length">
       <span class="icon">◈</span>
       <span class="title">Ask the source of truth</span>
-      <p>Grounded answers from approved docs — every claim cited.</p>
-      <div class="suggest">
+
+      <!-- What's indexed, stated up front. An empty index used to be
+           indistinguishable from a broken retriever: you asked, and got
+           "not found in the documents" with no way to tell which it was. -->
+      <p v-if="corpus.state === 'ready'">
+        {{ corpus.docs }} documents · {{ corpus.chunks }} retrievable sections.
+        Every claim cited.
+      </p>
+      <p v-else-if="corpus.state === 'empty'">
+        Nothing is indexed yet — run <code>make ingest DOCS=./docs</code>, then ask.
+      </p>
+      <p v-else-if="corpus.state === 'unavailable'">
+        Can't read the index. Check the server, then reload.
+      </p>
+      <p v-else>Grounded answers from approved docs — every claim cited.</p>
+
+      <div class="suggest" v-if="corpus.state === 'ready'">
         <button class="suggest-item" v-for="s in starters" :key="s" @click="ask(s)">
           {{ s }} <nes-icon name="arrowRight"></nes-icon>
         </button>
       </div>
+
+      <!-- zero-JS disclosure; the list is the corpus, so it answers "does it even
+           know about my file?" without a question being spent on it -->
+      <details class="corpus" v-if="corpus.documents.length" @toggle="showSources = $event.target.open">
+        <summary>
+          <span class="eyebrow">{{ showSources ? 'Hide' : 'Browse' }} indexed sources</span>
+        </summary>
+        <ol class="sources">
+          <li class="source" v-for="d in corpus.documents" :key="d.path">
+            <span class="source-n">{{ d.chunks }}</span>
+            <span class="source-title" :title="d.path">{{ d.title || short(d.path) }}</span>
+            <span class="source-host">{{ shortDate(d.updated_at) }}</span>
+          </li>
+        </ol>
+      </details>
     </div>
 
     <article class="turn" v-for="t in turns" :key="t.id">
@@ -161,7 +190,7 @@
      helpers rather than importing them, so the pinned, integrity-checked URL isn't
      duplicated across the app modules. -->
 <script type="module">
-  import { toast, setMute } from "<%.Base%>/8bit-nes@0.5.0/elements.min.js";
+  import { toast, setMute } from "<%url "8bit-nes" "elements.min.js"%>";
   import { boot } from "/app/app.js";
 
   boot({ toast, setMute });

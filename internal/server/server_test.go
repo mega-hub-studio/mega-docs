@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"knowledge-engine/internal/db"
 	"knowledge-engine/internal/rag"
 )
 
@@ -18,6 +20,8 @@ type fakeAnswers struct {
 	tokens []string
 	cites  []rag.Citation
 	err    error
+	corpus db.Corpus
+	cErr   error
 }
 
 func (f fakeAnswers) Answer(_ context.Context, _ string, onToken func(string)) ([]rag.Citation, error) {
@@ -26,6 +30,8 @@ func (f fakeAnswers) Answer(_ context.Context, _ string, onToken func(string)) (
 	}
 	return f.cites, f.err
 }
+
+func (f fakeAnswers) Corpus(int) (db.Corpus, error) { return f.corpus, f.cErr }
 
 func newTestServer(a Answerer) http.Handler {
 	return New(Deps{
@@ -173,5 +179,48 @@ func TestChatRejectsBadRequests(t *testing.T) {
 		if code := do(t, h, "POST", "/api/chat", body, nil).Code; code != http.StatusBadRequest {
 			t.Errorf("%s: got %d, want 400", name, code)
 		}
+	}
+}
+
+func TestCorpusReportsWhatIsIndexed(t *testing.T) {
+	h := newTestServer(fakeAnswers{corpus: db.Corpus{
+		Docs: 2, Chunks: 41, Approved: 7,
+		Documents: []db.Document{{Path: "docs/a.md", Title: "A", Chunks: 30, UpdatedAt: "2026-07-01 10:00:00"}},
+	}})
+
+	w := do(t, h, "GET", "/api/corpus", "", nil)
+	if w.Code != 200 {
+		t.Fatalf("corpus = %d", w.Code)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store (an ingest changes it)", got)
+	}
+	var got db.Corpus
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("not JSON: %v — %s", err, w.Body.String())
+	}
+	if got.Docs != 2 || got.Chunks != 41 || got.Approved != 7 || len(got.Documents) != 1 {
+		t.Errorf("round-trip lost data: %+v", got)
+	}
+}
+
+func TestCorpusOnEmptyIndexIsStillAJSONObject(t *testing.T) {
+	// The UI branches on docs === 0; a 500 or a bare "null" would read as a
+	// broken server rather than an empty index.
+	h := newTestServer(fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}})
+
+	w := do(t, h, "GET", "/api/corpus", "", nil)
+	if w.Code != 200 {
+		t.Fatalf("corpus = %d", w.Code)
+	}
+	if body := strings.TrimSpace(w.Body.String()); !strings.Contains(body, `"documents":[]`) {
+		t.Errorf("want an empty array, got %s", body)
+	}
+}
+
+func TestCorpusFailureIs500(t *testing.T) {
+	h := newTestServer(fakeAnswers{cErr: errors.New("db gone")})
+	if code := do(t, h, "GET", "/api/corpus", "", nil).Code; code != http.StatusInternalServerError {
+		t.Errorf("got %d, want 500", code)
 	}
 }

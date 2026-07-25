@@ -54,8 +54,10 @@ internal/ai       one OpenAI-compatible client (embeddings + chat streaming)
 internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
 internal/config   env → Config, with defaults
 
-web/              index.html (a Go template) + embed.go
+web/              index.html (a Go template) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
+                  app.js · chat.js · answer.js · viewport.js · library.js · session.js
+web/vendor.sha384 the one pin list: versions + digests, for the page and `make vendor`
 web/vendor/       `make vendor` output (gitignored)
 ```
 
@@ -64,21 +66,25 @@ web/vendor/       `make vendor` output (gitignored)
 | …this | goes here | because |
 |---|---|---|
 | a new API endpoint | `internal/server` | routing and transport live in one place |
+| a new dependency version | `web/vendor.sha384` | one line drives the URL, the digest and vendoring |
 | better retrieval / prompting | `internal/rag` | the domain never imports HTTP |
 | a new provider | `internal/ai` | one client, one seam |
 | a UI action | `web/app/app.js` | it's intent; plumbing lives in its own module |
 | a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
+| anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
+| what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
 
 ### The two seams that make it testable
 
-`internal/server` depends on a one-method interface, not on the engine:
+`internal/server` depends on a narrow interface, not on the engine:
 
 ```go
 type Answerer interface {
     Answer(ctx context.Context, question string, onToken func(string)) ([]rag.Citation, error)
+    Corpus(limit int) (db.Corpus, error)
 }
 ```
 
@@ -94,6 +100,17 @@ view.scrollToEnd();                                    // viewport.js: follows, 
 ```
 
 `make check` runs the lot (`gofmt`, `go vet`, `go test`).
+
+### HTTP surface
+
+| route | returns |
+|---|---|
+| `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
+| `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
+| `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
+| `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |
+| `GET /app/…` | app modules + CSS, one ETag over the tree |
+| `GET /vendor/…` | vendored assets, `immutable` (the version is in the path) |
 
 ## Ingesting PDF / DOCX
 
@@ -116,7 +133,15 @@ runtime problem.
   (`FTS5`) with Reciprocal Rank Fusion. Keyword match is what catches function
   names, error codes and config keys that pure semantic search misses.
 - The LLM is instructed to answer **only** from retrieved context, to say so
-  when the answer isn't there, and to cite every claim `[n]`.
+  when the answer isn't there, and to cite every claim `[n]`. The UI turns those
+  markers into links down to the numbered source list, so a claim is one tap from
+  the file it came from.
+- **You can see the corpus.** The empty state reports what is indexed and lists it
+  (`GET /api/corpus`). "Nothing is ingested yet" and "retrieval found nothing" used
+  to look identical — both just answered *not in the documents*.
+- **The thread survives a reload.** Conversations are kept in `localStorage` and
+  flushed on `pagehide`, because a phone backgrounds a tab far more often than it
+  closes one.
 
 ## Phase-1 hooks already in place
 
@@ -149,9 +174,19 @@ design system (**0.5.0**). All of it is version-pinned *and* hash-pinned:
 | `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
 | font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
 
-Digests live in [`web/vendor.sha384`](web/vendor.sha384) — the same values the
-HTML carries. 8-BIT NES publishes its own at
+**One line to upgrade.** [`web/vendor.sha384`](web/vendor.sha384) is the only place
+a version or a digest appears: `index.html` asks for
+`url "vue" "dist/vue.global.prod.js"` and Go resolves it from that manifest, which
+also drives `make vendor`. Change the line, run `make vendor`, done — and a
+half-finished bump (one file moved, the rest left behind) fails at **startup**, not
+in someone's browser. 8-BIT NES publishes its own digests at
 [`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
+
+> **On 8bit-nes 0.6.0:** it exists on the library's `main` (the OpenCode module —
+> workbench, diff, logs, preview) but is not tagged or published, so npm's `latest`
+> and therefore jsDelivr are still on 0.5.0. Nothing 0.6.0 adds is a docs-Q&A
+> surface, so this app stays pinned at 0.5.0 until it ships; then it's the one line
+> above.
 
 > **Why pin so hard?** Because the floating spec broke this page: `marked` stopped
 > shipping `marked.min.js` at its package root after v4, so the old unpinned

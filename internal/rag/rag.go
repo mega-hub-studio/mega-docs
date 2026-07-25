@@ -113,3 +113,8 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// Corpus reports what has been indexed. It's a thin pass-through, but it keeps
+// the HTTP layer talking to one thing (the engine) instead of reaching for the
+// store directly.
+func (e *Engine) Corpus(limit int) (db.Corpus, error) { return e.store.Corpus(limit) }

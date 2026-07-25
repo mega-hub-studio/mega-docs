@@ -14,6 +14,7 @@ func TestIndexSubstitutesRemoteAssetBase(t *testing.T) {
 	page := string(out)
 
 	for _, want := range []string{
+		// the versions here come from web/vendor.sha384, not from the page
 		`href="https://cdn.jsdelivr.net/npm/8bit-nes@0.5.0/all.min.css"`,
 		`src="https://cdn.jsdelivr.net/npm/vue@3.5.40/dist/vue.global.prod.js"`,
 		// a remote base is worth one warmed connection

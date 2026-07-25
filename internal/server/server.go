@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"knowledge-engine/internal/db"
 	"knowledge-engine/internal/rag"
 )
 
@@ -19,6 +20,9 @@ import (
 // *rag.Engine satisfies it; tests pass a fake.
 type Answerer interface {
 	Answer(ctx context.Context, question string, onToken func(string)) ([]rag.Citation, error)
+	// Corpus answers "what does this engine know?" — without it, an empty index
+	// is indistinguishable from a broken retriever.
+	Corpus(limit int) (db.Corpus, error)
 }
 
 // Deps is everything the handler set needs. All fields are required.
@@ -33,6 +37,7 @@ type Deps struct {
 //	GET  /            index.html          revalidated (it pins asset versions)
 //	GET  /api/health  {"ok":true}
 //	POST /api/chat    SSE: token · citations · done · error
+//	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /app/…       app modules + CSS   revalidated, ETag'd from the binary
 //	GET  /vendor/…    vendored CDN assets immutable (version is in the path)
 func New(d Deps) http.Handler {
@@ -44,6 +49,7 @@ func New(d Deps) http.Handler {
 	})
 
 	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers))
+	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))

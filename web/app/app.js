@@ -10,6 +10,8 @@
 import { ask as askServer, healthy } from "./chat.js";
 import { answerHtml, fileName } from "./answer.js";
 import { bindViewport } from "./viewport.js";
+import { loadCorpus, shortDate } from "./library.js";
+import * as session from "./session.js";
 
 const STARTERS = [
   "How does retrieval stay grounded?",
@@ -31,16 +33,24 @@ export function boot(ds) {
   if (localStorage.getItem("nes_mute") === null) ds.setMute(true);
 
   const app = Vue.createApp({
-    data: () => ({
-      turns: [],
-      busy: false,
-      online: true,
-      starters: STARTERS,
-    }),
+    data() {
+      const turns = session.load(); // a reload shouldn't lose the thread
+      seq = turns.reduce((m, t) => Math.max(m, t.id || 0), 0);
+      return {
+        turns,
+        busy: false,
+        online: true,
+        starters: STARTERS,
+        corpus: { state: "loading", docs: 0, chunks: 0, approved: 0, documents: [] },
+        showSources: false,
+      };
+    },
 
     mounted() {
       this.view = bindViewport(this.$refs.dock);
       this.checkHealth();
+      this.refreshCorpus();
+      if (this.turns.length) this.view.scrollToEnd({ force: true });
       addEventListener("online", () => this.checkHealth());
       addEventListener("offline", () => (this.online = false));
     },
@@ -56,11 +66,21 @@ export function boot(ds) {
         if (!el) return;
         on ? el.setAttribute("busy", "") : el.removeAttribute("busy");
       },
+
+      // Persisting on every mutation would write once per streamed token; save()
+      // debounces, so a deep watcher here is cheap and never misses the last one.
+      turns: {
+        deep: true,
+        handler(turns) {
+          turns.length ? session.save(turns) : session.clear();
+        },
+      },
     },
 
     methods: {
       /* ── template helpers ── */
       short: fileName,
+      shortDate,
       srcId(turn, n) {
         return `s${turn.id}-${n}`;
       },
@@ -98,7 +118,13 @@ export function boot(ds) {
       reset() {
         this.stop();
         this.turns = [];
+        session.clear();
+        this.showSources = false;
         this.$refs.prompt?.focus();
+      },
+
+      async refreshCorpus() {
+        this.corpus = await loadCorpus();
       },
 
       async copy(turn) {
@@ -131,6 +157,7 @@ export function boot(ds) {
           turn.streaming = false;
           this.busy = false;
           this.run = null;
+          if (this.corpus.state !== "ready") this.refreshCorpus();
         }
       },
 
