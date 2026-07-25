@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Knowledge Engine</title>
+<script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --ink: #1a2233;
+    --ink-soft: #5a6478;
+    --line: #e2ddd2;
+    --accent: #b6772b;      /* amber — reserved for provenance */
+    --accent-soft: #f3e7d3;
+    --card: #fffefb;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; background: rgba(247,245,240,.85);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+  }
+  .wordmark {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--ink);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #3fae6a; }
+  main {
+    max-width: 760px; margin: 0 auto; padding: 24px 20px 140px;
+  }
+  .empty {
+    margin-top: 12vh; text-align: center; color: var(--ink-soft);
+  }
+  .empty h1 {
+    font-family: var(--mono); font-weight: 600; font-size: 15px;
+    letter-spacing: .05em; color: var(--ink); margin: 0 0 6px;
+  }
+  .empty p { margin: 0; font-size: 14px; }
+  .turn { margin-bottom: 28px; }
+  .q {
+    font-weight: 600; color: var(--ink); margin-bottom: 10px;
+    padding-left: 14px; border-left: 3px solid var(--ink);
+  }
+  .a {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .a :is(p, ul, ol):first-child { margin-top: 0; }
+  .a :is(p, ul, ol):last-child { margin-bottom: 0; }
+  .a pre {
+    background: #1a2233; color: #eceff5; padding: 12px 14px;
+    border-radius: 8px; overflow-x: auto; font-family: var(--mono); font-size: 13px;
+  }
+  .a code { font-family: var(--mono); font-size: 13.5px; }
+  .a :not(pre) > code {
+    background: var(--accent-soft); padding: 1px 5px; border-radius: 4px;
+  }
+  .caret::after {
+    content: "▋"; color: var(--accent); animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .sources {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+  }
+  .sources-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+  }
+  .cite {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    margin: 0 8px 6px 0; padding: 4px 10px;
+    background: var(--accent-soft); border-radius: 6px; font-size: 12.5px;
+  }
+  .cite b { font-family: var(--mono); color: var(--accent); }
+  .cite span { color: var(--ink-soft); }
+  .err {
+    color: #a5392f; background: #fbeae8; border: 1px solid #f0cfca;
+    border-radius: 8px; padding: 12px 14px; font-size: 14px;
+  }
+  .composer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, var(--paper) 26%);
+    padding: 24px 20px 20px;
+  }
+  .composer-inner {
+    max-width: 760px; margin: 0 auto; display: flex; gap: 10px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 8px 8px 16px;
+    box-shadow: 0 4px 20px rgba(26,34,51,.06);
+  }
+  textarea {
+    flex: 1; border: 0; outline: 0; resize: none; background: transparent;
+    font-family: var(--sans); font-size: 15px; line-height: 1.5; color: var(--ink);
+    max-height: 160px; padding: 6px 0;
+  }
+  button {
+    align-self: flex-end; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--ink); color: #fff; font-weight: 600; font-size: 14px;
+    padding: 9px 16px; transition: opacity .15s;
+  }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  @media (prefers-reduced-motion: reduce) { .caret::after { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span class="dot"></span>
+    <span class="wordmark">Knowledge Engine</span>
+  </header>
+
+  <main>
+    <div class="empty" v-if="!turns.length">
+      <h1>Ask the source of truth</h1>
+      <p>Grounded answers from approved docs — every claim cited.</p>
+    </div>
+
+    <div class="turn" v-for="(t, i) in turns" :key="i">
+      <div class="q">{{ t.q }}</div>
+      <div class="err" v-if="t.error">{{ t.error }}</div>
+      <div class="a" v-else>
+        <div v-html="render(t.a)" :class="{ caret: t.streaming }"></div>
+        <div class="sources" v-if="t.citations.length">
+          <div class="sources-label">Sources</div>
+          <span class="cite" v-for="c in t.citations" :key="c.n">
+            <b>[{{ c.n }}]</b><span>{{ short(c.doc) }} · {{ c.heading || '—' }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <textarea
+        ref="input" v-model="draft" rows="1" placeholder="Ask about the system…"
+        @input="autosize" @keydown.enter.exact.prevent="ask"></textarea>
+      <button :disabled="busy || !draft.trim()" @click="ask">Ask</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+marked.setOptions({ breaks: true });
+
+createApp({
+  data: () => ({ draft: "", turns: [], busy: false }),
+  methods: {
+    render(md) { return DOMPurify.sanitize(marked.parse(md || "")); },
+    short(p) { return (p || "").split("/").pop(); },
+    autosize(e) { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; },
+    scroll() { this.$nextTick(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })); },
+
+    async ask() {
+      const q = this.draft.trim();
+      if (!q || this.busy) return;
+      this.draft = ""; this.$refs.input.style.height = "auto";
+      const turn = { q, a: "", citations: [], streaming: true, error: "" };
+      this.turns.push(turn); this.busy = true; this.scroll();
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: q }),
+        });
+        if (!res.ok) throw new Error("Server error " + res.status);
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const blocks = buf.split("\n\n");
+          buf = blocks.pop();
+          for (const b of blocks) this.handleEvent(b, turn);
+        }
+      } catch (e) {
+        turn.error = e.message;
+      } finally {
+        turn.streaming = false; this.busy = false;
+      }
+    },
+
+    handleEvent(block, turn) {
+      let event = "message", data = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (!data) return;
+      let payload; try { payload = JSON.parse(data); } catch { return; }
+      if (event === "token") { turn.a += payload.t; this.scroll(); }
+      else if (event === "citations") { turn.citations = payload; }
+      else if (event === "error") { turn.error = payload.message; }
+    },
+  },
+}).mount("#app");
+</script>
+</body>
+</html>
