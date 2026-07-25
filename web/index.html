@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- viewport-fit=cover makes env(safe-area-inset-*) non-zero, so the fixed prompt
+     can clear the iOS home indicator; interactive-widget=resizes-content lets the
+     on-screen keyboard shrink the layout instead of covering it (Android/Chrome —
+     iOS is handled from visualViewport below). Pinch-zoom stays enabled: no
+     maximum-scale / user-scalable=no, per WCAG 1.4.4. -->
+<meta name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="theme-color" content="#0a0a24" />
+<meta name="color-scheme" content="dark" />
 <title>Knowledge Engine</title>
 
 <!-- ══ Front-end assets ═══════════════════════════════════════════════════════
@@ -54,121 +62,213 @@
   crossorigin="anonymous"></script>
 
 <style>
-  /* App LAYOUT only — every value flows from an 8bit-nes token (tokens.css).
-     Reset/colors/fonts come from base.css; visual recipes from components.css. */
-  #app { min-block-size: 100dvh; }
+  /* ══ App CSS — LAYOUT ONLY, mobile-first ══════════════════════════════════
+     Rule this file follows: if 8bit-nes ships a recipe, use the recipe. Nothing
+     here re-styles a component (no colours, borders, fonts or sizes of its own)
+     — it only positions the shell and adapts to a narrow, touch, on-screen-
+     keyboard viewport. Every value comes from a token in tokens.css.
 
-  header {
-    position: sticky; top: 0; z-index: var(--z-overlay);
+     Breakpoint: base styles are the phone. One min-width query upgrades to
+     desktop — never the reverse.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* Local stacking scale. --z-overlay (100) stays reserved for the library's own
+     overlays, so a toast() is never trapped under the app chrome. */
+  #app {
+    --z-bar: 10;
+    --z-dock: 20;
+    min-block-size: 100dvh;
+  }
+
+  /* Kills the 300ms tap delay and double-tap-to-zoom; pinch-zoom is untouched,
+     so the WCAG zoom affordance stays. (The library's own docs do the same.) */
+  body { touch-action: manipulation; }
+
+  /* Anchor jumps (a .cite marker → its .source row) must not land under the
+     sticky bar or the fixed prompt. */
+  html {
+    scroll-padding-block-start: calc(var(--ctrl-h) + var(--sp-5));
+    scroll-padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-4));
+  }
+
+  /* ── touch ────────────────────────────────────────────────────────────────
+     components.css already grows .btn / .input / .suggest-item to a 44px tap zone
+     and floors .input/.textarea/.select at 16px on coarse pointers, so none of
+     that is repeated here. Exactly two things fall through its net: ── */
+  @media (pointer: coarse) {
+    /* .chat-submit sizes off --ctrl-h and isn't in that touch list, so the send
+       button — the most-tapped control on a phone — would stay 36px. */
+    .chat-submit { --ctrl-h: var(--ctrl-h-lg); }
+
+    /* The 16px iOS focus-zoom floor targets .textarea; the textarea inside
+       <nes-chat-prompt> is a bare element with no class, so it misses it.
+       (Fixed upstream for the next 8bit-nes release — remove this on that bump.) */
+    .chat-prompt textarea { font-size: max(16px, var(--fs-body)); }
+  }
+
+  /* ── top bar ── */
+  .bar {
+    position: sticky; inset-block-start: 0; z-index: var(--z-bar);
     display: flex; align-items: center; gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
+    padding: var(--sp-3);
+    padding-block-start: max(var(--sp-3), env(safe-area-inset-top));
     background: var(--bg);
     border-block-end: var(--bw-2) solid var(--line);
   }
+  .bar .grow { margin-inline-start: auto; }
 
+  /* ── conversation column ── */
   main {
     max-inline-size: 760px; margin-inline: auto;
-    padding: var(--sp-5) var(--sp-4) calc(var(--sp-7) * 3);
+    padding: var(--sp-4) var(--sp-3);
+    /* clears the fixed prompt, which grows as the textarea grows — measured at
+       runtime into --dock-h rather than guessed */
+    padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
   }
 
-  .empty { margin-block-start: 12vh; }
-  .turn { margin-block-end: var(--sp-6); }
+  .empty { margin-block-start: var(--sp-6); }
+  .turn + .turn { margin-block-start: var(--sp-6); }
 
-  /* the user's question — gold left-classifier bar, mirrors the .card accent bar */
+  /* The question. No message-bubble recipe exists, so this is the one piece of
+     app-owned styling — a gold classifier bar mirroring .card's accent bar.
+     font-family is set explicitly because it's an <h2> (for the document outline
+     and screen-reader navigation) but it is *body* copy, and DESIGN.md is firm
+     that chrome is mono and body is sans — don't mix the roles. */
   .q {
+    font-family: var(--font-body);
+    font-size: var(--fs-body); font-weight: 700; line-height: var(--lh-body);
+    color: var(--ink);
     border-inline-start: var(--accent-bar) solid var(--gold);
     padding-inline-start: var(--sp-3);
-    color: var(--ink); font-weight: 700;
     margin-block-end: var(--sp-3);
   }
 
+  /* A pasted identifier, path or URL must wrap, never widen the page — the one
+     thing a 390px viewport is unforgiving about. */
+  .q, .prose, .source { overflow-wrap: anywhere; }
+  .source { flex-wrap: wrap; }        /* long doc name + heading stack instead of overflowing */
+
   .a .head { justify-content: space-between; }
 
-  /* code blocks in a streamed answer: base.css styles inline code only, not blocks */
+  /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
+     styles inline code only) — the one recipe the app has to supply. */
   .prose pre {
     background: var(--slot);
     border: var(--bw-2) solid var(--line);
     box-shadow: var(--sh-2);
-    padding: var(--sp-3) var(--sp-4);
+    padding: var(--sp-3);
     overflow-x: auto;
     font-size: var(--fs-chip);
     line-height: var(--lh-body);
   }
   .prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
 
-  .sources {
-    margin-block-start: var(--sp-4);
-    padding-block-start: var(--sp-3);
-    border-block-start: var(--bw-2) dashed var(--line-hi);
-    display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center;
+  /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
+  .dock {
+    position: fixed; inset-block-end: 0; inset-inline: 0; z-index: var(--z-dock);
+    padding: var(--sp-4) var(--sp-3);
+    padding-block-end: max(var(--sp-3), env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, var(--screen) 40%);
+    /* iOS leaves fixed elements under the on-screen keyboard; --kb is the
+       overlap measured from visualViewport (0 whenever no keyboard is up). */
+    transform: translateY(calc(-1 * var(--kb, 0px)));
+  }
+  .dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+
+  /* ── desktop upgrade ── */
+  @media (min-width: 640px) {
+    .bar { padding-inline: var(--sp-4); }
+    main { padding: var(--sp-5) var(--sp-4) calc(var(--dock-h, 5rem) + var(--sp-6)); }
+    .empty { margin-block-start: 12vh; }
+    .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
+    .prose pre { padding: var(--sp-3) var(--sp-4); }
   }
 
-  .composer {
-    position: fixed; inset-block-end: 0; inset-inline: 0;
-    padding: var(--sp-5) var(--sp-4) var(--sp-4);
-    background: linear-gradient(transparent, var(--screen) 30%);
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
   }
-  .composer-bar {
-    max-inline-size: 760px; margin-inline: auto;
-    display: flex; gap: var(--sp-3); align-items: flex-end;
-    background: var(--panel);
-    border: var(--bw) solid var(--line-hi);
-    box-shadow: var(--sh-4);
-    padding: var(--sp-3);
-  }
-  /* the composer field is a bare textarea inside the panel — the panel is the frame */
-  .composer-bar .textarea {
-    min-block-size: var(--ctrl-h); max-block-size: 40vh; resize: none;
-    border: 0; box-shadow: none; background: transparent; padding: var(--sp-2);
-  }
-  .composer-bar .textarea:focus-visible { outline: 0; }
-  .composer-bar .btn { flex: none; }
 </style>
 </head>
 <body>
-<div id="app" class="scanlines">
-  <header>
-    <span class="badge clear" aria-label="online">●</span>
+<!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
+     everything, and DESIGN.md is explicit that reading text sits on a *solid*
+     ground, never a scanline layer. The CRT read comes from the chrome instead. -->
+<div id="app">
+  <header class="bar">
+    <!-- the light tracks /api/health, so it means something -->
+    <span class="badge clear" :data-accent="online ? 'good' : 'crit'"
+      :aria-label="online ? 'Server online' : 'Server unreachable'">●</span>
     <span class="eyebrow">Knowledge Engine</span>
+    <button class="btn ghost icon sm grow" v-if="turns.length" @click="reset"
+      aria-label="New question"><nes-icon name="plus"></nes-icon></button>
   </header>
 
   <main>
+    <!-- .empty ships the dashed panel + centred mono copy; the library's guidance
+         is "always an action out", which on a phone means tappable starters. -->
     <div class="empty" v-if="!turns.length">
       <span class="icon">◈</span>
       <span class="title">Ask the source of truth</span>
       <p>Grounded answers from approved docs — every claim cited.</p>
+      <div class="suggest">
+        <button class="suggest-item" v-for="s in starters" :key="s" @click="ask(s)">
+          {{ s }} <nes-icon name="arrowRight"></nes-icon>
+        </button>
+      </div>
     </div>
 
-    <div class="turn" v-for="(t, i) in turns" :key="i">
-      <div class="q">{{ t.q }}</div>
+    <article class="turn" v-for="(t, i) in turns" :key="t.id">
+      <h2 class="q">{{ t.q }}</h2>
 
-      <div class="callout gotcha" v-if="t.error">{{ t.error }}</div>
+      <div class="callout gotcha" v-if="t.error" role="alert">
+        <b>Request failed</b> — {{ t.error }}
+      </div>
 
-      <div class="a card" data-accent="blue" v-else>
+      <div class="a card" data-accent="blue" v-else :aria-busy="t.streaming ? 'true' : null">
         <div class="head">
           <span class="title">Answer</span>
           <span class="spinner sm" v-if="t.streaming" aria-label="Generating"></span>
         </div>
-        <div class="prose" v-html="render(t.a)"></div>
-        <div class="sources" v-if="t.citations.length">
-          <span class="eyebrow">Sources</span>
-          <span class="badge" v-for="c in t.citations" :key="c.n">
-            [{{ c.n }}] {{ short(c.doc) }} · {{ c.heading || '—' }}
-          </span>
+
+        <div class="prose" v-html="answerHtml(t)"></div>
+
+        <!-- official grounded-answer recipe: .sources rows that the inline .cite
+             markers in the prose above link down to -->
+        <ol class="sources" v-if="t.citations.length">
+          <li class="source" v-for="c in t.citations" :key="c.n" :id="srcId(t, c.n)">
+            <span class="source-n">{{ c.n }}</span>
+            <span class="source-title" :title="c.doc">{{ short(c.doc) }}</span>
+            <span class="source-host" v-if="c.heading">{{ c.heading }}</span>
+          </li>
+        </ol>
+
+        <div class="feedback" v-if="!t.streaming && t.a">
+          <div class="feedback-actions">
+            <button class="btn ghost xs icon" @click="copy(t)" aria-label="Copy answer">
+              <nes-icon name="copy"></nes-icon></button>
+            <button class="btn ghost xs icon" @click="regenerate(t)" aria-label="Regenerate answer">
+              <nes-icon name="refresh"></nes-icon></button>
+          </div>
+          <div class="feedback-meta">
+            <span v-if="t.citations.length">{{ t.citations.length }} SRC</span>
+            <span v-if="t.ms">{{ t.ms }} MS</span>
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   </main>
 
-  <div class="composer">
-    <form class="composer-bar" @submit.prevent="ask">
-      <textarea
-        class="textarea" ref="input" v-model="draft" rows="1"
-        placeholder="Ask about the system…" aria-label="Question"
-        @input="autosize" @keydown.enter.exact.prevent="ask"></textarea>
-      <button class="btn" type="submit" :disabled="busy || !draft.trim()"
-        :aria-busy="busy ? 'true' : null">Ask</button>
-    </form>
+  <div class="dock" ref="dock">
+    <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing
+         textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
+         only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
+    <!-- `busy` is driven by a watcher, not :busy — once the element has set its own
+         `busy` property, Vue's custom-element heuristic would start writing that
+         property instead of the attribute, and attributeChangedCallback (the only
+         thing that flips the button back to ▶) would stop firing. -->
+    <nes-chat-prompt ref="prompt"
+      placeholder="Ask about the system…" aria-label="Question"
+      @nes:submit="ask($event.detail.value)" @nes:stop="stop"></nes-chat-prompt>
   </div>
 </div>
 
@@ -176,36 +276,182 @@
      classic scripts run in document order, so Vue / marked / DOMPurify are always
      defined by the time this executes. (A plain inline <script> would run first.) -->
 <script type="module">
+// toast() and setMuted() come from the design system. Importing the same URL the
+// <script type="module"> tag above already fetched reuses that module instance —
+// no second request, and the integrity check has already run on it.
+import { toast, setMute } from "<%.Base%>/8bit-nes@0.5.0/elements.min.js";
+
 const { createApp } = Vue;
 marked.setOptions({ breaks: true });
 
+// The chiptune SFX default to on. In a work tool opened on a phone, the first
+// send shouldn't make noise — so default to muted, but only on a first visit, and
+// leave the <nes-sound> toggle in the bar to own it from then on (it persists).
+if (localStorage.getItem("nes_mute") === null) setMute(true);
+
+let seq = 0;
+
 const app = createApp({
-  data: () => ({ draft: "", turns: [], busy: false }),
+  data: () => ({
+    turns: [],
+    busy: false,
+    starters: [
+      "How does retrieval stay grounded?",
+      "How do I ingest a PDF?",
+      "Which env vars change answer quality?",
+    ],
+    // "stick to the bottom while streaming" — false as soon as the reader scrolls
+    // up, so an answer being generated never yanks the page out from under them
+    stick: true,
+    ctrl: null,
+    online: true,
+  }),
+
+  mounted() {
+    // --dock-h: the fixed prompt's real height, so main's bottom padding and the
+    // anchor scroll-padding track it as the textarea grows.
+    const dock = this.$refs.dock;
+    const setDockH = () =>
+      document.documentElement.style.setProperty("--dock-h", `${dock.offsetHeight}px`);
+    new ResizeObserver(setDockH).observe(dock);
+    setDockH();
+
+    // --kb: how much of the viewport the on-screen keyboard covers. iOS doesn't
+    // resize the layout viewport, so a fixed dock would hide behind the keyboard;
+    // visualViewport is the only reliable read. 0 whenever no keyboard is up.
+    const vv = window.visualViewport;
+    if (vv) {
+      const setKb = () => {
+        const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty("--kb", `${overlap}px`);
+      };
+      vv.addEventListener("resize", setKb);
+      vv.addEventListener("scroll", setKb);
+      setKb();
+    }
+
+    addEventListener("scroll", () => {
+      const gap = document.documentElement.scrollHeight - (scrollY + innerHeight);
+      this.stick = gap < 120;
+    }, { passive: true });
+
+    this.health();
+    // a phone changes network constantly — re-check when it comes back
+    addEventListener("online", () => this.health());
+    addEventListener("offline", () => { this.online = false; });
+  },
+
+  watch: {
+    // toggle the attribute by hand — see the note on <nes-chat-prompt> above
+    busy(v) {
+      const p = this.$refs.prompt;
+      if (!p) return;
+      v ? p.setAttribute("busy", "") : p.removeAttribute("busy");
+    },
+  },
+
   methods: {
-    render(md) { return DOMPurify.sanitize(marked.parse(md || "")); },
+    async health() {
+      try { this.online = (await fetch("/api/health")).ok; } catch { this.online = false; }
+    },
+
     short(p) { return (p || "").split("/").pop(); },
-    autosize(e) { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; },
-    scroll() { this.$nextTick(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })); },
+    srcId(turn, n) { return `s${turn.id}-${n}`; },
 
-    async ask() {
-      const q = this.draft.trim();
+    /* Render one answer. During streaming this is just markdown → sanitize (cheap,
+       it runs per token); once the citations land, the plain "[n]" markers the
+       model wrote become .cite anchors that jump to the .source rows. */
+    answerHtml(t) {
+      const html = DOMPurify.sanitize(marked.parse(t.a || ""));
+      return t.streaming || !t.citations.length ? html : this.linkCites(html, t);
+    },
+
+    /* Works on the sanitized DOM, never on the markdown: injecting anchors before
+       marked would make a "[1]" inside a code fence render as literal HTML. Text
+       inside code/pre — or an existing link — is left alone. */
+    linkCites(html, t) {
+      const tpl = document.createElement("template");
+      tpl.innerHTML = html;
+      const walk = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+      const hits = [];
+      while (walk.nextNode()) {
+        const n = walk.currentNode;
+        if (n.parentElement?.closest("code, pre, a")) continue;
+        if (/\[\d+\]/.test(n.nodeValue)) hits.push(n);
+      }
+      for (const n of hits) {
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        for (const m of n.nodeValue.matchAll(/\[(\d+)\]/g)) {
+          const num = Number(m[1]);
+          if (num < 1 || num > t.citations.length) continue;
+          frag.append(n.nodeValue.slice(last, m.index));
+          const a = document.createElement("a");
+          a.className = "cite";
+          a.href = `#${this.srcId(t, num)}`;
+          a.setAttribute("aria-label", `Source ${num}`);
+          a.textContent = String(num);
+          frag.append(a);
+          last = m.index + m[0].length;
+        }
+        frag.append(n.nodeValue.slice(last));
+        n.replaceWith(frag);
+      }
+      return tpl.innerHTML;
+    },
+
+    scroll(smooth = false) {
+      if (!this.stick) return;
+      this.$nextTick(() =>
+        scrollTo({ top: document.body.scrollHeight, behavior: smooth ? "smooth" : "instant" }));
+    },
+
+    reset() {
+      this.stop();
+      this.turns = [];
+      this.$refs.prompt?.focus();
+    },
+
+    stop() { this.ctrl?.abort(); },
+
+    async ask(q) {
+      q = (q || "").trim();
       if (!q || this.busy) return;
-      this.draft = ""; this.$refs.input.style.height = "auto";
-      const turn = { q, a: "", citations: [], streaming: true, error: "" };
-      this.turns.push(turn); this.busy = true; this.scroll();
+      this.turns.push({ id: ++seq, q, a: "", citations: [], streaming: true, error: "", ms: 0 });
+      // Stream into the *reactive* turn, not the literal just pushed: Vue hands out
+      // a proxy per array item, and writing to the raw object updates no DOM. That
+      // was why the answer only ever appeared once, at the end — now each token
+      // re-renders, so streaming is actually visible.
+      const turn = this.turns.at(-1);
+      this.stick = true;
+      this.scroll(true);
+      await this.stream(turn);
+    },
 
+    /* Re-run a turn in place — the mobile alternative to retyping the question. */
+    async regenerate(t) {
+      if (this.busy) return;
+      Object.assign(t, { a: "", citations: [], error: "", ms: 0, streaming: true });
+      await this.stream(t);
+    },
+
+    async stream(turn) {
+      this.busy = true;
+      this.ctrl = new AbortController();
+      const t0 = performance.now();
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: q }),
+          body: JSON.stringify({ question: turn.q }),
+          signal: this.ctrl.signal,
         });
         if (!res.ok) throw new Error("Server error " + res.status);
 
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "";
-        while (true) {
+        for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
           buf += dec.decode(value, { stream: true });
@@ -214,9 +460,13 @@ const app = createApp({
           for (const b of blocks) this.handleEvent(b, turn);
         }
       } catch (e) {
-        turn.error = e.message;
+        // an abort is the user's own decision, not an error to shout about
+        if (e.name !== "AbortError") { turn.error = e.message; this.health(); }
       } finally {
-        turn.streaming = false; this.busy = false;
+        turn.ms = Math.round(performance.now() - t0);
+        turn.streaming = false;
+        this.busy = false;
+        this.ctrl = null;
       }
     },
 
@@ -231,6 +481,15 @@ const app = createApp({
       if (event === "token") { turn.a += payload.t; this.scroll(); }
       else if (event === "citations") { turn.citations = payload; }
       else if (event === "error") { turn.error = payload.message; }
+    },
+
+    async copy(t) {
+      try {
+        await navigator.clipboard.writeText(t.a);
+        toast("<b>Copied.</b> Answer on the clipboard.", { accent: "good" });
+      } catch {
+        toast("<b>Copy blocked.</b> Select the text instead.", { accent: "warn" });
+      }
     },
   },
 });
