@@ -1,0 +1,18 @@
+%% Source of truth for the "How it works" diagram on the guide page.
+%% Rendered to web/howitworks.svg by `make diagram` — mermaid never ships to the
+%% browser (it is ~800KB gzipped, and this diagram never changes at runtime).
+%%
+%% Two constraints, both from the phone:
+%%   - keep it SHALLOW. Every rank is ~90px, and a diagram taller than the viewport
+%%     pushes the spotlit node off screen while you read the step explaining it.
+%%   - keep labels SHORT and lowercase-distinct: the walkthrough spotlights nodes by
+%%     matching its `focus` strings against node text.
+%% The init directive tightens mermaid's default spacing, which is tuned for desktop.
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 30, "padding": 6, "useMaxWidth": true}}}%%
+graph TD
+  Files[".md / .txt files"] --> Ingest["ingest"]
+  Ingest --> Store[("SQLite — text + vectors")]
+  Question["your question"] --> Search["hybrid search"]
+  Store --> Search
+  Search --> Matches["top matches"]
+  Matches --> Answer["grounded answer, cites [1]"]

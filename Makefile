@@ -2,7 +2,7 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test dead secrets live smoke server ingest build vendor vendor-clean clean
+.PHONY: deps check test dead secrets live smoke server ingest build vendor vendor-clean diagram clean
 
 deps:
 	go mod tidy
@@ -67,6 +67,13 @@ vendor:
 
 vendor-clean:
 	find web/vendor -mindepth 1 ! -name .gitkeep -delete
+
+# Render web/*.mmd to web/*.svg. Only needed after editing a diagram — the SVG is
+# committed, so a normal build and CI never run this and never need mermaid.
+# Requires the vendored assets (for the design system's own theme + fonts) and
+# fetches mermaid into .cache/ as a build-time-only tool.
+diagram: vendor
+	node scripts/gen-diagram.mjs
 
 clean:
 	rm -rf bin knowledge.db knowledge.db-*

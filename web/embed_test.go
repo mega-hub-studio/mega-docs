@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"io/fs"
 	"regexp"
 	"strings"
@@ -283,6 +285,35 @@ func TestThemeColorMatchesTheBarToken(t *testing.T) {
 		if strings.ToLower(got[1]) != token {
 			t.Errorf("%s theme-color is %s but the bar is painted --bg = %s — the browser chrome "+
 				"will not match the top of the page", name, got[1], token)
+		}
+	}
+}
+
+// The diagram is generated output that is committed, so the failure mode is a
+// .mmd edited without re-rendering: the page would keep showing the old picture
+// and nothing would complain. gen-diagram.mjs stamps the source hash into the SVG,
+// so that drift is detectable without needing mermaid here — which is the point,
+// since neither CI nor a normal build installs it.
+func TestCommittedDiagramsMatchTheirSource(t *testing.T) {
+	sources, err := fs.Glob(diagramFS, "*.mmd")
+	if err != nil || len(sources) == 0 {
+		t.Fatalf("no .mmd sources embedded (%v)", err)
+	}
+	for _, src := range sources {
+		name := strings.TrimSuffix(src, ".mmd")
+		mmd, err := diagramFS.ReadFile(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		svg, err := diagramFS.ReadFile(name + ".svg")
+		if err != nil {
+			t.Errorf("%s has no rendered %s.svg — run `make diagram`", src, name)
+			continue
+		}
+		want := fmt.Sprintf("%x", sha256.Sum256(mmd))[:16]
+		if !strings.Contains(string(svg), "mmd-sha256: "+want) {
+			t.Errorf("%s.svg was rendered from a different %s — run `make diagram` "+
+				"(want stamp %s)", name, src, want)
 		}
 	}
 }

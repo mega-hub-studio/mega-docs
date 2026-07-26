@@ -114,6 +114,31 @@
     main { padding-inline: var(--sp-4); }
     .grid.two { grid-template-columns: 1fr 1fr; }
   }
+  /* A diagram taller than the phone would scroll its spotlit node off screen while
+     you read the step explaining it. Cap the box so the diagram and the walkthrough
+     sit on screen together; .mermaid-view already scrolls inside itself, and the
+     walkthrough brings the focused node into view. */
+  .mermaid-view { max-block-size: 48svh; margin-block-start: var(--sp-3); }
+  @media (min-width: 640px) { .mermaid-view { max-block-size: none; } }
+  nes-walkthrough { display: block; margin-block-start: var(--sp-3); }
+  /* .steps is only ever seen with JS off — script folds it into the walkthrough and
+     removes it. Its titles live in data-title, so surface them there, in the same
+     mono/tracked idiom as a section heading. */
+  .steps > [data-title] { margin-block-start: var(--sp-4); }
+  .steps > [data-title]::before {
+    content: attr(data-title);
+    display: block; margin-block-end: var(--sp-2);
+    font-family: var(--font-mono); font-size: var(--fs-label); font-weight: 700;
+    text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
+  }
+  /* A .wt-dot is a real control (it jumps to that step) but only 12px, under even
+     the 24px AA floor. Grow the tap area, not the dot. Fixed upstream in 8bit-nes
+     0.6.2 — delete this block when the pin moves. */
+  @media (pointer: coarse) {
+    .wt-dot { position: relative; }
+    .wt-dot::after { content: ""; position: absolute; inset: -1rem; }
+  }
+
   .callout + .callout { margin-block-start: var(--sp-3); }
   nes-tabs { display: block; margin-block-start: var(--sp-3); }
   nes-tabs section > *:first-child { margin-block-start: 0; }

@@ -85,6 +85,8 @@ web/              index.html · docs.html · deploy.html (Go templates, shared h
                   in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js · session.js
+web/howitworks.mmd  the "how it works" diagram, authored as mermaid
+web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/vendor.sha384 the one pin list: versions + digests, for the page and `make vendor`
 web/vendor/       `make vendor` output (gitignored)
 ```
@@ -105,6 +107,7 @@ web/vendor/       `make vendor` output (gitignored)
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
+| a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 
 ### The two seams that make it testable
 
@@ -246,6 +249,16 @@ in someone's browser. 8-BIT NES publishes its own digests at
 > measurement rather than by reading the changelog — on 0.6.1 with no overrides the
 > send button is 44px and the chat textarea 16px, and pinning the same tree back to
 > 0.6.0 drops them to 36px and 14px.
+
+> **On the diagram.** The "how it works" picture is a mermaid graph, but mermaid
+> never reaches the browser: 8bit-nes deliberately does not bundle it (~800KB
+> gzipped, and its ESM build chunk-splits, so it cannot be SRI-pinned or vendored
+> for an air-gapped box). `make diagram` renders `web/*.mmd` to SVG once — themed by
+> the design system's own `mermaidTheme()`, so it matches what runtime mermaid would
+> have drawn — and the SVG is committed and inlined. `<nes-walkthrough>` then
+> spotlights one stage at a time. Editing a `.mmd` without re-rendering is the one
+> hazard of committing generated output, so the generator stamps the source hash into
+> the SVG and `make check` compares it.
 
 > **Why pin so hard?** Because the floating spec broke this page: `marked` stopped
 > shipping `marked.min.js` at its package root after v4, so the old unpinned

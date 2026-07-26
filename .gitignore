@@ -7,3 +7,7 @@ knowledge.db-*
 # so //go:embed always has a match).
 web/vendor/*
 !web/vendor/.gitkeep
+
+# Build-time-only tool cache (mermaid for `make diagram`) — never a dependency
+# of the product, so it is fetched on demand and not committed.
+.cache/

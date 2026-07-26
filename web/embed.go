@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"strings"
 	"text/template"
@@ -27,6 +28,25 @@ var deployTmpl string
 //
 //go:embed docsbase.html
 var docsBaseTmpl string
+
+// Diagrams are authored as mermaid (web/*.mmd) and rendered to SVG once by
+// `make diagram`. The .mmd files ride along so a test can prove the committed SVG
+// still matches its source — the failure mode of any generated file in a repo.
+//
+//go:embed *.svg *.mmd
+var diagramFS embed.FS
+
+// diagram returns a committed SVG for inlining. An unknown name is a template
+// error, which surfaces at startup rather than as a hole in the page. The result
+// is written verbatim — this is text/template, which does no escaping, and the
+// input is a file from this repository rather than anything user-supplied.
+func diagram(name string) (string, error) {
+	b, err := diagramFS.ReadFile(name + ".svg")
+	if err != nil {
+		return "", fmt.Errorf("diagram %q: %w (run `make diagram`)", name, err)
+	}
+	return string(b), nil
+}
 
 // Static tree served straight to the browser:
 //
@@ -118,6 +138,12 @@ func render(pg page) ([]byte, error) {
 			return base + "/" + path, nil
 		},
 		"sri": p.sri,
+		// diagram inlines a pre-rendered SVG. Mermaid renders it at build time
+		// (`make diagram`) and never ships to the browser: it is ~800KB gzipped, and
+		// this diagram is fixed, so paying that at runtime buys nothing. Inline
+		// rather than <img> so it needs no request, styles from the page's tokens,
+		// and its nodes stay reachable for the walkthrough's spotlight.
+		"diagram": diagram,
 	}).Parse(tmpl)
 	if err != nil {
 		return nil, err
