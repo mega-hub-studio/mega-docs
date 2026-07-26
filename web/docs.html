@@ -113,9 +113,10 @@
   <button class="btn ghost sm spacer" id="lang" aria-label="Switch language">
     <span lang="en">VI</span><span lang="vi">EN</span>
   </button>
-  <a class="btn ghost sm" href="/">
+<%if .AppLink%>  <a class="btn ghost sm" href="<%.AppLink%>">
     <span lang="en">Open app</span><span lang="vi">Mở app</span>
   </a>
+<%end%>
 </header>
 
 <main>

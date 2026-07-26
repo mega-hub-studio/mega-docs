@@ -42,10 +42,17 @@ make build && ./bin/knowledge
 The binary *is* the web server — the UI is embedded, so there is no frontend to
 deploy separately.
 
-Open **`/docs`** for the bilingual (EN/VI) guide: how it works, quick start,
-deploying for the team, and the failures that actually happen. It ships inside the
-binary too, so it is readable on a phone and on an air-gapped box. Operator detail
-lives in **[SELFHOST.md](SELFHOST.md)**.
+The bilingual (EN/VI) guide — how it works, quick start, deploying for the team,
+and the failures that actually happen — is readable two ways:
+
+- **[mega-hub-studio.github.io/mega-docs](https://mega-hub-studio.github.io/mega-docs/)**
+  — published by CI, so the team can read setup instructions before anything is
+  running and while it's down. (One-time: Settings → Pages → Source: GitHub Actions.)
+- **`/docs`** on a running instance — same page, plus an "Open app" button, and it
+  works on an air-gapped box because it ships inside the binary.
+
+Both are rendered from the same `web/docs.html` by the same template, so there is
+no second copy to drift. Operator detail lives in **[SELFHOST.md](SELFHOST.md)**.
 
 ## Architecture
 
@@ -55,6 +62,7 @@ No layer reaches back up, so each can be read (and tested) on its own.
 ```
 cmd/server        wiring only: config in, deps constructed, handler served (~50 lines)
 cmd/ingest        the indexing CLI
+cmd/rendocs       renders web/docs.html to a static file (GitHub Pages); no cgo
 
 internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer

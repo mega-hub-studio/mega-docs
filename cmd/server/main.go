@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("frontend: %v", err)
 	}
-	docs, err := web.Docs(cfg.AssetBase)
+	docs, err := web.Docs(cfg.AssetBase, "/")
 	if err != nil {
 		log.Fatalf("docs: %v", err)
 	}

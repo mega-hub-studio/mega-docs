@@ -33,14 +33,20 @@ var FS embed.FS
 // Index renders index.html for one asset base — "https://cdn.jsdelivr.net/npm"
 // (the default) or "/vendor" when the assets ship inside this binary. Rendering
 // happens once at startup, so serving a request is just bytes.
-func Index(assetBase string) ([]byte, error) { return render("index", indexTmpl, assetBase) }
+func Index(assetBase string) ([]byte, error) { return render("index", indexTmpl, assetBase, "/") }
 
 // Docs renders the bilingual guide (docs.html). Same asset plumbing as Index, so
 // the guide loads from the same pinned CDN — or from /vendor, which means the
 // operator manual stays readable on an air-gapped box.
-func Docs(assetBase string) ([]byte, error) { return render("docs", docsTmpl, assetBase) }
+//
+// appLink is where "Open app" points. The server passes "/"; the static build for
+// GitHub Pages passes "" so the button is left out entirely rather than linking
+// somewhere that isn't running.
+func Docs(assetBase, appLink string) ([]byte, error) {
+	return render("docs", docsTmpl, assetBase, appLink)
+}
 
-func render(name, tmpl, assetBase string) ([]byte, error) {
+func render(name, tmpl, assetBase, appLink string) ([]byte, error) {
 	base := strings.TrimSuffix(assetBase, "/")
 	if base == "" {
 		return nil, errors.New("web: empty asset base")
@@ -85,9 +91,9 @@ func render(name, tmpl, assetBase string) ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, struct {
-		Base, Origin string
-		Remote       bool
-	}{base, origin, remote}); err != nil {
+		Base, Origin, AppLink string
+		Remote                bool
+	}{base, origin, appLink, remote}); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

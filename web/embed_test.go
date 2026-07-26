@@ -138,7 +138,7 @@ func TestHasVendorReportsEmptyTree(t *testing.T) {
 
 func TestDocsRendersForBothAssetBases(t *testing.T) {
 	for _, base := range []string{"https://cdn.jsdelivr.net/npm", "/vendor"} {
-		out, err := Docs(base)
+		out, err := Docs(base, "/")
 		if err != nil {
 			t.Fatalf("Docs(%q): %v", base, err)
 		}
@@ -155,6 +155,33 @@ func TestDocsRendersForBothAssetBases(t *testing.T) {
 			if !strings.Contains(page, want) {
 				t.Errorf("Docs(%q) has no %s content", base, want)
 			}
+		}
+	}
+}
+
+// The static build for GitHub Pages must omit the "Open app" button — a static
+// host has no app to open — while keeping every asset pinned and SRI-verified.
+func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
+	out, err := Docs("https://cdn.jsdelivr.net/npm", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(out)
+
+	if strings.Contains(page, "Open app") {
+		t.Error(`the "Open app" button survived a build with no app link`)
+	}
+	if strings.Contains(page, "<%") {
+		t.Error("an unrendered action was left in the output")
+	}
+	// Still pinned and still hash-verified: publishing it changes nothing there.
+	if !strings.Contains(page, `integrity="`+pinnedDigest(t, "8bit-nes", "all.min.css")+`"`) {
+		t.Error("the published page lost its integrity digest")
+	}
+	// The content itself must be intact — this is the copy the team reads.
+	for _, want := range []string{"tailscale serve", "EMBED_BASE_URL", "Nothing is indexed"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("published guide is missing %q", want)
 		}
 	}
 }
