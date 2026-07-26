@@ -29,6 +29,7 @@ type Answerer interface {
 type Deps struct {
 	Answers Answerer // the RAG engine
 	Index   []byte   // index.html, already rendered for the configured asset base
+	Docs    []byte   // docs.html, the bilingual guide (optional)
 	Assets  fs.FS    // embedded static tree: app/… and vendor/…
 	Auth    Auth     // optional Basic credentials; zero value = open
 }
@@ -36,6 +37,7 @@ type Deps struct {
 // New wires the routes and returns the whole app as one handler.
 //
 //	GET  /            index.html          revalidated (it pins asset versions)
+//	GET  /docs        the bilingual guide (EN/VI)
 //	GET  /api/health  {"ok":true}  — always open, so probes need no secret
 //	POST /api/chat    SSE: token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
@@ -54,6 +56,9 @@ func New(d Deps) http.Handler {
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))
+	if d.Docs != nil {
+		mux.Handle("GET /docs", revalidate(etag(d.Docs), serveBytes(d.Docs, "text/html; charset=utf-8")))
+	}
 
 	// The app tree changes only when the binary does, so one ETag over the whole
 	// tree is enough to invalidate it — and costs one 304 instead of a re-download.

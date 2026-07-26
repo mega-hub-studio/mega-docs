@@ -82,7 +82,9 @@
     <span class="badge clear" :data-accent="online ? 'good' : 'crit'"
       :aria-label="online ? 'Server online' : 'Server unreachable'">●</span>
     <span class="eyebrow">Knowledge Engine</span>
-    <button class="btn ghost icon sm grow" v-if="turns.length" @click="reset"
+    <a class="btn ghost icon sm grow" href="/docs" aria-label="Guide">
+      <nes-icon name="info"></nes-icon></a>
+    <button class="btn ghost icon sm" v-if="turns.length" @click="reset"
       aria-label="New question"><nes-icon name="plus"></nes-icon></button>
   </header>
 

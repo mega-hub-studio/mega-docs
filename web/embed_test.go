@@ -135,3 +135,26 @@ func TestHasVendorReportsEmptyTree(t *testing.T) {
 		t.Skip("vendor/ is populated in this working tree (make vendor has run)")
 	}
 }
+
+func TestDocsRendersForBothAssetBases(t *testing.T) {
+	for _, base := range []string{"https://cdn.jsdelivr.net/npm", "/vendor"} {
+		out, err := Docs(base)
+		if err != nil {
+			t.Fatalf("Docs(%q): %v", base, err)
+		}
+		page := string(out)
+		if !strings.Contains(page, base+"/"+pinnedSpecs(t)["8bit-nes"]+"/all.min.css") {
+			t.Errorf("Docs(%q) did not resolve the stylesheet from the manifest", base)
+		}
+		if strings.Contains(page, "<%") {
+			t.Errorf("Docs(%q) left an unrendered action", base)
+		}
+		// Both languages must be present in the markup — the toggle is CSS-only, so
+		// if one side is missing it is missing for good.
+		for _, want := range []string{`lang="en"`, `lang="vi"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("Docs(%q) has no %s content", base, want)
+			}
+		}
+	}
+}

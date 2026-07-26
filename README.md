@@ -40,8 +40,12 @@ make build && ./bin/knowledge
 ```
 
 The binary *is* the web server — the UI is embedded, so there is no frontend to
-deploy separately. For team access from outside the office (Tailscale, Cloudflare
-Tunnel, LAN) see **[SELFHOST.md](SELFHOST.md)**.
+deploy separately.
+
+Open **`/docs`** for the bilingual (EN/VI) guide: how it works, quick start,
+deploying for the team, and the failures that actually happen. It ships inside the
+binary too, so it is readable on a phone and on an air-gapped box. Operator detail
+lives in **[SELFHOST.md](SELFHOST.md)**.
 
 ## Architecture
 
@@ -133,6 +137,7 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | route | returns |
 |---|---|
 | `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
+| `GET /docs` | the bilingual (EN/VI) guide — quick start, deploy, troubleshooting |
 | `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
 | `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |

@@ -11,10 +11,13 @@ import (
 	"text/template"
 )
 
-// index.html is a template, not a static file — see Index.
+// Both pages are templates, not static files — see Index and Docs.
 //
 //go:embed index.html
 var indexTmpl string
+
+//go:embed docs.html
+var docsTmpl string
 
 // Static tree served straight to the browser:
 //
@@ -30,7 +33,14 @@ var FS embed.FS
 // Index renders index.html for one asset base — "https://cdn.jsdelivr.net/npm"
 // (the default) or "/vendor" when the assets ship inside this binary. Rendering
 // happens once at startup, so serving a request is just bytes.
-func Index(assetBase string) ([]byte, error) {
+func Index(assetBase string) ([]byte, error) { return render("index", indexTmpl, assetBase) }
+
+// Docs renders the bilingual guide (docs.html). Same asset plumbing as Index, so
+// the guide loads from the same pinned CDN — or from /vendor, which means the
+// operator manual stays readable on an air-gapped box.
+func Docs(assetBase string) ([]byte, error) { return render("docs", docsTmpl, assetBase) }
+
+func render(name, tmpl, assetBase string) ([]byte, error) {
 	base := strings.TrimSuffix(assetBase, "/")
 	if base == "" {
 		return nil, errors.New("web: empty asset base")
@@ -60,7 +70,7 @@ func Index(assetBase string) ([]byte, error) {
 	// url/sri read web/vendor.sha384, so the page never spells out a version or a
 	// hash. Both return an error for anything unpinned, which Execute turns into a
 	// startup failure — the right time to find out.
-	t, err := template.New("index").Delims("<%", "%>").Funcs(template.FuncMap{
+	t, err := template.New(name).Delims("<%", "%>").Funcs(template.FuncMap{
 		"url": func(pkg, file string) (string, error) {
 			path, err := p.path(pkg, file)
 			if err != nil {
@@ -69,7 +79,7 @@ func Index(assetBase string) ([]byte, error) {
 			return base + "/" + path, nil
 		},
 		"sri": p.sri,
-	}).Parse(indexTmpl)
+	}).Parse(tmpl)
 	if err != nil {
 		return nil, err
 	}
