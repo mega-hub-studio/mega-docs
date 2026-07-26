@@ -59,8 +59,10 @@ source, no copy to drift — and locally you can build them with
 `go run ./cmd/rendocs -d /tmp/site`. On a running instance they also ship inside the
 binary, so they work on an air-gapped box.
 
-*Published by CI on every push to `main` that touches the guide; the workflow
-enables Pages itself on its first run, so there is nothing to switch on.*
+*Published by CI on every push to `main` that touches the guide. One-time first:
+Settings → Pages → Source: **GitHub Actions**. A workflow token cannot do this —
+creating a Pages site needs repo-admin rights — so until someone flips it, every
+run fails at `configure-pages`.*
 
 ## Architecture
 

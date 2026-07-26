@@ -7,7 +7,9 @@ name: Deploy guide
 #   index.html   the Guide  (web/docs.html)
 #   deploy.html  the Deploy runbook (web/deploy.html)
 #
-# No manual setup: the configure-pages step below enables Pages on its first run.
+# One-time setup, by a human with admin on the repo (a workflow token cannot do it):
+#   Settings → Pages → Source: GitHub Actions
+# Until that is done every run fails at configure-pages with "Get Pages site failed".
 #
 # Both are Go templates (versions and SRI digests come from web/vendor.sha384),
 # so they are rendered by cmd/rendocs rather than copied. That keeps the
@@ -64,12 +66,12 @@ jobs:
           grep -q 'deploy.html' _site/index.html
           grep -q 'index.html' _site/deploy.html
 
-      # enablement: true turns Pages on via the API on the first run, so the site
-      # does not depend on someone having clicked Settings → Pages → GitHub Actions.
-      # Without it the first run dies at "Get Pages site failed … Not Found".
+      # No `enablement: true` here — it was tried and cannot work. Creating a Pages
+      # site needs repo-admin rights, and GITHUB_TOKEN tops out at `pages: write`,
+      # which only deploys to a site that already exists. The attempt fails with
+      # "Create Pages site failed … Resource not accessible by integration", so the
+      # one-time toggle in Settings genuinely has to be done by a person.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
