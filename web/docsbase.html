@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport"
   content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0a0a24" />
+<meta name="theme-color" content="#07071c" />
 <meta name="color-scheme" content="dark" />
 <title>Knowledge Engine — <%.Title%></title>
 
@@ -13,10 +13,16 @@
      from /vendor on a box with no egress. -->
 <%if .Remote%><link rel="preconnect" href="<%.Origin%>" crossorigin>
 <%end%>
+<!-- All three faces, not the two tokens.css suggests: on these pages every section
+     heading, step chip and table header is bold mono, so nes-mono-700 is as
+     critical as the other two. It gets fetched either way — preloading only starts
+     it during head parse instead of after the stylesheet resolves. -->
 <link rel="preload" as="font" type="font/woff2" crossorigin
   href="<%url "8bit-nes" "fonts/nes-sans-var.woff2"%>">
 <link rel="preload" as="font" type="font/woff2" crossorigin
   href="<%url "8bit-nes" "fonts/nes-mono-400.woff2"%>">
+<link rel="preload" as="font" type="font/woff2" crossorigin
+  href="<%url "8bit-nes" "fonts/nes-mono-700.woff2"%>">
 <link rel="stylesheet" href="<%url "8bit-nes" "all.min.css"%>"
   integrity="<%sri "8bit-nes" "all.min.css"%>" crossorigin="anonymous">
 <script type="module" src="<%url "8bit-nes" "elements.min.js"%>"
@@ -36,6 +42,8 @@
   body { touch-action: manipulation; }
 
   .bar {
+    /* z-index stays well under the system's --z-overlay (100) so a toast or modal
+       from the design system still lands above the sticky header. */
     position: sticky; inset-block-start: 0; z-index: 10;
     display: flex; align-items: center; gap: var(--sp-3);
     padding: var(--sp-3);
@@ -63,10 +71,14 @@
     border-block-end: var(--bw-2) solid var(--line-hi);
     margin-block-end: var(--sp-4);
   }
+  /* h3 sits in the neutral ramp, not on --primary. DESIGN.md: "accents are for
+     meaning, never decoration" — and --primary already means "the page you're on"
+     in .pages .active. Hierarchy comes from size and the h2 rule instead, which is
+     how the 8bit-nes docs set their own section headings (mono, tracked, --muted). */
   main > section > h3 {
     font-family: var(--font-mono); font-size: var(--fs-h3);
     text-transform: uppercase; letter-spacing: var(--ls-chrome);
-    color: var(--primary);
+    color: var(--muted);
     margin-block: var(--sp-5) var(--sp-3);
   }
   p, li { overflow-wrap: anywhere; }
@@ -88,19 +100,14 @@
   .step > .body { flex: 1; min-inline-size: 0; }
   .step .terminal { margin-block-start: var(--sp-2); }
 
-  /* tables must scroll inside themselves, never widen a phone */
-  .scroll { overflow-x: auto; margin-block-start: var(--sp-3); }
-  table { border-collapse: collapse; inline-size: 100%; font-size: var(--fs-body); }
-  th, td {
-    text-align: start; padding: var(--sp-2) var(--sp-3);
-    border-block-end: var(--bw-1) solid var(--line-hi); vertical-align: top;
-  }
-  th {
-    font-family: var(--font-mono); font-size: var(--fs-label);
-    text-transform: uppercase; letter-spacing: var(--ls-chrome);
-    color: var(--dim); white-space: nowrap;
-  }
-  td code { white-space: nowrap; }
+  /* Tables are the system's .table-wrap + .table — it already scrolls inside
+     itself rather than widening a phone, and it already frames the box, which is
+     what tells you there is more to the right. Only two page-local additions: the
+     wrapper's rhythm, and cells that top-align because these rows wrap to several
+     lines (the component assumes short ones). */
+  .table-wrap { margin-block-start: var(--sp-3); }
+  .table td { vertical-align: top; }
+  .table td code { white-space: nowrap; }
 
   .grid { display: grid; gap: var(--sp-3); margin-block-start: var(--sp-3); }
   @media (min-width: 640px) {

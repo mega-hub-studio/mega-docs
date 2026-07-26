@@ -2,6 +2,7 @@ package web
 
 import (
 	"io/fs"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -245,6 +246,41 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 		hasDeploy := strings.Contains(page, "tailscale serve")
 		if (tc.name == "deploy") != hasDeploy {
 			t.Errorf("%s: deploy instructions in the wrong page", tc.name)
+		}
+	}
+}
+
+// <meta name="theme-color"> colours the browser's own chrome, which sits directly
+// above the sticky .bar — so it has to equal the token the bar is painted with. It
+// is the one value that cannot be written as var(--bg): meta content takes no CSS.
+// That makes it the one value that can drift silently when the design system moves,
+// which is what this checks.
+//
+// The token is read from the pinned 8bit-nes stylesheet, so it compares against the
+// exact bytes the page loads. That file arrives via `make vendor` and is never
+// committed, so the check skips rather than lies when it is absent.
+func TestThemeColorMatchesTheBarToken(t *testing.T) {
+	css, err := fs.ReadFile(FS, "vendor/8bit-nes@0.6.0/all.min.css")
+	if err != nil {
+		t.Skip("8bit-nes stylesheet not vendored — run `make vendor` to enable this check")
+	}
+	m := regexp.MustCompile(`--bg:\s*(#[0-9a-fA-F]{3,8})`).FindSubmatch(css)
+	if m == nil {
+		t.Fatal("no --bg token in the pinned stylesheet: has the design system renamed it?")
+	}
+	token := strings.ToLower(string(m[1]))
+
+	// .bar is painted with --bg in docsbase.html; index.html carries its own copy of
+	// the same bar, so both templates are checked.
+	for name, src := range map[string]string{"docsbase.html": docsBaseTmpl, "index.html": indexTmpl} {
+		got := regexp.MustCompile(`name="theme-color" content="(#[0-9a-fA-F]{3,8})"`).FindStringSubmatch(src)
+		if got == nil {
+			t.Errorf("%s has no theme-color meta", name)
+			continue
+		}
+		if strings.ToLower(got[1]) != token {
+			t.Errorf("%s theme-color is %s but the bar is painted --bg = %s — the browser chrome "+
+				"will not match the top of the page", name, got[1], token)
 		}
 	}
 }
