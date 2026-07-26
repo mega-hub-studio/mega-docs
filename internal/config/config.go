@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	BindAddr   string
 	Port       string
 	DBPath     string
 	AssetBase  string
@@ -18,6 +19,8 @@ type Config struct {
 	ChatModel  string
 	EmbedDim   int
 	TopK       int
+	AuthUser   string
+	AuthPass   string
 }
 
 // DefaultAssetBase is the CDN the frontend loads Vue / marked / DOMPurify /
@@ -31,6 +34,10 @@ const (
 func Load() Config {
 	loadDotEnv(".env")
 	return Config{
+		// Loopback by default: this app has no authentication of its own, so
+		// binding every interface has to be a deliberate choice, not the default
+		// you get by forgetting. Set BIND_ADDR=0.0.0.0 for LAN/Tailscale.
+		BindAddr:  env("BIND_ADDR", "127.0.0.1"),
 		Port:      env("PORT", "8080"),
 		DBPath:    env("DB_PATH", "knowledge.db"),
 		AssetBase: env("ASSET_BASE", DefaultAssetBase),
@@ -43,6 +50,8 @@ func Load() Config {
 		ChatModel:  env("CHAT_MODEL", "gpt-4o-mini"),
 		EmbedDim:   envInt("EMBED_DIM", 1536),
 		TopK:       envInt("TOP_K", 6),
+		AuthUser:   env("AUTH_USER", "team"),
+		AuthPass:   env("AUTH_PASS", ""), // empty = no auth
 	}
 }
 

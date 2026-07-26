@@ -224,3 +224,70 @@ func TestCorpusFailureIs500(t *testing.T) {
 		t.Errorf("got %d, want 500", code)
 	}
 }
+
+func authServer(t *testing.T, a Auth) http.Handler {
+	t.Helper()
+	return New(Deps{
+		Answers: fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}},
+		Index:   []byte("<html>index</html>"),
+		Assets:  fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
+		Auth:    a,
+	})
+}
+
+func TestNoAuthConfiguredLeavesEverythingOpen(t *testing.T) {
+	h := authServer(t, Auth{})
+	for _, path := range []string{"/", "/api/health", "/api/corpus", "/app/app.js"} {
+		if code := do(t, h, "GET", path, "", nil).Code; code != 200 {
+			t.Errorf("%s = %d with auth off, want 200", path, code)
+		}
+	}
+}
+
+func TestAuthChallengesEveryPathExceptHealth(t *testing.T) {
+	h := authServer(t, Auth{User: "team", Pass: "s3cret"})
+
+	// Health stays open so a tunnel or uptime probe needs no credential.
+	if code := do(t, h, "GET", "/api/health", "", nil).Code; code != 200 {
+		t.Errorf("/api/health = %d, want 200 (probes must not need a secret)", code)
+	}
+
+	for _, path := range []string{"/", "/api/corpus", "/app/app.js"} {
+		w := do(t, h, "GET", path, "", nil)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("%s = %d without credentials, want 401", path, w.Code)
+		}
+		// Without this header the browser never shows a prompt.
+		if ch := w.Header().Get("WWW-Authenticate"); !strings.HasPrefix(ch, "Basic ") {
+			t.Errorf("%s: WWW-Authenticate = %q", path, ch)
+		}
+	}
+	// The chat endpoint must be gated too — it spends the provider key.
+	if code := do(t, h, "POST", "/api/chat", `{"question":"x"}`, nil).Code; code != http.StatusUnauthorized {
+		t.Errorf("/api/chat = %d without credentials, want 401", code)
+	}
+}
+
+func TestAuthAcceptsCorrectCredentialsAndRejectsWrongOnes(t *testing.T) {
+	h := authServer(t, Auth{User: "team", Pass: "s3cret"})
+
+	cases := map[string]struct {
+		user, pass string
+		want       int
+	}{
+		"correct":      {"team", "s3cret", 200},
+		"wrong pass":   {"team", "nope", http.StatusUnauthorized},
+		"wrong user":   {"other", "s3cret", http.StatusUnauthorized},
+		"empty":        {"", "", http.StatusUnauthorized},
+		"pass as user": {"s3cret", "team", http.StatusUnauthorized},
+	}
+	for name, c := range cases {
+		r := httptest.NewRequest("GET", "/", nil)
+		r.SetBasicAuth(c.user, c.pass)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != c.want {
+			t.Errorf("%s: got %d, want %d", name, w.Code, c.want)
+		}
+	}
+}

@@ -6,6 +6,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -37,16 +38,45 @@ func main() {
 	}
 
 	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
-	handler := server.New(server.Deps{Answers: engine, Index: index, Assets: web.FS})
+	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
+	handler := server.New(server.Deps{Answers: engine, Index: index, Assets: web.FS, Auth: auth})
 
+	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
+		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: an answer is a long-lived SSE stream, and a deadline
 		// here would cut it off mid-generation.
 	}
 
-	log.Printf("Knowledge Engine on http://localhost:%s (assets: %s)", cfg.Port, cfg.AssetBase)
+	log.Printf("Knowledge Engine on http://%s (assets: %s, auth: %s)", addr, cfg.AssetBase, describe(auth))
+	warnIfExposed(cfg.BindAddr, auth)
 	log.Fatal(srv.ListenAndServe())
+}
+
+func describe(a server.Auth) string {
+	if a.Pass == "" {
+		return "off"
+	}
+	return "basic as " + a.User
+}
+
+// warnIfExposed says the quiet part out loud: this app has no access control of
+// its own, so reaching past loopback without AUTH_PASS means whoever can route to
+// the port can read every indexed document and spend the provider key.
+func warnIfExposed(bind string, a server.Auth) {
+	if a.Enabled() || isLoopback(bind) {
+		return
+	}
+	log.Printf("WARNING: bound to %s with no auth — anyone who can reach this port can read every", bind)
+	log.Printf("         indexed document. Either set AUTH_PASS, or keep it inside a tailnet/VPN.")
+}
+
+func isLoopback(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

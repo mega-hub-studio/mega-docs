@@ -39,6 +39,10 @@ Ship it as a single binary instead:
 make build && ./bin/knowledge
 ```
 
+The binary *is* the web server — the UI is embedded, so there is no frontend to
+deploy separately. For team access from outside the office (Tailscale, Cloudflare
+Tunnel, LAN) see **[SELFHOST.md](SELFHOST.md)**.
+
 ## Architecture
 
 One binary, four layers, one direction of dependency — `cmd` → `internal` → nothing.
@@ -181,7 +185,11 @@ additive — no migration, no re-architecture.
   `internal/db/store.go`. This scaffold was not compiled in this environment.
 - **FTS5 build tag.** Uses `-tags sqlite_fts5`. If your `go-sqlite3` version
   wants `-tags fts5` instead, change it in the `Makefile`.
-- **No auth.** Run it behind your VPN/LAN. Auth/RBAC is a later phase.
+- **Access control is minimal.** The server binds `127.0.0.1` by default and offers
+  optional HTTP Basic auth (`AUTH_PASS`); there are no per-user permissions and no
+  audit trail. To let the team reach it from anywhere, publish it through a tailnet
+  or a Cloudflare Tunnel rather than opening a port — see
+  **[SELFHOST.md](SELFHOST.md)**.
 
 ## Frontend assets (CDN, pinned)
 

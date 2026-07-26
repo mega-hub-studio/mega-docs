@@ -25,17 +25,18 @@ type Answerer interface {
 	Corpus(limit int) (db.Corpus, error)
 }
 
-// Deps is everything the handler set needs. All fields are required.
+// Deps is everything the handler set needs.
 type Deps struct {
 	Answers Answerer // the RAG engine
 	Index   []byte   // index.html, already rendered for the configured asset base
 	Assets  fs.FS    // embedded static tree: app/… and vendor/…
+	Auth    Auth     // optional Basic credentials; zero value = open
 }
 
 // New wires the routes and returns the whole app as one handler.
 //
 //	GET  /            index.html          revalidated (it pins asset versions)
-//	GET  /api/health  {"ok":true}
+//	GET  /api/health  {"ok":true}  — always open, so probes need no secret
 //	POST /api/chat    SSE: token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /app/…       app modules + CSS   revalidated, ETag'd from the binary
@@ -60,7 +61,7 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /app/", revalidate(etagFS(d.Assets, "app"), files))
 	mux.Handle("GET /vendor/", immutable(files))
 
-	return mux
+	return guard(d.Auth, mux)
 }
 
 func serveBytes(b []byte, contentType string) http.Handler {
