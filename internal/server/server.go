@@ -27,19 +27,20 @@ type Answerer interface {
 
 // Deps is everything the handler set needs.
 type Deps struct {
-	Answers   Answerer // the RAG engine
-	Index     []byte   // index.html, already rendered for the configured asset base
-	Docs      []byte   // the bilingual guide (optional)
-	DeployDoc []byte   // the deployment page (optional)
-	Assets    fs.FS    // embedded static tree: app/… and vendor/…
-	Auth      Auth     // optional Basic credentials; zero value = open
+	Answers Answerer // the RAG engine
+	Index   []byte   // index.html, already rendered for the configured asset base
+	// Pages maps a route to an already-rendered guide page, e.g. "/docs". A map
+	// rather than a field per page: adding one to the guide should not need a change
+	// here at all. Nil or empty is fine — the routes simply don't exist.
+	Pages  map[string][]byte
+	Assets fs.FS // embedded static tree: app/… and vendor/…
+	Auth   Auth  // optional Basic credentials; zero value = open
 }
 
 // New wires the routes and returns the whole app as one handler.
 //
 //	GET  /            index.html          revalidated (it pins asset versions)
-//	GET  /docs        the bilingual guide (EN/VI)
-//	GET  /deploy      the deployment page (EN/VI)
+//	GET  /docs · /dev · /deploy   the bilingual guide, one page per role (EN/VI)
 //	GET  /api/health  {"ok":true}  — always open, so probes need no secret
 //	POST /api/chat    SSE: token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
@@ -58,7 +59,7 @@ func New(d Deps) http.Handler {
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))
-	for path, page := range map[string][]byte{"/docs": d.Docs, "/deploy": d.DeployDoc} {
+	for path, page := range d.Pages {
 		if page != nil {
 			mux.Handle("GET "+path, revalidate(etag(page), serveBytes(page, "text/html; charset=utf-8")))
 		}

@@ -42,20 +42,28 @@ make build && ./bin/knowledge
 The binary *is* the web server — the UI is embedded, so there is no frontend to
 deploy separately.
 
-The bilingual (EN/VI) guide — how it works, quick start, deploying for the team,
-and the failures that actually happen — is readable two ways:
+The bilingual (EN/VI) guide is published as static pages and also ships inside the
+binary. One page per role, because each role arrives with a different question:
 
-| | Guide | Deploy |
-|---|---|---|
-| Published by CI | [/](https://mega-hub-studio.github.io/mega-docs/) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
-| On a running instance | `/docs` | `/deploy` |
+| | Guide | Dev | Deploy |
+|---|---|---|---|
+| Answers | "what is this, can I trust this answer?" | "where do I change X?" | "how do we run it for the team?" |
+| For | everyone, then BA / PM / support | DEV | whoever hosts it |
+| Published by CI | [/](https://mega-hub-studio.github.io/mega-docs/) | [/dev.html](https://mega-hub-studio.github.io/mega-docs/dev.html) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
+| On a running instance | `/docs` | `/dev` | `/deploy` |
 
-**Guide** is what it is, how it works, three steps to running it, and the four
-failures that actually happen. **Deploy** is letting the team in (Tailscale /
-Cloudflare Tunnel / LAN), where to run it, systemd, backups and the settings table.
+The Guide opens with a router, so nobody has to read a page that is not theirs.
 
-Both hosts render the same `web/{docs,deploy}.html` through the same template — one
-source, no copy to drift — and locally you can build them with
+**Guide** is what it is, how it works, three steps to running it, using it well
+(asking, reading citations, what is actually indexed) and the four failures that
+actually happen. **Dev** is the first hour: where things live, the two seams,
+testing with no API key, and the knobs people actually turn — it points here for
+the full reference rather than restating it. **Deploy** is letting the team in
+(Tailscale / Cloudflare Tunnel / LAN), where to run it, systemd, backups and the
+settings table.
+
+Both hosts render the same `web/{docs,dev,deploy}.html` through the same template —
+one source, no copy to drift — and locally you can build them with
 `go run ./cmd/rendocs -d /tmp/site`. On a running instance they also ship inside the
 binary, so they work on an air-gapped box.
 
@@ -72,7 +80,7 @@ No layer reaches back up, so each can be read (and tested) on its own.
 ```
 cmd/server        wiring only: config in, deps constructed, handler served (~50 lines)
 cmd/ingest        the indexing CLI
-cmd/rendocs       renders the two guide pages to static files (Pages); no cgo
+cmd/rendocs       renders every guide page to a static file (Pages); no cgo
 
 internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
@@ -81,8 +89,8 @@ internal/aitest   a fake provider over httptest — the whole pipeline, no key n
 internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
 internal/config   env → Config, with defaults
 
-web/              index.html · docs.html · deploy.html (Go templates, shared head
-                  in docsbase.html) + embed.go + assets.go
+web/              index.html · docs.html · dev.html · deploy.html (Go templates,
+                  shared head in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js · session.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
@@ -108,6 +116,8 @@ web/vendor/       `make vendor` output (gitignored)
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
+| a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
+| a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the server routes whatever is in its `Pages` map, so it needs no change |
 
 ### The two seams that make it testable
 
@@ -159,7 +169,8 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | route | returns |
 |---|---|
 | `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
-| `GET /docs` | the bilingual (EN/VI) guide — how it works, quick start, troubleshooting |
+| `GET /docs` | the guide (EN/VI) — how it works, quick start, using it well, troubleshooting |
+| `GET /dev` | the dev page — where things live, the two seams, testing, the knobs |
 | `GET /deploy` | the deployment page — Tailscale / Cloudflare / LAN, systemd, ops |
 | `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
 | `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |

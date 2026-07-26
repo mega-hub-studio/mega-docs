@@ -171,8 +171,11 @@ func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
 	}
 	page := string(out)
 
-	if strings.Contains(page, "Open app") {
-		t.Error(`the "Open app" button survived a build with no app link`)
+	// Asserted on markup, not on the words: the phrase also appears in the shipped
+	// stylesheet's comments, so a bare substring check passes and fails for the wrong
+	// reasons. What must be absent is a link whose target is the app.
+	if strings.Contains(page, `href="`+ServedNav.App+`"`) {
+		t.Error("the app link survived a build with no app to link to")
 	}
 	if strings.Contains(page, "<%") {
 		t.Error("an unrendered action was left in the output")
@@ -215,6 +218,7 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 		owns  string
 	}{
 		{"guide", Docs, "Deploy", "Ask your own docs"},
+		{"dev", Dev, "Deploy", "Change it"},
 		{"deploy", Deploy, "Guide", "Run it for the team"},
 	} {
 		out, err := tc.build("/vendor", ServedNav)
@@ -333,5 +337,41 @@ func TestNavAddressesMatchTheHost(t *testing.T) {
 	}
 	if !strings.Contains(string(served), `href="/docs"`) {
 		t.Error("served build should link the guide by route")
+	}
+}
+
+// Every page in Nav must be addressable and distinct on both hosts. Adding a role
+// means adding a field here, and the easy mistake is leaving one of the two Navs
+// unset — which renders href="" and silently links to the current page.
+func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
+	for host, nav := range map[string]Nav{"served": ServedNav, "static": StaticNav} {
+		seen := map[string]string{}
+		for label, addr := range map[string]string{
+			"Guide": nav.Guide, "Dev": nav.Dev, "Deploy": nav.Deploy,
+		} {
+			if addr == "" {
+				t.Errorf("%s nav: %s has no address", host, label)
+				continue
+			}
+			if other, dup := seen[addr]; dup {
+				t.Errorf("%s nav: %s and %s both point at %q", host, label, other, addr)
+			}
+			seen[addr] = label
+		}
+	}
+	// …and each rendered page must actually link the other two, not just hold the
+	// addresses. A router that points nowhere is the whole failure mode here.
+	for name, build := range map[string]func(string, Nav) ([]byte, error){
+		"guide": Docs, "dev": Dev, "deploy": Deploy,
+	} {
+		out, err := build("/vendor", ServedNav)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, addr := range []string{ServedNav.Guide, ServedNav.Dev, ServedNav.Deploy} {
+			if !strings.Contains(string(out), `href="`+addr+`"`) {
+				t.Errorf("%s page never links %s", name, addr)
+			}
+		}
 	}
 }

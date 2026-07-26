@@ -20,6 +20,9 @@ var indexTmpl string
 //go:embed docs.html
 var docsTmpl string
 
+//go:embed dev.html
+var devTmpl string
+
 //go:embed deploy.html
 var deployTmpl string
 
@@ -62,18 +65,27 @@ var FS embed.FS
 // Index renders index.html for one asset base — "https://cdn.jsdelivr.net/npm"
 // (the default) or "/vendor" when the assets ship inside this binary. Rendering
 // happens once at startup, so serving a request is just bytes.
-// Nav is where the guide's two pages live. They differ per host: the binary
-// serves /docs and /deploy, while a static build uses relative file names.
+// Nav is where the guide's pages live. They differ per host: the binary serves
+// /docs, /dev and /deploy, while a static build uses relative file names.
+//
+// One page per role, because each role arrives with a different question:
+//
+//	Guide   "what is this, and can I trust this answer?"   — everyone, then BA
+//	Dev     "where do I change X, and how do I test it?"   — DEV
+//	Deploy  "how do we run this for the team?"             — whoever hosts it
+//
+// To add a page: a field here, an address in both Navs, a render func, and one line
+// in cmd/rendocs and cmd/server. Nothing in the markup learns which host it is on.
 type Nav struct {
-	Guide, Deploy, App string
+	Guide, Dev, Deploy, App string
 }
 
 // ServedNav is how the running binary addresses its own pages.
-var ServedNav = Nav{Guide: "/docs", Deploy: "/deploy", App: "/"}
+var ServedNav = Nav{Guide: "/docs", Dev: "/dev", Deploy: "/deploy", App: "/"}
 
 // StaticNav is how a file-based host (GitHub Pages) addresses them. App is empty:
 // there is no app to open next to a static page.
-var StaticNav = Nav{Guide: "./index.html", Deploy: "./deploy.html"}
+var StaticNav = Nav{Guide: "./index.html", Dev: "./dev.html", Deploy: "./deploy.html"}
 
 func Index(assetBase string) ([]byte, error) {
 	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, nav: ServedNav})
@@ -85,6 +97,11 @@ func Index(assetBase string) ([]byte, error) {
 func Docs(assetBase string, nav Nav) ([]byte, error) {
 	return render(page{name: "docs", tmpl: docsTmpl, base: assetBase, nav: nav,
 		id: "docs", title: "Guide / Hướng dẫn"})
+}
+
+func Dev(assetBase string, nav Nav) ([]byte, error) {
+	return render(page{name: "dev", tmpl: devTmpl, base: assetBase, nav: nav,
+		id: "dev", title: "Dev / Cho dev"})
 }
 
 func Deploy(assetBase string, nav Nav) ([]byte, error) {
@@ -156,11 +173,12 @@ func render(pg page) ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, struct {
-		Base, Origin                 string
-		AppLink, GuideURL, DeployURL string
-		Page, Title                  string
-		Remote                       bool
-	}{base, origin, pg.nav.App, pg.nav.Guide, pg.nav.Deploy, pg.id, pg.title, remote}); err != nil {
+		Base, Origin                         string
+		AppLink, GuideURL, DevURL, DeployURL string
+		Page, Title                          string
+		Remote                               bool
+	}{base, origin, pg.nav.App, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
+		pg.id, pg.title, remote}); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

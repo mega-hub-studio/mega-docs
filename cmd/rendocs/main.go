@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"knowledge-engine/web"
 )
@@ -26,9 +27,13 @@ func main() {
 
 	// StaticNav links the pages to each other by file name and drops the "Open app"
 	// button — there is no app next to a static page.
+	// Keyed by the file name StaticNav points at, so a page and the link to it cannot
+	// drift. index.html rather than docs.html: it is the site's landing page.
+	nav := web.StaticNav
 	pages := map[string]func() ([]byte, error){
-		"index.html":  func() ([]byte, error) { return web.Docs(*base, web.StaticNav) },
-		"deploy.html": func() ([]byte, error) { return web.Deploy(*base, web.StaticNav) },
+		"index.html":                         func() ([]byte, error) { return web.Docs(*base, nav) },
+		strings.TrimPrefix(nav.Dev, "./"):    func() ([]byte, error) { return web.Dev(*base, nav) },
+		strings.TrimPrefix(nav.Deploy, "./"): func() ([]byte, error) { return web.Deploy(*base, nav) },
 	}
 	if err := os.MkdirAll(*dir, 0o755); err != nil {
 		die(err)

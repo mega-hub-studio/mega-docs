@@ -14,6 +14,34 @@
     Go, một file SQLite — không Docker, không Node, không vector database.
   </p>
 
+  <!-- Three readers arrive here with three different questions, so the first thing
+       on the page is a router, not prose: recognise your own row and leave. Everyone
+       still gets "how it works" and "quick start" below, because those are the two
+       things worth reading whichever row you picked. -->
+  <div class="grid three" id="roles">
+    <a class="card" href="#use">
+      <div class="head"><span class="title" lang="en">I look things up</span><span class="title" lang="vi">Tôi tra cứu</span></div>
+      <p lang="en">BA, PM, support. Ask well, and know when an answer can be trusted.
+        <b>Stay on this page.</b></p>
+      <p lang="vi">BA, PM, support. Hỏi cho đúng, và biết khi nào tin được câu trả
+        lời. <b>Ở lại trang này.</b></p>
+    </a>
+    <a class="card" data-accent="blue" href="<%.DevURL%>">
+      <div class="head"><span class="title" lang="en">I change it</span><span class="title" lang="vi">Tôi sửa code</span></div>
+      <p lang="en">The four seams you will touch, and how to test them with no API
+        key. <b>→ Dev</b></p>
+      <p lang="vi">Bốn chỗ bạn sẽ sửa, và cách test không cần API key.
+        <b>→ Dev</b></p>
+    </a>
+    <a class="card" data-accent="purple" href="<%.DeployURL%>">
+      <div class="head"><span class="title" lang="en">I host it</span><span class="title" lang="vi">Tôi host</span></div>
+      <p lang="en">Let the team in from anywhere, safely. Backups, systemd.
+        <b>→ Deploy</b></p>
+      <p lang="vi">Cho cả team truy cập từ mọi nơi, an toàn. Backup, systemd.
+        <b>→ Triển khai</b></p>
+    </a>
+  </div>
+
   <!-- ══ how it works ══════════════════════════════════════════════════════ -->
   <section>
     <h2 lang="en">How it works</h2>
@@ -189,6 +217,93 @@ done: 8/8 files, 74 chunks</span></div>
           <code>make smoke</code>: nó index một file mẫu, hỏi câu chỉ file đó
           trả lời được, rồi kiểm tra câu trả lời có dẫn nguồn đúng file.</p>
       </div>
+    </div>
+  </section>
+
+  <!-- ══ using it well (BA) ════════════════════════════════════════════════ -->
+  <section id="use">
+    <h2 lang="en">Using it well</h2>
+    <h2 lang="vi">Dùng cho hiệu quả</h2>
+    <p class="lede" lang="en">You never need a command for any of this. Three habits
+      cover almost every question worth asking.</p>
+    <p class="lede" lang="vi">Phần này không cần lệnh nào. Ba thói quen là đủ cho gần
+      hết những câu đáng hỏi.</p>
+
+    <h3 lang="en">1 · Ask with the words the document uses</h3>
+    <h3 lang="vi">1 · Hỏi bằng đúng từ trong tài liệu</h3>
+    <p lang="en">Search is half keyword, so an exact term — an error code, a config
+      key, a screen name — is the strongest thing you can give it. Add the term
+      <i>and</i> the question.</p>
+    <p lang="vi">Tìm kiếm có một nửa là từ khoá, nên một thuật ngữ chính xác — mã lỗi,
+      tên config, tên màn hình — là thứ mạnh nhất bạn có thể đưa vào. Ghi cả thuật ngữ
+      <i>và</i> câu hỏi.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Instead of</th><th>Ask</th></tr>
+          <tr lang="vi"><th>Thay vì</th><th>Hãy hỏi</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><td>“why is checkout broken?”</td><td>“what causes <code>ERR_PAY_402</code> at checkout?”</td></tr>
+          <tr lang="vi"><td>“sao checkout lỗi?”</td><td>“<code>ERR_PAY_402</code> ở checkout do đâu?”</td></tr>
+          <tr lang="en"><td>“tell me about refunds”</td><td>“who approves a refund over 5m, and in how long?”</td></tr>
+          <tr lang="vi"><td>“nói về hoàn tiền đi”</td><td>“ai duyệt hoàn tiền trên 5tr, trong bao lâu?”</td></tr>
+          <tr lang="en"><td>“is this documented?”</td><td>“which document defines the SLA for tier-2 tickets?”</td></tr>
+          <tr lang="vi"><td>“cái này có tài liệu chưa?”</td><td>“tài liệu nào định nghĩa SLA cho ticket tier-2?”</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 lang="en">2 · Read the citation, not just the answer</h3>
+    <h3 lang="vi">2 · Đọc phần dẫn nguồn, đừng chỉ đọc câu trả lời</h3>
+    <p lang="en">Every <code>[1]</code> is a link to the file the sentence came from.
+      Opening one is the whole quality check: if the cited section really says it, the
+      answer is as good as your document. If nothing is cited, treat it as a lead, not
+      a fact.</p>
+    <p lang="vi">Mỗi <code>[1]</code> là link tới file mà câu đó lấy ra. Mở nó chính là
+      toàn bộ việc kiểm tra chất lượng: nếu đoạn được dẫn đúng là có nói vậy, câu trả
+      lời tốt bằng tài liệu của bạn. Nếu không có dẫn nguồn nào, coi đó là gợi ý, chưa
+      phải sự thật.</p>
+
+    <div class="callout gotcha">
+      <b lang="en">Three answers to distrust.</b>
+      <span lang="en">No citation at all · a citation to a file you know is out of
+        date · a confident answer to something your team only ever discussed in chat.
+        The engine can only ever be as current as what was indexed.</span>
+      <b lang="vi">Ba loại câu trả lời nên nghi ngờ.</b>
+      <span lang="vi">Không có dẫn nguồn nào · dẫn tới file mà bạn biết đã cũ · trả lời
+        chắc chắn về thứ mà team chỉ từng bàn trong chat. Hệ thống chỉ mới được bằng
+        đúng những gì đã index.</span>
+    </div>
+
+    <h3 lang="en">3 · Check what is actually indexed</h3>
+    <h3 lang="vi">3 · Kiểm tra thật sự đang có gì trong index</h3>
+    <p lang="en">The app lists every indexed document and its section count. Look there
+      first when an answer feels thin — “not in the documents” and “the document was
+      never added” look identical from the outside, and only that list tells them
+      apart.</p>
+    <p lang="vi">App có liệt kê mọi tài liệu đã index kèm số đoạn. Nhìn vào đó trước
+      khi thấy câu trả lời mỏng — “không có trong tài liệu” và “tài liệu chưa từng được
+      thêm” nhìn từ ngoài y như nhau, chỉ danh sách đó phân biệt được.</p>
+
+    <div class="callout">
+      <b lang="en">To get a document in:</b>
+      <span lang="en">send whoever runs the server a <code>.md</code> or
+        <code>.txt</code> file — PDF and DOCX must be converted first. Re-sending a
+        corrected file updates it in place; there is no duplicate to clean up.</span>
+      <b lang="vi">Để thêm một tài liệu:</b>
+      <span lang="vi">gửi người chạy server một file <code>.md</code> hoặc
+        <code>.txt</code> — PDF và DOCX phải chuyển trước. Gửi lại bản đã sửa thì nó
+        cập nhật tại chỗ, không sinh bản trùng cần dọn.</span>
+    </div>
+
+    <div class="callout warn">
+      <b lang="en">Everyone who can reach the app can read everything in it.</b>
+      <span lang="en">There are no per-document permissions. Anything you would not
+        show the whole team should not be indexed.</span>
+      <b lang="vi">Ai vào được app là đọc được tất cả trong đó.</b>
+      <span lang="vi">Không có phân quyền theo từng tài liệu. Thứ gì bạn không muốn cả
+        team thấy thì đừng index.</span>
     </div>
   </section>
 

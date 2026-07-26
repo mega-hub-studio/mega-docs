@@ -1,0 +1,230 @@
+<%template "head" .%><main>
+
+  <h1 lang="en">◈ Change it</h1>
+  <h1 lang="vi">◈ Sửa và mở rộng</h1>
+  <p class="lede" lang="en">
+    Everything on this page is the <b>first hour</b>: the four seams you will
+    actually touch, and how to test them without an API key. It is deliberately not
+    the full reference — that is the <a href="https://github.com/mega-hub-studio/mega-docs#architecture">README</a>,
+    and it stays the one place that describes every file.
+  </p>
+  <p class="lede" lang="vi">
+    Toàn bộ trang này là <b>một giờ đầu tiên</b>: bốn chỗ bạn thật sự sẽ sửa, và
+    cách test chúng mà không cần API key. Đây cố ý <i>không</i> phải tài liệu tham
+    chiếu đầy đủ — chỗ đó là <a href="https://github.com/mega-hub-studio/mega-docs#architecture">README</a>,
+    và nó vẫn là nơi duy nhất mô tả mọi file.
+  </p>
+
+  <!-- ══ orient ════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Where things live</h2>
+    <h2 lang="vi">Cái gì nằm ở đâu</h2>
+    <p lang="en">One direction of dependency: <code>cmd</code> → <code>internal</code>
+      → nothing. No layer reaches back up, so each reads on its own.</p>
+    <p lang="vi">Phụ thuộc một chiều: <code>cmd</code> → <code>internal</code> →
+      không gì cả. Không tầng nào ngược lên, nên đọc từng tầng độc lập được.</p>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>You want to change…</th><th>Go here</th></tr>
+          <tr lang="vi"><th>Bạn muốn sửa…</th><th>Vào đây</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>how answers are retrieved or prompted</th><td><code>internal/rag</code></td></tr>
+          <tr lang="vi"><th>cách truy xuất hoặc prompt</th><td><code>internal/rag</code></td></tr>
+          <tr lang="en"><th>an HTTP route, cache header, SSE frame</th><td><code>internal/server</code></td></tr>
+          <tr lang="vi"><th>route HTTP, cache header, frame SSE</th><td><code>internal/server</code></td></tr>
+          <tr lang="en"><th>a provider quirk (headers, endpoints)</th><td><code>internal/ai</code></td></tr>
+          <tr lang="vi"><th>đặc thù provider (header, endpoint)</th><td><code>internal/ai</code></td></tr>
+          <tr lang="en"><th>chunking, schema, hybrid search</th><td><code>internal/db</code></td></tr>
+          <tr lang="vi"><th>cắt đoạn, schema, hybrid search</th><td><code>internal/db</code></td></tr>
+          <tr lang="en"><th>anything the user clicks</th><td><code>web/app/</code></td></tr>
+          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/app/</code></td></tr>
+          <tr lang="en"><th>a dependency version</th><td><code>web/vendor.sha384</code> — one line</td></tr>
+          <tr lang="vi"><th>version một dependency</th><td><code>web/vendor.sha384</code> — một dòng</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══ seams ═════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">The two seams</h2>
+    <h2 lang="vi">Hai đường nối</h2>
+    <p class="lede" lang="en">These are why the codebase is testable. Learn these two
+      and most of the rest follows.</p>
+    <p class="lede" lang="vi">Đây là lý do codebase test được. Hiểu hai cái này thì
+      phần lớn còn lại tự sáng.</p>
+
+    <h3 lang="en">Server ↔ engine</h3>
+    <h3 lang="vi">Server ↔ engine</h3>
+    <p lang="en">The HTTP layer depends on an interface, not the engine — so every
+      route, SSE frame and 400 is covered by <code>go test</code> with a fake,
+      needing no key and no database.</p>
+    <p lang="vi">Tầng HTTP phụ thuộc vào một interface, không phải engine — nên mọi
+      route, frame SSE và lỗi 400 đều test được bằng <code>go test</code> với fake,
+      không cần key, không cần database.</p>
+    <div class="terminal"><span class="out">type Answerer interface {
+    Answer(ctx, question string, onToken func(string)) ([]rag.Citation, error)
+    Corpus(limit int) (db.Corpus, error)
+}</span></div>
+
+    <h3 lang="en">App ↔ transport</h3>
+    <h3 lang="vi">App ↔ transport</h3>
+    <p lang="en"><code>app.js</code> never sees an <code>AbortController</code>, a
+      <code>TextDecoder</code> or <code>visualViewport</code>. It states intent; the
+      modules hide the mechanism.</p>
+    <p lang="vi"><code>app.js</code> không bao giờ thấy <code>AbortController</code>,
+      <code>TextDecoder</code> hay <code>visualViewport</code>. Nó chỉ nói ý định;
+      các module giấu phần cơ chế.</p>
+    <div class="terminal"><span class="out">const run = ask(q, { onToken, onCitations });  // chat.js
+run.stop();                                    // resolves, never throws
+view.scrollToEnd();                            // viewport.js</span></div>
+  </section>
+
+  <!-- ══ test ══════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Test without a key</h2>
+    <h2 lang="vi">Test không cần key</h2>
+    <p lang="en"><code>internal/aitest</code> serves a <b>fake OpenAI-compatible
+      provider</b> over <code>httptest</code>, and the real client talks to it. That
+      covers what a new provider actually breaks — request encoding,
+      <code>index</code>-ordered embeddings, SSE parsing — which a hand-written fake
+      client would not. It can also misbehave on purpose.</p>
+    <p lang="vi"><code>internal/aitest</code> dựng một <b>provider giả tương thích
+      OpenAI</b> qua <code>httptest</code>, và client thật nói chuyện với nó. Nó phủ
+      đúng những chỗ provider mới hay làm vỡ — encode request, embeddings xếp theo
+      <code>index</code>, parse SSE — thứ mà fake client viết tay bỏ sót. Nó còn có
+      thể hỏng có chủ đích.</p>
+    <div class="terminal"><span class="cmd">make check</span><span class="out">tests + gofmt + vet + staticcheck + deadcode + secret scan</span><span class="cmd">make live</span><span class="out">the real provider: both endpoints + embedding width</span><span class="cmd">make smoke</span><span class="out">end to end: ingest a fixture, ask, check it cites the file</span></div>
+    <div class="callout">
+      <b lang="en">Point <code>make live</code> at a new provider before ingesting
+        anything real.</b>
+      <span lang="en">It tells you in seconds whether <code>/embeddings</code> is
+        missing, which is the one gap that stops indexing dead.</span>
+      <b lang="vi">Chạy <code>make live</code> với provider mới trước khi index thật.</b>
+      <span lang="vi">Nó cho biết trong vài giây là có thiếu
+        <code>/embeddings</code> không — đúng cái lỗ làm index chết hẳn.</span>
+    </div>
+  </section>
+
+  <!-- ══ knobs ═════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">The knobs people actually turn</h2>
+    <h2 lang="vi">Những nút thật sự hay bị xoay</h2>
+    <p class="lede" lang="en">In rough order of how often, and what each one costs.</p>
+    <p class="lede" lang="vi">Xếp theo mức độ hay dùng, kèm giá phải trả.</p>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Answer quality → how many sections reach the model</b>
+        <b lang="vi">Chất lượng trả lời → bao nhiêu đoạn tới được model</b>
+        <p lang="en"><code>TOP_K</code> in <code>.env</code>. Raise it when answers
+          miss context that you know is indexed; lower it when they wander. Costs
+          tokens per question, nothing else. No re-index.</p>
+        <p lang="vi"><code>TOP_K</code> trong <code>.env</code>. Tăng khi câu trả lời
+          thiếu ngữ cảnh mà bạn biết đã index; giảm khi nó lan lan. Chỉ tốn token mỗi
+          câu hỏi, không gì khác. Không cần index lại.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Grounding → the prompt</b>
+        <b lang="vi">Mức căn cứ → prompt</b>
+        <p lang="en"><code>internal/rag</code>. This is where "answer only from these
+          sections, and say so when it isn't there" lives. Change it and re-run
+          <code>make smoke</code>: it fails if the reply stops citing its file.</p>
+        <p lang="vi"><code>internal/rag</code>. Chỗ chứa câu "chỉ trả lời từ các đoạn
+          này, và nói rõ khi không có". Sửa rồi chạy lại <code>make smoke</code>: nó
+          fail nếu câu trả lời không còn dẫn nguồn.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">A different provider or model</b>
+        <b lang="vi">Đổi provider hoặc model</b>
+        <p lang="en"><code>AI_BASE_URL</code> / <code>EMBED_BASE_URL</code> and the
+          model names. Chat and embeddings may live on different hosts — coding-agent
+          gateways often serve chat only.</p>
+        <p lang="vi"><code>AI_BASE_URL</code> / <code>EMBED_BASE_URL</code> và tên
+          model. Chat và embeddings có thể ở hai host khác nhau — gateway cho coding
+          agent thường chỉ có chat.</p>
+        <div class="callout gotcha">
+          <b lang="en">Changing the embedding model means a full re-index.</b>
+          <span lang="en">Vectors from two models are not comparable.
+            <code>EMBED_DIM</code> must match exactly; delete
+            <code>knowledge.db</code> and ingest again.</span>
+          <b lang="vi">Đổi embedding model là phải index lại toàn bộ.</b>
+          <span lang="vi">Vector của hai model không so sánh được với nhau.
+            <code>EMBED_DIM</code> phải khớp chính xác; xoá
+            <code>knowledge.db</code> rồi ingest lại.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">4</span>
+      <div class="body">
+        <b lang="en">The UI</b>
+        <b lang="vi">Giao diện</b>
+        <p lang="en">Native ES modules, no build step — edit
+          <code>web/app/*.js</code> and reload. It is embedded in the binary, so
+          <code>make build</code> before you test the built artifact, or you will
+          debug the old bytes.</p>
+        <p lang="vi">ES module thuần, không có bước build — sửa
+          <code>web/app/*.js</code> rồi reload. Nó nằm trong binary, nên phải
+          <code>make build</code> trước khi test bản đã build, không thì bạn đang
+          debug bytes cũ.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ extend ════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Adding to these docs</h2>
+    <h2 lang="vi">Thêm vào tài liệu này</h2>
+    <p lang="en">The guide is one page per role, sharing one head partial. Growing it
+      is meant to be boring:</p>
+    <p lang="vi">Tài liệu này là một trang cho mỗi role, dùng chung một partial head.
+      Mở rộng nó cố tình làm cho nhàm:</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>To add…</th><th>Do this</th></tr>
+          <tr lang="vi"><th>Để thêm…</th><th>Làm thế này</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>a section</th><td>one <code>&lt;section&gt;</code> in the page, both languages</td></tr>
+          <tr lang="vi"><th>một mục</th><td>một <code>&lt;section&gt;</code> trong trang, đủ hai ngôn ngữ</td></tr>
+          <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, an address in both Navs, a render func, one line in <code>cmd/rendocs</code></td></tr>
+          <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ ở cả hai Nav, một render func, một dòng trong <code>cmd/rendocs</code></td></tr>
+          <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; mermaid never ships to the browser</td></tr>
+          <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; mermaid không bao giờ tới browser</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p lang="en">The server needs no change for a new page: it routes whatever is in
+      its <code>Pages</code> map, keyed by the same <code>Nav</code> the markup links
+      with, so a route and its page cannot drift apart.</p>
+    <p lang="vi">Server không cần sửa gì khi thêm trang: nó route theo map
+      <code>Pages</code>, khoá bằng đúng <code>Nav</code> mà markup dùng để link, nên
+      route và trang không thể lệch nhau.</p>
+  </section>
+
+  <p class="separator"></p>
+  <p class="lede" lang="en">Running it for the team — Tailscale, Cloudflare Tunnel,
+    LAN, systemd, backups — is the Deploy page.</p>
+  <p class="lede" lang="vi">Phần chạy cho cả team — Tailscale, Cloudflare Tunnel,
+    LAN, systemd, backup — nằm ở trang Triển khai.</p>
+  <p class="next"><a class="btn sm" href="<%.DeployURL%>"><span lang="en">Deploy
+    &rsaquo;</span><span lang="vi">Triển khai &rsaquo;</span></a></p>
+
+</main>
+
+<%template "foot" .%>

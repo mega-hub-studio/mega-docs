@@ -32,13 +32,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("frontend: %v", err)
 	}
-	docs, err := web.Docs(cfg.AssetBase, web.ServedNav)
-	if err != nil {
-		log.Fatalf("docs: %v", err)
-	}
-	deploy, err := web.Deploy(cfg.AssetBase, web.ServedNav)
-	if err != nil {
-		log.Fatalf("deploy page: %v", err)
+	// One entry per guide page, keyed by the same address web.ServedNav hands the
+	// markup — so a page and its route cannot drift apart.
+	nav := web.ServedNav
+	pages := map[string][]byte{}
+	for route, build := range map[string]func(string, web.Nav) ([]byte, error){
+		nav.Guide:  web.Docs,
+		nav.Dev:    web.Dev,
+		nav.Deploy: web.Deploy,
+	} {
+		page, err := build(cfg.AssetBase, nav)
+		if err != nil {
+			log.Fatalf("guide page %s: %v", route, err)
+		}
+		pages[route] = page
 	}
 	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
 		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
@@ -47,7 +54,9 @@ func main() {
 
 	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
-	handler := server.New(server.Deps{Answers: engine, Index: index, Docs: docs, DeployDoc: deploy, Assets: web.FS, Auth: auth})
+	handler := server.New(server.Deps{
+		Answers: engine, Index: index, Pages: pages, Assets: web.FS, Auth: auth,
+	})
 
 	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)
 	srv := &http.Server{

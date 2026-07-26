@@ -2,16 +2,17 @@ name: Deploy guide
 
 # Publishes the bilingual guide to GitHub Pages, so the team can read setup and
 # deploy instructions without anything running — including before the server
-# exists, and while it's down. Two pages, each with its own URL:
+# exists, and while it's down. One page per role, each with its own URL:
 #
-#   index.html   the Guide  (web/docs.html)
+#   index.html   the Guide  (web/docs.html)   — everyone, then BA
+#   dev.html     the Dev page (web/dev.html)  — DEV
 #   deploy.html  the Deploy runbook (web/deploy.html)
 #
 # One-time setup, by a human with admin on the repo (a workflow token cannot do it):
 #   Settings → Pages → Source: GitHub Actions
 # Until that is done every run fails at configure-pages with "Get Pages site failed".
 #
-# Both are Go templates (versions and SRI digests come from web/vendor.sha384),
+# All are Go templates (versions and SRI digests come from web/vendor.sha384),
 # so they are rendered by cmd/rendocs rather than copied. That keeps the
 # published pages generated from the same source the binary serves — there is no
 # second copy to drift.
@@ -21,6 +22,7 @@ on:
     branches: [main]
     paths:
       - web/docs.html
+      - web/dev.html
       - web/deploy.html
       - web/docsbase.html
       - web/vendor.sha384
@@ -57,14 +59,17 @@ jobs:
       - name: Render the guide
         run: |
           go run ./cmd/rendocs -d _site
-          # Both pages must exist: a grep over an empty _site would pass happily
+          # Every page must exist: a grep over an empty _site would pass happily
           # and publish nothing.
-          test -s _site/index.html && test -s _site/deploy.html
+          for f in index.html dev.html deploy.html; do test -s "_site/$f"; done
           # Fail loudly if a template action survived into either page.
           ! grep -rq '<%' _site/
-          # Each page must link the other, or the split leaves a dead end.
-          grep -q 'deploy.html' _site/index.html
-          grep -q 'index.html' _site/deploy.html
+          # Each page must link the other two, or a role lands in a dead end.
+          for f in index.html dev.html deploy.html; do
+            grep -q 'index.html'  "_site/$f"
+            grep -q 'dev.html'    "_site/$f"
+            grep -q 'deploy.html' "_site/$f"
+          done
 
       # No `enablement: true` here — it was tried and cannot work. Creating a Pages
       # site needs repo-admin rights, and GITHUB_TOKEN tops out at `pages: write`,
