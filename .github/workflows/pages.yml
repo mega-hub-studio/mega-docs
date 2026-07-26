@@ -7,7 +7,7 @@ name: Deploy guide
 #   index.html   the Guide  (web/docs.html)
 #   deploy.html  the Deploy runbook (web/deploy.html)
 #
-# One-time setup: repo Settings → Pages → Source: GitHub Actions.
+# No manual setup: the configure-pages step below enables Pages on its first run.
 #
 # Both are Go templates (versions and SRI digests come from web/vendor.sha384),
 # so they are rendered by cmd/rendocs rather than copied. That keeps the
@@ -64,7 +64,12 @@ jobs:
           grep -q 'deploy.html' _site/index.html
           grep -q 'index.html' _site/deploy.html
 
+      # enablement: true turns Pages on via the API on the first run, so the site
+      # does not depend on someone having clicked Settings → Pages → GitHub Actions.
+      # Without it the first run dies at "Get Pages site failed … Not Found".
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
