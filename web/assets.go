@@ -74,13 +74,3 @@ func (p pins) sri(pkg, file string) (string, error) {
 	}
 	return p.digest[full], nil
 }
-
-// Vendored reports the manifest's pinned files as "<pkg>@<version>/<path>",
-// which is exactly the layout `make vendor` writes under web/vendor/.
-func (p pins) files() []string {
-	out := make([]string, 0, len(p.digest))
-	for k := range p.digest {
-		out = append(out, k)
-	}
-	return out
-}

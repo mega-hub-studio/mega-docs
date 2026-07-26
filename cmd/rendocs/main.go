@@ -6,37 +6,47 @@
 // from the same source as the one the binary serves. No cgo, no database: it
 // imports the web package and nothing else.
 //
-//	go run ./cmd/rendocs -o _site/index.html
+//	go run ./cmd/rendocs -d _site
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"knowledge-engine/web"
 )
 
 func main() {
-	out := flag.String("o", "-", `output file, or "-" for stdout`)
+	dir := flag.String("d", "_site", "output directory")
 	base := flag.String("base", "https://cdn.jsdelivr.net/npm",
 		"asset base URL; the published page needs a public one")
-	app := flag.String("app", "",
-		`URL the "Open app" button points at; empty omits the button (there is no app on a static host)`)
 	flag.Parse()
 
-	page, err := web.Docs(*base, *app)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "rendocs: %v\n", err)
-		os.Exit(1)
+	// StaticNav links the pages to each other by file name and drops the "Open app"
+	// button — there is no app next to a static page.
+	pages := map[string]func() ([]byte, error){
+		"index.html":  func() ([]byte, error) { return web.Docs(*base, web.StaticNav) },
+		"deploy.html": func() ([]byte, error) { return web.Deploy(*base, web.StaticNav) },
 	}
-	if *out == "-" {
-		os.Stdout.Write(page)
-		return
+	if err := os.MkdirAll(*dir, 0o755); err != nil {
+		die(err)
 	}
-	if err := os.WriteFile(*out, page, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "rendocs: %v\n", err)
-		os.Exit(1)
+	for name, build := range pages {
+		page, err := build()
+		if err != nil {
+			die(err)
+		}
+		path := filepath.Join(*dir, name)
+		if err := os.WriteFile(path, page, 0o644); err != nil {
+			die(err)
+		}
+		fmt.Fprintf(os.Stderr, "rendocs: wrote %s (%d bytes)\n", path, len(page))
 	}
-	fmt.Fprintf(os.Stderr, "rendocs: wrote %s (%d bytes)\n", *out, len(page))
+}
+
+func die(err error) {
+	fmt.Fprintf(os.Stderr, "rendocs: %v\n", err)
+	os.Exit(1)
 }

@@ -32,9 +32,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("frontend: %v", err)
 	}
-	docs, err := web.Docs(cfg.AssetBase, "/")
+	docs, err := web.Docs(cfg.AssetBase, web.ServedNav)
 	if err != nil {
 		log.Fatalf("docs: %v", err)
+	}
+	deploy, err := web.Deploy(cfg.AssetBase, web.ServedNav)
+	if err != nil {
+		log.Fatalf("deploy page: %v", err)
 	}
 	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
 		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
@@ -43,7 +47,7 @@ func main() {
 
 	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
-	handler := server.New(server.Deps{Answers: engine, Index: index, Docs: docs, Assets: web.FS, Auth: auth})
+	handler := server.New(server.Deps{Answers: engine, Index: index, Docs: docs, DeployDoc: deploy, Assets: web.FS, Auth: auth})
 
 	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)
 	srv := &http.Server{

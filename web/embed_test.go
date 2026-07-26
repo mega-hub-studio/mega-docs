@@ -138,7 +138,7 @@ func TestHasVendorReportsEmptyTree(t *testing.T) {
 
 func TestDocsRendersForBothAssetBases(t *testing.T) {
 	for _, base := range []string{"https://cdn.jsdelivr.net/npm", "/vendor"} {
-		out, err := Docs(base, "/")
+		out, err := Docs(base, ServedNav)
 		if err != nil {
 			t.Fatalf("Docs(%q): %v", base, err)
 		}
@@ -162,7 +162,7 @@ func TestDocsRendersForBothAssetBases(t *testing.T) {
 // The static build for GitHub Pages must omit the "Open app" button — a static
 // host has no app to open — while keeping every asset pinned and SRI-verified.
 func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
-	out, err := Docs("https://cdn.jsdelivr.net/npm", "")
+	out, err := Docs("https://cdn.jsdelivr.net/npm", StaticNav)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,10 +178,91 @@ func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
 	if !strings.Contains(page, `integrity="`+pinnedDigest(t, "8bit-nes", "all.min.css")+`"`) {
 		t.Error("the published page lost its integrity digest")
 	}
-	// The content itself must be intact — this is the copy the team reads.
-	for _, want := range []string{"tailscale serve", "EMBED_BASE_URL", "Nothing is indexed"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("published guide is missing %q", want)
+	// The content itself must be intact — this is the copy the team reads. The
+	// split moved operations onto the deploy page, so each page is checked against
+	// what it now owns; asserting both here is what catches copy lost in the move.
+	deploy, err := Deploy("https://cdn.jsdelivr.net/npm", StaticNav)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		page  string
+		wants []string
+	}{
+		{"guide", page, []string{"Nothing is indexed", "make ingest"}},
+		{"deploy", string(deploy), []string{"tailscale serve", "EMBED_BASE_URL"}},
+	} {
+		for _, want := range tc.wants {
+			if !strings.Contains(tc.page, want) {
+				t.Errorf("published %s page is missing %q", tc.name, want)
+			}
 		}
+	}
+}
+
+// The guide is two pages sharing one head partial. Each must render whole, link to
+// the other, and mark itself current — a broken partial would show up as a page
+// with no <head> rather than as a test failure elsewhere.
+func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		build func(string, Nav) ([]byte, error)
+		other string
+		owns  string
+	}{
+		{"guide", Docs, "Deploy", "Ask your own docs"},
+		{"deploy", Deploy, "Guide", "Run it for the team"},
+	} {
+		out, err := tc.build("/vendor", ServedNav)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		page := string(out)
+
+		// the shared partial actually landed
+		for _, want := range []string{"<!DOCTYPE html>", "<style>", "</html>", `id="lang"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("%s: missing %q — is the head/foot partial wired?", tc.name, want)
+			}
+		}
+		if c := strings.Count(page, "<main>"); c != 1 {
+			t.Errorf("%s: %d <main> elements", tc.name, c)
+		}
+		if !strings.Contains(page, "</main>") {
+			t.Errorf("%s: <main> was never closed", tc.name)
+		}
+		if !strings.Contains(page, tc.owns) {
+			t.Errorf("%s: lost its own content (%q)", tc.name, tc.owns)
+		}
+		if !strings.Contains(page, ">"+tc.other+"<") {
+			t.Errorf("%s: no link to %s", tc.name, tc.other)
+		}
+		if strings.Contains(page, "<%") {
+			t.Errorf("%s: unrendered action", tc.name)
+		}
+		// the deploy content must live in exactly one page
+		hasDeploy := strings.Contains(page, "tailscale serve")
+		if (tc.name == "deploy") != hasDeploy {
+			t.Errorf("%s: deploy instructions in the wrong page", tc.name)
+		}
+	}
+}
+
+// Static hosting links by file name; the served binary links by route.
+func TestNavAddressesMatchTheHost(t *testing.T) {
+	static, err := Deploy("https://cdn.jsdelivr.net/npm", StaticNav)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(static), `href="./index.html"`) {
+		t.Error("static build should link the guide by file name")
+	}
+	served, err := Deploy("/vendor", ServedNav)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(served), `href="/docs"`) {
+		t.Error("served build should link the guide by route")
 	}
 }

@@ -71,7 +71,9 @@ func TestVendorTreeMatchesTheManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range p.files() {
+	// keys are "<pkg>@<version>/<path>", which is exactly the layout
+	// `make vendor` writes under web/vendor/
+	for f := range p.digest {
 		if _, err := fs.Stat(FS, "vendor/"+f); err != nil {
 			t.Errorf("pinned but not vendored: %s", f)
 		}

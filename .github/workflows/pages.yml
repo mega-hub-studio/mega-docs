@@ -16,6 +16,8 @@ on:
     branches: [main]
     paths:
       - web/docs.html
+      - web/deploy.html
+      - web/docsbase.html
       - web/vendor.sha384
       - web/embed.go
       - web/assets.go
@@ -49,11 +51,9 @@ jobs:
       # rendocs imports only the web package — no cgo, no SQLite, no API key.
       - name: Render the guide
         run: |
-          mkdir -p _site
-          go run ./cmd/rendocs -o _site/index.html
-          # A static host has no app to open, so -app is left empty and the
-          # button is omitted. Fail loudly if a template action survived.
-          ! grep -q '<%' _site/index.html
+          go run ./cmd/rendocs -d _site
+          # Fail loudly if a template action survived into either page.
+          ! grep -rq '<%' _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

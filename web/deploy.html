@@ -1,0 +1,245 @@
+<%template "head" .%><main>
+
+  <h1 lang="en">◈ Run it for the team</h1>
+  <h1 lang="vi">◈ Chạy cho cả team</h1>
+  <p class="lede" lang="en">
+    The UI is compiled into the binary, so publishing the app and publishing the
+    web interface are the same job: expose <b>one HTTP port</b>, safely. Everything
+    below differs only in <i>who decides who reaches that port</i>.
+  </p>
+  <p class="lede" lang="vi">
+    UI được biên dịch vào trong binary, nên publish app và publish web interface là
+    cùng một việc: mở <b>một cổng HTTP duy nhất</b>, một cách an toàn. Mọi phương án
+    dưới đây chỉ khác nhau ở chỗ <i>ai quyết định ai tới được cổng đó</i>.
+  </p>
+
+  <!-- ══ deploy ════════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Let the team in</h2>
+    <h2 lang="vi">Cho team truy cập</h2>
+
+    <div class="callout gotcha">
+      <b lang="en">Read this first.</b>
+      <span lang="en">This app has no accounts and no per-user permissions.
+        Whoever reaches the port can read <b>every</b> indexed document and spend
+        your provider key. It binds <code>127.0.0.1</code> by default for exactly
+        that reason — the three options below differ only in <i>who decides who
+        reaches the port</i>.</span>
+      <b lang="vi">Đọc phần này trước.</b>
+      <span lang="vi">App không có tài khoản và không có phân quyền theo người
+        dùng. Ai tới được port là đọc được <b>toàn bộ</b> tài liệu đã index và
+        tiêu API key của bạn. Chính vì vậy mặc định nó chỉ bind
+        <code>127.0.0.1</code> — ba phương án dưới đây khác nhau đúng ở chỗ
+        <i>ai quyết định ai tới được port</i>.</span>
+    </div>
+
+    <nes-tabs>
+      <section data-label="Tailscale" selected>
+        <p><span class="badge">RECOMMENDED</span></p>
+        <p lang="en">No open ports, automatic HTTPS, and the team signs in with
+          the company account. Identical whether the box is an office PC or a
+          cloud VM — no port forwarding, no static IP, no firewall ticket.</p>
+        <p lang="vi">Không mở port nào, HTTPS tự động, team đăng nhập bằng tài
+          khoản công ty. Giống nhau y hệt dù máy là PC ở công ty hay VM trên
+          cloud — không port forward, không IP tĩnh, không phải xin mở firewall.</p>
+        <div class="terminal"><span class="cmd">sudo tailscale up</span><span class="cmd">BIND_ADDR=127.0.0.1 ./bin/knowledge</span><span class="cmd">sudo tailscale serve --bg 8080</span><span class="out">https://&lt;machine&gt;.&lt;tailnet&gt;.ts.net</span></div>
+        <p lang="en">Team installs the Tailscale app once, then opens that URL
+          from anywhere — mobile data, hotel wifi, home.</p>
+        <p lang="vi">Team cài app Tailscale một lần, rồi mở URL đó từ bất cứ
+          đâu — 4G, wifi khách sạn, ở nhà.</p>
+        <div class="callout warn">
+          <b lang="en">Not Funnel.</b>
+          <span lang="en"><code>tailscale funnel</code> publishes to the open
+            internet and bypasses tailnet identity. If you use it, set
+            <code>AUTH_PASS</code>.</span>
+          <b lang="vi">Đừng dùng Funnel.</b>
+          <span lang="vi"><code>tailscale funnel</code> đưa ra internet công khai
+            và bỏ qua toàn bộ định danh tailnet. Nếu dùng, phải set
+            <code>AUTH_PASS</code>.</span>
+        </div>
+      </section>
+
+      <section data-label="Cloudflare">
+        <p lang="en">For when the team must not install anything: a normal HTTPS
+          address plus Google/Microsoft sign-in. Still no inbound ports —
+          <code>cloudflared</code> dials out.</p>
+        <p lang="vi">Dùng khi team không được cài thêm gì: một địa chỉ HTTPS bình
+          thường cộng đăng nhập Google/Microsoft. Vẫn không mở port nào —
+          <code>cloudflared</code> tự gọi ra ngoài.</p>
+        <div class="terminal"><span class="cmd">cloudflared tunnel create knowledge</span><span class="cmd">cloudflared tunnel route dns knowledge kb.company.com</span><span class="cmd">BIND_ADDR=127.0.0.1 ./bin/knowledge</span><span class="cmd">cloudflared tunnel run --url http://localhost:8080 knowledge</span></div>
+        <p lang="en">Then add a <b>Zero Trust → Access</b> application for that
+          hostname with the policy <i>emails ending in @company.com</i>. Nothing
+          unauthenticated ever reaches the binary.</p>
+        <p lang="vi">Sau đó thêm một application <b>Zero Trust → Access</b> cho
+          hostname đó với policy <i>email kết thúc bằng @company.com</i>. Không
+          request nào chưa xác thực tới được binary.</p>
+      </section>
+
+      <section data-label="LAN">
+        <p lang="en">Simplest, and enough if nobody needs access from outside the
+          office.</p>
+        <p lang="vi">Đơn giản nhất, và là đủ nếu không ai cần truy cập từ ngoài
+          công ty.</p>
+        <div class="terminal"><span class="cmd">BIND_ADDR=0.0.0.0 AUTH_PASS='&lt;long random string&gt;' ./bin/knowledge</span><span class="out">team opens http://&lt;office-pc-ip&gt;:8080</span></div>
+        <div class="callout gotcha">
+          <b lang="en">Set AUTH_PASS anyway.</b>
+          <span lang="en">Office wifi usually carries guests and personal phones.
+            And because this is plain HTTP, the password travels readable — fine
+            on a trusted LAN, not fine over the internet.</span>
+          <b lang="vi">Vẫn nên set AUTH_PASS.</b>
+          <span lang="vi">Wifi công ty thường có cả khách và điện thoại cá nhân.
+            Và vì đây là HTTP thuần, mật khẩu đi trên đường truyền ở dạng đọc
+            được — ổn trong LAN tin cậy, không ổn qua internet.</span>
+        </div>
+      </section>
+    </nes-tabs>
+
+    <h3 lang="en">Which one?</h3>
+    <h3 lang="vi">Chọn cái nào?</h3>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr lang="en"><th>&nbsp;</th><th>Tailscale</th><th>Cloudflare</th><th>LAN</th></tr>
+          <tr lang="vi"><th>&nbsp;</th><th>Tailscale</th><th>Cloudflare</th><th>LAN</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>Open ports</th><td>none</td><td>none</td><td>yes (LAN)</td></tr>
+          <tr lang="vi"><th>Mở port</th><td>không</td><td>không</td><td>có (trong LAN)</td></tr>
+          <tr lang="en"><th>Team installs</th><td>Tailscale app</td><td><b>nothing</b></td><td>nothing</td></tr>
+          <tr lang="vi"><th>Team cài gì</th><td>app Tailscale</td><td><b>không gì</b></td><td>không gì</td></tr>
+          <tr lang="en"><th>Sign-in</th><td>tailnet identity</td><td>Google/MS SSO</td><td>Basic auth</td></tr>
+          <tr lang="vi"><th>Đăng nhập</th><td>định danh tailnet</td><td>SSO Google/MS</td><td>Basic auth</td></tr>
+          <tr lang="en"><th>HTTPS</th><td>automatic</td><td>automatic</td><td>no</td></tr>
+          <tr lang="vi"><th>HTTPS</th><td>tự động</td><td>tự động</td><td>không</td></tr>
+          <tr lang="en"><th>Works outside office</th><td>yes</td><td>yes</td><td>no</td></tr>
+          <tr lang="vi"><th>Dùng ngoài công ty</th><td>được</td><td>được</td><td>không</td></tr>
+          <tr lang="en"><th>Needs <code>AUTH_PASS</code></th><td>no</td><td>no (but fine)</td><td><b>yes</b></td></tr>
+          <tr lang="vi"><th>Cần <code>AUTH_PASS</code></th><td>không</td><td>không (nhưng nên)</td><td><b>bắt buộc</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 lang="en">Where to run it</h3>
+    <h3 lang="vi">Chạy ở đâu</h3>
+    <div class="grid two">
+      <div class="card">
+        <div class="head"><span class="title" lang="en">Office PC</span><span class="title" lang="vi">PC công ty</span></div>
+        <p lang="en">Free, and the documents never leave the building. It just has
+          to stay powered on.</p>
+        <p lang="vi">Miễn phí, và tài liệu không ra khỏi công ty. Chỉ cần máy luôn
+          bật.</p>
+      </div>
+      <div class="card">
+        <div class="head"><span class="title" lang="en">Cloud VM</span><span class="title" lang="vi">VM cloud</span></div>
+        <p lang="en">Always up and easy to back up, but the key and the index live
+          off-site. 2 vCPU is plenty — the heavy work is the provider's.</p>
+        <p lang="vi">Luôn online và dễ backup, nhưng key và index nằm ngoài công
+          ty. 2 vCPU là thừa đủ — phần nặng là việc của provider.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ operations ════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Day-to-day</h2>
+    <h2 lang="vi">Vận hành hằng ngày</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr lang="en"><th>Task</th><th>How</th></tr>
+          <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>Back up</th><td>Copy <code>knowledge.db</code> — that is the entire backup. While it's running use <code>sqlite3 knowledge.db ".backup out.db"</code>; a plain copy of a live database can tear.</td></tr>
+          <tr lang="vi"><th>Backup</th><td>Copy <code>knowledge.db</code> — đó là toàn bộ việc backup. Khi đang chạy thì dùng <code>sqlite3 knowledge.db ".backup out.db"</code>; copy trực tiếp một database đang mở có thể bị lỗi dở dang.</td></tr>
+          <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>
+          <tr lang="vi"><th>Thêm / sửa tài liệu</th><td><code>./bin/ingest &lt;dir&gt;</code> — exit khác 0 nếu có gì lỗi</td></tr>
+          <tr lang="en"><th>Update the app</th><td>Replace the binary, restart. Browsers revalidate by ETag — no cache to clear.</td></tr>
+          <tr lang="vi"><th>Cập nhật app</th><td>Thay binary, restart. Browser revalidate bằng ETag — không cần xoá cache.</td></tr>
+          <tr lang="en"><th>Change embedding model</th><td><code>EMBED_DIM</code> must match it. Delete <code>knowledge.db</code> and re-index, or every insert fails.</td></tr>
+          <tr lang="vi"><th>Đổi embedding model</th><td><code>EMBED_DIM</code> phải khớp. Xoá <code>knowledge.db</code> rồi index lại, không thì mọi insert đều lỗi.</td></tr>
+          <tr lang="en"><th>No third-party requests</th><td><code>make vendor &amp;&amp; make build</code>, then <code>ASSET_BASE=/vendor</code></td></tr>
+          <tr lang="vi"><th>Không gọi ra third-party</th><td><code>make vendor &amp;&amp; make build</code>, rồi <code>ASSET_BASE=/vendor</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══ settings ══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Settings that matter</h2>
+    <h2 lang="vi">Các setting quan trọng</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr lang="en"><th>Variable</th><th>Default</th><th>Why you'd change it</th></tr>
+          <tr lang="vi"><th>Biến</th><th>Mặc định</th><th>Khi nào cần đổi</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th><code>BIND_ADDR</code></th><td><code>127.0.0.1</code></td><td><code>0.0.0.0</code> to serve the LAN — pair it with <code>AUTH_PASS</code></td></tr>
+          <tr lang="vi"><th><code>BIND_ADDR</code></th><td><code>127.0.0.1</code></td><td><code>0.0.0.0</code> để phục vụ LAN — nhớ kèm <code>AUTH_PASS</code></td></tr>
+          <tr lang="en"><th><code>AUTH_PASS</code></th><td>empty (off)</td><td>required for anything reachable beyond a tailnet/VPN</td></tr>
+          <tr lang="vi"><th><code>AUTH_PASS</code></th><td>trống (tắt)</td><td>bắt buộc nếu truy cập được từ ngoài tailnet/VPN</td></tr>
+          <tr lang="en"><th><code>EMBED_BASE_URL</code></th><td>same as chat</td><td>when the chat provider has no <code>/embeddings</code></td></tr>
+          <tr lang="vi"><th><code>EMBED_BASE_URL</code></th><td>giống chat</td><td>khi provider chat không có <code>/embeddings</code></td></tr>
+          <tr lang="en"><th><code>EMBED_DIM</code></th><td><code>1536</code></td><td>must match the embedding model exactly</td></tr>
+          <tr lang="vi"><th><code>EMBED_DIM</code></th><td><code>1536</code></td><td>phải khớp chính xác với embedding model</td></tr>
+          <tr lang="en"><th><code>TOP_K</code></th><td><code>6</code></td><td>how many sections feed the answer</td></tr>
+          <tr lang="vi"><th><code>TOP_K</code></th><td><code>6</code></td><td>bao nhiêu đoạn được đưa vào câu trả lời</td></tr>
+          <tr lang="en"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> to serve the UI's assets from the binary</td></tr>
+          <tr lang="vi"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> để binary tự phục vụ asset của UI</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══ run it as a service ═══════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">Run it as a service</h2>
+    <h2 lang="vi">Chạy như một service</h2>
+    <p class="lede" lang="en">systemd, with the process confined to its own
+      directory. Drop this in <code>/etc/systemd/system/knowledge.service</code>.</p>
+    <p class="lede" lang="vi">systemd, với process bị giới hạn trong thư mục của
+      nó. Đặt file này vào <code>/etc/systemd/system/knowledge.service</code>.</p>
+
+    <div class="terminal"><span class="out">[Unit]
+Description=Knowledge Engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=knowledge
+WorkingDirectory=/opt/knowledge
+EnvironmentFile=/opt/knowledge/.env
+ExecStart=/opt/knowledge/bin/knowledge
+Restart=always
+RestartSec=3
+
+<span class="ok"># the process needs its own directory and nothing else</span>
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/knowledge
+
+[Install]
+WantedBy=multi-user.target</span></div>
+
+    <div class="terminal"><span class="cmd">sudo chmod 600 /opt/knowledge/.env</span><span class="out"># it holds the provider key</span><span class="cmd">sudo systemctl enable --now knowledge</span><span class="cmd">journalctl -u knowledge -f</span></div>
+
+    <p lang="en">Re-indexing on a schedule is a timer or a cron line around the same
+      command — it exits non-zero if anything failed, so a failure is visible:</p>
+    <p lang="vi">Index lại theo lịch chỉ là một timer hoặc dòng cron quanh cùng lệnh
+      đó — nó exit khác 0 khi có lỗi, nên lỗi không bị chìm:</p>
+    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; ./bin/ingest /srv/docs</span></div>
+  </section>
+
+  <p class="separator"></p>
+  <p class="lede" lang="en">What it is and how to get it running is on the Guide.</p>
+  <p class="lede" lang="vi">Nó là gì và cách chạy nằm ở trang Hướng dẫn.</p>
+  <p class="next"><a class="btn sm" href="<%.GuideURL%>"><span lang="en">&lsaquo;
+    Guide</span><span lang="vi">&lsaquo; Hướng dẫn</span></a></p>
+
+</main>
+
+<%template "foot" .%>

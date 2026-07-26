@@ -2,7 +2,7 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test secrets live smoke server ingest build vendor vendor-clean clean
+.PHONY: deps check test dead secrets live smoke server ingest build vendor vendor-clean clean
 
 deps:
 	go mod tidy
@@ -11,6 +11,21 @@ deps:
 check: test secrets
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed in:"; gofmt -l .; exit 1; }
 	go vet -tags "$(TAGS)" ./...
+	@$(MAKE) --no-print-directory dead
+
+# Dead code has a way of accumulating quietly. staticcheck catches unused
+# declarations; deadcode catches functions no binary can reach. Missing tools are
+# reported as skipped — but a *finding* must fail the build, so neither is written
+# as `tool || echo skipped` (that turns a non-zero exit into a cheerful message).
+# deadcode only reports, so its output is what decides the exit code.
+dead:
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		staticcheck -tags "$(TAGS)" ./...; \
+	else echo "  skipped staticcheck (go install honnef.co/go/tools/cmd/staticcheck@latest)"; fi
+	@if command -v deadcode >/dev/null 2>&1; then \
+		out=$$(deadcode -tags "$(TAGS)" ./cmd/...); \
+		if [ -n "$$out" ]; then echo "$$out"; echo "^ unreachable from any binary"; exit 1; fi; \
+	else echo "  skipped deadcode (go install golang.org/x/tools/cmd/deadcode@latest)"; fi
 
 # Nothing key-shaped may be committed. .env is gitignored; this catches the case
 # where a key gets pasted into a tracked file by accident.

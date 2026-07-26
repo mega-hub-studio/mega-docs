@@ -45,14 +45,21 @@ deploy separately.
 The bilingual (EN/VI) guide — how it works, quick start, deploying for the team,
 and the failures that actually happen — is readable two ways:
 
-- **[mega-hub-studio.github.io/mega-docs](https://mega-hub-studio.github.io/mega-docs/)**
-  — published by CI, so the team can read setup instructions before anything is
-  running and while it's down. (One-time: Settings → Pages → Source: GitHub Actions.)
-- **`/docs`** on a running instance — same page, plus an "Open app" button, and it
-  works on an air-gapped box because it ships inside the binary.
+| | Guide | Deploy |
+|---|---|---|
+| Published by CI | [/](https://mega-hub-studio.github.io/mega-docs/) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
+| On a running instance | `/docs` | `/deploy` |
 
-Both are rendered from the same `web/docs.html` by the same template, so there is
-no second copy to drift. Operator detail lives in **[SELFHOST.md](SELFHOST.md)**.
+**Guide** is what it is, how it works, three steps to running it, and the four
+failures that actually happen. **Deploy** is letting the team in (Tailscale /
+Cloudflare Tunnel / LAN), where to run it, systemd, backups and the settings table.
+
+Both hosts render the same `web/{docs,deploy}.html` through the same template — one
+source, no copy to drift — and locally you can build them with
+`go run ./cmd/rendocs -d /tmp/site`. On a running instance they also ship inside the
+binary, so they work on an air-gapped box.
+
+*One-time to publish: Settings → Pages → Source: GitHub Actions.*
 
 ## Architecture
 
@@ -62,7 +69,7 @@ No layer reaches back up, so each can be read (and tested) on its own.
 ```
 cmd/server        wiring only: config in, deps constructed, handler served (~50 lines)
 cmd/ingest        the indexing CLI
-cmd/rendocs       renders web/docs.html to a static file (GitHub Pages); no cgo
+cmd/rendocs       renders the two guide pages to static files (Pages); no cgo
 
 internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
@@ -71,7 +78,8 @@ internal/aitest   a fake provider over httptest — the whole pipeline, no key n
 internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
 internal/config   env → Config, with defaults
 
-web/              index.html (a Go template) + embed.go + assets.go
+web/              index.html · docs.html · deploy.html (Go templates, shared head
+                  in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js · session.js
 web/vendor.sha384 the one pin list: versions + digests, for the page and `make vendor`
@@ -145,7 +153,8 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | route | returns |
 |---|---|
 | `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
-| `GET /docs` | the bilingual (EN/VI) guide — quick start, deploy, troubleshooting |
+| `GET /docs` | the bilingual (EN/VI) guide — how it works, quick start, troubleshooting |
+| `GET /deploy` | the deployment page — Tailscale / Cloudflare / LAN, systemd, ops |
 | `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
 | `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |
@@ -201,8 +210,8 @@ additive — no migration, no re-architecture.
 - **Access control is minimal.** The server binds `127.0.0.1` by default and offers
   optional HTTP Basic auth (`AUTH_PASS`); there are no per-user permissions and no
   audit trail. To let the team reach it from anywhere, publish it through a tailnet
-  or a Cloudflare Tunnel rather than opening a port — see
-  **[SELFHOST.md](SELFHOST.md)**.
+  or a Cloudflare Tunnel rather than opening a port — see the
+  **[Deploy page](https://mega-hub-studio.github.io/mega-docs/deploy.html)**.
 
 ## Frontend assets (CDN, pinned)
 

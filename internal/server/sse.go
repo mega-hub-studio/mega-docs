@@ -30,8 +30,8 @@ func newStream(w http.ResponseWriter) (*stream, error) {
 }
 
 // send emits one event, JSON-encoding v. The first write error is remembered and
-// every later call is a no-op, so a disconnected client needs no checking at each
-// call site — ask err() once at the end if you care.
+// every later call becomes a no-op, so a handler can emit a whole answer without
+// checking after each frame: once the client is gone, the rest is dropped quietly.
 func (s *stream) send(event string, v any) {
 	if s.writeErr != nil {
 		return
@@ -49,6 +49,3 @@ func (s *stream) send(event string, v any) {
 	}
 	s.f.Flush()
 }
-
-// err reports the first write failure, if any.
-func (s *stream) err() error { return s.writeErr }

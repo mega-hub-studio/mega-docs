@@ -19,17 +19,15 @@ type Auth struct {
 	Pass string
 }
 
-func (a Auth) enabled() bool { return a.Pass != "" }
-
-// Enabled reports whether credentials are configured, so callers can warn about
-// an unprotected exposure without handling the password itself.
-func (a Auth) Enabled() bool { return a.enabled() }
+// Enabled reports whether credentials are configured. Exported so a caller can
+// warn about an unprotected exposure without handling the password itself.
+func (a Auth) Enabled() bool { return a.Pass != "" }
 
 // guard requires credentials on everything except /api/health, which stays open
 // so tunnels, load balancers and uptime checks can probe without a secret. It
 // reveals nothing but liveness.
 func guard(a Auth, h http.Handler) http.Handler {
-	if !a.enabled() {
+	if !a.Enabled() {
 		return h
 	}
 	// Compare digests, not the raw strings: equal-length hashes keep

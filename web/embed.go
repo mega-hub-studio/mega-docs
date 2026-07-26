@@ -19,6 +19,15 @@ var indexTmpl string
 //go:embed docs.html
 var docsTmpl string
 
+//go:embed deploy.html
+var deployTmpl string
+
+// docsbase.html holds the <head>, the top bar and the closing script that both
+// guide pages share — one copy of the 80-line style block, not two.
+//
+//go:embed docsbase.html
+var docsBaseTmpl string
+
 // Static tree served straight to the browser:
 //
 //	app/     the app shell — styles.css + the ES modules (no build step)
@@ -33,20 +42,44 @@ var FS embed.FS
 // Index renders index.html for one asset base — "https://cdn.jsdelivr.net/npm"
 // (the default) or "/vendor" when the assets ship inside this binary. Rendering
 // happens once at startup, so serving a request is just bytes.
-func Index(assetBase string) ([]byte, error) { return render("index", indexTmpl, assetBase, "/") }
-
-// Docs renders the bilingual guide (docs.html). Same asset plumbing as Index, so
-// the guide loads from the same pinned CDN — or from /vendor, which means the
-// operator manual stays readable on an air-gapped box.
-//
-// appLink is where "Open app" points. The server passes "/"; the static build for
-// GitHub Pages passes "" so the button is left out entirely rather than linking
-// somewhere that isn't running.
-func Docs(assetBase, appLink string) ([]byte, error) {
-	return render("docs", docsTmpl, assetBase, appLink)
+// Nav is where the guide's two pages live. They differ per host: the binary
+// serves /docs and /deploy, while a static build uses relative file names.
+type Nav struct {
+	Guide, Deploy, App string
 }
 
-func render(name, tmpl, assetBase, appLink string) ([]byte, error) {
+// ServedNav is how the running binary addresses its own pages.
+var ServedNav = Nav{Guide: "/docs", Deploy: "/deploy", App: "/"}
+
+// StaticNav is how a file-based host (GitHub Pages) addresses them. App is empty:
+// there is no app to open next to a static page.
+var StaticNav = Nav{Guide: "./index.html", Deploy: "./deploy.html"}
+
+func Index(assetBase string) ([]byte, error) {
+	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, nav: ServedNav})
+}
+
+// Docs renders the guide page, Deploy the deployment page. Same asset plumbing as
+// Index, so both load from the same pinned CDN — or from /vendor, which keeps the
+// guide readable on an air-gapped box.
+func Docs(assetBase string, nav Nav) ([]byte, error) {
+	return render(page{name: "docs", tmpl: docsTmpl, base: assetBase, nav: nav,
+		id: "docs", title: "Guide / Hướng dẫn"})
+}
+
+func Deploy(assetBase string, nav Nav) ([]byte, error) {
+	return render(page{name: "deploy", tmpl: deployTmpl, base: assetBase, nav: nav,
+		id: "deploy", title: "Deploy / Triển khai"})
+}
+
+type page struct {
+	name, tmpl, base string
+	nav              Nav
+	id, title        string // guide pages only; index.html uses neither
+}
+
+func render(pg page) ([]byte, error) {
+	name, tmpl, assetBase := pg.name, pg.tmpl, pg.base
 	base := strings.TrimSuffix(assetBase, "/")
 	if base == "" {
 		return nil, errors.New("web: empty asset base")
@@ -89,11 +122,19 @@ func render(name, tmpl, assetBase, appLink string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The guide pages share a head/bar/foot partial; index.html doesn't use it.
+	if pg.id != "" {
+		if _, err := t.Parse(docsBaseTmpl); err != nil {
+			return nil, err
+		}
+	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, struct {
-		Base, Origin, AppLink string
-		Remote                bool
-	}{base, origin, appLink, remote}); err != nil {
+		Base, Origin                 string
+		AppLink, GuideURL, DeployURL string
+		Page, Title                  string
+		Remote                       bool
+	}{base, origin, pg.nav.App, pg.nav.Guide, pg.nav.Deploy, pg.id, pg.title, remote}); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
