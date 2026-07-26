@@ -27,21 +27,10 @@ html {
   scroll-padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-4));
 }
 
-/* ── touch ────────────────────────────────────────────────────────────────
-   components.css already grows .btn / .input / .suggest-item to a 44px tap zone
-   and floors .input/.textarea/.select at 16px on coarse pointers, so none of
-   that is repeated here. Exactly two things fall through its net: ── */
-@media (pointer: coarse) {
-  /* .chat-submit sizes off --ctrl-h and isn't in that touch list, so the send
-     button — the most-tapped control on a phone — would stay 36px. */
-  .chat-submit { --ctrl-h: var(--ctrl-h-lg); }
-
-  /* The 16px iOS focus-zoom floor targets .textarea; the textarea inside
-     <nes-chat-prompt> is a bare element with no class, so it misses it.
-     Still true in 0.6.0: the upstream fix for both of these exists but was not in
-     the 0.6.0 tag, so keep them until a release actually carries it. */
-  .chat-prompt textarea { font-size: max(16px, var(--fs-body)); }
-}
+/* No touch overrides live here any more. 8bit-nes 0.6.1 carries both fixes this
+   file used to patch — .chat-submit on the --ctrl-h-lg rung, and the bare textarea
+   inside .chat-prompt / .composer floored at 16px so iOS never zooms on focus — so
+   the app owns no coarse-pointer CSS at all. */
 
 /* ── top bar ── */
 .bar {

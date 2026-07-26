@@ -260,7 +260,9 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 // exact bytes the page loads. That file arrives via `make vendor` and is never
 // committed, so the check skips rather than lies when it is absent.
 func TestThemeColorMatchesTheBarToken(t *testing.T) {
-	css, err := fs.ReadFile(FS, "vendor/8bit-nes@0.6.0/all.min.css")
+	// The path is built from the manifest, not written here, so bumping the design
+	// system stays a one-line change in web/vendor.sha384.
+	css, err := fs.ReadFile(FS, "vendor/"+pinnedSpecs(t)["8bit-nes"]+"/all.min.css")
 	if err != nil {
 		t.Skip("8bit-nes stylesheet not vendored — run `make vendor` to enable this check")
 	}
