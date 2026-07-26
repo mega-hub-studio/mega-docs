@@ -132,11 +132,28 @@ for (const file of sources) {
     .trim();
 
   const name = basename(file, ".mmd");
-  let svg = await page.evaluate(
+  let { svg, fontSize } = await page.evaluate(
     async ([code, id]) => {
-      window.mermaid.initialize(window.__nesTheme());
+      // mermaidTheme() carries the font family but not a size, so mermaid falls back
+      // to its own 16px — noticeably larger than --fs-body (13.5px), which made the
+      // diagram's text the biggest text on the page and the diagram itself taller
+      // than it needed to be. Measure the token and hand it over.
+      const probe = document.createElement("div");
+      probe.style.fontSize = "var(--fs-body)";
+      document.body.appendChild(probe);
+      const fontSize = parseFloat(getComputedStyle(probe).fontSize);
+      probe.remove();
+
+      // The size that ends up in the SVG's own <style> comes from themeVariables,
+      // not the top-level config key, so set it there.
+      const cfg = window.__nesTheme();
+      window.mermaid.initialize({
+        ...cfg,
+        fontSize,
+        themeVariables: { ...cfg.themeVariables, fontSize: `${fontSize}px` },
+      });
       const out = await window.mermaid.render(id, code);
-      return typeof out === "string" ? out : out.svg;
+      return { svg: typeof out === "string" ? out : out.svg, fontSize };
     },
     [code, name],
   );
@@ -155,7 +172,7 @@ for (const file of sources) {
   svg = closed;
   const out = `<!-- generated from ${file} by scripts/gen-diagram.mjs — do not edit\n     mmd-sha256: ${stamp(src)} -->\n${svg}\n`;
   writeFileSync(join(WEB, `${name}.svg`), out);
-  console.log(`  ✓ ${name}.svg (${(out.length / 1024).toFixed(1)} kB)`);
+  console.log(`  ✓ ${name}.svg (${(out.length / 1024).toFixed(1)} kB, text ${fontSize}px)`);
 }
 
 await browser.close();
