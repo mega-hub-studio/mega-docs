@@ -234,12 +234,12 @@ additive — no migration, no re-architecture.
 
 The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
 `marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
-design system (**0.6.1**). All of it is version-pinned *and* hash-pinned:
+design system (**0.7.0**). All of it is version-pinned *and* hash-pinned:
 
 | | pin |
 |---|---|
 | one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
-| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.6.1` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
+| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.0` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
 | `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
 | `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
 | font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
@@ -252,14 +252,20 @@ half-finished bump (one file moved, the rest left behind) fails at **startup**, 
 in someone's browser. 8-BIT NES publishes its own digests at
 [`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
 
-> **On 8bit-nes 0.6.1** (released 2026-07-26): the bump was one line plus
-> `make vendor`. 0.6.1 is CSS-only — `elements.min.js` and all three woff2 faces are
-> byte-identical to 0.6.0, and only `all.min.css` has a new digest — and it carries
-> the two touch fixes `web/app/styles.css` used to patch locally. Those overrides are
-> **deleted**: the app now owns no `(pointer: coarse)` CSS at all. Confirmed by
-> measurement rather than by reading the changelog — on 0.6.1 with no overrides the
-> send button is 44px and the chat textarea 16px, and pinning the same tree back to
-> 0.6.0 drops them to 36px and 14px.
+> **On 8bit-nes 0.7.0** (released 2026-07-26): the bump is one line plus
+> `make vendor`. Everything here is verified against the published tarball rather
+> than the changelog, because a release has already once been tagged without the fix
+> it claimed — all five digests match the package's own `sri.json`.
+>
+> 0.7.0 **keeps** 0.6.1's two touch fixes (send button 44px, chat textarea 16px), so
+> `web/app/styles.css` still owns no `(pointer: coarse)` CSS.
+>
+> It does **not** carry two accessibility fixes this project found and reported
+> upstream, so `web/docsbase.html` still overrides them locally, each marked with why:
+> `.wt-dot` is a 12×12 tap target, and `base.css` has no `a` rule at all so an inline
+> link is visually identical to the text around it. Both confirmed by pinning 0.7.0
+> and removing the overrides: the dots drop to 12×12 and links lose their underline
+> and go back to body colour. They stay until a release carries them.
 
 > **On the diagram.** The "how it works" picture is a mermaid graph, but mermaid
 > never reaches the browser: 8bit-nes deliberately does not bundle it (~800KB

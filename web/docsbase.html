@@ -146,8 +146,8 @@
   /* 8bit-nes styles headings, code and body but has no rule for `a` at all, so an
      inline link in prose rendered identically to the text around it — same colour,
      no underline, invisible as a link. Distinguish it on two channels, not colour
-     alone (WCAG 1.4.1): brighter ink *and* an underline. Reported upstream; this
-     goes away when the design system carries it. */
+     alone (WCAG 1.4.1): brighter ink *and* an underline. Still absent from 0.7.0
+     (verified against the published bytes), so this stays. */
   main :is(p, li, td, th) a:not(.btn, .card) {
     color: var(--ink);
     text-decoration: underline;
@@ -172,8 +172,8 @@
     text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
   }
   /* A .wt-dot is a real control (it jumps to that step) but only 12px, under even
-     the 24px AA floor. Grow the tap area, not the dot. Fixed upstream in 8bit-nes
-     0.6.2 — delete this block when the pin moves. */
+     the 24px AA floor. Grow the tap area, not the dot. Still absent from 0.7.0
+     (verified against the published bytes), so this stays. */
   @media (pointer: coarse) {
     .wt-dot { position: relative; }
     .wt-dot::after { content: ""; position: absolute; inset: -1rem; }
