@@ -36,7 +36,7 @@ func main() {
 			config.VendorAssetBase)
 	}
 
-	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
+	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
 	handler := server.New(server.Deps{Answers: engine, Index: index, Assets: web.FS})
 
 	srv := &http.Server{

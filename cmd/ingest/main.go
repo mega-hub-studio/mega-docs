@@ -31,7 +31,7 @@ func main() {
 	}
 	defer store.Close()
 
-	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
+	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
 	ctx := context.Background()
 
 	var files []string
@@ -53,20 +53,37 @@ func main() {
 		}
 	}
 
+	var indexed, chunks, failed int
 	for _, f := range files {
 		content, err := os.ReadFile(f)
 		if err != nil {
 			log.Printf("read %s: %v", f, err)
+			failed++
 			continue
 		}
 		n, err := engine.Ingest(ctx, f, string(content))
 		if err != nil {
 			log.Printf("ingest %s: %v", f, err)
+			failed++
 			continue
 		}
+		indexed++
+		chunks += n
 		log.Printf("indexed %s (%d chunks)", f, n)
 	}
-	log.Printf("done: %d files", len(files))
+
+	// Report what was *indexed*, not what was found, and fail the process if
+	// anything didn't make it. Exiting 0 after indexing nothing is how you end up
+	// with a server that looks ready and answers "not in the documents" forever.
+	log.Printf("done: %d/%d files, %d chunks", indexed, len(files), chunks)
+	if failed > 0 {
+		log.Printf("%d file(s) failed — the index is incomplete", failed)
+		os.Exit(1)
+	}
+	if chunks == 0 {
+		log.Print("nothing was indexed: no chunks were written")
+		os.Exit(1)
+	}
 }
 
 func isDoc(p string) bool {

@@ -23,7 +23,10 @@ export async function loadCorpus() {
     const res = await fetch("/api/corpus");
     if (!res.ok) return NONE;
     const c = await res.json();
-    return { ...c, state: c.docs > 0 ? "ready" : "empty" };
+    // "ready" needs retrievable *chunks*, not just document rows. A failed ingest
+    // can leave documents with nothing indexed under them, and calling that ready
+    // is how you get a UI that promises answers it can never give.
+    return { ...c, state: c.chunks > 0 ? "ready" : "empty" };
   } catch {
     return NONE;
   }

@@ -29,14 +29,12 @@ func (e *Engine) Ingest(ctx context.Context, path, content string) (int, error) 
 	if len(chunks) == 0 {
 		return 0, nil
 	}
-	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	docID, err := e.store.UpsertDocument(path, title)
-	if err != nil {
-		return 0, err
-	}
 
-	// Embed in batches to stay under provider limits.
-	const batch = 64
+	// Embed everything *before* touching the database. Writing the document row
+	// first would leave a chunk-less row behind whenever the provider fails — a
+	// document the corpus lists and retrieval can never return.
+	const batch = 64 // stay under per-request provider limits
+	vectors := make([][]float32, 0, len(chunks))
 	for i := 0; i < len(chunks); i += batch {
 		end := min(i+batch, len(chunks))
 		inputs := make([]string, 0, end-i)
@@ -47,11 +45,20 @@ func (e *Engine) Ingest(ctx context.Context, path, content string) (int, error) 
 		if err != nil {
 			return 0, err
 		}
-		for j, v := range vecs {
-			c := chunks[i+j]
-			if err := e.store.InsertChunk(docID, c.Heading, c.Content, i+j, v); err != nil {
-				return 0, err
-			}
+		if len(vecs) != len(inputs) {
+			return 0, fmt.Errorf("embed: %d vectors for %d chunks", len(vecs), len(inputs))
+		}
+		vectors = append(vectors, vecs...)
+	}
+
+	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	docID, err := e.store.UpsertDocument(path, title)
+	if err != nil {
+		return 0, err
+	}
+	for i, c := range chunks {
+		if err := e.store.InsertChunk(docID, c.Heading, c.Content, i, vectors[i]); err != nil {
+			return 0, err
 		}
 	}
 	return len(chunks), nil

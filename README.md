@@ -51,6 +51,7 @@ cmd/ingest        the indexing CLI
 internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
 internal/ai       one OpenAI-compatible client (embeddings + chat streaming)
+internal/aitest   a fake provider over httptest — the whole pipeline, no key needed
 internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
 internal/config   env → Config, with defaults
 
@@ -68,7 +69,8 @@ web/vendor/       `make vendor` output (gitignored)
 | a new API endpoint | `internal/server` | routing and transport live in one place |
 | a new dependency version | `web/vendor.sha384` | one line drives the URL, the digest and vendoring |
 | better retrieval / prompting | `internal/rag` | the domain never imports HTTP |
-| a new provider | `internal/ai` | one client, one seam |
+| a new provider | `internal/ai` | one client, one seam; probe it with `make live` |
+| a provider quirk to survive | `internal/aitest` | fault injection lives with the fake, not in each test |
 | a UI action | `web/app/app.js` | it's intent; plumbing lives in its own module |
 | a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
 | anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
@@ -99,7 +101,28 @@ run.stop();                                            // resolves, never throws
 view.scrollToEnd();                                    // viewport.js: follows, unless the reader scrolled up
 ```
 
-`make check` runs the lot (`gofmt`, `go vet`, `go test`).
+`make check` runs the lot (`gofmt`, `go vet`, `go test`, plus a guard that refuses
+to let anything credential-shaped into a tracked file).
+
+### Testing against a provider
+
+The unit and pipeline tests need no key and no network: `internal/aitest` serves a
+**fake OpenAI-compatible provider** over `httptest`, and the real `ai.Client` talks
+to it. That covers the parts a new provider actually breaks — request encoding,
+`index`-ordered embeddings, SSE frame parsing — which a hand-written fake client
+would not. It can also misbehave on purpose: no `/embeddings`, shuffled indexes, a
+short response, a mid-stream error, a 5xx.
+
+Two commands reach for the real thing:
+
+| command | what it answers |
+|---|---|
+| `make live` | Does this provider speak both endpoints? What embedding width does it return? Does chat stream incrementally? |
+| `make smoke` | The whole product: ingest a fixture, ask a question only that document can answer, and check the reply streams, cites the file, and quotes a fact unique to it. |
+
+Both read `AI_API_KEY` from `.env`, so the key never lands on a command line. Point
+them at a new provider *before* ingesting anything real — `make live` will tell you
+in seconds if `/embeddings` is missing, which is the one gap that stops ingest dead.
 
 ### HTTP surface
 

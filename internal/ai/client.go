@@ -1,5 +1,11 @@
 // Package ai is a minimal OpenAI-compatible client (embeddings + streaming chat).
-// Works with OpenAI, Azure, Groq, Together, OpenRouter, local Ollama/LM Studio, etc.
+// Works with OpenAI, Azure, Groq, Together, OpenRouter, local Ollama/LM Studio,
+// and any gateway that speaks the same two endpoints.
+//
+// Embeddings and chat carry separate base URLs on purpose: plenty of gateways
+// serve /chat/completions but not /embeddings, and a RAG index needs both. Point
+// EmbedBaseURL somewhere that has them (a local Ollama is enough) and keep chat
+// wherever you want it.
 package ai
 
 import (
@@ -8,42 +14,78 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"sort"
 	"strings"
+	"time"
+)
+
+// Timeouts: embeddings are a normal request/response, so a total deadline is
+// right. A chat stream is long-lived by design — bounding the *whole* call would
+// cut a long answer off mid-sentence, so only the wait for response headers is
+// capped there.
+const (
+	embedTimeout       = 60 * time.Second
+	chatHeaderTimeout  = 45 * time.Second
+	maxErrBody         = 2 << 10 // enough to read a provider's message, not its HTML
+	maxSSELineBytes    = 1 << 20
+	initialSSELineSize = 64 << 10
 )
 
 type Client struct {
-	BaseURL    string // e.g. https://api.openai.com/v1
-	APIKey     string
-	EmbedModel string
-	ChatModel  string
-	http       *http.Client
+	ChatBaseURL  string // e.g. https://api.openai.com/v1
+	EmbedBaseURL string // usually the same; split when a gateway lacks /embeddings
+	APIKey       string
+	EmbedModel   string
+	ChatModel    string
+
+	embedHTTP *http.Client
+	chatHTTP  *http.Client
 }
 
-func New(baseURL, apiKey, embedModel, chatModel string) *Client {
+// New builds a client. embedBaseURL may be empty, in which case chat's base URL
+// is used for both.
+func New(chatBaseURL, embedBaseURL, apiKey, embedModel, chatModel string) *Client {
+	chatBaseURL = strings.TrimRight(chatBaseURL, "/")
+	if embedBaseURL == "" {
+		embedBaseURL = chatBaseURL
+	}
 	return &Client{
-		BaseURL:    strings.TrimRight(baseURL, "/"),
-		APIKey:     apiKey,
-		EmbedModel: embedModel,
-		ChatModel:  chatModel,
-		http:       &http.Client{},
+		ChatBaseURL:  chatBaseURL,
+		EmbedBaseURL: strings.TrimRight(embedBaseURL, "/"),
+		APIKey:       apiKey,
+		EmbedModel:   embedModel,
+		ChatModel:    chatModel,
+		embedHTTP:    &http.Client{Timeout: embedTimeout},
+		chatHTTP: &http.Client{
+			Transport: &http.Transport{ResponseHeaderTimeout: chatHeaderTimeout},
+		},
 	}
 }
 
-func (c *Client) post(ctx context.Context, path string, body any) (*http.Response, error) {
-	b, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+path, bytes.NewReader(b))
+func (c *Client) post(ctx context.Context, hc *http.Client, base, path string, body any) (*http.Response, error) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+path, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
-	return c.http.Do(req)
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+	return hc.Do(req)
 }
 
-// Embed returns one vector per input string.
+// Embed returns one vector per input, in the same order as the inputs.
 func (c *Client) Embed(ctx context.Context, inputs []string) ([][]float32, error) {
-	resp, err := c.post(ctx, "/embeddings", map[string]any{
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	resp, err := c.post(ctx, c.embedHTTP, c.EmbedBaseURL, "/embeddings", map[string]any{
 		"model": c.EmbedModel,
 		"input": inputs,
 	})
@@ -52,18 +94,32 @@ func (c *Client) Embed(ctx context.Context, inputs []string) ([][]float32, error
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return nil, apiErr("embeddings", resp)
+		return nil, apiErr("embeddings", c.EmbedBaseURL, resp)
 	}
+
 	var out struct {
 		Data []struct {
+			Index     int       `json:"index"`
 			Embedding []float32 `json:"embedding"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("embeddings: decode: %w", err)
+	}
+
+	// The API contract orders by `index`, not by position in the array. Trusting
+	// array order would silently attach embeddings to the wrong chunks — an index
+	// that looks fine and retrieves nonsense.
+	sort.SliceStable(out.Data, func(i, j int) bool { return out.Data[i].Index < out.Data[j].Index })
+
+	if len(out.Data) != len(inputs) {
+		return nil, fmt.Errorf("embeddings: asked for %d vectors, got %d", len(inputs), len(out.Data))
 	}
 	vecs := make([][]float32, len(out.Data))
 	for i, d := range out.Data {
+		if len(d.Embedding) == 0 {
+			return nil, fmt.Errorf("embeddings: vector %d is empty", i)
+		}
 		vecs[i] = d.Embedding
 	}
 	return vecs, nil
@@ -76,7 +132,7 @@ type Msg struct {
 
 // ChatStream streams the assistant reply token-by-token to onToken.
 func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string)) error {
-	resp, err := c.post(ctx, "/chat/completions", map[string]any{
+	resp, err := c.post(ctx, c.chatHTTP, c.ChatBaseURL, "/chat/completions", map[string]any{
 		"model":       c.ChatModel,
 		"messages":    msgs,
 		"stream":      true,
@@ -87,19 +143,19 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return apiErr("chat", resp)
+		return apiErr("chat", c.ChatBaseURL, resp)
 	}
 
 	sc := bufio.NewScanner(resp.Body)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	sc.Buffer(make([]byte, 0, initialSSELineSize), maxSSELineBytes)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if !strings.HasPrefix(line, "data:") {
-			continue
+			continue // comments, keep-alives and blank separators
 		}
 		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if data == "[DONE]" {
-			break
+			return nil
 		}
 		var chunk struct {
 			Choices []struct {
@@ -107,9 +163,17 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 					Content string `json:"content"`
 				} `json:"delta"`
 			} `json:"choices"`
+			Error *struct {
+				Message string `json:"message"`
+			} `json:"error"`
 		}
 		if json.Unmarshal([]byte(data), &chunk) != nil {
-			continue
+			continue // a partial frame isn't worth failing a whole answer over
+		}
+		// Some providers report a mid-stream failure as a data frame rather than
+		// an HTTP status; swallowing it would look like a short answer.
+		if chunk.Error != nil && chunk.Error.Message != "" {
+			return fmt.Errorf("chat: %s", chunk.Error.Message)
 		}
 		for _, ch := range chunk.Choices {
 			if ch.Delta.Content != "" {
@@ -120,8 +184,18 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 	return sc.Err()
 }
 
-func apiErr(where string, resp *http.Response) error {
-	buf := new(bytes.Buffer)
-	_, _ = buf.ReadFrom(resp.Body)
-	return fmt.Errorf("%s API %d: %s", where, resp.StatusCode, strings.TrimSpace(buf.String()))
+// apiErr names the base URL, because "404 on /embeddings" is nearly always a
+// provider that doesn't have that endpoint rather than a broken request.
+func apiErr(where, base string, resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBody))
+	msg := strings.TrimSpace(string(body))
+	if msg == "" {
+		msg = resp.Status
+	}
+	if resp.StatusCode == http.StatusNotFound && where == "embeddings" {
+		return fmt.Errorf("embeddings: %s%s returned 404 — this provider has no embeddings endpoint. "+
+			"Point EMBED_BASE_URL at one that does (a local Ollama works) and keep chat where it is. Body: %s",
+			base, "/embeddings", msg)
+	}
+	return fmt.Errorf("%s API %d at %s: %s", where, resp.StatusCode, base, msg)
 }

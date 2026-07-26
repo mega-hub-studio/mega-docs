@@ -12,6 +12,7 @@ type Config struct {
 	DBPath     string
 	AssetBase  string
 	BaseURL    string
+	EmbedURL   string
 	APIKey     string
 	EmbedModel string
 	ChatModel  string
@@ -30,10 +31,13 @@ const (
 func Load() Config {
 	loadDotEnv(".env")
 	return Config{
-		Port:       env("PORT", "8080"),
-		DBPath:     env("DB_PATH", "knowledge.db"),
-		AssetBase:  env("ASSET_BASE", DefaultAssetBase),
-		BaseURL:    env("AI_BASE_URL", "https://api.openai.com/v1"),
+		Port:      env("PORT", "8080"),
+		DBPath:    env("DB_PATH", "knowledge.db"),
+		AssetBase: env("ASSET_BASE", DefaultAssetBase),
+		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
+		// Empty means "same as chat". Split it when a gateway serves
+		// /chat/completions but not /embeddings — a RAG index needs both.
+		EmbedURL:   env("EMBED_BASE_URL", ""),
 		APIKey:     env("AI_API_KEY", ""),
 		EmbedModel: env("EMBED_MODEL", "text-embedding-3-small"),
 		ChatModel:  env("CHAT_MODEL", "gpt-4o-mini"),
