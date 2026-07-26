@@ -1,15 +1,18 @@
 name: Deploy guide
 
-# Publishes the bilingual guide (web/docs.html) to GitHub Pages, so the team can
-# read setup and deploy instructions without anything running — including before
-# the server exists, and while it's down.
+# Publishes the bilingual guide to GitHub Pages, so the team can read setup and
+# deploy instructions without anything running — including before the server
+# exists, and while it's down. Two pages, each with its own URL:
+#
+#   index.html   the Guide  (web/docs.html)
+#   deploy.html  the Deploy runbook (web/deploy.html)
 #
 # One-time setup: repo Settings → Pages → Source: GitHub Actions.
 #
-# The page is a Go template (versions and SRI digests come from
-# web/vendor.sha384), so it is rendered by cmd/rendocs rather than copied. That
-# keeps the published page generated from the same source the binary serves —
-# there is no second copy to drift.
+# Both are Go templates (versions and SRI digests come from web/vendor.sha384),
+# so they are rendered by cmd/rendocs rather than copied. That keeps the
+# published pages generated from the same source the binary serves — there is no
+# second copy to drift.
 
 on:
   push:
@@ -52,8 +55,14 @@ jobs:
       - name: Render the guide
         run: |
           go run ./cmd/rendocs -d _site
+          # Both pages must exist: a grep over an empty _site would pass happily
+          # and publish nothing.
+          test -s _site/index.html && test -s _site/deploy.html
           # Fail loudly if a template action survived into either page.
           ! grep -rq '<%' _site/
+          # Each page must link the other, or the split leaves a dead end.
+          grep -q 'deploy.html' _site/index.html
+          grep -q 'index.html' _site/deploy.html
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
