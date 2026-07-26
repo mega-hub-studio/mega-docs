@@ -38,7 +38,8 @@ html {
 
   /* The 16px iOS focus-zoom floor targets .textarea; the textarea inside
      <nes-chat-prompt> is a bare element with no class, so it misses it.
-     (Fixed upstream for the next 8bit-nes release — remove this on that bump.) */
+     Still true in 0.6.0: the upstream fix for both of these exists but was not in
+     the 0.6.0 tag, so keep them until a release actually carries it. */
   .chat-prompt textarea { font-size: max(16px, var(--fs-body)); }
 }
 

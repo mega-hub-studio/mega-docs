@@ -164,12 +164,12 @@ additive — no migration, no re-architecture.
 
 The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
 `marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
-design system (**0.5.0**). All of it is version-pinned *and* hash-pinned:
+design system (**0.6.0**). All of it is version-pinned *and* hash-pinned:
 
 | | pin |
 |---|---|
 | one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
-| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.5.0` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
+| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.6.0` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
 | `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
 | `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
 | font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
@@ -182,11 +182,12 @@ half-finished bump (one file moved, the rest left behind) fails at **startup**, 
 in someone's browser. 8-BIT NES publishes its own digests at
 [`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
 
-> **On 8bit-nes 0.6.0:** it exists on the library's `main` (the OpenCode module —
-> workbench, diff, logs, preview) but is not tagged or published, so npm's `latest`
-> and therefore jsDelivr are still on 0.5.0. Nothing 0.6.0 adds is a docs-Q&A
-> surface, so this app stays pinned at 0.5.0 until it ships; then it's the one line
-> above.
+> **On 8bit-nes 0.6.0** (released 2026-07-26): the version bump was exactly the one
+> line above plus `make vendor`. The release is the OpenCode module — workbench,
+> diff, logs, preview — none of which is a docs-Q&A surface, so nothing here
+> changed shape. Note that `v0.6.0` was tagged *before* the upstream touch fixes
+> landed, so the two `(pointer: coarse)` rules in `web/app/styles.css` still carry
+> their own weight; they go away when a release includes them.
 
 > **Why pin so hard?** Because the floating spec broke this page: `marked` stopped
 > shipping `marked.min.js` at its package root after v4, so the old unpinned

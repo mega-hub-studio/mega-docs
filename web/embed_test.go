@@ -6,17 +6,19 @@ import (
 	"testing"
 )
 
+// Versions are read from the manifest, not written here: this asserts the wiring,
+// so bumping a dependency stays a one-line change in web/vendor.sha384.
 func TestIndexSubstitutesRemoteAssetBase(t *testing.T) {
 	out, err := Index("https://cdn.jsdelivr.net/npm")
 	if err != nil {
 		t.Fatal(err)
 	}
 	page := string(out)
+	pin := pinnedSpecs(t)
 
 	for _, want := range []string{
-		// the versions here come from web/vendor.sha384, not from the page
-		`href="https://cdn.jsdelivr.net/npm/8bit-nes@0.5.0/all.min.css"`,
-		`src="https://cdn.jsdelivr.net/npm/vue@3.5.40/dist/vue.global.prod.js"`,
+		`href="https://cdn.jsdelivr.net/npm/` + pin["8bit-nes"] + `/all.min.css"`,
+		`src="https://cdn.jsdelivr.net/npm/` + pin["vue"] + `/dist/vue.global.prod.js"`,
 		// a remote base is worth one warmed connection
 		`<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>`,
 	} {
@@ -24,6 +26,32 @@ func TestIndexSubstitutesRemoteAssetBase(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
+	// and the digest must travel with it
+	if !strings.Contains(page, `integrity="`+pinnedDigest(t, "8bit-nes", "all.min.css")+`"`) {
+		t.Error("the stylesheet went out without its manifest digest")
+	}
+}
+
+func pinnedSpecs(t *testing.T) map[string]string {
+	t.Helper()
+	p, err := parsePins(manifestSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.spec
+}
+
+func pinnedDigest(t *testing.T, pkg, file string) string {
+	t.Helper()
+	p, err := parsePins(manifestSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := p.sri(pkg, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
 }
 
 func TestIndexSubstitutesVendorBaseAndDropsPreconnect(t *testing.T) {
@@ -33,7 +61,7 @@ func TestIndexSubstitutesVendorBaseAndDropsPreconnect(t *testing.T) {
 	}
 	page := string(out)
 
-	if !strings.Contains(page, `href="/vendor/8bit-nes@0.5.0/all.min.css"`) {
+	if !strings.Contains(page, `href="/vendor/`+pinnedSpecs(t)["8bit-nes"]+`/all.min.css"`) {
 		t.Error("vendor path not substituted (or slash doubled)")
 	}
 	if strings.Contains(page, "preconnect") {

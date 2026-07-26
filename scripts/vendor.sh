@@ -65,5 +65,17 @@ done <"$MANIFEST"
 	exit 1
 }
 
+# Prune whatever the manifest no longer pins. Without this, every version bump
+# leaves the old tree behind — and it gets embedded into the binary forever.
+
+if [ -d "$OUT" ]; then
+	find "$OUT" -type f ! -name .gitkeep | while IFS= read -r f; do
+		rel=${f#"$OUT"/}
+		grep -q "^$rel " "$MANIFEST" || { rm -f "$f"; echo "  − $rel (no longer pinned)"; }
+	done
+	# drop directories the pruning emptied
+	find "$OUT" -mindepth 1 -type d -empty -delete
+fi
+
 echo "vendor: $count files verified into web/vendor/"
 echo "        rebuild to embed them (make build), then run with ASSET_BASE=/vendor"
