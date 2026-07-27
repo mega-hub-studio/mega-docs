@@ -281,6 +281,86 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     </div>
   </section>
 
+  <!-- ══ the DEV half of the loop ══════════════════════════════════════════════
+       The Guide explains the loop and the four states for both roles. This is only
+       what a DEV does differently: three steps before filing, and what to expect
+       back. Kept here rather than duplicated, so the two pages cannot drift. -->
+  <section>
+    <h2 lang="en">Filing a gap a BA can answer</h2>
+    <h2 lang="vi">Báo gap sao cho BA trả lời được</h2>
+    <p class="lede" lang="en">Your side of the QA loop. Three things before you file, so
+      the BA gets a real gap and not a rephrasing problem.</p>
+    <p class="lede" lang="vi">Phần việc của bạn trong vòng QA. Ba việc trước khi báo, để
+      BA nhận đúng một gap thật chứ không phải chuyện diễn đạt.</p>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Ask once more in the document's words</b>
+        <b lang="vi">Hỏi lại một lần bằng đúng từ trong tài liệu</b>
+        <p lang="en">Half of retrieval is keyword matching, so the identifier, error code
+          or config key beats a paraphrase. <b>Regenerate</b> also skips the answer
+          cache, which is what you want if you suspect a stale answer.</p>
+        <p lang="vi">Một nửa của truy xuất là khớp từ khoá, nên tên identifier, mã lỗi hay
+          key config ăn hơn diễn giải lại. <b>Regenerate</b> cũng bỏ qua cache, đúng thứ
+          bạn cần khi nghi câu trả lời cũ.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Check the corpus list</b>
+        <b lang="vi">Xem danh sách corpus</b>
+        <p lang="en">“Retrieval missed it” and “the document was never indexed” read
+          identically from a chat reply. The indexed-sources list on the empty screen —
+          or <code>GET /api/corpus</code> — is the only thing that tells them apart, and
+          the second one is not a ticket, it is a missing file.</p>
+        <p lang="vi">“Truy xuất trượt” và “tài liệu chưa từng được index” đọc từ câu trả
+          lời thì y như nhau. Danh sách nguồn đã index ở màn hình trống — hoặc
+          <code>GET /api/corpus</code> — là thứ duy nhất phân biệt được, và trường hợp
+          thứ hai không phải ticket, mà là thiếu file.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">Then Ask BA — don't retype the question</b>
+        <b lang="vi">Rồi bấm Ask BA — đừng gõ lại câu hỏi</b>
+        <p lang="en">The button sends the question <i>and</i> the answer that failed, so
+          the BA can see whether the documents are wrong or merely silent. Filing the same
+          gap twice is harmless: identical questions fold into one ticket, so you get the
+          existing one back rather than adding to the queue.</p>
+        <p lang="vi">Nút đó gửi cả câu hỏi <i>và</i> câu trả lời sai, để BA thấy tài liệu
+          sai hay chỉ đang thiếu. Báo trùng cũng không sao: câu hỏi giống nhau gộp vào một
+          ticket, nên bạn nhận lại ticket cũ chứ không làm dài hàng đợi.</p>
+      </div>
+    </div>
+
+    <p lang="en">The turn keeps a badge showing that ticket's real state. When it reaches
+      <span class="badge clear">IN KNOWLEDGE</span> the answer is a document: ask again and
+      you get it with a citation to <code>qa/ticket-N.md</code>, and free from the cache
+      after that.</p>
+    <p lang="vi">Lượt hỏi đó giữ một nhãn hiện trạng thái thật của ticket. Khi nó tới
+      <span class="badge clear">IN KNOWLEDGE</span> thì câu trả lời đã là tài liệu: hỏi lại
+      sẽ nhận được kèm dẫn nguồn tới <code>qa/ticket-N.md</code>, và sau đó miễn phí từ
+      cache.</p>
+
+    <div class="callout memo">
+      <b lang="en">Holding <code>BA_PASS</code> doesn't make it your ticket.</b>
+      <span lang="en">Confirming writes into the corpus for the whole team. If you know the
+        answer but not that it is <i>the</i> answer, leave it for someone who owns the
+        subject — the four states and the guidance for answering well are on the
+        <a href="<%.GuideURL%>#use">Guide</a>.</span>
+      <b lang="vi">Có <code>BA_PASS</code> không có nghĩa ticket đó là của bạn.</b>
+      <span lang="vi">Confirm là ghi vào corpus cho cả team. Nếu bạn biết câu trả lời nhưng
+        không chắc đó là câu trả lời <i>đúng thẩm quyền</i>, để người nắm nghiệp vụ làm —
+        bốn trạng thái và cách viết câu trả lời tốt nằm ở
+        <a href="<%.GuideURL%>#use">trang Hướng dẫn</a>.</span>
+    </div>
+  </section>
+
   <!-- ══ extend ════════════════════════════════════════════════════════════ -->
   <section>
     <h2 lang="en">Adding to these docs</h2>
