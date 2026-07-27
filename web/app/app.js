@@ -16,6 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { ask as askServer, health } from "./chat.js";
 import { answerHtml, fileName } from "./answer.js";
+import * as diagram from "./diagram.js";
 import { bindViewport } from "./viewport.js";
 import { loadCorpus, shortDate } from "./library.js";
 import * as session from "./session.js";
@@ -71,6 +72,9 @@ export function boot(ds) {
         writes: false, // does this instance allow a BA to confirm at all
         // What the bottom strip reports. Filled by checkHealth; zeros stay hidden.
         runtime: { model: "", window: 0, priceIn: 0, priceOut: 0 },
+        // Flipped once the mermaid renderer is in the page. Until then a diagram
+        // answer shows the fenced code the model wrote, which still reads.
+        mermaidReady: false,
         queue: { tickets: [], open: 0, answered: 0, confirmed: 0, rejected: 0 },
         history: [],
         status: qa.STATUS,
@@ -166,7 +170,10 @@ export function boot(ds) {
         // No linking mid-stream: the citation list only lands at the end, and
         // until then a "[1]" has nothing to point at.
         return answerHtml(t.a, {
-          count: t.streaming ? 0 : t.citations.length,
+          diagrams: !t.streaming && this.mermaidReady,
+          // The numbers, not how many: the engine returns only the sources the
+          // answer cited and keeps their original n, so [2] can arrive alone.
+          nums: t.streaming ? [] : t.citations.map((c) => c.n),
           srcId: (n) => this.srcId(t, n),
         });
       },
@@ -310,6 +317,12 @@ export function boot(ds) {
           this.busy = false;
           this.run = null;
           if (this.corpus.state !== "ready") this.refreshCorpus();
+          // Fetch the diagram renderer only now, and only if this answer drew one.
+          // Flipping the flag re-renders the answer, which is when the fence turns
+          // into <nes-mermaid> — so the element never exists before mermaid does.
+          if (!this.mermaidReady && diagram.hasDiagram(turn.a)) {
+            diagram.ready().then((ok) => (this.mermaidReady = ok));
+          }
         }
       },
 

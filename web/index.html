@@ -82,6 +82,14 @@
 <link rel="modulepreload" href="/app/qa.js">
 <link rel="modulepreload" href="/app/upload.js">
 <link rel="modulepreload" href="/app/ba.js">
+<link rel="modulepreload" href="/app/diagram.js">
+<!-- Where the diagram renderer lives, and its digest — resolved from
+     web/vendor.sha384 like every other asset, so no version or hash is spelled out
+     twice. It is data, not a <script>: 3.4 MB is fetched by web/app/diagram.js only
+     when an answer actually contains a mermaid block, and never on first paint. -->
+<script type="application/json" id="mermaid-src">
+{"src": "<%url "mermaid" "dist/mermaid.min.js"%>", "integrity": "<%sri "mermaid" "dist/mermaid.min.js"%>"}
+</script>
 <link rel="modulepreload" href="/app/tree.js">
 </head>
 <body>

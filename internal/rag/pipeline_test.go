@@ -334,3 +334,48 @@ func TestAMissCitesNothingEvenWhenRetrievalFoundChunks(t *testing.T) {
 		t.Errorf("a miss cited %d source(s): %+v", len(reply.Citations), reply.Citations)
 	}
 }
+
+// TOP_K is a retrieval budget, not a reading list. An answer that used one section
+// must not hand the reader five more to check — and the numbers it did use have to
+// keep working as links, so nothing may be renumbered.
+func TestOnlyTheSourcesTheAnswerCitedAreReturned(t *testing.T) {
+	e, _ := engine(t, &aitest.Provider{Reply: "Approved chunks are boosted [2]."})
+	ctx := context.Background()
+	for _, d := range []struct{ path, body string }{
+		{"docs/retrieval.md", retrievalDoc},
+		{"docs/deploy.md", deployDoc},
+	} {
+		if _, err := e.Ingest(ctx, d.path, d.body); err != nil {
+			t.Fatalf("ingest %s: %v", d.path, err)
+		}
+	}
+
+	_, reply, err := ask(t, e, "are approved chunks boosted?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if len(reply.Citations) != 1 {
+		t.Fatalf("answer cited [2] only, but %d source(s) came back: %+v", len(reply.Citations), reply.Citations)
+	}
+	if reply.Citations[0].N != 2 {
+		t.Errorf("citation renumbered to %d — the answer text says [2] and the link would miss", reply.Citations[0].N)
+	}
+}
+
+// An answer with no markers has the source list as its only provenance; guessing
+// which entry mattered would be worse than showing them all.
+func TestAnAnswerThatCitesNothingKeepsEverySource(t *testing.T) {
+	e, _ := engine(t, &aitest.Provider{Reply: "Approved chunks are boosted."})
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	_, reply, err := ask(t, e, "are approved chunks boosted?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if len(reply.Citations) == 0 {
+		t.Error("an uncited answer was left with no provenance at all")
+	}
+}
