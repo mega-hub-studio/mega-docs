@@ -330,16 +330,26 @@ done: 8/8 files, 74 chunks</span></div>
       <b lang="en">Ingest says "no embeddings endpoint"</b>
       <span lang="en">Your chat provider doesn't serve <code>/embeddings</code> —
         common for coding-agent gateways. Point embeddings elsewhere and keep chat
-        where it is: <code>EMBED_BASE_URL=http://localhost:11434/v1</code> with
-        <code>EMBED_MODEL=nomic-embed-text</code> and <code>EMBED_DIM=768</code>
-        (a local Ollama, free).</span>
+        where it is. Two ways: a local Ollama (free), or OpenAI for embeddings only.
+        If the two are different vendors, <code>EMBED_API_KEY</code> is required —
+        one key is not valid at both.</span>
       <b lang="vi">Ingest báo "no embeddings endpoint"</b>
       <span lang="vi">Provider chat của bạn không có <code>/embeddings</code> —
         rất thường gặp ở các gateway kiểu coding-agent. Trỏ embeddings sang chỗ
-        khác và giữ chat ở nguyên đó:
-        <code>EMBED_BASE_URL=http://localhost:11434/v1</code> với
-        <code>EMBED_MODEL=nomic-embed-text</code> và <code>EMBED_DIM=768</code>
-        (Ollama local, miễn phí).</span>
+        khác và giữ chat ở nguyên đó. Hai cách: Ollama local (miễn phí), hoặc dùng
+        OpenAI chỉ cho embeddings. Nếu là hai nhà cung cấp khác nhau thì
+        <b>phải</b> set <code>EMBED_API_KEY</code> — một key không dùng được ở cả
+        hai.</span>
+      <div class="terminal"><span class="out"># free, nothing leaves the machine
+EMBED_BASE_URL=http://localhost:11434/v1
+EMBED_MODEL=nomic-embed-text
+EMBED_DIM=768
+
+# or OpenAI for embeddings only
+EMBED_BASE_URL=https://api.openai.com/v1
+EMBED_API_KEY=sk-…
+EMBED_MODEL=text-embedding-3-small
+EMBED_DIM=1536</span></div>
     </div>
 
     <div class="callout info">
