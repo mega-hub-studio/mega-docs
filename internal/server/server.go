@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"knowledge-engine/internal/db"
@@ -41,6 +42,7 @@ type Deps struct {
 //
 //	GET  /            index.html          revalidated (it pins asset versions)
 //	GET  /docs · /dev · /deploy   the bilingual guide, one page per role (EN/VI)
+//	GET  /llms.txt    the llmstxt.org index for AI agents (text/plain)
 //	GET  /api/health  {"ok":true}  — always open, so probes need no secret
 //	POST /api/chat    SSE: token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
@@ -61,7 +63,7 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))
 	for path, page := range d.Pages {
 		if page != nil {
-			mux.Handle("GET "+path, revalidate(etag(page), serveBytes(page, "text/html; charset=utf-8")))
+			mux.Handle("GET "+path, revalidate(etag(page), serveBytes(page, contentType(path))))
 		}
 	}
 
@@ -72,6 +74,16 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /vendor/", immutable(files))
 
 	return guard(d.Auth, mux)
+}
+
+// contentType picks the type from the route. The Pages map holds HTML pages and
+// /llms.txt, and serving that as text/html makes a browser try to render it and an
+// agent guess — so the one plain-text route says so.
+func contentType(route string) string {
+	if strings.HasSuffix(route, ".txt") {
+		return "text/plain; charset=utf-8"
+	}
+	return "text/html; charset=utf-8"
 }
 
 func serveBytes(b []byte, contentType string) http.Handler {

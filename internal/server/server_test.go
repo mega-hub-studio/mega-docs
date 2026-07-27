@@ -301,10 +301,11 @@ func TestPagesMapIsRoutedByAddress(t *testing.T) {
 		Answers: fakeAnswers{},
 		Index:   []byte("<html>index</html>"),
 		Pages: map[string][]byte{
-			"/docs":   []byte("<html>guide</html>"),
-			"/dev":    []byte("<html>dev</html>"),
-			"/deploy": []byte("<html>deploy</html>"),
-			"/nope":   nil, // a page that failed to render must not become a route
+			"/docs":     []byte("<html>guide</html>"),
+			"/dev":      []byte("<html>dev</html>"),
+			"/deploy":   []byte("<html>deploy</html>"),
+			"/llms.txt": []byte("# index\n"), // plain text, not HTML
+			"/nope":     nil,                 // a page that failed to render must not become a route
 		},
 		Assets: fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
 	})
@@ -324,6 +325,14 @@ func TestPagesMapIsRoutedByAddress(t *testing.T) {
 		if w.Header().Get("ETag") == "" {
 			t.Errorf("%s went out without an ETag", path)
 		}
+	}
+
+	// llms.txt must not go out as text/html: a browser would try to render it and an
+	// agent would have to guess.
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/llms.txt", nil))
+	if ct := w.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+		t.Errorf("/llms.txt served as %q, want text/plain", ct)
 	}
 
 	for _, path := range []string{"/nope", "/unknown"} {

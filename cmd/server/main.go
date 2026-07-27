@@ -47,6 +47,15 @@ func main() {
 		}
 		pages[route] = page
 	}
+	// The same machine index the published site serves, so an agent pointed at a
+	// running instance — the only source on an air-gapped box — finds it too. Absolute
+	// URLs are the public site's: llms.txt is an index of the documentation, not of
+	// this particular host.
+	if llms, err := web.LLMs(cfg.SiteURL); err != nil {
+		log.Fatalf("llms.txt: %v", err)
+	} else {
+		pages["/llms.txt"] = llms
+	}
 	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
 		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
 			config.VendorAssetBase)

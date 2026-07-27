@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -373,5 +374,69 @@ func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
 				t.Errorf("%s page never links %s", name, addr)
 			}
 		}
+	}
+}
+
+// AGENTS.md tells an agent which 8bit-nes docs to read, and points at a
+// version-exact URL rather than the unversioned docs site. That version is quoted
+// prose, and quoted prose drifts from generated pins — which is exactly how 8bit-nes
+// 0.7.0 shipped a README pinning @0.7.0 with 0.6.1's digests. Same class of bug, so
+// same guard.
+func TestAgentNotesPinMatchesTheManifest(t *testing.T) {
+	notes, err := os.ReadFile("../AGENTS.md")
+	if err != nil {
+		t.Fatalf("AGENTS.md is the entry point for agents; it must exist: %v", err)
+	}
+	spec := pinnedSpecs(t)["8bit-nes"] // e.g. "8bit-nes@0.7.0"
+	text := string(notes)
+
+	// Every 8bit-nes version mentioned must be the pinned one — a stale URL sends the
+	// reader to docs for CSS this repo does not load.
+	found := regexp.MustCompile(`8bit-nes@[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(text, -1)
+	if len(found) == 0 {
+		t.Fatal("AGENTS.md quotes no 8bit-nes version at all")
+	}
+	for _, got := range found {
+		if got != spec {
+			t.Errorf("AGENTS.md points at %s but web/vendor.sha384 pins %s — an agent would "+
+				"read docs for a version this repo does not load", got, spec)
+		}
+	}
+
+	// And it must name the version-exact source, not only the docs site, which is
+	// always latest.
+	if !strings.Contains(text, "cdn.jsdelivr.net/npm/"+spec+"/llms.txt") {
+		t.Errorf("AGENTS.md does not link the pinned llms.txt for %s", spec)
+	}
+}
+
+// llms.txt is what an agent reads first, so it must actually list every published
+// page and be derived from them rather than hand-kept.
+func TestLLMsIndexListsEveryPage(t *testing.T) {
+	out, err := LLMs("https://example.test/docs/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+
+	for _, want := range []string{"index.html", "dev.html", "deploy.html"} {
+		if !strings.Contains(got, "https://example.test/docs/"+want) {
+			t.Errorf("llms.txt never links %s", want)
+		}
+	}
+	// Section names come out of the pages, so a page's own heading must appear.
+	for _, want := range []string{"Using it well", "The two seams", "Let the team in"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("llms.txt is missing the %q section — is it still derived from the pages?", want)
+		}
+	}
+	// No markup, no template actions, no trailing slash doubling.
+	for _, bad := range []string{"<", "<%", "docs//"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("llms.txt contains %q — it should be plain text", bad)
+		}
+	}
+	if _, err := LLMs(""); err == nil {
+		t.Error("want an error for an empty site base")
 	}
 }

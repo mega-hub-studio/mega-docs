@@ -54,6 +54,14 @@ binary. One page per role, because each role arrives with a different question:
 
 The Guide opens with a router, so nobody has to read a page that is not theirs.
 
+For AI agents there is [`AGENTS.md`](AGENTS.md) and a generated
+[`/llms.txt`](https://mega-hub-studio.github.io/mega-docs/llms.txt) — an
+[llmstxt.org](https://llmstxt.org) index of every page and section, built by
+`cmd/rendocs` from the pages themselves so it cannot drift from them. `AGENTS.md`
+also points at the **version-pinned** 8bit-nes docs (`llms.txt` ships inside the
+package, so a jsDelivr URL is version-exact, unlike the always-latest docs site) and
+a test fails if that version drifts from `web/vendor.sha384`.
+
 **Guide** is what it is, how it works, three steps to running it, using it well
 (asking, reading citations, what is actually indexed) and the four failures that
 actually happen. **Dev** is the first hour: where things live, the two seams,
@@ -80,7 +88,7 @@ No layer reaches back up, so each can be read (and tested) on its own.
 ```
 cmd/server        wiring only: config in, deps constructed, handler served (~50 lines)
 cmd/ingest        the indexing CLI
-cmd/rendocs       renders every guide page to a static file (Pages); no cgo
+cmd/rendocs       renders every guide page + llms.txt to static files; no cgo
 
 internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
@@ -95,6 +103,7 @@ web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js · session.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
+web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
 web/vendor.sha384 the one pin list: versions + digests, for the page and `make vendor`
 web/vendor/       `make vendor` output (gitignored)
 ```
@@ -118,6 +127,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
 | a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the server routes whatever is in its `Pages` map, so it needs no change |
+| something an AI agent must know | [`AGENTS.md`](AGENTS.md) | `llms.txt` is generated; this is the hand-written part, and its pins are tested |
 
 ### The two seams that make it testable
 
@@ -172,6 +182,7 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | `GET /docs` | the guide (EN/VI) — how it works, quick start, using it well, troubleshooting |
 | `GET /dev` | the dev page — where things live, the two seams, testing, the knobs |
 | `GET /deploy` | the deployment page — Tailscale / Cloudflare / LAN, systemd, ops |
+| `GET /llms.txt` | the [llmstxt.org](https://llmstxt.org) index for AI agents, generated from the pages |
 | `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
 | `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |

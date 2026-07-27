@@ -12,6 +12,7 @@ type Config struct {
 	Port       string
 	DBPath     string
 	AssetBase  string
+	SiteURL    string
 	BaseURL    string
 	EmbedURL   string
 	APIKey     string
@@ -29,6 +30,11 @@ type Config struct {
 const (
 	DefaultAssetBase = "https://cdn.jsdelivr.net/npm"
 	VendorAssetBase  = "/vendor"
+
+	// DefaultSiteURL is where the guide is published. It appears in the absolute
+	// URLs of /llms.txt, which indexes the documentation rather than this host, so a
+	// fork should point it at its own Pages site.
+	DefaultSiteURL = "https://mega-hub-studio.github.io/mega-docs"
 )
 
 func Load() Config {
@@ -41,6 +47,7 @@ func Load() Config {
 		Port:      env("PORT", "8080"),
 		DBPath:    env("DB_PATH", "knowledge.db"),
 		AssetBase: env("ASSET_BASE", DefaultAssetBase),
+		SiteURL:   env("SITE_URL", DefaultSiteURL),
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
 		// Empty means "same as chat". Split it when a gateway serves
 		// /chat/completions but not /embeddings — a RAG index needs both.

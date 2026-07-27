@@ -7,6 +7,7 @@ name: Deploy guide
 #   index.html   the Guide  (web/docs.html)   — everyone, then BA
 #   dev.html     the Dev page (web/dev.html)  — DEV
 #   deploy.html  the Deploy runbook (web/deploy.html)
+#   llms.txt     the llmstxt.org index for AI agents — generated from the pages
 #
 # One-time setup, by a human with admin on the repo (a workflow token cannot do it):
 #   Settings → Pages → Source: GitHub Actions
@@ -24,6 +25,7 @@ on:
       - web/docs.html
       - web/dev.html
       - web/deploy.html
+      - web/llms.go
       - web/docsbase.html
       - web/vendor.sha384
       - web/embed.go
@@ -61,7 +63,7 @@ jobs:
           go run ./cmd/rendocs -d _site
           # Every page must exist: a grep over an empty _site would pass happily
           # and publish nothing.
-          for f in index.html dev.html deploy.html; do test -s "_site/$f"; done
+          for f in index.html dev.html deploy.html llms.txt; do test -s "_site/$f"; done
           # Fail loudly if a template action survived into either page.
           ! grep -rq '<%' _site/
           # Each page must link the other two, or a role lands in a dead end.
@@ -70,6 +72,10 @@ jobs:
             grep -q 'dev.html'    "_site/$f"
             grep -q 'deploy.html' "_site/$f"
           done
+          # llms.txt is what an agent reads first: it must link every page, and it
+          # must be plain text (it is derived from HTML, so a leaked tag is possible).
+          for f in index.html dev.html deploy.html; do grep -q "$f" _site/llms.txt; done
+          ! grep -q '<' _site/llms.txt
 
       # No `enablement: true` here — it was tried and cannot work. Creating a Pages
       # site needs repo-admin rights, and GITHUB_TOKEN tops out at `pages: write`,

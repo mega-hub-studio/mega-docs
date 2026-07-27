@@ -23,6 +23,8 @@ func main() {
 	dir := flag.String("d", "_site", "output directory")
 	base := flag.String("base", "https://cdn.jsdelivr.net/npm",
 		"asset base URL; the published page needs a public one")
+	site := flag.String("site", "https://mega-hub-studio.github.io/mega-docs",
+		"where these pages are published; llms.txt needs absolute URLs")
 	flag.Parse()
 
 	// StaticNav links the pages to each other by file name and drops the "Open app"
@@ -35,6 +37,10 @@ func main() {
 		strings.TrimPrefix(nav.Dev, "./"):    func() ([]byte, error) { return web.Dev(*base, nav) },
 		strings.TrimPrefix(nav.Deploy, "./"): func() ([]byte, error) { return web.Deploy(*base, nav) },
 	}
+	// llms.txt rides along with the pages: it is derived from them, so publishing one
+	// without the other is how an agent ends up reading a stale index.
+	pages["llms.txt"] = func() ([]byte, error) { return web.LLMs(*site) }
+
 	if err := os.MkdirAll(*dir, 0o755); err != nil {
 		die(err)
 	}
