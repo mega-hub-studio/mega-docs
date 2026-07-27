@@ -101,16 +101,18 @@ await qa.act(id, "confirm", { answer });       // qa.js — throws WrongPass on 
 view.scrollToEnd();                            // viewport.js</span></div>
     <p lang="en">The two screens are two components. <code>app.js</code> is the shell —
       turns, health, corpus, the queue both screens list; <code>ba.js</code> owns what
-      only BA mode touches (drafts, the unlock form, import progress). Three crossings:
-      props down, one <code>changed</code> event up, and <code>toast</code> injected
-      because the pinned CDN URL lives in one file. In-DOM templates, so components still
-      cost no build step.</p>
+      only BA mode touches (drafts, the unlock form, import progress). Three kinds of crossing, and no more:
+      four props down, two events up (<code>changed</code>, <code>ask</code>), and
+      <code>toast</code> injected because the pinned CDN URL lives in one file. In-DOM
+      templates, so components still cost no build step — and every branch behind that
+      contract lives in a composable, which is the section below.</p>
     <p lang="vi">Hai màn hình là hai component. <code>app.js</code> là lớp vỏ — lượt hỏi,
       health, corpus, hàng đợi mà cả hai màn hình đều hiển thị; <code>ba.js</code> giữ
-      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Ba chỗ
-      giao nhau: props xuống, một event <code>changed</code> lên, và <code>toast</code>
-      được inject vì URL CDN đã pin chỉ nằm ở một file. Template in-DOM, nên component
-      vẫn không cần bước build.</p>
+      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Ba loại chỗ
+      giao nhau, không hơn: bốn props xuống, hai event lên (<code>changed</code>,
+      <code>ask</code>), và <code>toast</code> được inject vì URL CDN đã pin chỉ nằm ở
+      một file. Template in-DOM, nên component vẫn không cần bước build — và mọi nhánh
+      logic phía sau contract đó nằm trong composable, đúng mục bên dưới.</p>
 
   </section>
 
