@@ -257,6 +257,10 @@
           <tr lang="vi"><th><code>EMBED_DIM</code></th><td><code>1536</code></td><td>phải khớp chính xác với embedding model</td></tr>
           <tr lang="en"><th><code>TOP_K</code></th><td><code>6</code></td><td>how many sections feed the answer</td></tr>
           <tr lang="vi"><th><code>TOP_K</code></th><td><code>6</code></td><td>bao nhiêu đoạn được đưa vào câu trả lời</td></tr>
+          <tr lang="en"><th><code>CONTEXT_WINDOW</code></th><td><code>0</code> (hidden)</td><td>the chat model's window, in tokens. Set it and the status line shows what share of it an answer used; leave it and that number is simply absent, because a made-up percentage is worse than none</td></tr>
+          <tr lang="vi"><th><code>CONTEXT_WINDOW</code></th><td><code>0</code> (ẩn)</td><td>context window của model chat, tính theo token. Đặt vào thì status line hiện câu trả lời dùng bao nhiêu phần trăm; bỏ trống thì không hiện số đó, vì một con số đoán bừa còn tệ hơn không có</td></tr>
+          <tr lang="en"><th><code>PRICE_IN</code> · <code>PRICE_OUT</code></th><td><code>0</code> (hidden)</td><td>USD per 1M prompt / completion tokens, from your provider's price list. Both zero means no money is shown at all — the token counts still are, because they come from the provider itself</td></tr>
+          <tr lang="vi"><th><code>PRICE_IN</code> · <code>PRICE_OUT</code></th><td><code>0</code> (ẩn)</td><td>USD cho 1M token prompt / completion, lấy từ bảng giá của provider. Cả hai bằng 0 thì không hiện tiền — số token thì vẫn hiện, vì đó là do provider tự đếm</td></tr>
           <tr lang="en"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> to serve the UI's assets from the binary</td></tr>
           <tr lang="vi"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> để binary tự phục vụ asset của UI</td></tr>
         </tbody>

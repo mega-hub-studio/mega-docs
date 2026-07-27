@@ -37,7 +37,7 @@ func TestHybridSearch(t *testing.T) {
 	}
 
 	// Query semantically close to chunk 0, and keyword "JWT" also in chunk 0.
-	hits, err := s.Search(vec(0.9, 0.1, 0, 0), "how do I get a JWT token", 3)
+	hits, err := s.Search(vec(0.9, 0.1, 0, 0), "how do I get a JWT token", 3, "")
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -112,5 +112,96 @@ func TestCorpus(t *testing.T) {
 	// limit is a cap, not a suggestion — the payload has to stay phone-sized.
 	if one, err := s.Corpus(1); err != nil || len(one.Documents) != 1 {
 		t.Errorf("Corpus(1) = %d docs, %v; want 1 and no error", len(one.Documents), err)
+	}
+}
+
+// TestScopedSearchRanksWithinTheScope is the check that the scope is a *pre*-filter on
+// both retrievers, not a filter over their results.
+//
+// The corpus is stacked against it: twenty chunks outside the scope are the nearest
+// vectors *and* the strongest keyword matches, and only five far-away chunks are
+// inside it. A post-filter would take the global top-k first and return nothing (or a
+// handful); a pre-filter returns k hits, all from the scope. sqlite-vec does the
+// former as of v0.1.6 — if a later version regresses, this test says so instead of
+// scoped answers quietly going thin.
+func TestScopedSearchRanksWithinTheScope(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "scope.db"), 4)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer s.Close()
+
+	loud, err := s.UpsertDocument("support/faq.md", "faq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quiet, err := s.UpsertDocument("booking/calendar/rules.md", "rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 20; i++ {
+		if err := s.InsertChunk(loud, "FAQ", "refund window and refund policy", i, vec(1, float32(i)*0.001, 0, 0)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		if err := s.InsertChunk(quiet, "Rules", "a refund inside the booking calendar", i, vec(0, 0, 1, float32(i)*0.001)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, c := range []struct {
+		name, scope string
+		wantDoc     string
+		wantHits    int
+	}{
+		{"the whole corpus still ranks globally", "", "support/faq.md", 3},
+		{"a folder scope", "booking/calendar", "booking/calendar/rules.md", 3},
+		{"a folder above it", "booking", "booking/calendar/rules.md", 3},
+		{"one document", "booking/calendar/rules.md", "booking/calendar/rules.md", 3},
+		{"a scope that matches nothing retrieves nothing", "engineering", "", 0},
+		// "booking" must not also match a sibling that merely starts with it, which is
+		// what a bare LIKE 'booking%' would do.
+		{"a prefix that is not a path segment", "book", "", 0},
+	} {
+		hits, err := s.Search(vec(1, 0, 0, 0), "refund policy", 3, c.scope)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if len(hits) != c.wantHits {
+			t.Errorf("%s: %d hits; want %d", c.name, len(hits), c.wantHits)
+		}
+		for _, h := range hits {
+			if h.DocPath != c.wantDoc {
+				t.Errorf("%s: hit from %s; want only %s", c.name, h.DocPath, c.wantDoc)
+			}
+		}
+	}
+}
+
+// A document path containing a LIKE metacharacter is matched as itself. Without the
+// escape, scoping to "q_1" would also answer from "qa1", citing a folder nobody asked
+// for.
+func TestScopeTreatsWildcardsAsCharacters(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "wild.db"), 4)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer s.Close()
+	underscore, _ := s.UpsertDocument("q_1/spec.md", "underscore")
+	other, _ := s.UpsertDocument("qa1/spec.md", "other")
+	if err := s.InsertChunk(underscore, "H", "the escaped one", 0, vec(1, 0, 0, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertChunk(other, "H", "the escaped one", 0, vec(1, 0, 0, 0)); err != nil {
+		t.Fatal(err)
+	}
+
+	hits, err := s.Search(vec(1, 0, 0, 0), "escaped", 5, "q_1")
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(hits) != 1 || hits[0].DocPath != "q_1/spec.md" {
+		t.Errorf("hits = %+v; want only q_1/spec.md", hits)
 	}
 }

@@ -443,3 +443,125 @@ func TestChangingTheChatModelInvalidatesTheCache(t *testing.T) {
 		t.Error("the new model never reached the provider")
 	}
 }
+
+/* ══ Scoped retrieval ═══════════════════════════════════════════════════════════
+   A scope is a promise: answer from *this* part of the corpus. Two things can break
+   it — retrieval reaching outside the scope, and the cache answering a scoped
+   question from an unscoped row. Both are asserted here, because a violation of
+   either produces a confident answer citing documents the reader excluded. */
+
+func TestAScopeKeepsTheAnswerInsideIt(t *testing.T) {
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "booking/rules.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Ingest(ctx, "support/deploy.md", deployDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct{ name, scope, want string }{
+		{"unscoped reaches both documents", "", ""},
+		{"a folder scope", "support", "support/deploy.md"},
+		{"the same folder, written loosely", "/support/", "support/deploy.md"},
+		{"one document", "booking/rules.md", "booking/rules.md"},
+	} {
+		_, reply, err := askIn(t, e, "what ships in the binary?", c.scope)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if len(reply.Citations) == 0 {
+			t.Fatalf("%s: nothing cited", c.name)
+		}
+		if c.want == "" {
+			continue
+		}
+		for _, cite := range reply.Citations {
+			if cite.DocPath != c.want {
+				t.Errorf("%s: cited %s, which is outside the scope %q", c.name, cite.DocPath, c.scope)
+			}
+		}
+	}
+}
+
+func TestTheSameQuestionInAnotherScopeIsAnotherAnswer(t *testing.T) {
+	e, prov := engine(t, nil)
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "booking/rules.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Ingest(ctx, "support/deploy.md", deployDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	const q = "what ships in the binary?"
+	if _, reply, err := askIn(t, e, q, "support"); err != nil || reply.Cached {
+		t.Fatalf("first scoped ask: cached=%v err=%v", reply.Cached, err)
+	}
+	spent := len(prov.Chats())
+
+	// Same words, different scope: this must be answered afresh, from the other
+	// folder — not handed the row the first ask stored.
+	_, reply, err := askIn(t, e, q, "booking")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Cached {
+		t.Error("a different scope was served from another scope's cached answer")
+	}
+	if len(prov.Chats()) == spent {
+		t.Error("no completion was bought, so the answer came from the wrong scope's row")
+	}
+	for _, c := range reply.Citations {
+		if c.DocPath != "booking/rules.md" {
+			t.Errorf("cited %s under scope booking", c.DocPath)
+		}
+	}
+
+	// And the scope's own repeat is still free.
+	if _, reply, err := askIn(t, e, q, "booking"); err != nil || !reply.Cached {
+		t.Errorf("repeating a scoped question was not free: cached=%v err=%v", reply.Cached, err)
+	}
+	// The unscoped question is a third identity, and is not answered by either row.
+	if _, reply, err := askIn(t, e, q, ""); err != nil || reply.Cached {
+		t.Errorf("the unscoped question was served from a scoped row: cached=%v err=%v", reply.Cached, err)
+	}
+}
+
+// The History panel is what makes a free answer visible, and a scoped row is only
+// free when replayed in the same scope — so the scope has to survive the round trip.
+func TestHistoryRemembersTheScopeItWasAnsweredIn(t *testing.T) {
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "booking/rules.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := askIn(t, e, "how does hybrid search rank?", "booking"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := askIn(t, e, "what is approval?", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := e.History(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range rows {
+		got[r.Question] = r.Scope
+	}
+	if got["how does hybrid search rank?"] != "booking" {
+		t.Errorf("scoped row came back with scope %q; want booking", got["how does hybrid search rank?"])
+	}
+	if got["what is approval?"] != "" {
+		t.Errorf("unscoped row came back with scope %q; want empty", got["what is approval?"])
+	}
+	// The question text itself must stay clean — the key carries the scope, the
+	// display text does not.
+	for q := range got {
+		if strings.ContainsRune(q, '\x1f') {
+			t.Errorf("history question leaked the key separator: %q", q)
+		}
+	}
+}

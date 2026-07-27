@@ -121,9 +121,17 @@ func (s *Store) InsertChunk(docID int64, heading, content string, ord int, emb [
 // Search runs hybrid retrieval: vector KNN + BM25, fused with Reciprocal Rank Fusion.
 // Approved chunks — the answers a BA confirmed — get a small boost, so a human-vouched
 // section wins a tie against one that merely mentions the same words.
-func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
+//
+// scope narrows retrieval to one part of the corpus — a document path or the folder
+// above it; "" is everything. Both retrievers are filtered *before* they rank, never
+// after fusion: dropping out-of-scope rows afterwards leaves fewer than k results and
+// degrades the answer without saying so.
+func (s *Store) Search(qEmb []float32, qText string, k int, scope string) ([]Hit, error) {
 	const pool = 40 // candidates pulled from each retriever before fusion
 	const rrfK = 60.0
+
+	inVec, scopeArgs := scopeFilter("chunk_id", scope)
+	inFTS, _ := scopeFilter("rowid", scope)
 
 	// 1) Vector candidates
 	blob, err := sqlite_vec.SerializeFloat32(qEmb)
@@ -131,8 +139,9 @@ func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
 		return nil, err
 	}
 	vrows, err := s.db.Query(
-		`SELECT chunk_id FROM vec_chunks WHERE embedding MATCH ? AND k = ? ORDER BY distance`,
-		blob, pool)
+		`SELECT chunk_id FROM vec_chunks WHERE embedding MATCH ? AND k = ?`+inVec+
+			` ORDER BY distance`,
+		append([]any{blob, pool}, scopeArgs...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vec search: %w", err)
 	}
@@ -151,8 +160,9 @@ func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
 	var ftsOrder []int
 	if match := toFTSQuery(qText); match != "" {
 		frows, err := s.db.Query(
-			`SELECT rowid FROM fts_chunks WHERE fts_chunks MATCH ? ORDER BY rank LIMIT ?`,
-			match, pool)
+			`SELECT rowid FROM fts_chunks WHERE fts_chunks MATCH ?`+inFTS+
+				` ORDER BY rank LIMIT ?`,
+			append(append([]any{match}, scopeArgs...), pool)...)
 		if err == nil {
 			for frows.Next() {
 				var id int
@@ -213,6 +223,37 @@ func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
 		hits = hits[:k]
 	}
 	return hits, nil
+}
+
+// scopeFilter restricts a retriever to the chunks under one document path. col is the
+// chunk-id column of the table being filtered — `chunk_id` in vec_chunks, `rowid` in
+// fts_chunks — and an empty scope adds no clause at all, so the unscoped query is the
+// one that always ran.
+//
+// A scope matches the document itself *or* anything below it, which is what makes one
+// control serve both a folder and a single file: picking "booking/calendar" asks its
+// whole subtree, picking "booking/calendar/x.md" asks that file.
+//
+// sqlite-vec applies a `chunk_id IN (…)` constraint before the KNN, so k counts
+// matches inside the scope rather than survivors of a global top-k. Verified against
+// v0.1.6 in TestScopedSearchRanksWithinTheScope; a version that regressed that would
+// turn scoped answers into thin ones.
+func scopeFilter(col, scope string) (string, []any) {
+	if scope == "" {
+		return "", nil
+	}
+	return ` AND ` + col + ` IN (SELECT c.id FROM chunks c JOIN documents d ON d.id = c.document_id
+			WHERE d.path = ? OR d.path LIKE ? ESCAPE '\')`,
+		[]any{scope, likeLiteral(scope) + `/%`}
+}
+
+// likeLiteral escapes the three characters LIKE treats as syntax, so a document path
+// containing one is matched as itself rather than as a pattern.
+func likeLiteral(s string) string {
+	for _, c := range []string{`\`, `%`, `_`} {
+		s = strings.ReplaceAll(s, c, `\`+c)
+	}
+	return s
 }
 
 var wordRe = regexp.MustCompile(`[\p{L}\p{N}]+`)

@@ -79,6 +79,7 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 func readQuestion(r *http.Request) (rag.Ask, error) {
 	var body struct {
 		Question string `json:"question"`
+		Scope    string `json:"scope"` // a document or folder to answer from; "" = all
 		Fresh    bool   `json:"fresh"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxQuestion)).Decode(&body); err != nil {
@@ -88,5 +89,7 @@ func readQuestion(r *http.Request) (rag.Ask, error) {
 	if q == "" {
 		return rag.Ask{}, errBadRequest
 	}
-	return rag.Ask{Question: q, Fresh: body.Fresh}, nil
+	// The engine canonicalises the scope rather than the handler: it is part of the
+	// cache key, so exactly one place may decide what "booking/" means.
+	return rag.Ask{Question: q, Scope: body.Scope, Fresh: body.Fresh}, nil
 }

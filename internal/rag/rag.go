@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -125,8 +126,26 @@ RULES:
 // because the next flag added here shouldn't change every call site.
 type Ask struct {
 	Question string
-	Fresh    bool         // ignore any cached answer — what Regenerate means
-	OnToken  func(string) // may be nil
+	// Scope narrows retrieval to one document or folder of the corpus; "" is all of
+	// it. It is the reader's own filter — "answer from the booking docs" — and it
+	// changes both what is retrieved and which cached answer applies.
+	Scope   string
+	Fresh   bool         // ignore any cached answer — what Regenerate means
+	OnToken func(string) // may be nil
+}
+
+// Scope canonicalises a retrieval scope. There is nothing to validate — a prefix that
+// matches no document simply retrieves nothing, and the engine then says so — but it
+// must be *canonical*, because it is part of the answer cache's key: "booking/",
+// "/booking" and "booking/./" have to be one scope rather than three.
+func Scope(s string) string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, `\`, "/"))
+	if s == "" {
+		return ""
+	}
+	// Cleaning against a leading "/" collapses "//", resolves "." and drops any
+	// "../" that would otherwise reach above the corpus.
+	return strings.TrimPrefix(path.Clean("/"+s), "/")
 }
 
 // Reply is what the engine produced. Cached is surfaced to the UI on purpose: a
@@ -143,11 +162,13 @@ type Reply struct {
 // streaming so the UI can render source links.
 //
 // A repeat question is served from the cache: no embedding call, no completion, no
-// cost. The key is the question, the corpus signature and the chat model — so
-// re-indexing *or* changing the model invalidates it, rather than serving an answer
-// whose sources have moved or whose model has been replaced.
+// cost. The key is the question *and its scope*, under a signature covering the
+// corpus, the chat model and the prompt — so re-indexing, changing the model, or
+// asking the same words about a different folder all produce a different answer
+// rather than a stale one.
 func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	question := strings.TrimSpace(a.Question)
+	scope := Scope(a.Scope)
 	onToken := a.OnToken
 	if onToken == nil {
 		onToken = func(string) {}
@@ -156,7 +177,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// A signature we can't read means "don't cache", never "fail the question".
 	sig, sigErr := e.sig()
 	if sigErr == nil && !a.Fresh {
-		if c, ok, err := e.store.Cached(sig, question); err == nil && ok {
+		if c, ok, err := e.store.Cached(sig, scope, question); err == nil && ok {
 			onToken(c.Answer)
 			var cites []Citation
 			_ = json.Unmarshal(c.Citations, &cites)
@@ -168,7 +189,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	if err != nil {
 		return Reply{}, err
 	}
-	hits, err := e.store.Search(qv[0], question, e.topK)
+	hits, err := e.store.Search(qv[0], question, e.topK, scope)
 	if err != nil {
 		return Reply{}, err
 	}
@@ -204,7 +225,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// one bad answer into a permanent one.
 	if sigErr == nil && full.Len() > 0 && !isMiss(full.String()) {
 		raw, _ := json.Marshal(cites)
-		_ = e.store.Cache(sig, db.Cached{Question: question, Answer: full.String(), Citations: raw})
+		_ = e.store.Cache(sig, db.Cached{Question: question, Scope: scope, Answer: full.String(), Citations: raw})
 	}
 	return Reply{Citations: cites, Usage: usage}, nil
 }

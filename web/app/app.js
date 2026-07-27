@@ -21,6 +21,7 @@ import { loadCorpus, shortDate } from "./library.js";
 import * as session from "./session.js";
 import * as qa from "./qa.js";
 import { BaScreen } from "./ba.js";
+import { CorpusTree } from "./tree.js";
 
 const STARTERS = [
   "How does retrieval stay grounded?",
@@ -29,10 +30,11 @@ const STARTERS = [
 ];
 
 const MODE_KEY = "ke.mode"; // a BA reopening the app wants the queue, not the prompt
+const SCOPE_KEY = "ke.scope"; // the folder being asked about outlives a reload, like the thread
 
 let seq = 0;
-const newTurn = (q) => ({
-  id: ++seq, q, a: "", citations: [], streaming: true, error: "", ms: 0,
+const newTurn = (q, scope) => ({
+  id: ++seq, q, scope, a: "", citations: [], streaming: true, error: "", ms: 0,
   cached: false, in: 0, out: 0,
   ticket: null, // the gap filed from this answer, once there is one
 });
@@ -58,6 +60,9 @@ export function boot(ds) {
         starters: STARTERS,
         corpus: { state: "loading", docs: 0, chunks: 0, approved: 0, documents: [] },
         showSources: false,
+        // Which part of the corpus questions are answered from. "" is all of it, and
+        // is what every question was before this control existed.
+        scope: localStorage.getItem(SCOPE_KEY) || "",
 
         /* ── the QA loop. Everything here is rendered by *both* screens — the
            header badge, and the "questions with a BA" list on the ASK screen. What
@@ -169,7 +174,7 @@ export function boot(ds) {
       /* ── actions ── */
       async ask(question) {
         if (!question?.trim() || this.busy) return;
-        this.turns.push(newTurn(question.trim()));
+        this.turns.push(newTurn(question.trim(), this.scope));
         // Stream into the *reactive* turn, not the object just pushed: Vue hands
         // out a proxy per array item, and writing to the raw one updates no DOM.
         const turn = this.turns.at(-1);
@@ -187,6 +192,14 @@ export function boot(ds) {
 
       stop() {
         this.run?.stop();
+      },
+
+      /** Narrow the next question to one folder or document — or, with "", widen it
+       *  back to everything. Stored, because a reader working through one area asks
+       *  several questions about it and a reload should not silently widen them. */
+      setScope(scope) {
+        this.scope = scope || "";
+        this.scope ? localStorage.setItem(SCOPE_KEY, this.scope) : localStorage.removeItem(SCOPE_KEY);
       },
 
       reset() {
@@ -252,10 +265,13 @@ export function boot(ds) {
         }
       },
 
-      /** Re-ask a cached question. Free — that is the whole point of the panel. */
-      replay(question) {
+      /** Re-ask a cached question. Free — but only in the scope it was answered in:
+       *  the same words in another folder are another question, and buying a
+       *  completion from a panel labelled "free to repeat" is a broken promise. */
+      replay(entry) {
         this.setMode("dev");
-        this.ask(question);
+        this.setScope(entry.scope || "");
+        this.ask(entry.question);
       },
 
       async copy(turn) {
@@ -273,6 +289,9 @@ export function boot(ds) {
         const started = performance.now();
         this.run = askServer(turn.q, {
           fresh,
+          // The turn's own scope, not the current one: a regenerate must re-ask the
+          // question that was asked, even if the reader has since picked elsewhere.
+          scope: turn.scope || "",
           onToken: (t) => {
             turn.a += t;
             this.view.scrollToEnd();
@@ -307,6 +326,7 @@ export function boot(ds) {
   // set before mount.
   app.config.compilerOptions.isCustomElement = (tag) => tag.startsWith("nes-");
   app.component("ba-screen", BaScreen);
+  app.component("corpus-tree", CorpusTree);
   // ba.js cannot import toast(): the pinned, integrity-checked CDN URL lives in
   // index.html alone, so the helper is injected the same way boot() receives it.
   app.provide("toast", ds.toast);

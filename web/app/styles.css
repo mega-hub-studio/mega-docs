@@ -160,6 +160,23 @@ main.ba {
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
 .dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+
+/* The scope bar: one row above the prompt saying which folder answers come from.
+   Wraps rather than truncating — a path is the one thing here that must stay
+   readable — and shares the prompt's reading column so it reads as part of it.
+
+   It needs its own ground: the dock fades in from transparent, so a row added at
+   the top of it would otherwise sit over whatever the page is scrolled to, and the
+   corpus tree behind it read as part of the bar. */
+.scopebar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  max-inline-size: 760px; margin: 0 auto var(--sp-2);
+  padding-block: var(--sp-1);
+  background: var(--screen);
+}
+/* The badge already names the folder and the button already offers the way out; on
+   a phone the sentence is the part that costs a second row. */
+.scopebar .scope-note { display: none; }
 /* The status line sits inside the dock, under the prompt, so viewport.js keeps
    measuring one height and the conversation still clears everything fixed. The
    strip, its light and its items are all .statusline — this only undoes the dock's
@@ -177,6 +194,7 @@ main.ba {
   .empty { margin-block-start: 12vh; }
   .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
+  .scopebar .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
 }
 

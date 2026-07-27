@@ -129,10 +129,10 @@ view.scrollToEnd();                            // viewport.js</span></div>
           <tr lang="vi"><th>Route</th><th>Làm gì</th><th>Mật khẩu</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th><code>GET /api/health</code></th><td><code>{"ok":true,"writes":bool}</code> — also tells the UI whether BA mode can publish</td><td>never, so probes need no secret</td></tr>
-          <tr lang="vi"><th><code>GET /api/health</code></th><td><code>{"ok":true,"writes":bool}</code> — cũng cho UI biết chế độ BA có publish được không</td><td>không bao giờ, để probe không cần secret</td></tr>
-          <tr lang="en"><th><code>POST /api/chat</code></th><td>SSE: <code>token</code> · <code>citations</code> · <code>done{cached}</code> · <code>error</code></td><td>—</td></tr>
-          <tr lang="vi"><th><code>POST /api/chat</code></th><td>SSE: <code>token</code> · <code>citations</code> · <code>done{cached}</code> · <code>error</code></td><td>—</td></tr>
+          <tr lang="en"><th><code>GET /api/health</code></th><td><code>{ok, writes, model, window, price_in, price_out}</code> — whether BA mode can publish, plus what the status line reports. A zero means "not configured", and the strip prints nothing rather than a zero</td><td>never, so probes need no secret</td></tr>
+          <tr lang="vi"><th><code>GET /api/health</code></th><td><code>{ok, writes, model, window, price_in, price_out}</code> — chế độ BA có publish được không, kèm dữ liệu cho status line. Giá trị 0 nghĩa là "chưa cấu hình", và thanh trạng thái để trống chứ không in số 0</td><td>không bao giờ, để probe không cần secret</td></tr>
+          <tr lang="en"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> is a document path or the folder above it — answers come from that subtree only; <code>""</code> is the whole corpus</td><td>—</td></tr>
+          <tr lang="vi"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> là đường dẫn tài liệu hoặc thư mục chứa nó — câu trả lời chỉ lấy từ nhánh đó; <code>""</code> là toàn bộ corpus</td><td>—</td></tr>
           <tr lang="en"><th><code>GET /api/corpus</code></th><td>what is indexed, and how much of it is approved</td><td>—</td></tr>
           <tr lang="vi"><th><code>GET /api/corpus</code></th><td>đang index những gì, bao nhiêu đã approved</td><td>—</td></tr>
           <tr lang="en"><th><code>GET · POST /api/tickets</code></th><td>read the queue · file a gap</td><td>—</td></tr>
@@ -141,8 +141,8 @@ view.scrollToEnd();                            // viewport.js</span></div>
           <tr lang="vi"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 sai, 403 tắt ghi</td></tr>
           <tr lang="en"><th><code>POST /api/documents</code></th><td>multipart import: <code>files</code> (repeatable) + optional <code>dir</code>. Partial success is reported — 200 if anything landed, 400 if nothing did, and both bodies list every file</td><td><code>X-BA-Pass</code></td></tr>
           <tr lang="vi"><th><code>POST /api/documents</code></th><td>import multipart: <code>files</code> (lặp được) + <code>dir</code> tuỳ chọn. Thành công một phần vẫn được báo — 200 nếu có file nào vào, 400 nếu không file nào, và cả hai body đều liệt kê từng file</td><td><code>X-BA-Pass</code></td></tr>
-          <tr lang="en"><th><code>GET /api/history</code></th><td>answers still free to replay, with hit counts</td><td>—</td></tr>
-          <tr lang="vi"><th><code>GET /api/history</code></th><td>các câu trả lời còn lặp lại miễn phí, kèm số lần dùng</td><td>—</td></tr>
+          <tr lang="en"><th><code>GET /api/history</code></th><td>answers still free to replay, with hit counts and the <code>scope</code> each was answered in — replaying under a different scope is a different question, and costs</td><td>—</td></tr>
+          <tr lang="vi"><th><code>GET /api/history</code></th><td>các câu trả lời còn lặp lại miễn phí, kèm số lần dùng và <code>scope</code> lúc trả lời — lặp lại ở scope khác là câu hỏi khác, và có tính phí</td><td>—</td></tr>
         </tbody>
       </table>
     </div>
@@ -298,6 +298,72 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           debug bytes cũ.</p>
       </div>
     </div>
+  </section>
+
+  <!-- ══ scoped retrieval ══════════════════════════════════════════════════════
+       Two invariants a change here can break silently, so both are written down with
+       the test that catches them. -->
+  <section>
+    <h2 lang="en">How a scoped answer stays honest</h2>
+    <h2 lang="vi">Câu trả lời có scope giữ đúng bằng cách nào</h2>
+    <p class="lede" lang="en">A scope is a promise — <i>answer from this folder</i> — and
+      there are exactly two ways to break it. Both are covered by a test, because both
+      fail as a confident answer rather than an error.</p>
+    <p class="lede" lang="vi">Scope là một lời hứa — <i>trả lời từ thư mục này</i> — và có
+      đúng hai cách làm nó sai. Cả hai đều có test, vì cả hai đều lỗi dưới dạng một câu
+      trả lời nghe rất chắc chứ không phải một error.</p>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Filter before ranking, never after</b>
+        <b lang="vi">Lọc trước khi xếp hạng, không phải sau</b>
+        <p lang="en">Both retrievers take the scope as a pre-filter — the vector KNN via a
+          <code>chunk_id IN (…)</code> constraint, BM25 via the same subquery on
+          <code>rowid</code> — so <code>k</code> counts matches <i>inside</i> the folder.
+          Filtering the fused result instead would return fewer than <code>TOP_K</code>
+          sections and quietly thin the answer. <code>sqlite-vec</code> honours that
+          constraint as of v0.1.6; <code>TestScopedSearchRanksWithinTheScope</code> stacks
+          twenty nearer out-of-scope chunks against five far ones to prove it still
+          does.</p>
+        <p lang="vi">Cả hai bộ truy xuất nhận scope như một pre-filter — vector KNN qua
+          điều kiện <code>chunk_id IN (…)</code>, BM25 qua đúng subquery đó trên
+          <code>rowid</code> — nên <code>k</code> đếm các kết quả <i>trong</i> thư mục. Nếu
+          lọc sau khi fuse thì sẽ trả về ít hơn <code>TOP_K</code> đoạn và làm câu trả lời
+          mỏng đi âm thầm. <code>sqlite-vec</code> tôn trọng điều kiện đó từ v0.1.6;
+          <code>TestScopedSearchRanksWithinTheScope</code> dựng hai mươi đoạn ngoài scope
+          gần hơn đối đầu năm đoạn xa để chứng minh nó vẫn vậy.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">The scope is part of the cache key, not the signature</b>
+        <b lang="vi">Scope thuộc về cache key, không thuộc signature</b>
+        <p lang="en">The same words asked in another folder are another question, so the
+          key is <code>scope + question</code>. It is deliberately <i>not</i> in
+          <code>corpus_sig</code>: a signature is pruned when it changes, so scoping it
+          would empty every other folder's cache on each pick. A scope is canonicalised in
+          exactly one place — <code>rag.Scope</code> — because two spellings of one folder
+          are two cache entries and one of them is always paid for twice.</p>
+        <p lang="vi">Cùng câu chữ mà hỏi ở thư mục khác là câu hỏi khác, nên key là
+          <code>scope + câu hỏi</code>. Nó cố tình <i>không</i> nằm trong
+          <code>corpus_sig</code>: signature bị xoá khi thay đổi, nên nếu đưa scope vào đó
+          thì mỗi lần chọn thư mục sẽ xoá cache của mọi thư mục khác. Scope được chuẩn hoá
+          ở đúng một chỗ — <code>rag.Scope</code> — vì hai cách viết của một thư mục là hai
+          entry cache, và một trong hai luôn bị trả tiền lần nữa.</p>
+      </div>
+    </div>
+
+    <p lang="en">The tree itself is the library's <code>&lt;nes-tree&gt;</code>, built from
+      <code>GET /api/corpus</code> paths in <code>web/app/tree.js</code> — no API was added
+      for it. The element renders once from a child JSON payload, which is why the
+      component replaces it instead of mutating it.</p>
+    <p lang="vi">Cây thư mục là <code>&lt;nes-tree&gt;</code> của thư viện, dựng từ đường
+      dẫn của <code>GET /api/corpus</code> trong <code>web/app/tree.js</code> — không thêm
+      API nào. Element chỉ render một lần từ payload JSON con, nên component thay nó chứ
+      không sửa nó.</p>
   </section>
 
   <!-- ══ the DEV half of the loop ══════════════════════════════════════════════

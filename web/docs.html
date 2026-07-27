@@ -427,8 +427,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Dừng câu trả lời dài</th><td>Nút gửi thành ■ khi đang sinh. Dừng thì phần đã về vẫn giữ lại.</td></tr>
           <tr lang="en"><th>Regenerate</th><td>Same question, fresh answer — useful when retrieval got the wrong sections. Always skips the cache.</td></tr>
           <tr lang="vi"><th>Sinh lại</th><td>Cùng câu hỏi, câu trả lời mới — hữu ích khi truy xuất lấy sai đoạn. Luôn bỏ qua cache.</td></tr>
-          <tr lang="en"><th>Repeat a question for free</th><td>An answer already given comes back from the cache, marked <b>CACHED</b>. No provider call, no cost. <b>Asked before</b> on the empty screen lists them.</td></tr>
-          <tr lang="vi"><th>Hỏi lại miễn phí</th><td>Câu đã trả lời sẽ lấy lại từ cache, có nhãn <b>CACHED</b>. Không gọi provider, không tốn tiền. Mục <b>Asked before</b> ở màn hình trống liệt kê sẵn.</td></tr>
+          <tr lang="en"><th>Repeat a question for free</th><td>An answer already given comes back from the cache, marked <b>CACHED</b>. No provider call, no cost. <b>Asked before</b> on the empty screen lists them, with the folder each was answered in — tapping one puts you back in that folder, because the same words asked elsewhere are a different question and cost again.</td></tr>
+          <tr lang="vi"><th>Hỏi lại miễn phí</th><td>Câu đã trả lời sẽ lấy lại từ cache, có nhãn <b>CACHED</b>. Không gọi provider, không tốn tiền. Mục <b>Asked before</b> ở màn hình trống liệt kê sẵn, kèm thư mục lúc trả lời — bấm vào là quay lại thư mục đó, vì cùng câu chữ mà hỏi ở nơi khác là câu hỏi khác và sẽ tốn tiền lại.</td></tr>
           <tr lang="en"><th>Report a gap</th><td><b>Ask BA</b> under a wrong or missing answer files it as a ticket, with that answer attached as evidence.</td></tr>
           <tr lang="vi"><th>Báo thiếu tài liệu</th><td><b>Ask BA</b> ở dưới câu trả lời sai/thiếu sẽ tạo ticket, kèm luôn câu trả lời đó làm bằng chứng.</td></tr>
           <tr lang="en"><th>Answer a gap (BA mode)</th><td>The <b>BA</b> tab is the ticket queue. Confirming an answer writes it into the documents and indexes it.</td></tr>
@@ -437,8 +437,12 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Import tài liệu (chế độ BA)</th><td>Kéo file <code>.md</code> / <code>.txt</code> vào tab <b>BA</b>, có thể chọn thư mục. Mỗi file được index ngay khi tới; file lỗi sẽ được nêu tên chứ không bị bỏ qua âm thầm.</td></tr>
           <tr lang="en"><th>Copy an answer</th><td>One button, the text without the markup.</td></tr>
           <tr lang="vi"><th>Copy câu trả lời</th><td>Một nút, lấy phần text không kèm markup.</td></tr>
-          <tr lang="en"><th>See what is indexed</th><td>Document and section counts, plus the list of files. Three states: ready · nothing indexed · can't reach the server.</td></tr>
-          <tr lang="vi"><th>Xem đang index gì</th><td>Số tài liệu và số đoạn, kèm danh sách file. Ba trạng thái: sẵn sàng · chưa index gì · không tới được server.</td></tr>
+          <tr lang="en"><th>See what is indexed</th><td>Document and section counts, plus the folder tree of files. Three states: ready · nothing indexed · can't reach the server.</td></tr>
+          <tr lang="vi"><th>Xem đang index gì</th><td>Số tài liệu và số đoạn, kèm cây thư mục file. Ba trạng thái: sẵn sàng · chưa index gì · không tới được server.</td></tr>
+          <tr lang="en"><th>Ask inside one folder</th><td>Tap a folder in <b>Browse documents</b> and the next answer is built from that folder only — cited from it, and nothing outside it. The folder stays shown above the box until you tap <b>ALL DOCS</b>.</td></tr>
+          <tr lang="vi"><th>Hỏi trong một thư mục</th><td>Bấm một thư mục ở <b>Browse documents</b> thì câu trả lời sau đó chỉ dựng từ thư mục đó — dẫn nguồn trong đó, không lấy gì bên ngoài. Thư mục đang chọn vẫn hiện trên ô nhập tới khi bạn bấm <b>ALL DOCS</b>.</td></tr>
+          <tr lang="en"><th>See what an answer cost</th><td>The strip along the bottom: state, model, tokens the provider counted, sources, time — and money only when the operator configured a price. A cached answer says <b>free</b>, because it is.</td></tr>
+          <tr lang="vi"><th>Xem một câu trả lời tốn bao nhiêu</th><td>Dải dưới cùng: trạng thái, model, số token do provider đếm, số nguồn, thời gian — và tiền chỉ khi người vận hành đã cấu hình giá. Câu lấy từ cache ghi <b>free</b>, vì đúng là vậy.</td></tr>
           <tr lang="en"><th>Tell if the server is up</th><td>The dot in the header tracks the health endpoint, and reacts to going offline.</td></tr>
           <tr lang="vi"><th>Biết server còn sống</th><td>Đèn ở thanh trên theo dõi endpoint health, và phản ứng khi mất mạng.</td></tr>
           <tr lang="en"><th>Reload without losing the thread</th><td>The conversation is kept in the browser; close the tab and come back to it.</td></tr>
@@ -590,9 +594,9 @@ done: 8/8 files, 74 chunks</span></div>
   <section id="use">
     <h2 lang="en">Using it well</h2>
     <h2 lang="vi">Dùng cho hiệu quả</h2>
-    <p class="lede" lang="en">You never need a command for any of this. Three habits
+    <p class="lede" lang="en">You never need a command for any of this. Four habits
       cover almost every question worth asking.</p>
-    <p class="lede" lang="vi">Phần này không cần lệnh nào. Ba thói quen là đủ cho gần
+    <p class="lede" lang="vi">Phần này không cần lệnh nào. Bốn thói quen là đủ cho gần
       hết những câu đáng hỏi.</p>
 
     <h3 lang="en">1 · Ask with the words the document uses</h3>
@@ -642,15 +646,41 @@ done: 8/8 files, 74 chunks</span></div>
         đúng những gì đã index.</span>
     </div>
 
-    <h3 lang="en">3 · Check what is actually indexed</h3>
-    <h3 lang="vi">3 · Kiểm tra thật sự đang có gì trong index</h3>
-    <p lang="en">The app lists every indexed document and its section count. Look there
-      first when an answer feels thin — “not in the documents” and “the document was
-      never added” look identical from the outside, and only that list tells them
-      apart.</p>
-    <p lang="vi">App có liệt kê mọi tài liệu đã index kèm số đoạn. Nhìn vào đó trước
-      khi thấy câu trả lời mỏng — “không có trong tài liệu” và “tài liệu chưa từng được
-      thêm” nhìn từ ngoài y như nhau, chỉ danh sách đó phân biệt được.</p>
+    <h3 lang="en">3 · Check the index, then narrow it</h3>
+    <h3 lang="vi">3 · Kiểm tra thật sự đang có gì trong index — và thu hẹp lại</h3>
+    <p lang="en"><b>Browse documents</b> is the folder tree of everything indexed, with
+      each file's section count. Look there first when an answer feels thin — “not in the
+      documents” and “the document was never added” look identical from the outside, and
+      only that tree tells them apart.</p>
+    <p lang="vi"><b>Browse documents</b> là cây thư mục của mọi thứ đã index, kèm số đoạn
+      của từng file. Nhìn vào đó trước khi thấy câu trả lời mỏng — “không có trong tài
+      liệu” và “tài liệu chưa từng được thêm” nhìn từ ngoài y như nhau, chỉ cây đó phân
+      biệt được.</p>
+    <p lang="en">Tapping a folder there does the second job: the next answer is built from
+      that folder only. The folder stays visible above the box, and every answer keeps a
+      badge naming it, so a narrow answer is never mistaken for the whole truth.
+      <b>ALL DOCS</b> widens it again.</p>
+    <p lang="vi">Bấm một thư mục ở đó làm thêm việc thứ hai: câu trả lời sau đó chỉ dựng
+      từ thư mục ấy. Thư mục đang chọn vẫn hiện trên ô nhập, và mỗi câu trả lời đều giữ
+      một nhãn ghi tên nó, để câu trả lời hẹp không bị hiểu thành toàn bộ sự thật.
+      <b>ALL DOCS</b> mở rộng lại.</p>
+
+    <div class="callout tip">
+      <b lang="en">Scope when the same word means two things.</b>
+      <span lang="en">“Deposit” in <code>support/</code> and “deposit” in
+        <code>booking/</code> are different rules, and an unscoped question can fuse them
+        into one confident answer. Narrowing is also the fix for a thin answer in a large
+        corpus: fewer candidate sections means the ones that reach the model are the
+        relevant ones. It cannot invent coverage, though — a folder that does not answer
+        the question says so, and that is a gap to file.</span>
+      <b lang="vi">Thu hẹp khi cùng một từ mang hai nghĩa.</b>
+      <span lang="vi">“Deposit” trong <code>support/</code> và “deposit” trong
+        <code>booking/</code> là hai quy định khác nhau, và một câu hỏi không thu hẹp có
+        thể trộn chúng thành một câu trả lời nghe rất chắc. Thu hẹp cũng là cách chữa câu
+        trả lời mỏng khi corpus lớn: ít đoạn ứng viên hơn thì đoạn tới được model đúng là
+        đoạn liên quan. Nhưng nó không tạo ra nội dung — thư mục không có câu trả lời sẽ
+        nói vậy, và đó là một gap cần báo.</span>
+    </div>
 
     <div class="callout">
       <b lang="en">To get a document in:</b>

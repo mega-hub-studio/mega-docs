@@ -88,7 +88,7 @@ So the entire HTTP surface is covered by `go test` with fakes: no API key, no
 database. On the front end the same idea — `app.js` never sees an `AbortController`,
 a `TextDecoder` or `visualViewport`.
 
-### Four invariants worth not breaking
+### Five invariants worth not breaking
 
 1. **`CORPUS_DIR` is the source of truth; `knowledge.db` is derived.** `ingest docs`
    rebuilds the database. A BA-confirmed answer is *written as a file* into
@@ -103,8 +103,15 @@ a `TextDecoder` or `visualViewport`.
    chat model, and a hash of the system prompt (`Engine.sig`). Adding a dependency an
    answer can change under — a retrieval parameter, a new prompt section — means
    adding it here, or the instance serves answers produced under rules it no longer
-   has.
-4. **The document path is one identity.** `cmd/ingest.docPath` and `rag.SafePath`
+   has. The **scope** is the exception, and belongs in the *key* instead
+   (`db.cacheKey`): a signature is pruned when it changes, so scoping it would wipe
+   every other folder's answers on each pick.
+4. **A scope is filtered before ranking.** `db.Search` constrains both retrievers —
+   the vector KNN via `chunk_id IN (…)` and BM25 via the same subquery on `rowid` — to
+   the chunks under the scope, so `TOP_K` counts matches inside it. Filtering after RRF
+   fusion returns fewer sections and thins the answer without saying so. `rag.Scope`
+   canonicalises the string, once, because it is half the cache key.
+5. **The document path is one identity.** `cmd/ingest.docPath` and `rag.SafePath`
    must agree: relative to `CORPUS_DIR`, folders kept, `..`/absolute/hidden/`qa/`
    refused. Two spellings of one file become two documents, each cited separately.
 
@@ -131,7 +138,9 @@ testing the built artifact**, or you are debugging the old bytes.
 
 The design system (8bit-nes) owns components; `web/app/styles.css` owns layout only.
 Before writing CSS, check the pinned `llms.txt` for a recipe that already exists —
-`.statusline`, `.pbar`, `.spinner`, `.datalist`, `<nes-tree>` are all there. Two
+`.statusline`, `.pbar`, `.spinner`, `.datalist` and `<nes-tree>` are all there — the
+tree is now in use (`web/app/tree.js`), and it renders once from a child JSON payload,
+so the component replaces the element rather than mutating it. Two
 selectors are defined twice in the library (`.row` is also a tree row, with
 `cursor: pointer`); scope app rules rather than reusing an ambiguous class.
 

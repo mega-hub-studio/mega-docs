@@ -108,7 +108,7 @@ web/              index.html · docs.html · dev.html · deploy.html (Go templat
                   shared head in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js ·
-                  session.js · qa.js · ba.js · upload.js
+                  session.js · qa.js · ba.js · tree.js · upload.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -130,7 +130,8 @@ web/vendor/       `make vendor` output (gitignored)
 | anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
 | what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
 | a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
-| anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + corpus signature + chat model |
+| anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + scope, under a signature of corpus + chat model + prompt |
+| retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `web/app/tree.js` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
 | a BA-screen behaviour | `web/app/ba.js` | its own component with its own state; the shell only passes what both screens render |
 | a chat-screen behaviour | `web/app/app.js` | the shell: turns, health, corpus, queue, mode |
 | document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
@@ -206,10 +207,13 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | route | returns |
 |---|---|
 | `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
-
-| `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
-| `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
-| `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |
+| `GET /api/health` | `{ok,writes,model,window,price_in,price_out}` — the light in the top bar, whether BA mode can publish, and what the status line reports |
+| `POST /api/chat` | `{question, scope?, fresh?}` → SSE: `token` · `citations` · `done{cached,in,out}`, or `error` |
+| `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed, with full paths |
+| `GET · POST /api/tickets` | read the queue · file a gap |
+| `POST /api/tickets/{id}/{action}` | `draft` · `confirm` · `reject` — needs `X-BA-Pass` |
+| `POST /api/documents` | multipart import: `files` (repeatable) + optional `dir` — needs `X-BA-Pass` |
+| `GET /api/history` | answers still free to replay, with hit counts and the scope each was answered in |
 | `GET /app/…` | app modules + CSS, one ETag over the tree |
 | `GET /vendor/…` | vendored assets, `immutable` (the version is in the path) |
 

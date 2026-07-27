@@ -82,6 +82,7 @@
 <link rel="modulepreload" href="/app/qa.js">
 <link rel="modulepreload" href="/app/upload.js">
 <link rel="modulepreload" href="/app/ba.js">
+<link rel="modulepreload" href="/app/tree.js">
 </head>
 <body>
 <!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
@@ -147,19 +148,15 @@
         </button>
       </div>
 
-      <!-- zero-JS disclosure; the list is the corpus, so it answers "does it even
-           know about my file?" without a question being spent on it -->
+      <!-- The corpus, as the folders it actually is. It answers "does it even know
+           about my file?" without spending a question — and picking a row narrows the
+           next answer to that folder, which is the same control doing both jobs.
+           <nes-tree> is the library's element: keyboard nav and ARIA come with it. -->
       <details class="corpus" v-if="corpus.documents.length" @toggle="showSources = $event.target.open">
         <summary>
-          <span class="eyebrow">{{ showSources ? 'Hide' : 'Browse' }} indexed sources</span>
+          <span class="eyebrow">{{ showSources ? 'Hide' : 'Browse' }} documents — tap a folder to ask inside it</span>
         </summary>
-        <ol class="sources">
-          <li class="source" v-for="d in corpus.documents" :key="d.path">
-            <span class="source-n">{{ d.chunks }}</span>
-            <span class="source-title" :title="d.path">{{ d.title || short(d.path) }}</span>
-            <span class="source-host">{{ shortDate(d.updated_at) }}</span>
-          </li>
-        </ol>
+        <corpus-tree :documents="corpus.documents" :scope="scope" @pick="setScope"></corpus-tree>
       </details>
 
       <!-- History. Every row here is an answer already paid for: asking it again
@@ -170,9 +167,13 @@
              above use: a question is body copy, so it must not arrive as uppercase
              mono chrome the way a .btn label would. -->
         <div class="suggest">
-          <button class="suggest-item" v-for="h in history" :key="h.question"
-            @click="replay(h.question)">
+          <button class="suggest-item" v-for="h in history" :key="h.scope + h.question"
+            @click="replay(h)">
             {{ h.question }}
+            <!-- A scoped row is only free in its own scope, so replaying it restores
+                 that scope — the badge is why the folder is about to change. -->
+            <span class="badge clear" v-if="h.scope" :title="'Answered from ' + h.scope">
+              {{ h.scope }}</span>
             <span class="badge clear" v-if="h.hits" :title="h.hits + ' free repeats so far'">
               {{ h.hits }}×</span>
           </button>
@@ -209,6 +210,10 @@
                learns that repeating a question is cheap. -->
           <span class="badge todo" v-if="t.cached"
             title="Served from this server's cache — no provider call, no cost">CACHED</span>
+          <!-- Asked inside a folder: the answer is only as complete as that folder,
+               so the turn keeps saying so long after the picker moved on. -->
+          <span class="badge warn" v-if="t.scope" :title="'Retrieved from ' + t.scope + ' only'">
+            {{ t.scope }}</span>
           <span class="spinner sm" v-if="t.streaming" aria-label="Generating"></span>
         </div>
 
@@ -267,6 +272,16 @@
          textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
          only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
     <!-- `busy` reaches it as an attribute via a watcher, not :busy — see app.js. -->
+    <!-- The active scope, where the question is typed rather than where it was
+         chosen: a filter you cannot see from the prompt is a filter you forget, and
+         then read a narrow answer as the whole truth. One tap clears it. -->
+    <div class="scopebar" v-if="scope">
+      <span class="badge warn"><nes-icon name="layers" aria-hidden="true"></nes-icon> {{ scope }}</span>
+      <span class="scope-note">answers come from this folder only</span>
+      <button class="btn ghost xs" @click="setScope('')"
+        aria-label="Ask the whole corpus again">ALL DOCS</button>
+    </div>
+
     <nes-chat-prompt ref="prompt"
       placeholder="Ask the documents…" aria-label="Question"
       @nes:submit="ask($event.detail.value)" @nes:stop="stop"></nes-chat-prompt>

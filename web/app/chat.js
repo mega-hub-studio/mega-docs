@@ -16,13 +16,15 @@
  * Ask one question and stream the answer.
  * @param {string} question
  * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
- *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean }} handlers
- *   fresh skips the server's answer cache — what Regenerate means.
+ *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean,
+ *          scope?: string }} handlers
+ *   fresh skips the server's answer cache — what Regenerate means. scope narrows
+ *   retrieval to one document or folder; "" is the whole corpus.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations, onDone, fresh = false } = {}) {
+export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = "" } = {}) {
   const ctrl = new AbortController();
-  const done = run(question, { onToken, onCitations, onDone, fresh }, ctrl.signal);
+  const done = run(question, { onToken, onCitations, onDone, fresh, scope }, ctrl.signal);
   return { done, stop: () => ctrl.abort() };
 }
 
@@ -32,7 +34,7 @@ async function run(question, handlers, signal) {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, fresh: handlers.fresh }),
+      body: JSON.stringify({ question, fresh: handlers.fresh, scope: handlers.scope }),
       signal,
     });
   } catch (e) {

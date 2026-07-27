@@ -181,7 +181,11 @@ this one, on purpose.
 Done when: a BA confirm or a browser import appears in the remote within ~15 minutes
 with no human action.
 
-### b. Tree UI + scoped retrieval
+### b. Tree UI + scoped retrieval — **done**, see `2026-07-27-scoped-retrieval.md`
+
+Built once the corpus had something to verify against. The plan below held, including
+the pre-filter warning; what it did not anticipate was the cache key, which the same
+question in two folders breaks if the scope is not part of it.
 
 The requested end state: a folder tree in the app, click a branch, ask a question
 scoped to it.
@@ -198,13 +202,13 @@ scoped to it.
   the FTS side before RRF fuses them. Filtering after fusion returns fewer than
   `TOP_K` results and silently degrades the answer.
 - Not started deliberately: with only three documents indexed there is nothing to
-  verify a scope filter against.
+  verify a scope filter against. *(That condition lifted — see below.)*
 
-### c. The corpus is still mostly empty
+### c. The corpus has real material now
 
-Three documents, all about this project. No real business or engineering material has
-been loaded yet — the owner has that. Until then, any retrieval-quality judgement is
-about the wrong corpus.
+Five dev-handoff documents landed under `docs/booking/**` (471 sections, three folders
+deep), which is what made the scope filter verifiable. Retrieval quality can now be
+judged, but only about booking — business, product and support are still empty.
 
 ### d. Fork divergence
 
@@ -223,11 +227,12 @@ it. Expect conflicts in those four files on every pull.
 | `proxy.golang.org` unreachable from this network (github and `sum.golang.org` are fine) | `GOPROXY=direct` on every `go` command, or `go env -w GOPROXY=direct` once |
 | `make live` cannot see the repo `.env` — `go test ./internal/ai/` runs with CWD in the package dir, and `config.Load()` reads `./.env` | `set -a; . ./.env; set +a; make live` |
 | Tailnet root `/` is taken by another service on `127.0.0.1:9119` | published on `--https=8443`; `--set-path` is not an option, the app serves absolute `/app/…` URLs |
-| Changing `CHAT_MODEL` serves stale answers | the answer cache keys on the normalised question and invalidates on `corpus_sig` only — the model is not in the key. `sqlite3 knowledge.db 'DELETE FROM answers'` after a model change |
+| ~~Changing `CHAT_MODEL` serves stale answers~~ — **fixed upstream**, no workaround needed | `Engine.sig` now appends the chat model *and* a hash of the system prompt, so changing either invalidates the cache by itself. The manual `DELETE FROM answers` is no longer required |
 | systemd only runs while the WSL distro is up | the host has a separate always-on mechanism for that; `knowledge.service` rides on it |
 
-The cache one is a genuine upstream gap, not a local misconfiguration: folding the
-chat model into `corpus_sig` would fix it at the source.
+The cache one was a genuine upstream gap rather than a local misconfiguration, and it
+was fixed where it belonged — in the signature, not in a runbook step someone has to
+remember.
 
 ---
 

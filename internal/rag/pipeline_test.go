@@ -56,6 +56,17 @@ func ask(t *testing.T, e *rag.Engine, question string) (string, rag.Reply, error
 	return sb.String(), reply, err
 }
 
+// askIn is ask() with a retrieval scope.
+func askIn(t *testing.T, e *rag.Engine, question, scope string) (string, rag.Reply, error) {
+	t.Helper()
+	var sb strings.Builder
+	reply, err := e.Answer(context.Background(), rag.Ask{
+		Question: question, Scope: scope,
+		OnToken: func(tok string) { sb.WriteString(tok) },
+	})
+	return sb.String(), reply, err
+}
+
 const retrievalDoc = `# Retrieval
 
 ## Hybrid search

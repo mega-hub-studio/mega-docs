@@ -81,6 +81,9 @@ function settle(t) {
     q: t.q,
     a: t.a ?? "",
     citations: Array.isArray(t.citations) ? t.citations : [],
+    // The scope explains the answer — which folder it came from — so it has to come
+    // back with it, or a restored thread looks like it was asked of everything.
+    scope: t.scope ?? "",
     error: t.error ?? "",
     ms: t.ms ?? 0,
     streaming: false,

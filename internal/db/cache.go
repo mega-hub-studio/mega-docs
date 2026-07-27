@@ -5,13 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Cached is one answer the engine already paid for. It is both the cache row and
 // one line of the History panel — the same fact serves both, so there is no second
 // table recording "questions people asked".
 type Cached struct {
-	Question  string          `json:"question"`
+	Question string `json:"question"`
+	// Scope is the part of the corpus the answer was retrieved from — "" is the whole
+	// of it. Not a column: it lives inside the key (see cacheKey), so replaying a
+	// scoped answer can restore the scope it was answered under.
+	Scope     string          `json:"scope"`
 	Answer    string          `json:"answer"`
 	Citations json.RawMessage `json:"citations"` // opaque here: db must not import rag
 	Hits      int             `json:"hits"`
@@ -38,11 +43,38 @@ func (s *Store) Sig() (string, error) {
 	return fmt.Sprintf("%d:%d:%s", docs, chunks, newest.String), nil
 }
 
-// Cached returns a stored answer for this question, and counts the hit. A miss is
-// (Cached{}, false, nil) — not an error, since most questions are new.
-func (s *Store) Cached(sig, question string) (Cached, bool, error) {
-	norm := normalise(question)
+// cacheKey is the identity of a cached answer. The same words asked inside a folder
+// are a different question: answering one from the other's row would cite documents
+// the asker deliberately left out.
+//
+// The scope belongs in the key and not in the corpus signature, even though both
+// invalidate. A signature is *pruned* when it changes — scoping it would make every
+// scope change wipe every other scope's answers, and the panel that exists to say
+// "this one is free" would empty on each click. An unscoped question keeps the bare
+// normalised form, so rows cached before scopes existed are still served.
+func cacheKey(scope, question string) string {
+	if scope == "" {
+		return normalise(question)
+	}
+	return scope + "\x1f" + normalise(question)
+}
+
+// scopeOf reads the scope back out of a key. The stored answer is the only record of
+// what it was retrieved from, and a History row has to replay under the same scope or
+// the "free" it advertises is a different answer.
+func scopeOf(key string) string {
+	if i := strings.IndexByte(key, '\x1f'); i >= 0 {
+		return key[:i]
+	}
+	return ""
+}
+
+// Cached returns a stored answer for this question in this scope, and counts the hit.
+// A miss is (Cached{}, false, nil) — not an error, since most questions are new.
+func (s *Store) Cached(sig, scope, question string) (Cached, bool, error) {
+	norm := cacheKey(scope, question)
 	var c Cached
+	c.Scope = scope
 	var cites []byte // database/sql won't scan into json.RawMessage directly
 	err := s.db.QueryRow(
 		`SELECT question, answer, citations, hits, used_at FROM answers
@@ -75,7 +107,7 @@ func (s *Store) Cache(sig string, c Cached) error {
 		 ON CONFLICT(q_norm) DO UPDATE SET answer=excluded.answer,
 		   citations=excluded.citations, corpus_sig=excluded.corpus_sig,
 		   used_at=datetime('now')`,
-		normalise(c.Question), c.Question, c.Answer, string(c.Citations), sig); err != nil {
+		cacheKey(c.Scope, c.Question), c.Question, c.Answer, string(c.Citations), sig); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`DELETE FROM answers WHERE corpus_sig <> ?
@@ -91,7 +123,7 @@ func (s *Store) History(sig string, limit int) ([]Cached, error) {
 		limit = 20
 	}
 	rows, err := s.db.Query(
-		`SELECT question, answer, citations, hits, used_at FROM answers
+		`SELECT q_norm, question, answer, citations, hits, used_at FROM answers
 		 WHERE corpus_sig=? ORDER BY used_at DESC LIMIT ?`, sig, limit)
 	if err != nil {
 		return nil, fmt.Errorf("history: %w", err)
@@ -101,10 +133,12 @@ func (s *Store) History(sig string, limit int) ([]Cached, error) {
 	out := []Cached{} // never nil: serialised straight to JSON
 	for rows.Next() {
 		var c Cached
+		var key string
 		var cites []byte
-		if err := rows.Scan(&c.Question, &c.Answer, &cites, &c.Hits, &c.At); err != nil {
+		if err := rows.Scan(&key, &c.Question, &c.Answer, &cites, &c.Hits, &c.At); err != nil {
 			return nil, err
 		}
+		c.Scope = scopeOf(key)
 		c.Citations = cites
 		out = append(out, c)
 	}
