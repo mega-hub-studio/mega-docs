@@ -333,12 +333,12 @@ cost is re-embedding the corpus.
 
 The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
 `marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
-design system (**0.7.1**). All of it is version-pinned *and* hash-pinned:
+design system (**0.7.2**). All of it is version-pinned *and* hash-pinned:
 
 | | pin |
 |---|---|
 | one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
-| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.1` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
+| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.2` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
 | `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
 | `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
 | font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
@@ -351,6 +351,12 @@ half-finished bump (one file moved, the rest left behind) fails at **startup**, 
 in someone's browser. 8-BIT NES publishes its own digests at
 [`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
 
+> **On 8bit-nes 0.7.2** (released 2026-07-27): housekeeping upstream — a dead-code
+> audit that dropped a `.log-time` hook this app never rendered. `elements.min.js` is
+> byte-identical to 0.7.1, only `all.min.css` moved, and all fifteen digests in the
+> package match its own `sri.json`. Taken because the drift is one line, not because
+> anything here needed it.
+>
 > **On 8bit-nes 0.7.1** (released 2026-07-27): the bump is one line plus
 > `make vendor`. Everything here is verified against the published tarball rather
 > than the changelog, because a release has already once been tagged without the fix
