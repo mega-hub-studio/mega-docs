@@ -79,6 +79,12 @@ export function boot(ds) {
       this.refreshCorpus();
       this.refreshQueue();
       if (this.turns.length) this.view.scrollToEnd({ force: true });
+      // A restored thread can already contain a diagram: the renderer is fetched when
+      // an answer *arrives*, so without this a reload leaves it as source code — and a
+      // phone reloads a page far more often than it asks a question.
+      if (this.turns.some((t) => diagram.hasDiagram(t.a))) {
+        diagram.ready().then((ok) => (this.mermaidReady = ok));
+      }
       addEventListener("online", () => this.checkHealth());
       addEventListener("offline", () => (this.online = false));
     },
@@ -173,6 +179,27 @@ export function boot(ds) {
           nums: t.streaming ? [] : t.citations.map((c) => c.n),
           srcId: (n) => this.srcId(t, n),
         });
+      },
+
+      /** A diagram just drew. The event is the library's and it bubbles, so one
+       *  listener on the answer catches every diagram in it — including the ones
+       *  inside v-html, which Vue never sees as components. */
+      diagramDrawn(e) {
+        diagram.onRender(e.target);
+      },
+
+      /** Open the tapped diagram full-screen, at the size it was drawn for. */
+      zoomDiagram(e) {
+        if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+        const host = e.target.closest?.("nes-mermaid");
+        if (!host) return;
+        e.preventDefault(); // Space would otherwise scroll the conversation
+        if (diagram.zoomInto(this.$refs.zoomBody, host)) this.$refs.zoom?.showModal();
+      },
+
+      closeZoom() {
+        this.$refs.zoom?.close();
+        this.$refs.zoomBody?.replaceChildren(); // a 1000-node SVG is not worth keeping
       },
 
       /* ── actions ── */

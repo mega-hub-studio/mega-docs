@@ -214,7 +214,11 @@
           <span class="spinner sm" v-if="t.streaming" aria-label="Generating"></span>
         </div>
 
-        <div class="prose" v-html="answerHtml(t)"></div>
+        <!-- The diagram listeners live on the answer, not on the element: the diagram
+             arrives inside v-html, so Vue never sees it as a component. nes:render is
+             the library's own event and bubbles here. -->
+        <div class="prose" v-html="answerHtml(t)"
+          @nes:render="diagramDrawn" @click="zoomDiagram" @keydown="zoomDiagram"></div>
 
         <!-- official grounded-answer recipe: .sources rows that the inline .cite
              markers in the prose above link down to -->
@@ -261,6 +265,24 @@
        the app's 22 reactive keys belonged only to it. Template below, outside #app. -->
   <ba-screen v-else :writes="writes" :online="online" :queue="queue"
     :documents="corpus.documents" @changed="baChanged" @ask="setMode('dev')"></ba-screen>
+
+  <!-- ══ Diagram viewer ══════════════════════════════════════════════════════
+       One dialog for every diagram in the thread: a <dialog class="modal"> is the
+       library's recipe, so focus trapping, the backdrop and Escape are the platform's
+       rather than ours. Clicking the backdrop closes it — on a native dialog that
+       click lands on the dialog element itself, which is what .self matches.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <dialog class="modal diagram-zoom" ref="zoom" @click.self="closeZoom" @close="closeZoom">
+    <div class="head">
+      <span class="title">Diagram</span>
+      <button class="btn ghost icon sm" @click="closeZoom" aria-label="Close">
+        <nes-icon name="close"></nes-icon></button>
+    </div>
+    <!-- .mermaid-view is the library's own diagram frame: panel background, square
+         corners on the nodes, and scrolling. The copy is styled exactly like the
+         original because it is in the same kind of box. -->
+    <div class="mermaid-view zoom-view" ref="zoomBody"></div>
+  </dialog>
 
   <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes
        away rather than sitting there disabled. -->

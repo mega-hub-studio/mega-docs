@@ -7,6 +7,8 @@
    classic scripts so they cost no module graph. This is the only file that knows.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+import { isDiagram } from "./diagram.js";
+
 let configured = false;
 
 /**
@@ -75,7 +77,11 @@ function asDiagrams(html) {
   tpl.innerHTML = html;
   for (const code of tpl.content.querySelectorAll("pre > code")) {
     const lang = [...code.classList].find((c) => c.startsWith("language-"));
-    if (lang?.slice(9).toLowerCase() !== "mermaid") continue;
+    // Labelled `mermaid`, or unlabelled and starting like a diagram. The second case
+    // is the common one: models fence a graph without naming the language, and a
+    // reader then gets source code where a picture was meant.
+    const labelled = lang?.slice(9).toLowerCase() === "mermaid";
+    if (!labelled && !(lang === undefined && isDiagram(code.textContent))) continue;
     const el = document.createElement("nes-mermaid");
     el.textContent = code.textContent;
     code.parentElement.replaceWith(el);

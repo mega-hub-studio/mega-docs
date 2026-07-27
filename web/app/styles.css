@@ -199,6 +199,29 @@ main.ba {
   padding-block-end: max(var(--sp-1), env(safe-area-inset-bottom));
 }
 
+/* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
+   wide, was squeezed into 289, and its 16px labels rendered at about 4px. The natural
+   width is pinned in JS (diagram.fit — it lives in the viewBox, where CSS cannot reach
+   it) and the scrolling is the library's own .mermaid-view, so the page itself never
+   scrolls sideways.
+
+   Height is capped for the same reason in the other direction: a tall flowchart would
+   push the answer's citations off screen, and the sources are the point. */
+.prose nes-mermaid { display: block; cursor: zoom-in; }
+.prose nes-mermaid .mermaid-view { max-block-size: 70vh; }
+/* The affordance has to be visible: a diagram that opens on tap and does not say so
+   is a diagram nobody taps. Mono and muted, like every other piece of chrome here. */
+.prose nes-mermaid .zoom-hint {
+  display: block; margin-block-start: var(--sp-1);
+  font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--ls-chrome); color: var(--muted); text-align: end;
+}
+/* The viewer: wider than the library's 32rem default, because the whole point is the
+   drawing at its own size, and scrolling in both axes rather than shrinking again. */
+.diagram-zoom { inline-size: min(96vw, 1200px); }
+.diagram-zoom .zoom-view { overflow: auto; max-block-size: 76vh; }
+.diagram-zoom .zoom-view svg { display: block; }
+
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
   .bar { padding-inline: var(--sp-4); }
