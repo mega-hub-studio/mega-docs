@@ -34,6 +34,7 @@ func main() {
 	nav := web.StaticNav
 	pages := map[string]func() ([]byte, error){
 		"index.html":                         func() ([]byte, error) { return web.Docs(*base, nav) },
+		strings.TrimPrefix(nav.BA, "./"):     func() ([]byte, error) { return web.BA(*base, nav) },
 		strings.TrimPrefix(nav.Dev, "./"):    func() ([]byte, error) { return web.Dev(*base, nav) },
 		strings.TrimPrefix(nav.Deploy, "./"): func() ([]byte, error) { return web.Deploy(*base, nav) },
 	}

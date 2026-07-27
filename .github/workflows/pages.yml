@@ -23,6 +23,7 @@ on:
     branches: [main]
     paths:
       - web/docs.html
+      - web/ba.html
       - web/dev.html
       - web/deploy.html
       - web/llms.go
@@ -63,18 +64,19 @@ jobs:
           go run ./cmd/rendocs -d _site
           # Every page must exist: a grep over an empty _site would pass happily
           # and publish nothing.
-          for f in index.html dev.html deploy.html llms.txt; do test -s "_site/$f"; done
+          for f in index.html ba.html dev.html deploy.html llms.txt; do test -s "_site/$f"; done
           # Fail loudly if a template action survived into either page.
           ! grep -rq '<%' _site/
           # Each page must link the other two, or a role lands in a dead end.
-          for f in index.html dev.html deploy.html; do
+          for f in index.html ba.html dev.html deploy.html; do
             grep -q 'index.html'  "_site/$f"
+            grep -q 'ba.html'     "_site/$f"
             grep -q 'dev.html'    "_site/$f"
             grep -q 'deploy.html' "_site/$f"
           done
           # llms.txt is what an agent reads first: it must link every page, and it
           # must be plain text (it is derived from HTML, so a leaked tag is possible).
-          for f in index.html dev.html deploy.html; do grep -q "$f" _site/llms.txt; done
+          for f in index.html ba.html dev.html deploy.html; do grep -q "$f" _site/llms.txt; done
           ! grep -q '<' _site/llms.txt
 
       # No `enablement: true` here — it was tried and cannot work. Creating a Pages

@@ -259,6 +259,8 @@
   <nav class="pages">
     <a class="btn ghost sm<%if eq .Page "docs"%> active<%end%>" href="<%.GuideURL%>"
       ><span lang="en">Guide</span><span lang="vi">Hướng dẫn</span></a>
+    <a class="btn ghost sm<%if eq .Page "ba"%> active<%end%>" href="<%.BAURL%>"
+      >BA</a>
     <a class="btn ghost sm<%if eq .Page "dev"%> active<%end%>" href="<%.DevURL%>"
       >Dev</a>
     <a class="btn ghost sm<%if eq .Page "deploy"%> active<%end%>" href="<%.DeployURL%>"
@@ -300,12 +302,20 @@
     if (toc && toc.getAttribute(name) !== value) toc.setAttribute(name, value);
   };
 
+  // `label` is written BEFORE `levels`, and the order is load-bearing. A language
+  // change writes both, so the index rebuilds twice, and only the rebuild that also
+  // changes which headings are indexed leaves the component with a *different* first
+  // heading id than the one it still thinks is active — the one case where its
+  // "current section" update is not skipped. With the writes the other way round the
+  // label rebuild came last and the collapsed bar stayed blank for good: measured on a
+  // phone, every page, after one tap on VI/EN. (The component's own fix is to forget
+  // the active id when it rebuilds; until a release carries it, the order does it.)
   const pick = (lang) => {
     document.documentElement.dataset.lang = lang;
     document.documentElement.lang = lang;
     store.set("lang", lang);
-    setIf("levels", `h2[lang="${lang}"], h3[lang="${lang}"]`);
     setIf("label", TOC_LABEL[lang]);
+    setIf("levels", `h2[lang="${lang}"], h3[lang="${lang}"]`);
   };
 
   pick(store.get("lang") || (navigator.language?.startsWith("vi") ? "vi" : "en"));

@@ -1,0 +1,16 @@
+%% Source of truth for the "gap → document" diagram on the Guide page.
+%% Rendered to web/loop.svg by `make diagram` — mermaid never ships to the browser.
+%%
+%% Shallow and short-labelled for the same reasons as the other two: it is read on a
+%% phone, and the walkthrough spotlights nodes by matching text.
+%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 28, "padding": 6, "useMaxWidth": true}}}%%
+graph TD
+  Ask["DEV asks"] --> Miss["not in the documents"]
+  Miss --> Ticket["Ask BA — one tap"]
+  Ticket --> Queue["queue: open"]
+  Queue --> Draft["BA drafts"]
+  Draft --> Confirm["confirm"]
+  Confirm --> File["file in qa/"]
+  File --> Indexed["indexed + approved"]
+  Indexed --> Cited["next answer cites it"]
+  Cited --> FreeAgain["and then it is free"]

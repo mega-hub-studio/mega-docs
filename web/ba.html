@@ -1,0 +1,421 @@
+<%template "head" .%><main>
+
+  <h1 lang="en">◆ BA mode</h1>
+  <h1 lang="vi">◆ Chế độ BA</h1>
+  <p class="lede" lang="en">
+    Everything you do in the app, one section each, in the order you will meet them.
+    No commands anywhere on this page — if a step needs a terminal, it is somebody
+    else's job and it is on the <a href="<%.DeployURL%>">Deploy</a> page.
+  </p>
+  <p class="lede" lang="vi">
+    Toàn bộ việc bạn làm trong app, mỗi việc một mục, theo đúng thứ tự bạn sẽ gặp.
+    Trang này không có lệnh nào — nếu một bước cần terminal thì đó là việc của người
+    khác và nó nằm ở trang <a href="<%.DeployURL%>">Triển khai</a>.
+  </p>
+
+  <!-- The 20% that covers 80%: four moves, in order, each one link away from its own
+       section below. A reader who does only these four is already using it properly. -->
+  <div class="callout tip">
+    <b lang="en">The four that cover almost everything.</b>
+    <span lang="en"><a href="#ask">Ask with the document's words</a> ·
+      <a href="#trust">read the citation</a> ·
+      <a href="#scope">narrow to a folder</a> when the answer is thin ·
+      <a href="#gap">file the gap</a> when it is missing. The rest of this page is
+      detail for when one of those four is not enough.</span>
+    <b lang="vi">Bốn việc gần như đủ dùng.</b>
+    <span lang="vi"><a href="#ask">Hỏi bằng đúng từ trong tài liệu</a> ·
+      <a href="#trust">đọc dẫn nguồn</a> ·
+      <a href="#scope">thu hẹp vào một thư mục</a> khi câu trả lời mỏng ·
+      <a href="#gap">báo phần thiếu</a> khi không có. Phần còn lại của trang này là chi
+      tiết cho lúc bốn việc đó chưa đủ.</span>
+  </div>
+
+  <!-- ══ 1 · ask ═══════════════════════════════════════════════════════════ -->
+  <section id="ask">
+    <h2 lang="en">1 · Ask so retrieval can find it</h2>
+    <h2 lang="vi">1 · Hỏi sao cho truy xuất tìm được</h2>
+    <p class="lede" lang="en">Half of search is keyword matching, so an exact term — an
+      error code, a config key, a screen name, a rule ID — is the strongest thing you can
+      give it. Put the term <i>and</i> the question in.</p>
+    <p class="lede" lang="vi">Một nửa của tìm kiếm là khớp từ khoá, nên một thuật ngữ
+      chính xác — mã lỗi, tên config, tên màn hình, mã quy định — là thứ mạnh nhất bạn có
+      thể đưa vào. Ghi cả thuật ngữ <i>và</i> câu hỏi.</p>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Instead of</th><th>Ask</th><th>Why it lands</th></tr>
+          <tr lang="vi"><th>Thay vì</th><th>Hãy hỏi</th><th>Vì sao ăn</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><td>“why is checkout broken?”</td><td>“what causes <code>ERR_PAY_402</code> at checkout?”</td><td>the code appears verbatim in the document</td></tr>
+          <tr lang="vi"><td>“sao checkout lỗi?”</td><td>“<code>ERR_PAY_402</code> ở checkout do đâu?”</td><td>mã đó có nguyên văn trong tài liệu</td></tr>
+          <tr lang="en"><td>“tell me about deposits”</td><td>“which rule covers an unpaid deposit after 24h?”</td><td>names the rule, not the topic</td></tr>
+          <tr lang="vi"><td>“nói về tiền cọc đi”</td><td>“quy định nào áp dụng khi cọc chưa trả sau 24h?”</td><td>gọi tên quy định, không phải chủ đề</td></tr>
+          <tr lang="en"><td>“is this documented?”</td><td>“which document defines the waiting-list default view?”</td><td>asks for a document, so a citation answers it</td></tr>
+          <tr lang="vi"><td>“cái này có tài liệu chưa?”</td><td>“tài liệu nào định nghĩa view mặc định của waiting list?”</td><td>hỏi về tài liệu, nên dẫn nguồn là câu trả lời</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">Ask in any language; identifiers stay as written.</b>
+      <span lang="en">A Vietnamese question over English documents gets a Vietnamese
+        answer — but <code>CORPUS_DIR</code>, a file path or an error code is never
+        translated, because a translated identifier is one nobody can search for.</span>
+      <b lang="vi">Hỏi bằng ngôn ngữ nào cũng được; identifier giữ nguyên.</b>
+      <span lang="vi">Câu hỏi tiếng Việt trên tài liệu tiếng Anh sẽ được trả lời bằng
+        tiếng Việt — nhưng <code>CORPUS_DIR</code>, đường dẫn file hay mã lỗi thì không
+        bao giờ bị dịch, vì identifier bị dịch là identifier không ai tìm được.</span>
+    </div>
+  </section>
+
+  <!-- ══ 2 · trust ═════════════════════════════════════════════════════════ -->
+  <section id="trust">
+    <h2 lang="en">2 · Decide whether to trust it</h2>
+    <h2 lang="vi">2 · Quyết định có tin được hay không</h2>
+    <p class="lede" lang="en">Every <code>[1]</code> is a link to the file the sentence
+      came from. Opening one is the whole quality check: if the cited section really says
+      it, the answer is as good as your document.</p>
+    <p class="lede" lang="vi">Mỗi <code>[1]</code> là link tới file mà câu đó lấy ra. Mở
+      nó chính là toàn bộ việc kiểm chất lượng: nếu đoạn được dẫn đúng là có nói vậy,
+      câu trả lời tốt bằng tài liệu của bạn.</p>
+
+    <!-- .timeline reads as a sequence of judgements rather than a list of warnings:
+         each row is a thing you see on screen, and what it means. -->
+    <ol class="timeline">
+      <li data-accent="green">
+        <div class="time" lang="en">Cited, and the section says it</div>
+        <div class="time" lang="vi">Có dẫn nguồn, và đoạn đó đúng là có nói</div>
+        <p lang="en">Trust it as far as you trust that document. Nothing else was used —
+          the model is only allowed to answer from what was retrieved.</p>
+        <p lang="vi">Tin ở mức bạn tin tài liệu đó. Không có gì khác được dùng — model
+          chỉ được trả lời từ những đoạn đã truy xuất.</p>
+      </li>
+      <li data-accent="gold">
+        <div class="time" lang="en">Cited, but the section is out of date</div>
+        <div class="time" lang="vi">Có dẫn nguồn, nhưng đoạn đó đã cũ</div>
+        <p lang="en">The engine is exactly as current as the file. Fix the document —
+          re-importing the corrected file updates it in place.</p>
+        <p lang="vi">Hệ thống mới đúng bằng file. Sửa tài liệu — import lại bản đã sửa sẽ
+          cập nhật tại chỗ.</p>
+      </li>
+      <li data-accent="crit">
+        <div class="time" lang="en">No citation at all</div>
+        <div class="time" lang="vi">Không có dẫn nguồn nào</div>
+        <p lang="en">Treat it as a lead, not a fact — and <a href="#gap">file it</a>. An
+          answer the documents cannot support is the definition of a gap.</p>
+        <p lang="vi">Coi như gợi ý, chưa phải sự thật — và <a href="#gap">báo lại</a>.
+          Câu trả lời mà tài liệu không đỡ được chính là định nghĩa của một gap.</p>
+      </li>
+    </ol>
+
+    <div class="callout gotcha">
+      <b lang="en">One more to distrust: a confident answer about something your team only
+        ever discussed in chat.</b>
+      <span lang="en">Nothing in a chat thread is indexed. If it matters, it has to become
+        a document — see <a href="#import">importing</a>.</span>
+      <b lang="vi">Còn một loại nên nghi: câu trả lời rất chắc chắn về thứ mà team chỉ
+        từng bàn trong chat.</b>
+      <span lang="vi">Không có gì trong chat được index. Nếu nó quan trọng thì phải thành
+        tài liệu — xem <a href="#import">import</a>.</span>
+    </div>
+  </section>
+
+  <!-- ══ 3 · scope ═════════════════════════════════════════════════════════ -->
+  <section id="scope">
+    <h2 lang="en">3 · Narrow to one folder</h2>
+    <h2 lang="vi">3 · Thu hẹp vào một thư mục</h2>
+    <p class="lede" lang="en">The row above the box is the corpus. Tap a folder and the
+      next answer is built from that folder only — cited from it, and nothing outside
+      it.</p>
+    <p class="lede" lang="vi">Hàng phía trên ô nhập chính là corpus. Bấm một thư mục thì
+      câu trả lời sau đó chỉ dựng từ thư mục ấy — dẫn nguồn trong đó, không lấy gì bên
+      ngoài.</p>
+
+    <!-- The control, drawn with the same recipes the app uses, so the page shows the
+         thing rather than describing it. -->
+    <div class="card" data-accent="gold">
+      <div class="head">
+        <span class="badge warn"><nes-icon name="layers" aria-hidden="true"></nes-icon> booking/calendar</span>
+        <span class="title" lang="en">answers come from this folder only</span>
+        <span class="title" lang="vi">câu trả lời chỉ lấy từ thư mục này</span>
+      </div>
+      <p lang="en">Tap the row to open the tree, tap a folder to narrow, tap
+        <b>ALL DOCS</b> to widen again. Every answer keeps a badge naming the folder it
+        was built from, long after the picker moved on — so a narrow answer is never
+        mistaken for the whole truth.</p>
+      <p lang="vi">Bấm vào hàng đó để mở cây, bấm một thư mục để thu hẹp, bấm
+        <b>ALL DOCS</b> để mở rộng lại. Mỗi câu trả lời đều giữ một nhãn ghi tên thư mục
+        đã dựng nó, kể cả rất lâu sau khi bạn đổi chỗ khác — để câu trả lời hẹp không bị
+        hiểu thành toàn bộ sự thật.</p>
+    </div>
+
+    <h3 lang="en">When narrowing is the right move</h3>
+    <h3 lang="vi">Khi nào thu hẹp là đúng</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Situation</th><th>Do</th></tr>
+          <tr lang="vi"><th>Tình huống</th><th>Làm gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>The same word means two things</th><td>Narrow. “Deposit” in <code>support/</code> and in <code>booking/</code> are different rules, and an unscoped question can fuse them into one confident answer.</td></tr>
+          <tr lang="vi"><th>Cùng một từ mang hai nghĩa</th><td>Thu hẹp. “Deposit” trong <code>support/</code> và trong <code>booking/</code> là hai quy định khác nhau, câu hỏi không thu hẹp có thể trộn chúng thành một câu nghe rất chắc.</td></tr>
+          <tr lang="en"><th>The answer is thin in a big corpus</th><td>Narrow. Fewer candidate sections means the ones that reach the model are the relevant ones.</td></tr>
+          <tr lang="vi"><th>Câu trả lời mỏng trong corpus lớn</th><td>Thu hẹp. Ít đoạn ứng viên hơn thì đoạn tới được model đúng là đoạn liên quan.</td></tr>
+          <tr lang="en"><th>You do not know which folder</th><td>Don't. Ask the whole corpus and read the citation — it tells you where the answer lives.</td></tr>
+          <tr lang="vi"><th>Bạn không biết thư mục nào</th><td>Đừng. Hỏi toàn bộ corpus rồi đọc dẫn nguồn — nó cho biết câu trả lời nằm ở đâu.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout warn">
+      <b lang="en">A scope is a filter, not a permission.</b>
+      <span lang="en">It narrows what <i>you</i> asked for. It hides nothing from anyone
+        else: whoever can reach the app can read every indexed document, in any
+        folder.</span>
+      <b lang="vi">Scope là bộ lọc, không phải quyền.</b>
+      <span lang="vi">Nó thu hẹp thứ <i>bạn</i> hỏi. Nó không che gì với người khác: ai
+        vào được app là đọc được mọi tài liệu đã index, ở mọi thư mục.</span>
+    </div>
+  </section>
+
+  <!-- ══ 4 · gap ═══════════════════════════════════════════════════════════ -->
+  <section id="gap">
+    <h2 lang="en">4 · File a gap, and answer one</h2>
+    <h2 lang="vi">4 · Báo phần thiếu, và trả lời phần thiếu</h2>
+    <p class="lede" lang="en">This is the loop that makes the thing get better instead of
+      staying the same. One tap files the question; a BA answers it; the answer becomes a
+      document the next person retrieves with a citation.</p>
+    <p class="lede" lang="vi">Đây là vòng lặp làm hệ thống tốt lên thay vì đứng yên. Một
+      cú bấm là báo được câu hỏi; một BA trả lời; câu trả lời thành tài liệu mà người sau
+      truy xuất được kèm dẫn nguồn.</p>
+
+    <!-- The loop as a picture. No walkthrough here: this diagram is read once, and the
+         stepper earns its keep on the Guide's pipeline where five stages need
+         explaining one at a time. The SVG is rendered at build time from web/loop.mmd,
+         so it paints with the page and needs none of mermaid at runtime. -->
+    <div class="mermaid-view"><%diagram "loop"%></div>
+
+    <h3 lang="en">The four states, and who moves each one</h3>
+    <h3 lang="vi">Bốn trạng thái, và ai chuyển</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>State</th><th>Means</th><th>Moved by</th></tr>
+          <tr lang="vi"><th>Trạng thái</th><th>Nghĩa là</th><th>Ai chuyển</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th><span class="badge crit">OPEN</span></th><td>a DEV hit a gap and filed it, with the failed answer attached as evidence</td><td>anyone, one tap</td></tr>
+          <tr lang="vi"><th><span class="badge crit">OPEN</span></th><td>một DEV gặp phần thiếu và đã báo, kèm luôn câu trả lời sai làm bằng chứng</td><td>bất kỳ ai, một cú bấm</td></tr>
+          <tr lang="en"><th><span class="badge warn">DRAFT</span></th><td>a BA wrote an answer but has not published it. Survives a closed tab; costs the team nothing</td><td>BA</td></tr>
+          <tr lang="vi"><th><span class="badge warn">DRAFT</span></th><td>một BA đã viết câu trả lời nhưng chưa publish. Đóng tab vẫn còn; không ảnh hưởng ai</td><td>BA</td></tr>
+          <tr lang="en"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>written into the documents as <code>qa/ticket-N.md</code>, indexed, and marked approved — retrieval gives it a small boost</td><td>BA (needs the password)</td></tr>
+          <tr lang="vi"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>đã ghi vào tài liệu thành <code>qa/ticket-N.md</code>, đã index, và đánh dấu approved — truy xuất cộng thêm một chút điểm</td><td>BA (cần mật khẩu)</td></tr>
+          <tr lang="en"><th><span class="badge todo">DISMISSED</span></th><td>not a documentation gap. Stays on the list <i>with your reason</i>, which the person who filed it can read</td><td>BA (needs the password)</td></tr>
+          <tr lang="vi"><th><span class="badge todo">DISMISSED</span></th><td>không phải phần thiếu tài liệu. Vẫn nằm trong danh sách <i>kèm lý do của bạn</i>, người báo đọc được</td><td>BA (cần mật khẩu)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 lang="en">Writing an answer that stays answered</h3>
+    <h3 lang="vi">Viết câu trả lời để nó ở lại</h3>
+    <p lang="en">What you confirm becomes one retrievable section that the model is told to
+      answer <i>only</i> from. How it is written decides whether the next person finds
+      it.</p>
+    <p lang="vi">Thứ bạn confirm sẽ thành một đoạn truy xuất được, và model bị buộc chỉ
+      trả lời <i>từ</i> đoạn đó. Cách viết quyết định người sau có tìm thấy hay không.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Habit</th><th>Why it matters here</th></tr>
+          <tr lang="vi"><th>Thói quen</th><th>Vì sao quan trọng ở đây</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>Answer the question in the title, only</th><td>A section that answers two questions is retrieved well for neither. Let the second one come back as its own ticket.</td></tr>
+          <tr lang="vi"><th>Chỉ trả lời đúng câu hỏi trong tiêu đề</th><td>Một đoạn trả lời hai câu hỏi thì cả hai đều truy xuất kém. Cứ để câu thứ hai quay lại thành ticket riêng.</td></tr>
+          <tr lang="en"><th>Use the words people will search with</th><td>Retrieval is half keyword matching. Internal vocabulary nobody types is a section nobody reaches.</td></tr>
+          <tr lang="vi"><th>Dùng đúng từ mà người ta sẽ gõ</th><td>Truy xuất có một nửa là khớp từ khoá. Từ nội bộ không ai gõ là đoạn không ai tới được.</td></tr>
+          <tr lang="en"><th>Short and exact beats complete</th><td>Two precise sentences retrieve better than a page, and are far easier for the next BA to correct.</td></tr>
+          <tr lang="vi"><th>Ngắn và chính xác hơn là đầy đủ</th><td>Hai câu chính xác truy xuất tốt hơn cả một trang, và BA sau sửa lại cũng dễ hơn nhiều.</td></tr>
+          <tr lang="en"><th>Dismiss <i>with</i> the reason</th><td>An unexplained dismissal is indistinguishable from the queue eating the question.</td></tr>
+          <tr lang="vi"><th>Dismiss thì <i>kèm</i> lý do</th><td>Dismiss không lý do thì y như hàng đợi làm mất câu hỏi.</td></tr>
+          <tr lang="en"><th>Save a draft when unsure</th><td>Nothing is published until you confirm, so an unfinished answer costs nothing and survives a closed tab.</td></tr>
+          <tr lang="vi"><th>Chưa chắc thì lưu nháp</th><td>Chưa confirm là chưa publish, nên câu trả lời dở dang không tốn gì và vẫn còn sau khi đóng tab.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">Holding the password doesn't make it your ticket.</b>
+      <span lang="en">Confirming writes into the corpus for the whole team. If you know the
+        answer but not that it is <i>the</i> answer, leave it for whoever owns the
+        subject.</span>
+      <b lang="vi">Có mật khẩu không có nghĩa ticket đó là của bạn.</b>
+      <span lang="vi">Confirm là ghi vào corpus cho cả team. Nếu bạn biết câu trả lời nhưng
+        không chắc đó là câu trả lời <i>đúng thẩm quyền</i>, để người nắm nghiệp vụ
+        làm.</span>
+    </div>
+  </section>
+
+  <!-- ══ 5 · import ════════════════════════════════════════════════════════ -->
+  <section id="import">
+    <h2 lang="en">5 · Import documents</h2>
+    <h2 lang="vi">5 · Import tài liệu</h2>
+    <p class="lede" lang="en">The other way a document enters the corpus: drop
+      <code>.md</code> or <code>.txt</code> files on the BA tab, optionally into a folder.
+      Each one is indexed on arrival, and you can ask about it immediately.</p>
+    <p class="lede" lang="vi">Cách còn lại để tài liệu vào corpus: kéo file
+      <code>.md</code> hoặc <code>.txt</code> vào tab BA, có thể chọn thư mục. Mỗi file
+      được index ngay khi tới, và hỏi được luôn.</p>
+
+    <ol class="steps">
+      <li>
+        <b lang="en">Convert anything that is not text</b>
+        <b lang="vi">Chuyển mọi thứ không phải text</b>
+        <p lang="en">PDF, DOCX and spreadsheets are refused by name, not silently. Convert
+          first — the tool that is good at it does a better job than a Go binary
+          would.</p>
+        <p lang="vi">PDF, DOCX, spreadsheet sẽ bị từ chối kèm tên file, không im lặng bỏ
+          qua. Chuyển trước — công cụ chuyên làm việc đó tốt hơn một binary Go.</p>
+      </li>
+      <li>
+        <b lang="en">Pick the folder before dropping</b>
+        <b lang="vi">Chọn thư mục trước khi kéo vào</b>
+        <p lang="en">The folder is the scope a reader will click, so it is worth ten
+          seconds. The box suggests the folders that already exist — take one rather than
+          inventing a fourth spelling of the same domain.</p>
+        <p lang="vi">Thư mục chính là scope người đọc sẽ bấm, nên đáng bỏ ra mười giây. Ô
+          nhập gợi ý các thư mục đã có — chọn một cái thay vì đặt thêm cách viết thứ tư
+          cho cùng một domain.</p>
+      </li>
+      <li>
+        <b lang="en">Watch the bar, then read the list</b>
+        <b lang="vi">Xem thanh tiến trình, rồi đọc danh sách</b>
+        <p lang="en">One request per file, so the progress is real rather than animated.
+          Afterwards every file is listed: <span class="badge clear">INDEXED</span> with
+          its section count, or <span class="badge warn">SKIPPED</span> with the
+          reason.</p>
+        <p lang="vi">Mỗi file một request, nên tiến trình là thật chứ không phải hoạt hoạ.
+          Sau đó mọi file đều được liệt kê: <span class="badge clear">INDEXED</span> kèm số
+          đoạn, hoặc <span class="badge warn">SKIPPED</span> kèm lý do.</p>
+      </li>
+      <li>
+        <b lang="en">Re-import to correct, never to duplicate</b>
+        <b lang="vi">Import lại để sửa, không bao giờ tạo bản trùng</b>
+        <p lang="en">The same path updates that document in place. There is no duplicate to
+          clean up, and the old sections stop being retrievable the moment the new ones
+          land.</p>
+        <p lang="vi">Cùng một đường dẫn thì cập nhật tại chỗ. Không có bản trùng phải dọn,
+          và các đoạn cũ hết truy xuất được ngay khi đoạn mới vào.</p>
+      </li>
+    </ol>
+
+    <div class="callout warn">
+      <b lang="en">Everyone who can reach the app can read everything in it.</b>
+      <span lang="en">There are no per-document permissions. Anything you would not show
+        the whole team should not be imported.</span>
+      <b lang="vi">Ai vào được app là đọc được tất cả trong đó.</b>
+      <span lang="vi">Không có phân quyền theo tài liệu. Thứ gì bạn không muốn cả team thấy
+        thì đừng import.</span>
+    </div>
+  </section>
+
+  <!-- ══ 6 · cost ══════════════════════════════════════════════════════════ -->
+  <section id="cost">
+    <h2 lang="en">6 · What an answer cost</h2>
+    <h2 lang="vi">6 · Một câu trả lời tốn bao nhiêu</h2>
+    <p class="lede" lang="en">The strip along the bottom. Nothing on it is estimated: a
+      number that was not measured is simply absent, because an unmeasured cost and a cost
+      of nothing are different facts.</p>
+    <p class="lede" lang="vi">Dải dưới cùng. Không có số nào là ước lượng: số nào chưa đo
+      được thì để trống, vì “chưa đo” và “miễn phí” là hai chuyện khác nhau.</p>
+
+    <dl class="datalist">
+      <dt lang="en">READY · ASKING · ERROR · OFFLINE</dt>
+      <dd lang="en">What the app is doing. OFFLINE means the server is unreachable, which
+        is not the same as read-only.</dd>
+      <dt lang="vi">READY · ASKING · ERROR · OFFLINE</dt>
+      <dd lang="vi">App đang làm gì. OFFLINE là không tới được server, khác với chỉ-đọc.</dd>
+      <dt>gpt-4o-mini</dt>
+      <dd lang="en">The model that wrote the answer. Worth knowing when comparing two
+        answers to the same question.</dd>
+      <dd lang="vi">Model đã viết câu trả lời. Đáng biết khi so hai câu trả lời cho cùng
+        một câu hỏi.</dd>
+      <dt lang="en">1,964 tok · 2%</dt>
+      <dd lang="en">Tokens the provider itself counted, and how much of the model's context
+        window that used. The percentage only appears when whoever hosts it configured the
+        window size.</dd>
+      <dt lang="vi">1.964 tok · 2%</dt>
+      <dd lang="vi">Số token do chính provider đếm, và nó chiếm bao nhiêu phần context
+        window. Phần trăm chỉ hiện khi người host đã cấu hình kích thước window.</dd>
+      <dt lang="en">6 · 3.8s</dt>
+      <dd lang="en">Sources cited, and how long it took.</dd>
+      <dt lang="vi">6 · 3.8s</dt>
+      <dd lang="vi">Số nguồn đã dẫn, và mất bao lâu.</dd>
+      <dt lang="en">$0.0004 — or “cached · free”</dt>
+      <dd lang="en">What this answer cost, when prices are configured. <b>cached · free</b>
+        means it came from the answer cache: no provider call, no money. Asking a question
+        the team already asked is free, and the <b>Asked before</b> list on the empty
+        screen is exactly those questions.</dd>
+      <dt lang="vi">$0.0004 — hoặc “cached · free”</dt>
+      <dd lang="vi">Câu trả lời này tốn bao nhiêu, khi đã cấu hình giá. <b>cached · free</b>
+        nghĩa là lấy từ cache: không gọi provider, không tốn tiền. Hỏi lại câu team đã hỏi
+        là miễn phí, và mục <b>Asked before</b> ở màn hình trống chính là các câu đó.</dd>
+    </dl>
+
+    <div class="callout tip">
+      <b lang="en">Free is not the same as unchanged.</b>
+      <span lang="en">A cached answer is dropped the moment the documents change — a
+        confirm, an import, a re-index — so “free” always means “still true as far as the
+        corpus is concerned”. And the same words asked in a different folder are a
+        different question, which is why replaying from the list puts you back in the
+        folder it was answered in.</span>
+      <b lang="vi">Miễn phí không có nghĩa là chưa đổi.</b>
+      <span lang="vi">Câu trả lời trong cache bị bỏ ngay khi tài liệu thay đổi — confirm,
+        import, index lại — nên “miễn phí” luôn có nghĩa “vẫn đúng theo corpus hiện tại”.
+        Và cùng câu chữ mà hỏi ở thư mục khác là câu hỏi khác, nên bấm lại từ danh sách sẽ
+        đưa bạn về đúng thư mục lúc trả lời.</span>
+    </div>
+  </section>
+
+  <!-- ══ 7 · when it goes wrong ════════════════════════════════════════════ -->
+  <section id="stuck">
+    <h2 lang="en">7 · When something's wrong</h2>
+    <h2 lang="vi">7 · Khi có vấn đề</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>What you see</th><th>What it is</th><th>What to do</th></tr>
+          <tr lang="vi"><th>Bạn thấy</th><th>Thực ra là gì</th><th>Làm gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>“Không tìm thấy thông tin này trong tài liệu.”</th><td>Retrieval found nothing usable. Honest, not broken.</td><td>Try the document's exact words; then <a href="#gap">file it</a>.</td></tr>
+          <tr lang="vi"><th>“Không tìm thấy thông tin này trong tài liệu.”</th><td>Truy xuất không thấy gì dùng được. Đó là trung thực, không phải lỗi.</td><td>Thử đúng từ trong tài liệu; rồi <a href="#gap">báo lại</a>.</td></tr>
+          <tr lang="en"><th>The BA tab says read-only</th><td>The instance has no write password set, so confirming and importing are switched off — not broken, absent.</td><td>Ask whoever hosts it to set <code>BA_PASS</code>.</td></tr>
+          <tr lang="vi"><th>Tab BA báo chỉ-đọc</th><td>Instance chưa đặt mật khẩu ghi, nên confirm và import bị tắt — không phải lỗi, là không có.</td><td>Nhờ người host đặt <code>BA_PASS</code>.</td></tr>
+          <tr lang="en"><th>The unlock form comes back after you typed the password</th><td>The password was refused. The form says so; the card does not vanish silently.</td><td>Check it with whoever set it. Reading never needs it.</td></tr>
+          <tr lang="vi"><th>Nhập mật khẩu rồi mà form unlock hiện lại</th><td>Mật khẩu bị từ chối. Form sẽ nói rõ; thẻ không tự biến mất im lặng.</td><td>Hỏi lại người đặt. Đọc thì không bao giờ cần mật khẩu.</td></tr>
+          <tr lang="en"><th>The dot in the header is red / OFFLINE</th><td>The app cannot reach the server — usually the VPN or tailnet, not the app.</td><td>Check the connection your team uses, then reload.</td></tr>
+          <tr lang="vi"><th>Đèn ở thanh trên đỏ / OFFLINE</th><td>App không tới được server — thường là VPN/tailnet, không phải app.</td><td>Kiểm tra kết nối team đang dùng, rồi reload.</td></tr>
+          <tr lang="en"><th>A document you sent is not in the tree</th><td>It was never indexed. “Not in the documents” and “never added” look identical from a chat reply.</td><td>Open the tree and look. If it is missing, import it — or ask for it to be.</td></tr>
+          <tr lang="vi"><th>Tài liệu bạn gửi không có trong cây</th><td>Nó chưa từng được index. “Không có trong tài liệu” và “chưa từng thêm” nhìn từ câu trả lời thì y như nhau.</td><td>Mở cây ra xem. Nếu thiếu thì import — hoặc nhờ import.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b lang="en">Next:</b>
+      <span lang="en">the <a href="<%.GuideURL%>">Guide</a> has the 60-second start and how
+        the whole thing works; <a href="<%.DevURL%>">Dev</a> is for whoever changes it;
+        <a href="<%.DeployURL%>">Deploy</a> is for whoever hosts it.</span>
+      <b lang="vi">Tiếp theo:</b>
+      <span lang="vi">trang <a href="<%.GuideURL%>">Hướng dẫn</a> có phần bắt đầu 60 giây và
+        cách hệ thống hoạt động; <a href="<%.DevURL%>">Dev</a> cho người sửa code;
+        <a href="<%.DeployURL%>">Triển khai</a> cho người host.</span>
+    </div>
+  </section>
+
+</main>
+<%template "foot" .%>

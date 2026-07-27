@@ -52,13 +52,16 @@ deploy separately.
 The bilingual (EN/VI) guide is published as static pages on its own domain. One page
 per role, because each role arrives with a different question:
 
-| | Guide | Dev | Deploy |
-|---|---|---|---|
-| Answers | "what is this, can I trust this answer?" | "where do I change X?" | "how do we run it for the team?" |
-| For | everyone, then BA / PM / support | DEV | whoever hosts it |
-| Published at | [/](https://mega-hub-studio.github.io/mega-docs/) | [/dev.html](https://mega-hub-studio.github.io/mega-docs/dev.html) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
+| | Guide | BA mode | Dev | Deploy |
+|---|---|---|---|---|
+| Answers | "what is this, can I trust this answer?" | "how do I get good answers, and answer a gap?" | "where do I change X?" | "how do we run it for the team?" |
+| For | everyone, first 60 seconds | BA / PM / support, day to day | DEV | whoever hosts it |
+| Published at | [/](https://mega-hub-studio.github.io/mega-docs/) | [/ba.html](https://mega-hub-studio.github.io/mega-docs/ba.html) | [/dev.html](https://mega-hub-studio.github.io/mega-docs/dev.html) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
 
-The Guide opens with a router, so nobody has to read a page that is not theirs.
+The Guide opens with a router and a 60-second quick start, so nobody has to read a page
+that is not theirs. Each page is split into one section per feature, indexed by
+`<nes-toc>`; the two flows a reader has to hold in their head — how an answer is built,
+and how a gap becomes a document — are diagrams, rendered at build time from `web/*.mmd`.
 
 For AI agents there is [`AGENTS.md`](AGENTS.md) and a generated
 [`/llms.txt`](https://mega-hub-studio.github.io/mega-docs/llms.txt) — an
@@ -68,13 +71,17 @@ also points at the **version-pinned** 8bit-nes docs (`llms.txt` ships inside the
 package, so a jsDelivr URL is version-exact, unlike the always-latest docs site) and
 a test fails if that version drifts from `web/vendor.sha384`.
 
-**Guide** is what it is, how it works, three steps to running it, using it well
-(asking, reading citations, what is actually indexed) and the four failures that
-actually happen. **Dev** is the first hour: where things live, the two seams,
-testing with no API key, and the knobs people actually turn — it points here for
-the full reference rather than restating it. **Deploy** is letting the team in
-(Tailscale / Cloudflare Tunnel / LAN), where to run it, systemd, backups and the
-settings table.
+**Guide** is the first read: 60 seconds to a first answer, how it works as a diagram,
+what happens when the answer isn't there, what the app can do, getting in the first
+time, and the failures that actually happen. **BA mode** is the day-to-day, seven
+numbered moves in the order they come up: ask so retrieval finds it, decide whether to
+trust the answer, narrow to one folder, file and answer a gap, import documents, read
+what an answer cost, and what to do when something looks wrong. **Dev** is the first
+hour: where things live, the two seams, how an answer is built, the HTTP surface,
+testing with no API key, the knobs people actually turn, and the four layers of the
+front end — it points here for the full reference rather than restating it. **Deploy**
+is the first install, letting the team in (Tailscale / Cloudflare Tunnel / LAN), where
+to run it, systemd, backups and the settings table.
 
 The app binary does **not** serve the guide. Documentation has its own domain, and a
 second copy inside the app is noise on the one surface people came to use — plus a
@@ -104,8 +111,9 @@ internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF,
                   tickets (the QA state machine) and the answer cache
 internal/config   env → Config, with defaults
 
-web/              index.html · docs.html · dev.html · deploy.html (Go templates,
-                  shared head in docsbase.html) + embed.go + assets.go
+web/              index.html · docs.html · ba.html · dev.html · deploy.html
+                  (Go templates, shared head in docsbase.html) + embed.go + assets.go
+                  *.mmd + *.svg  diagram sources and their committed renders
 web/app/          the front end — Vue 3.5 Composition API, native ES modules,
                   no build step
                   app.js      wiring: composables in, components registered, mount
@@ -160,6 +168,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
+| a sub-module inside a section | an `<h3>` in that section | `<nes-toc>` indexes h2+h3, so it appears in the rail on its own |
 | a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the guide is static, so the app needs no change at all |
 | something an AI agent must know | [`AGENTS.md`](AGENTS.md) | `llms.txt` is generated; this is the hand-written part, and its pins are tested |
 

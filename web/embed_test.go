@@ -222,6 +222,7 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 		owns  string
 	}{
 		{"guide", Docs, "Deploy", "Ask your own docs"},
+		{"ba", BA, "Deploy", "BA mode"},
 		{"dev", Dev, "Deploy", "Change it"},
 		{"deploy", Deploy, "Guide", "Run it for the team"},
 	} {
@@ -344,7 +345,7 @@ func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
 	for host, nav := range map[string]Nav{"static": StaticNav} {
 		seen := map[string]string{}
 		for label, addr := range map[string]string{
-			"Guide": nav.Guide, "Dev": nav.Dev, "Deploy": nav.Deploy,
+			"Guide": nav.Guide, "BA": nav.BA, "Dev": nav.Dev, "Deploy": nav.Deploy,
 		} {
 			if addr == "" {
 				t.Errorf("%s nav: %s has no address", host, label)
@@ -359,13 +360,13 @@ func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
 	// …and each rendered page must actually link the other two, not just hold the
 	// addresses. A router that points nowhere is the whole failure mode here.
 	for name, build := range map[string]func(string, Nav) ([]byte, error){
-		"guide": Docs, "dev": Dev, "deploy": Deploy,
+		"guide": Docs, "ba": BA, "dev": Dev, "deploy": Deploy,
 	} {
 		out, err := build("/vendor", StaticNav)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		for _, addr := range []string{StaticNav.Guide, StaticNav.Dev, StaticNav.Deploy} {
+		for _, addr := range []string{StaticNav.Guide, StaticNav.BA, StaticNav.Dev, StaticNav.Deploy} {
 			if !strings.Contains(string(out), `href="`+addr+`"`) {
 				t.Errorf("%s page never links %s", name, addr)
 			}
@@ -415,13 +416,14 @@ func TestLLMsIndexListsEveryPage(t *testing.T) {
 	}
 	got := string(out)
 
-	for _, want := range []string{"index.html", "dev.html", "deploy.html"} {
+	for _, want := range []string{"index.html", "ba.html", "dev.html", "deploy.html"} {
 		if !strings.Contains(got, "https://example.test/docs/"+want) {
 			t.Errorf("llms.txt never links %s", want)
 		}
 	}
-	// Section names come out of the pages, so a page's own heading must appear.
-	for _, want := range []string{"Using it well", "The two seams", "Let the team in"} {
+	// Section names come out of the pages, so a page's own heading must appear. One per
+	// page, so a page dropping out of the index is caught rather than averaged away.
+	for _, want := range []string{"Start in 60 seconds", "Narrow to one folder", "The two seams", "Let the team in"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("llms.txt is missing the %q section — is it still derived from the pages?", want)
 		}

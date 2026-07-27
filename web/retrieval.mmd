@@ -1,0 +1,20 @@
+%% Source of truth for the "How an answer is built" diagram on the Dev page.
+%% Rendered to web/retrieval.svg by `make diagram` — mermaid never ships to the browser.
+%%
+%% Same two constraints as howitworks.mmd, both from the phone: keep it SHALLOW (every
+%% rank is ~90px and a diagram taller than the viewport pushes the spotlit node off
+%% screen), and keep labels SHORT and lowercase-distinct, because the walkthrough
+%% spotlights nodes by matching its `focus` strings against node text.
+%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 28, "padding": 6, "useMaxWidth": true}}}%%
+graph TD
+  Q["question + scope"] --> Cache{"cached?"}
+  Cache -->|hit| Free["free answer"]
+  Cache -->|miss| Embed["embed"]
+  Embed --> Vec["vectors"]
+  Q --> Fts["keywords"]
+  Vec --> Rrf["RRF fuse"]
+  Fts --> Rrf
+  Rrf --> Top["top K"]
+  Top --> Prompt["prompt + context"]
+  Prompt --> Stream["stream, cite [n]"]
+  Stream --> Store["store in cache"]

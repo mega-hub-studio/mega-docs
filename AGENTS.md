@@ -9,7 +9,8 @@ be wrong or out of date.
 | | URL |
 |---|---|
 | Machine index | <https://mega-hub-studio.github.io/mega-docs/llms.txt> |
-| Guide — what it is, quick start, using it well | <https://mega-hub-studio.github.io/mega-docs/> |
+| Guide — what it is, quick start, how it works | <https://mega-hub-studio.github.io/mega-docs/> |
+| BA mode — asking, judging, scoping, answering a gap | <https://mega-hub-studio.github.io/mega-docs/ba.html> |
 | Dev — the seams, testing, the knobs | <https://mega-hub-studio.github.io/mega-docs/dev.html> |
 | Deploy — hosting for a team | <https://mega-hub-studio.github.io/mega-docs/deploy.html> |
 | Full file-by-file reference | [`README.md`](README.md) |

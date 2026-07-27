@@ -13,8 +13,69 @@
     dưới đây chỉ khác nhau ở chỗ <i>ai quyết định ai tới được cổng đó</i>.
   </p>
 
-  <!-- ══ deploy ════════════════════════════════════════════════════════════ -->
-  <section>
+    <!-- ══ first install ═════════════════════════════════════════════════════════
+       Moved here from the Guide: three commands belong on the page read by the person
+       who types them, not on the one a BA opens. -->
+  <section id="install">
+    <h2 lang="en">First install</h2>
+    <h2 lang="vi">Cài đặt lần đầu</h2>
+    <p class="lede" lang="en">Three commands on the machine that will hold the index.
+      Everything after this — who can reach it, how it stays up — is the rest of this
+      page.</p>
+    <p class="lede" lang="vi">Ba lệnh trên máy sẽ giữ index. Mọi thứ sau đó — ai truy cập
+      được, làm sao nó luôn chạy — là phần còn lại của trang này.</p>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Configure the AI provider</b>
+        <b lang="vi">Cấu hình AI provider</b>
+        <div class="terminal"><span class="cmd">cp .env.example .env</span><span class="out"># fill in AI_API_KEY, AI_BASE_URL, models</span><span class="cmd">make live</span><span class="out"><span class="ok">✓</span> checks both endpoints + embedding width</span></div>
+        <p lang="en"><code>make live</code> answers the question that actually
+          bites: does this provider have <code>/embeddings</code>? Without it,
+          indexing cannot run.</p>
+        <p lang="vi"><code>make live</code> trả lời đúng câu hỏi hay gây đau:
+          provider này có <code>/embeddings</code> không? Thiếu nó là không index
+          được.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Index your documents</b>
+        <b lang="vi">Index tài liệu</b>
+        <div class="terminal"><span class="cmd">make ingest DOCS=./docs</span><span class="out">indexed docs/retrieval.md (12 chunks)
+done: 8/8 files, 74 chunks</span></div>
+        <p lang="en">Only <code>.md</code> / <code>.txt</code>. For PDF or DOCX,
+          convert first — <code>markitdown spec.pdf &gt; docs/spec.md</code>.
+          Re-running on the same path updates it in place.</p>
+        <p lang="vi">Chỉ nhận <code>.md</code> / <code>.txt</code>. PDF hay DOCX
+          thì chuyển trước — <code>markitdown spec.pdf &gt; docs/spec.md</code>.
+          Chạy lại trên cùng đường dẫn thì cập nhật tại chỗ.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">Start it</b>
+        <b lang="vi">Chạy</b>
+        <div class="terminal"><span class="cmd">make build &amp;&amp; ./bin/knowledge</span><span class="out">mega-docs on http://127.0.0.1:8080</span></div>
+        <p lang="en">The UI is compiled into the binary, so there is nothing else
+          to deploy. Verify the whole chain any time with
+          <code>make smoke</code>: it indexes a fixture, asks a question only
+          that file can answer, and checks the reply cites it.</p>
+        <p lang="vi">UI được biên dịch vào trong binary, nên không có gì khác
+          phải deploy. Kiểm tra toàn bộ chuỗi bất cứ lúc nào bằng
+          <code>make smoke</code>: nó index một file mẫu, hỏi câu chỉ file đó
+          trả lời được, rồi kiểm tra câu trả lời có dẫn nguồn đúng file.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ let the team in ═══════════════════════════════════════════════════════ -->
+  <section id="access">
     <h2 lang="en">Let the team in</h2>
     <h2 lang="vi">Cho team truy cập</h2>
 

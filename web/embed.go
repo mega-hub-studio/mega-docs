@@ -23,6 +23,9 @@ var docsTmpl string
 //go:embed dev.html
 var devTmpl string
 
+//go:embed ba.html
+var baTmpl string
+
 //go:embed deploy.html
 var deployTmpl string
 
@@ -73,7 +76,7 @@ var FS embed.FS
 // To add a page: a field here, an address in StaticNav, a render func, and one line
 // in cmd/rendocs.
 type Nav struct {
-	Guide, Dev, Deploy string
+	Guide, BA, Dev, Deploy string
 }
 
 // StaticNav is how the published site addresses its own pages. It is the only Nav:
@@ -81,7 +84,7 @@ type Nav struct {
 // does not serve it. There is deliberately no link from the guide back to an app —
 // an instance lives behind a tailnet or a tunnel, and a public page must not
 // hardcode somebody's private address.
-var StaticNav = Nav{Guide: "./index.html", Dev: "./dev.html", Deploy: "./deploy.html"}
+var StaticNav = Nav{Guide: "./index.html", BA: "./ba.html", Dev: "./dev.html", Deploy: "./deploy.html"}
 
 // Index renders the app shell. docsURL is the published guide, which the app links
 // out to rather than hosting: the docs have their own domain, and serving a second
@@ -97,6 +100,7 @@ func Index(assetBase, docsURL string) ([]byte, error) {
 // a nav entry — one spelling, so a new page cannot half-exist.
 const (
 	pageDocs   = "docs"
+	pageBA     = "ba"
 	pageDev    = "dev"
 	pageDeploy = "deploy"
 )
@@ -108,6 +112,14 @@ func Docs(assetBase string, nav Nav) ([]byte, error) {
 	return render(page{
 		name: pageDocs, tmpl: docsTmpl, base: assetBase, nav: nav,
 		id: pageDocs, title: "Guide / Hướng dẫn",
+	})
+}
+
+// BA renders the BA page: one section per thing a BA does — see Docs.
+func BA(assetBase string, nav Nav) ([]byte, error) {
+	return render(page{
+		name: pageBA, tmpl: baTmpl, base: assetBase, nav: nav,
+		id: pageBA, title: "BA / Cho BA",
 	})
 }
 
@@ -192,13 +204,13 @@ func render(pg page) ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, struct {
-		Base, Origin                string
-		DocsURL                     string
-		GuideURL, DevURL, DeployURL string
-		Page, Title                 string
-		Remote                      bool
+		Base, Origin                       string
+		DocsURL                            string
+		GuideURL, BAURL, DevURL, DeployURL string
+		Page, Title                        string
+		Remote                             bool
 	}{
-		base, origin, pg.docsURL, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
+		base, origin, pg.docsURL, pg.nav.Guide, pg.nav.BA, pg.nav.Dev, pg.nav.Deploy,
 		pg.id, pg.title, remote,
 	}); err != nil {
 		return nil, err

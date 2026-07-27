@@ -114,6 +114,67 @@ view.scrollToEnd();                            // viewport.js</span></div>
 
   </section>
 
+  <!-- ══ how an answer is built ═══════════════════════════════════════════════
+       The pipeline as one picture, then the three rules that make each stage honest.
+       Rendered from web/retrieval.mmd at build time — mermaid never reaches this page. -->
+  <section id="pipeline">
+    <h2 lang="en">How an answer is built</h2>
+    <h2 lang="vi">Một câu trả lời được dựng thế nào</h2>
+    <p class="lede" lang="en">One question, eight stages, and two of them can return early.
+      Everything below in this page is a knob on one of these boxes.</p>
+    <p class="lede" lang="vi">Một câu hỏi, tám chặng, và hai chặng có thể trả về sớm. Mọi
+      thứ phía dưới trong trang này là một cái núm trên một trong các hộp này.</p>
+
+    <div class="mermaid-view"><%diagram "retrieval"%></div>
+
+    <dl class="datalist">
+      <dt lang="en">cached?</dt>
+      <dd lang="en">Keyed on the normalised question <i>and its scope</i>, under a signature
+        of the corpus + chat model + a hash of the prompt. A hit costs nothing: no embedding
+        call, no completion. <code>fresh</code> (Regenerate) skips it.</dd>
+      <dt lang="vi">cached?</dt>
+      <dd lang="vi">Khoá theo câu hỏi đã chuẩn hoá <i>và scope của nó</i>, dưới một signature
+        gồm corpus + chat model + hash của prompt. Trúng cache là không tốn gì: không gọi
+        embedding, không gọi completion. <code>fresh</code> (Regenerate) bỏ qua nó.</dd>
+      <dt lang="en">vectors · keywords</dt>
+      <dd lang="en">Both legs, always, and both filtered by the scope <i>before</i> they
+        rank. sqlite-vec takes the scope as a pre-filter, so <code>TOP_K</code> counts
+        matches inside the folder rather than survivors of a global top-k.</dd>
+      <dt lang="vi">vectors · keywords</dt>
+      <dd lang="vi">Luôn chạy cả hai nhánh, và cả hai đều bị lọc theo scope <i>trước</i> khi
+        xếp hạng. sqlite-vec nhận scope như pre-filter, nên <code>TOP_K</code> đếm kết quả
+        trong thư mục chứ không phải phần sót lại của top-k toàn cục.</dd>
+      <dt lang="en">RRF fuse</dt>
+      <dd lang="en">Reciprocal Rank Fusion: a section both retrievers found beats one that
+        only ranks highly in either. Chunks a BA confirmed get a small boost — the only part
+        of the corpus a person vouched for.</dd>
+      <dt lang="vi">RRF fuse</dt>
+      <dd lang="vi">Reciprocal Rank Fusion: đoạn mà cả hai bộ truy xuất đều thấy thắng đoạn
+        chỉ mạnh ở một bên. Đoạn đã được BA confirm được cộng thêm chút điểm — phần duy nhất
+        của corpus có người bảo đảm.</dd>
+      <dt lang="en">stream, cite [n]</dt>
+      <dd lang="en">Server-sent events: <code>token</code> repeatedly, then
+        <code>citations</code>, then one <code>done</code> carrying whether it was cached and
+        what the provider counted. Only the sources the answer actually referenced come
+        back, keeping their original numbers.</dd>
+      <dt lang="vi">stream, cite [n]</dt>
+      <dd lang="vi">Server-sent events: <code>token</code> nhiều lần, rồi
+        <code>citations</code>, rồi một <code>done</code> mang theo có phải cache không và
+        provider đếm được bao nhiêu. Chỉ những nguồn mà câu trả lời thực sự dẫn mới quay về,
+        giữ nguyên số thứ tự.</dd>
+      <dt lang="en">store in cache</dt>
+      <dd lang="en">A grounded answer is stored; a whole miss never is (caching a miss makes
+        one gap permanent). A <i>partial</i> answer is stored, because it cost a real
+        completion and the corpus signature will invalidate it the day the missing document
+        arrives.</dd>
+      <dt lang="vi">store in cache</dt>
+      <dd lang="vi">Câu trả lời có căn cứ thì lưu; câu miss hoàn toàn thì không bao giờ (lưu
+        một miss là biến một gap thành vĩnh viễn). Câu trả lời <i>một phần</i> thì lưu, vì nó
+        đã tốn một completion thật và signature của corpus sẽ vô hiệu hoá nó vào ngày tài
+        liệu còn thiếu xuất hiện.</dd>
+    </dl>
+  </section>
+
   <!-- ══ http surface ══════════════════════════════════════════════════════════ -->
   <section>
     <h2 lang="en">The whole HTTP surface</h2>
@@ -494,12 +555,94 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       <span lang="en">Confirming writes into the corpus for the whole team. If you know the
         answer but not that it is <i>the</i> answer, leave it for someone who owns the
         subject — the four states and the guidance for answering well are on the
-        <a href="<%.GuideURL%>#use">Guide</a>.</span>
+        <a href="<%.BAURL%>#gap">BA page</a>.</span>
       <b lang="vi">Có <code>BA_PASS</code> không có nghĩa ticket đó là của bạn.</b>
       <span lang="vi">Confirm là ghi vào corpus cho cả team. Nếu bạn biết câu trả lời nhưng
         không chắc đó là câu trả lời <i>đúng thẩm quyền</i>, để người nắm nghiệp vụ làm —
         bốn trạng thái và cách viết câu trả lời tốt nằm ở
-        <a href="<%.GuideURL%>#use">trang Hướng dẫn</a>.</span>
+        <a href="<%.BAURL%>#gap">trang BA</a>.</span>
+    </div>
+  </section>
+
+  <!-- ══ front-end architecture ═══════════════════════════════════════════════
+       New because it is now real and enforced: four layers, four tests. -->
+  <section id="frontend">
+    <h2 lang="en">The front end, in four layers</h2>
+    <h2 lang="vi">Frontend, bốn tầng</h2>
+    <p class="lede" lang="en">Vue 3.5 Composition API, no bundler, no
+      <code>node_modules</code>, no build step — the binary serves <code>web/app/</code>
+      straight from its embed FS. Put a change in the lowest layer that can hold it.</p>
+    <p class="lede" lang="vi">Vue 3.5 Composition API, không bundler, không
+      <code>node_modules</code>, không build step — binary serve <code>web/app/</code> trực
+      tiếp từ embed FS. Đặt thay đổi vào tầng thấp nhất còn giữ được nó.</p>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Layer</th><th>Files</th><th>May contain</th><th>May not</th></tr>
+          <tr lang="vi"><th>Tầng</th><th>File</th><th>Được chứa</th><th>Không được</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>plumbing</th><td><code>chat.js</code> <code>qa.js</code> <code>upload.js</code> <code>answer.js</code> <code>diagram.js</code> <code>library.js</code> <code>session.js</code> <code>viewport.js</code></td><td>fetch, SSE, storage, markdown, DOM maths</td><td>any Vue import — these run in a bare console</td></tr>
+          <tr lang="vi"><th>plumbing</th><td><code>chat.js</code> <code>qa.js</code> <code>upload.js</code> <code>answer.js</code> <code>diagram.js</code> <code>library.js</code> <code>session.js</code> <code>viewport.js</code></td><td>fetch, SSE, storage, markdown, toán DOM</td><td>bất kỳ import Vue nào — chúng chạy được trong console trần</td></tr>
+          <tr lang="en"><th>logic</th><td><code>use/*.js</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · toast</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
+          <tr lang="vi"><th>logic</th><td><code>use/*.js</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · toast</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
+          <tr lang="en"><th>components</th><td><code>ba.js</code> <code>tree.js</code></td><td>props, emits, compose, return</td><td>branches — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
+          <tr lang="vi"><th>component</th><td><code>ba.js</code> <code>tree.js</code></td><td>props, emits, compose, return</td><td>nhánh — component có <code>if</code> là composable chưa ai viết</td></tr>
+          <tr lang="en"><th>wiring</th><td><code>app.js</code></td><td>who gets what, and what the template binds</td><td>logic of its own</td></tr>
+          <tr lang="vi"><th>wiring</th><td><code>app.js</code></td><td>ai nhận gì, và template bind gì</td><td>logic của riêng nó</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 lang="en">Four rules, four tests</h3>
+    <h3 lang="vi">Bốn quy tắc, bốn test</h3>
+    <p lang="en">All four break silently — nothing fails to build, and the browser looks fine
+      until the exact moment someone uses the feature. So they are checked in Go, in
+      <code>web/frontend_test.go</code>, and each was mutation-tested against an injected
+      violation.</p>
+    <p lang="vi">Cả bốn đều sai một cách im lặng — không có gì build lỗi, và browser trông
+      vẫn ổn tới đúng lúc có người dùng tính năng đó. Nên chúng được kiểm bằng Go, trong
+      <code>web/frontend_test.go</code>, và mỗi cái đều đã được mutation-test bằng một lỗi
+      tiêm vào.</p>
+    <dl class="datalist">
+      <dt><code>TestPlumbingDoesNotImportVue</code></dt>
+      <dd lang="en">A <code>ref</code> in <code>session.js</code> and that file can only run
+        inside a mounted app.</dd>
+      <dd lang="vi">Một <code>ref</code> lọt vào <code>session.js</code> là file đó chỉ chạy
+        được trong app đã mount.</dd>
+      <dt><code>TestComposablesDoNotImportEachOther</code></dt>
+      <dd lang="en">What a composable needs arrives as an argument — reactive inputs it does
+        not own as <i>getters</i>, or it freezes on the array that existed at setup.</dd>
+      <dd lang="vi">Thứ một composable cần thì được truyền vào — input reactive nó không sở
+        hữu thì truyền dạng <i>getter</i>, không thì nó đóng băng vào array lúc setup.</dd>
+      <dt><code>TestComponentsHoldNoLogic</code></dt>
+      <dd lang="en">This is the drift that grew <code>ba.js</code> to 179 lines holding the
+        password gate, the import pipeline and the ticket transitions at once.</dd>
+      <dd lang="vi">Đây đúng là kiểu trôi đã làm <code>ba.js</code> phình lên 179 dòng chứa
+        cả gate mật khẩu, đường import và các chuyển trạng thái ticket.</dd>
+      <dt><code>TestTemplatesBindNothingUndefined</code></dt>
+      <dd lang="en">A missing key in a <code>setup()</code> return is <code>undefined</code>
+        at render, with no error and no warning — just a blank where a badge should be.</dd>
+      <dd lang="vi">Thiếu một key trong <code>setup()</code> return là
+        <code>undefined</code> lúc render, không error không warning — chỉ là chỗ trống nơi
+        đáng ra có badge.</dd>
+    </dl>
+
+    <div class="callout memo">
+      <b lang="en">No JavaScript linter in the gate, on purpose.</b>
+      <span lang="en">Measured: <code>@antfu/eslint-config</code> pulls 255 packages and
+        113 MB to report three small findings here, and its best rules — eslint-plugin-vue's
+        reactivity-loss checks — do not fire without SFCs. It is wired as
+        <code>make lint-js</code>, installed into <code>.cache/</code>, with nothing
+        committed for it. Promote it the day TypeScript or <code>.vue</code> files
+        land.</span>
+      <b lang="vi">Không có linter JavaScript trong gate, và đó là chủ ý.</b>
+      <span lang="vi">Đã đo: <code>@antfu/eslint-config</code> kéo về 255 package và 113 MB
+        để báo ba finding nhỏ ở đây, còn các rule mạnh nhất của nó — reactivity-loss của
+        eslint-plugin-vue — không chạy khi không có SFC. Nó được wire thành
+        <code>make lint-js</code>, cài vào <code>.cache/</code>, không commit gì cho nó. Đẩy
+        nó vào gate vào ngày TypeScript hoặc file <code>.vue</code> xuất hiện.</span>
     </div>
   </section>
 

@@ -33,6 +33,7 @@ func LLMs(siteBase string) ([]byte, error) {
 	// Ordered, unlike a map: an index that shuffles between builds is a useless diff.
 	order := []entry{
 		{"index.html", Docs},
+		{strings.TrimPrefix(StaticNav.BA, "./"), BA},
 		{strings.TrimPrefix(StaticNav.Dev, "./"), Dev},
 		{strings.TrimPrefix(StaticNav.Deploy, "./"), Deploy},
 	}
