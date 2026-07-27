@@ -3,13 +3,13 @@
   <h1 lang="en">◈ Change it</h1>
   <h1 lang="vi">◈ Sửa và mở rộng</h1>
   <p class="lede" lang="en">
-    Everything on this page is the <b>first hour</b>: the four seams you will
+    Everything on this page is the <b>first hour</b>: the seams you will
     actually touch, and how to test them without an API key. It is deliberately not
     the full reference — that is the <a href="https://github.com/mega-hub-studio/mega-docs#architecture">README</a>,
     and it stays the one place that describes every file.
   </p>
   <p class="lede" lang="vi">
-    Toàn bộ trang này là <b>một giờ đầu tiên</b>: bốn chỗ bạn thật sự sẽ sửa, và
+    Toàn bộ trang này là <b>một giờ đầu tiên</b>: những chỗ bạn thật sự sẽ sửa, và
     cách test chúng mà không cần API key. Đây cố ý <i>không</i> phải tài liệu tham
     chiếu đầy đủ — chỗ đó là <a href="https://github.com/mega-hub-studio/mega-docs#architecture">README</a>,
     và nó vẫn là nơi duy nhất mô tả mọi file.
@@ -59,16 +59,28 @@
 
     <h3 lang="en">Server ↔ engine</h3>
     <h3 lang="vi">Server ↔ engine</h3>
-    <p lang="en">The HTTP layer depends on an interface, not the engine — so every
-      route, SSE frame and 400 is covered by <code>go test</code> with a fake,
-      needing no key and no database.</p>
-    <p lang="vi">Tầng HTTP phụ thuộc vào một interface, không phải engine — nên mọi
-      route, frame SSE và lỗi 400 đều test được bằng <code>go test</code> với fake,
-      không cần key, không cần database.</p>
-    <div class="terminal"><span class="out">type Answerer interface {
-    Answer(ctx, question string, onToken func(string)) ([]rag.Citation, error)
+    <p lang="en">The HTTP layer depends on two narrow interfaces, not the engine — split
+      by side, so a test of the read path fakes nothing it doesn't use. Every route, SSE
+      frame, write gate and 400 is covered by <code>go test</code> with a fake, needing
+      no key and no database.</p>
+    <p lang="vi">Tầng HTTP phụ thuộc vào hai interface hẹp, không phải engine — chia theo
+      từng bên, nên test đường đọc không phải fake thứ nó không dùng. Mọi route, frame
+      SSE, cửa ghi và lỗi 400 đều test được bằng <code>go test</code> với fake, không
+      cần key, không cần database.</p>
+    <div class="terminal"><span class="out">type Answerer interface {              // read
+    Answer(ctx, Ask) (Reply, error)     // Ask.Fresh skips the cache
     Corpus(limit int) (db.Corpus, error)
+}
+type Knowledge interface {             // the BA ⇄ DEV loop
+    Queue(limit int) (db.Queue, error)
+    OpenTicket(question, miss string) (db.Ticket, error)
+    Draft / Confirm / Reject           // one transition each
+    History(limit int) ([]db.Cached, error)
 }</span></div>
+    <p lang="en"><code>Deps.Know</code> is optional: leave it nil and the ticket routes
+      simply aren't registered, so a read-only build has no write surface to secure.</p>
+    <p lang="vi"><code>Deps.Know</code> là tuỳ chọn: để nil thì các route ticket không
+      được đăng ký, nên bản chỉ-đọc không có chỗ ghi nào cần bảo vệ.</p>
 
     <h3 lang="en">App ↔ transport</h3>
     <h3 lang="vi">App ↔ transport</h3>
@@ -78,9 +90,49 @@
     <p lang="vi"><code>app.js</code> không bao giờ thấy <code>AbortController</code>,
       <code>TextDecoder</code> hay <code>visualViewport</code>. Nó chỉ nói ý định;
       các module giấu phần cơ chế.</p>
-    <div class="terminal"><span class="out">const run = ask(q, { onToken, onCitations });  // chat.js
+    <div class="terminal"><span class="out">const run = ask(q, { onToken, onCitations, onDone, fresh });  // chat.js
 run.stop();                                    // resolves, never throws
+await qa.act(id, "confirm", { answer });       // qa.js — throws WrongPass on 401/403
 view.scrollToEnd();                            // viewport.js</span></div>
+
+  </section>
+
+  <!-- ══ http surface ══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2 lang="en">The whole HTTP surface</h2>
+    <h2 lang="vi">Toàn bộ mặt HTTP</h2>
+    <p class="lede" lang="en">Every route the binary serves. It serves no documentation
+      pages — this guide is published separately.</p>
+    <p class="lede" lang="vi">Tất cả route mà binary phục vụ. Nó không phục vụ trang tài
+      liệu nào — guide này được publish riêng.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Route</th><th>Does</th><th>Password</th></tr>
+          <tr lang="vi"><th>Route</th><th>Làm gì</th><th>Mật khẩu</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th><code>GET /api/health</code></th><td><code>{"ok":true,"writes":bool}</code> — also tells the UI whether BA mode can publish</td><td>never, so probes need no secret</td></tr>
+          <tr lang="vi"><th><code>GET /api/health</code></th><td><code>{"ok":true,"writes":bool}</code> — cũng cho UI biết chế độ BA có publish được không</td><td>không bao giờ, để probe không cần secret</td></tr>
+          <tr lang="en"><th><code>POST /api/chat</code></th><td>SSE: <code>token</code> · <code>citations</code> · <code>done{cached}</code> · <code>error</code></td><td>—</td></tr>
+          <tr lang="vi"><th><code>POST /api/chat</code></th><td>SSE: <code>token</code> · <code>citations</code> · <code>done{cached}</code> · <code>error</code></td><td>—</td></tr>
+          <tr lang="en"><th><code>GET /api/corpus</code></th><td>what is indexed, and how much of it is approved</td><td>—</td></tr>
+          <tr lang="vi"><th><code>GET /api/corpus</code></th><td>đang index những gì, bao nhiêu đã approved</td><td>—</td></tr>
+          <tr lang="en"><th><code>GET · POST /api/tickets</code></th><td>read the queue · file a gap</td><td>—</td></tr>
+          <tr lang="vi"><th><code>GET · POST /api/tickets</code></th><td>đọc hàng đợi · báo phần thiếu</td><td>—</td></tr>
+          <tr lang="en"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 wrong, 403 writes off</td></tr>
+          <tr lang="vi"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 sai, 403 tắt ghi</td></tr>
+          <tr lang="en"><th><code>GET /api/history</code></th><td>answers still free to replay, with hit counts</td><td>—</td></tr>
+          <tr lang="vi"><th><code>GET /api/history</code></th><td>các câu trả lời còn lặp lại miễn phí, kèm số lần dùng</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p lang="en">A stale transition (two BAs on one queue) is a <code>409</code> with the
+      reason, not a <code>500</code>. <code>AUTH_PASS</code>, when set, sits in front of
+      all of it except <code>/api/health</code>.</p>
+    <p lang="vi">Chuyển trạng thái lỗi thời (hai BA trên cùng hàng đợi) trả
+      <code>409</code> kèm lý do, không phải <code>500</code>. <code>AUTH_PASS</code>,
+      nếu đặt, chắn trước tất cả trừ <code>/api/health</code>.</p>
   </section>
 
   <!-- ══ test ══════════════════════════════════════════════════════════════ -->
@@ -180,6 +232,41 @@ EMBED_DIM=1536</span></div>
     <div class="step">
       <span class="num">4</span>
       <div class="body">
+        <b lang="en">Who may write, and where their answers land</b>
+        <b lang="vi">Ai được ghi, và câu trả lời của họ đi đâu</b>
+        <p lang="en"><code>BA_PASS</code> gates the two actions that change what the
+          engine says — confirm and dismiss. Empty means the instance has no write
+          surface at all, which is the safe way to forget a secret.
+          <code>CORPUS_DIR</code> is the folder <code>ingest</code> reads and where a
+          confirmed answer is written as <code>qa/ticket-N.md</code>; it is why the
+          database stays derived. Neither needs a re-index.</p>
+        <p lang="vi"><code>BA_PASS</code> khoá hai hành động đổi câu trả lời của engine —
+          confirm và dismiss. Để trống thì instance không có chỗ ghi nào, đó là cách an
+          toàn khi quên đặt secret. <code>CORPUS_DIR</code> là thư mục
+          <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm thành
+          <code>qa/ticket-N.md</code>; nhờ vậy database vẫn chỉ là thứ dựng lại được.
+          Cả hai đều không cần index lại.</p>
+        <div class="terminal"><span class="out">BA_PASS=…            # empty = read-only instance
+CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
+        <div class="callout memo">
+          <b lang="en">The answer cache is keyed on the corpus, not a clock.</b>
+          <span lang="en">A repeat question skips both provider calls. Any ingest — a
+            document or a BA confirm — changes the corpus signature and drops the whole
+            cache, so a cached answer can never outlive the sources it cites. There is
+            no TTL to tune, and <code>Ask.Fresh</code> (Regenerate) bypasses it.</span>
+          <b lang="vi">Cache câu trả lời khoá theo corpus, không theo thời gian.</b>
+          <span lang="vi">Câu hỏi lặp lại bỏ qua cả hai lần gọi provider. Bất kỳ lần
+            ingest nào — tài liệu hay một confirm của BA — đều đổi signature của corpus
+            và xoá sạch cache, nên câu trả lời trong cache không bao giờ sống lâu hơn
+            nguồn nó dẫn. Không có TTL nào để tinh chỉnh, và <code>Ask.Fresh</code>
+            (Regenerate) thì bỏ qua cache.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">5</span>
+      <div class="body">
         <b lang="en">The UI</b>
         <b lang="vi">Giao diện</b>
         <p lang="en">Native ES modules, no build step — edit
@@ -211,8 +298,8 @@ EMBED_DIM=1536</span></div>
         <tbody>
           <tr lang="en"><th>a section</th><td>one <code>&lt;section&gt;</code> in the page, both languages</td></tr>
           <tr lang="vi"><th>một mục</th><td>một <code>&lt;section&gt;</code> trong trang, đủ hai ngôn ngữ</td></tr>
-          <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, an address in both Navs, a render func, one line in <code>cmd/rendocs</code></td></tr>
-          <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ ở cả hai Nav, một render func, một dòng trong <code>cmd/rendocs</code></td></tr>
+          <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one line in <code>cmd/rendocs</code></td></tr>
+          <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một dòng trong <code>cmd/rendocs</code></td></tr>
           <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; mermaid never ships to the browser</td></tr>
           <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; mermaid không bao giờ tới browser</td></tr>
         </tbody>

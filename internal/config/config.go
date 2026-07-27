@@ -11,6 +11,7 @@ type Config struct {
 	BindAddr   string
 	Port       string
 	DBPath     string
+	CorpusDir  string
 	AssetBase  string
 	SiteURL    string
 	BaseURL    string
@@ -23,6 +24,7 @@ type Config struct {
 	TopK       int
 	AuthUser   string
 	AuthPass   string
+	BAPass     string
 }
 
 // DefaultAssetBase is the CDN the frontend loads Vue / marked / DOMPurify /
@@ -44,9 +46,13 @@ func Load() Config {
 		// Loopback by default: this app has no authentication of its own, so
 		// binding every interface has to be a deliberate choice, not the default
 		// you get by forgetting. Set BIND_ADDR=0.0.0.0 for LAN/Tailscale.
-		BindAddr:  env("BIND_ADDR", "127.0.0.1"),
-		Port:      env("PORT", "8080"),
-		DBPath:    env("DB_PATH", "knowledge.db"),
+		BindAddr: env("BIND_ADDR", "127.0.0.1"),
+		Port:     env("PORT", "8080"),
+		DBPath:   env("DB_PATH", "knowledge.db"),
+		// The folder `ingest` reads, and where a BA-confirmed answer is written as
+		// a markdown file. Keeping both on one path is what makes the database
+		// derived: this directory is the source of truth, so put it in git.
+		CorpusDir: env("CORPUS_DIR", "docs"),
 		AssetBase: env("ASSET_BASE", DefaultAssetBase),
 		SiteURL:   env("SITE_URL", DefaultSiteURL),
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
@@ -63,6 +69,11 @@ func Load() Config {
 		TopK:       envInt("TOP_K", 6),
 		AuthUser:   env("AUTH_USER", "team"),
 		AuthPass:   env("AUTH_PASS", ""), // empty = no auth
+		// Gates the two actions that change what the engine will say. Empty means
+		// the instance has no write surface at all — reads still work, BA mode says
+		// it is read-only. Deliberately separate from AUTH_PASS: everyone who can
+		// read shares that one, and confirming into the corpus is not everyone's.
+		BAPass: env("BA_PASS", ""),
 	}
 }
 

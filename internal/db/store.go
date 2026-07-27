@@ -76,16 +76,14 @@ func (s *Store) UpsertDocument(path, title string) (int64, error) {
 		_, _ = tx.Exec(`DELETE FROM vec_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id=?)`, oldID.Int64)
 		_, _ = tx.Exec(`DELETE FROM chunks WHERE document_id=?`, oldID.Int64)
 	}
-	res, err := tx.Exec(
-		`INSERT INTO documents(path,title,version,updated_at)
-		 VALUES(?,?,1,datetime('now'))
+	if _, err := tx.Exec(
+		`INSERT INTO documents(path,title,updated_at)
+		 VALUES(?,?,datetime('now'))
 		 ON CONFLICT(path) DO UPDATE SET title=excluded.title,
-		   version=version+1, updated_at=datetime('now')`,
-		path, title)
-	if err != nil {
+		   updated_at=datetime('now')`,
+		path, title); err != nil {
 		return 0, err
 	}
-	_ = res
 	var docID int64
 	if err := tx.QueryRow(`SELECT id FROM documents WHERE path=?`, path).Scan(&docID); err != nil {
 		return 0, err
@@ -121,7 +119,8 @@ func (s *Store) InsertChunk(docID int64, heading, content string, ord int, emb [
 }
 
 // Search runs hybrid retrieval: vector KNN + BM25, fused with Reciprocal Rank Fusion.
-// Approved chunks get a small score boost (Phase-1 SoT behaviour, no-op while all draft).
+// Approved chunks — the answers a BA confirmed — get a small boost, so a human-vouched
+// section wins a tie against one that merely mentions the same words.
 func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
 	const pool = 40 // candidates pulled from each retriever before fusion
 	const rrfK = 60.0
@@ -205,7 +204,7 @@ func (s *Store) Search(qEmb []float32, qText string, k int) ([]Hit, error) {
 		}
 		h.Score = score[h.ChunkID]
 		if h.Status == "approved" {
-			h.Score *= 1.2 // SoT priority; harmless while everything is draft
+			h.Score *= 1.2 // a person vouched for this one
 		}
 		hits = append(hits, h)
 	}

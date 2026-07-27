@@ -42,6 +42,11 @@ html {
   border-block-end: var(--bw-2) solid var(--line);
 }
 .bar .grow { margin-inline-start: auto; }
+/* 360px is unforgiving: the product name is the first thing worth losing, since
+   the tab title and the mode switch both still say where you are. */
+@media (max-width: 400px) {
+  .bar .eyebrow { display: none; }
+}
 
 /* ── conversation column ── */
 main {
@@ -99,6 +104,27 @@ main {
 .corpus summary { cursor: pointer; }
 .corpus .sources { text-align: start; }
 .corpus .source { margin-block-start: var(--sp-2); }
+
+/* ── BA mode: the queue ──
+   Layout only. Every block inside is a library recipe (.steps, .stat, .card,
+   .field, .badge, .callout, .datalist); all this does is stack them and let the
+   stat row reflow on a phone. */
+main.ba {
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  /* nothing is fixed at the bottom in this mode — the prompt is hidden */
+  padding-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
+}
+.stats {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+}
+.ticket { display: flex; flex-direction: column; gap: var(--sp-3); }
+.ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
+.ticket .q { margin-block-end: 0; }
+.ticket .textarea { inline-size: 100%; }
+/* The three actions wrap instead of shrinking: a 44px target that has been
+   squeezed to 30px is worse than one on the next line. */
+.ticket .control-group { flex-wrap: wrap; }
 
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {

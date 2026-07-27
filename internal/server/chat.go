@@ -18,14 +18,14 @@ var errBadRequest = errors.New("bad request")
 //
 //	token     {"t":"…"}                       repeated, as the model streams
 //	citations [{"n":1,"doc":"…","heading":"…"}] once, after the answer
-//	done      {"done":true}
+//	done      {"done":true,"cached":bool}
 //	error     {"message":"…"}                  instead of citations/done
 //
 // The error arrives *in the stream* because the status line is already sent by the
 // time generation can fail — the client shows it on the turn either way.
 func chatHandler(answers Answerer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		question, err := readQuestion(r)
+		ask, err := readQuestion(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -37,9 +37,8 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 			return
 		}
 
-		cites, err := answers.Answer(r.Context(), question, func(tok string) {
-			s.send("token", map[string]string{"t": tok})
-		})
+		ask.OnToken = func(tok string) { s.send("token", map[string]string{"t": tok}) }
+		reply, err := answers.Answer(r.Context(), ask)
 		if err != nil {
 			// A client that navigated away cancels the context; that's not worth
 			// reporting to a connection which is already gone.
@@ -50,24 +49,34 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 		}
 		// Never emit `null` here: the engine returns nil citations when retrieval
 		// found nothing, and the client reads .length off this straight away.
-		if cites == nil {
-			cites = []rag.Citation{}
+		if reply.Citations == nil {
+			reply.Citations = []rag.Citation{}
 		}
-		s.send("citations", cites)
-		s.send("done", map[string]bool{"done": true})
+		s.send("citations", reply.Citations)
+		// cached rides on `done` rather than its own event: it is known only once
+		// the answer is complete, and one frame keeps the client's switch small.
+		// A struct, not a map, so the frame's field order is stable.
+		s.send("done", struct {
+			Done   bool `json:"done"`
+			Cached bool `json:"cached"`
+		}{true, reply.Cached})
 	}
 }
 
-func readQuestion(r *http.Request) (string, error) {
+// readQuestion parses the request into the engine's own Ask, minus the callback the
+// handler owns. `fresh` is Regenerate: the one case where a cached answer is the
+// wrong answer, because the user just told us it was.
+func readQuestion(r *http.Request) (rag.Ask, error) {
 	var body struct {
 		Question string `json:"question"`
+		Fresh    bool   `json:"fresh"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxQuestion)).Decode(&body); err != nil {
-		return "", errBadRequest
+		return rag.Ask{}, errBadRequest
 	}
 	q := strings.TrimSpace(body.Question)
 	if q == "" {
-		return "", errBadRequest
+		return rag.Ask{}, errBadRequest
 	}
-	return q, nil
+	return rag.Ask{Question: q, Fresh: body.Fresh}, nil
 }

@@ -35,7 +35,7 @@ func main() {
 		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
 		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
 		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
-	}), cfg.TopK)
+	}), rag.Options{TopK: cfg.TopK})
 	ctx := context.Background()
 
 	var files []string
@@ -65,7 +65,7 @@ func main() {
 			failed++
 			continue
 		}
-		n, err := engine.Ingest(ctx, f, string(content))
+		n, err := engine.Ingest(ctx, docPath(cfg.CorpusDir, f), string(content))
 		if err != nil {
 			log.Printf("ingest %s: %v", f, err)
 			failed++
@@ -93,4 +93,35 @@ func main() {
 func isDoc(p string) bool {
 	ext := strings.ToLower(filepath.Ext(p))
 	return ext == ".md" || ext == ".txt" || ext == ".markdown"
+}
+
+// docPath is the identity a document is stored under. It is the path the UI prints
+// beside every citation, and the key a re-ingest updates in place — so it must not
+// depend on how ingest happened to be invoked.
+//
+// Inside the corpus directory it is relative to it. `ingest docs`,
+// `ingest /opt/knowledge/docs` and `ingest docs/spec.md` then all agree, and they
+// agree with the `qa/ticket-N.md` a BA confirm writes — without this, the same file
+// becomes two documents and gets cited twice. An absolute path also puts the server's
+// directory layout in front of every reader.
+//
+// A file from outside the corpus keeps its given path: there is no honest way to
+// shorten it, and pretending otherwise would collide with a real corpus entry.
+func docPath(corpusDir, file string) string {
+	if corpusDir == "" {
+		return filepath.Clean(file)
+	}
+	base, err := filepath.Abs(corpusDir)
+	if err != nil {
+		return filepath.Clean(file)
+	}
+	full, err := filepath.Abs(file)
+	if err != nil {
+		return filepath.Clean(file)
+	}
+	rel, err := filepath.Rel(base, full)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return filepath.Clean(file)
+	}
+	return filepath.ToSlash(rel)
 }

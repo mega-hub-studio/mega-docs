@@ -41,10 +41,11 @@ func main() {
 		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
 		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
 		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
-	}), cfg.TopK)
+	}), rag.Options{TopK: cfg.TopK, CorpusDir: cfg.CorpusDir})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	handler := server.New(server.Deps{
-		Answers: engine, Index: index, Assets: web.FS, Auth: auth,
+		Answers: engine, Know: engine, Index: index, Assets: web.FS,
+		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
 	})
 
 	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)
@@ -56,7 +57,8 @@ func main() {
 		// here would cut it off mid-generation.
 	}
 
-	log.Printf("Knowledge Engine on http://%s (assets: %s, auth: %s)", addr, cfg.AssetBase, describe(auth))
+	log.Printf("Knowledge Engine on http://%s (assets: %s, auth: %s, writes: %s)",
+		addr, cfg.AssetBase, describe(auth), writes(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
 	log.Fatal(srv.ListenAndServe())
 }
@@ -66,6 +68,17 @@ func describe(a server.Auth) string {
 		return "off"
 	}
 	return "basic as " + a.User
+}
+
+// writes reports whether a BA can confirm an answer into the corpus on this
+// instance — the difference between a read-only mirror and the one that owns the
+// knowledge base. Worth one word in the startup line, because getting it wrong is
+// only discovered by a BA typing an answer that has nowhere to go.
+func writes(cfg config.Config) string {
+	if cfg.BAPass == "" {
+		return "read-only (BA_PASS unset)"
+	}
+	return "BA into " + cfg.CorpusDir
 }
 
 // warnIfExposed says the quiet part out loud: this app has no access control of

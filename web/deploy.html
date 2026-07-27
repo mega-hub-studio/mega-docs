@@ -150,8 +150,10 @@
           <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>Back up</th><td>Copy <code>knowledge.db</code> — that is the entire backup. While it's running use <code>sqlite3 knowledge.db ".backup out.db"</code>; a plain copy of a live database can tear.</td></tr>
-          <tr lang="vi"><th>Backup</th><td>Copy <code>knowledge.db</code> — đó là toàn bộ việc backup. Khi đang chạy thì dùng <code>sqlite3 knowledge.db ".backup out.db"</code>; copy trực tiếp một database đang mở có thể bị lỗi dở dang.</td></tr>
+          <tr lang="en"><th>Back up</th><td>Put the documents directory in <b>git</b>. That is the backup: <code>knowledge.db</code> is derived from it, and <code>./bin/ingest docs</code> rebuilds the whole thing — including the answers BAs confirmed, which are files in <code>docs/qa/</code>. A snapshot of the database is only a shortcut back to a running state (<code>sqlite3 knowledge.db ".backup out.db"</code> while it runs — a plain copy of a live database can tear).</td></tr>
+          <tr lang="vi"><th>Backup</th><td>Đưa thư mục tài liệu vào <b>git</b>. Đó mới là backup: <code>knowledge.db</code> được dựng ra từ nó, và <code>./bin/ingest docs</code> dựng lại toàn bộ — kể cả câu trả lời BA đã confirm, vì chúng là file trong <code>docs/qa/</code>. Snapshot database chỉ là đường tắt để quay lại trạng thái đang chạy (<code>sqlite3 knowledge.db ".backup out.db"</code> khi đang chạy — copy trực tiếp một database đang mở có thể bị lỗi dở dang).</td></tr>
+          <tr lang="en"><th>Review what BAs published</th><td><code>git diff docs/qa/</code>. Every confirm is one file, so the knowledge base has a review trail without anyone opening the database.</td></tr>
+          <tr lang="vi"><th>Xem BA đã publish gì</th><td><code>git diff docs/qa/</code>. Mỗi lần confirm là một file, nên knowledge base có vết để review mà không cần mở database.</td></tr>
           <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>
           <tr lang="vi"><th>Thêm / sửa tài liệu</th><td><code>./bin/ingest &lt;dir&gt;</code> — exit khác 0 nếu có gì lỗi</td></tr>
           <tr lang="en"><th>Update the app</th><td>Replace the binary, restart. Browsers revalidate by ETag — no cache to clear.</td></tr>
@@ -180,6 +182,10 @@
           <tr lang="vi"><th><code>BIND_ADDR</code></th><td><code>127.0.0.1</code></td><td><code>0.0.0.0</code> để phục vụ LAN — nhớ kèm <code>AUTH_PASS</code></td></tr>
           <tr lang="en"><th><code>AUTH_PASS</code></th><td>empty (off)</td><td>required for anything reachable beyond a tailnet/VPN</td></tr>
           <tr lang="vi"><th><code>AUTH_PASS</code></th><td>trống (tắt)</td><td>bắt buộc nếu truy cập được từ ngoài tailnet/VPN</td></tr>
+          <tr lang="en"><th><code>BA_PASS</code></th><td>empty (read-only)</td><td>set it to let BAs confirm answers into the documents. Empty means no write surface at all — reads and the queue still work. Keep it different from <code>AUTH_PASS</code>: everyone who reads shares that one.</td></tr>
+          <tr lang="vi"><th><code>BA_PASS</code></th><td>trống (chỉ đọc)</td><td>đặt để BA confirm được câu trả lời vào tài liệu. Trống nghĩa là không có chỗ ghi nào — đọc và hàng đợi vẫn hoạt động. Nên khác <code>AUTH_PASS</code>: mật khẩu đó ai đọc cũng dùng chung.</td></tr>
+          <tr lang="en"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>the folder <code>ingest</code> reads and where a confirmed answer is written. The service needs write access to it (<code>ReadWritePaths</code> below).</td></tr>
+          <tr lang="vi"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>thư mục <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm. Service cần quyền ghi vào đó (xem <code>ReadWritePaths</code> bên dưới).</td></tr>
           <tr lang="en"><th><code>EMBED_BASE_URL</code></th><td>same as chat</td><td>when the chat provider has no <code>/embeddings</code></td></tr>
           <tr lang="vi"><th><code>EMBED_BASE_URL</code></th><td>giống chat</td><td>khi provider chat không có <code>/embeddings</code></td></tr>
           <tr lang="en"><th><code>EMBED_API_KEY</code></th><td>same as <code>AI_API_KEY</code></td><td>only when embeddings are a different vendor — one key is not valid at two</td></tr>
@@ -217,7 +223,8 @@ ExecStart=/opt/knowledge/bin/knowledge
 Restart=always
 RestartSec=3
 
-<span class="ok"># the process needs its own directory and nothing else</span>
+<span class="ok"># its own directory and nothing else — that includes docs/, which a BA
+# confirm writes into, so keep the corpus inside WorkingDirectory</span>
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -229,11 +236,23 @@ WantedBy=multi-user.target</span></div>
 
     <div class="terminal"><span class="cmd">sudo chmod 600 /opt/knowledge/.env</span><span class="out"># it holds the provider key</span><span class="cmd">sudo systemctl enable --now knowledge</span><span class="cmd">journalctl -u knowledge -f</span></div>
 
-    <p lang="en">Re-indexing on a schedule is a timer or a cron line around the same
-      command — it exits non-zero if anything failed, so a failure is visible:</p>
-    <p lang="vi">Index lại theo lịch chỉ là một timer hoặc dòng cron quanh cùng lệnh
-      đó — nó exit khác 0 khi có lỗi, nên lỗi không bị chìm:</p>
-    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; ./bin/ingest /srv/docs</span></div>
+    <p lang="en">Re-index by hand, with the same one-liner, whenever the documents
+      change. It exits non-zero if anything failed, so a failure is visible:</p>
+    <p lang="vi">Index lại bằng tay, cũng đúng một dòng đó, mỗi khi tài liệu thay đổi.
+      Nó exit khác 0 khi có lỗi, nên lỗi không bị chìm:</p>
+    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; ./bin/ingest docs</span></div>
+    <div class="callout memo">
+      <b lang="en">Don't add a timer yet.</b>
+      <span lang="en">A schedule is worth it once the documents have a real change
+        cadence — until then it re-indexes an unchanged corpus and spends embedding
+        calls to do it. When that day comes it is this same line in a
+        <code>systemd</code> timer or a cron entry, and nothing else changes.</span>
+      <b lang="vi">Chưa cần timer.</b>
+      <span lang="vi">Chỉ nên đặt lịch khi tài liệu thật sự có nhịp thay đổi rõ ràng —
+        trước đó nó chỉ index lại một corpus không đổi và tốn tiền embeddings để làm
+        việc đó. Đến lúc cần, vẫn là đúng dòng lệnh này trong timer
+        <code>systemd</code> hoặc một dòng cron, không đổi gì thêm.</span>
+    </div>
   </section>
 
   <p class="separator"></p>

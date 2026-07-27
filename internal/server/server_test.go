@@ -19,19 +19,22 @@ import (
 type fakeAnswers struct {
 	tokens []string
 	cites  []rag.Citation
+	cached bool
 	err    error
 	corpus db.Corpus
 	cErr   error
+	asked  []rag.Ask // what the handler passed down, so `fresh` can be verified
 }
 
-func (f fakeAnswers) Answer(_ context.Context, _ string, onToken func(string)) ([]rag.Citation, error) {
+func (f *fakeAnswers) Answer(_ context.Context, a rag.Ask) (rag.Reply, error) {
+	f.asked = append(f.asked, a)
 	for _, t := range f.tokens {
-		onToken(t)
+		a.OnToken(t)
 	}
-	return f.cites, f.err
+	return rag.Reply{Citations: f.cites, Cached: f.cached}, f.err
 }
 
-func (f fakeAnswers) Corpus(int) (db.Corpus, error) { return f.corpus, f.cErr }
+func (f *fakeAnswers) Corpus(int) (db.Corpus, error) { return f.corpus, f.cErr }
 
 func newTestServer(a Answerer) http.Handler {
 	return New(Deps{
@@ -56,14 +59,14 @@ func do(t *testing.T, h http.Handler, method, path, body string, hdr map[string]
 }
 
 func TestHealth(t *testing.T) {
-	w := do(t, newTestServer(fakeAnswers{}), "GET", "/api/health", "", nil)
+	w := do(t, newTestServer(&fakeAnswers{}), "GET", "/api/health", "", nil)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"ok":true`) {
 		t.Fatalf("health = %d %q", w.Code, w.Body.String())
 	}
 }
 
 func TestIndexIsRevalidatedAndCachesWithETag(t *testing.T) {
-	h := newTestServer(fakeAnswers{})
+	h := newTestServer(&fakeAnswers{})
 
 	w := do(t, h, "GET", "/", "", nil)
 	if w.Code != 200 || w.Body.String() != "<html>index</html>" {
@@ -85,7 +88,7 @@ func TestIndexIsRevalidatedAndCachesWithETag(t *testing.T) {
 }
 
 func TestAppTreeRevalidatesAndVendorIsImmutable(t *testing.T) {
-	h := newTestServer(fakeAnswers{})
+	h := newTestServer(&fakeAnswers{})
 
 	app := do(t, h, "GET", "/app/app.js", "", nil)
 	if app.Code != 200 {
@@ -113,7 +116,7 @@ func TestAppTreeRevalidatesAndVendorIsImmutable(t *testing.T) {
 }
 
 func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
-	h := newTestServer(fakeAnswers{
+	h := newTestServer(&fakeAnswers{
 		tokens: []string{"Hybrid ", "search [1]"},
 		cites:  []rag.Citation{{N: 1, DocPath: "docs/a.md", Heading: "How"}},
 	})
@@ -132,7 +135,7 @@ func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
 		"event: token\ndata: {\"t\":\"search [1]\"}\n\n",
 		`event: citations`,
 		`"doc":"docs/a.md"`,
-		"event: done\ndata: {\"done\":true}\n\n",
+		"event: done\ndata: {\"done\":true,\"cached\":false}\n\n",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("stream missing %q\n--- got ---\n%s", want, body)
@@ -147,7 +150,7 @@ func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
 func TestChatSendsEmptyCitationListNotNull(t *testing.T) {
 	// Retrieval finding nothing returns nil citations; the client reads .length
 	// off this immediately, so `null` would break the render.
-	h := newTestServer(fakeAnswers{tokens: []string{"nothing found"}, cites: nil})
+	h := newTestServer(&fakeAnswers{tokens: []string{"nothing found"}, cites: nil})
 
 	body := do(t, h, "POST", "/api/chat", `{"question":"x"}`, nil).Body.String()
 	if !strings.Contains(body, "event: citations\ndata: []\n\n") {
@@ -156,7 +159,7 @@ func TestChatSendsEmptyCitationListNotNull(t *testing.T) {
 }
 
 func TestChatReportsEngineFailureInStream(t *testing.T) {
-	h := newTestServer(fakeAnswers{tokens: []string{"partial"}, err: errors.New("provider down")})
+	h := newTestServer(&fakeAnswers{tokens: []string{"partial"}, err: errors.New("provider down")})
 
 	body := do(t, h, "POST", "/api/chat", `{"question":"x"}`, nil).Body.String()
 	if !strings.Contains(body, `event: error`) || !strings.Contains(body, "provider down") {
@@ -168,7 +171,7 @@ func TestChatReportsEngineFailureInStream(t *testing.T) {
 }
 
 func TestChatRejectsBadRequests(t *testing.T) {
-	h := newTestServer(fakeAnswers{})
+	h := newTestServer(&fakeAnswers{})
 	for name, body := range map[string]string{
 		"not json":        `{`,
 		"missing field":   `{}`,
@@ -183,7 +186,7 @@ func TestChatRejectsBadRequests(t *testing.T) {
 }
 
 func TestCorpusReportsWhatIsIndexed(t *testing.T) {
-	h := newTestServer(fakeAnswers{corpus: db.Corpus{
+	h := newTestServer(&fakeAnswers{corpus: db.Corpus{
 		Docs: 2, Chunks: 41, Approved: 7,
 		Documents: []db.Document{{Path: "docs/a.md", Title: "A", Chunks: 30, UpdatedAt: "2026-07-01 10:00:00"}},
 	}})
@@ -207,7 +210,7 @@ func TestCorpusReportsWhatIsIndexed(t *testing.T) {
 func TestCorpusOnEmptyIndexIsStillAJSONObject(t *testing.T) {
 	// The UI branches on docs === 0; a 500 or a bare "null" would read as a
 	// broken server rather than an empty index.
-	h := newTestServer(fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}})
+	h := newTestServer(&fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}})
 
 	w := do(t, h, "GET", "/api/corpus", "", nil)
 	if w.Code != 200 {
@@ -219,7 +222,7 @@ func TestCorpusOnEmptyIndexIsStillAJSONObject(t *testing.T) {
 }
 
 func TestCorpusFailureIs500(t *testing.T) {
-	h := newTestServer(fakeAnswers{cErr: errors.New("db gone")})
+	h := newTestServer(&fakeAnswers{cErr: errors.New("db gone")})
 	if code := do(t, h, "GET", "/api/corpus", "", nil).Code; code != http.StatusInternalServerError {
 		t.Errorf("got %d, want 500", code)
 	}
@@ -228,7 +231,7 @@ func TestCorpusFailureIs500(t *testing.T) {
 func authServer(t *testing.T, a Auth) http.Handler {
 	t.Helper()
 	return New(Deps{
-		Answers: fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}},
+		Answers: &fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}},
 		Index:   []byte("<html>index</html>"),
 		Assets:  fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
 		Auth:    a,
@@ -296,7 +299,7 @@ func TestAuthAcceptsCorrectCredentialsAndRejectsWrongOnes(t *testing.T) {
 // the app: one surface, one job. So these must be 404s, not a second copy of the
 // docs — and this is the test that notices if someone wires them back in.
 func TestGuideRoutesAreNotServed(t *testing.T) {
-	h := newTestServer(fakeAnswers{})
+	h := newTestServer(&fakeAnswers{})
 	for _, path := range []string{"/docs", "/dev", "/deploy", "/llms.txt"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))

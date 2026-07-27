@@ -15,12 +15,14 @@
 /**
  * Ask one question and stream the answer.
  * @param {string} question
- * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void }} handlers
+ * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
+ *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean }} handlers
+ *   fresh skips the server's answer cache — what Regenerate means.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations } = {}) {
+export function ask(question, { onToken, onCitations, onDone, fresh = false } = {}) {
   const ctrl = new AbortController();
-  const done = run(question, { onToken, onCitations }, ctrl.signal);
+  const done = run(question, { onToken, onCitations, onDone, fresh }, ctrl.signal);
   return { done, stop: () => ctrl.abort() };
 }
 
@@ -30,7 +32,7 @@ async function run(question, handlers, signal) {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, fresh: handlers.fresh }),
       signal,
     });
   } catch (e) {
@@ -77,19 +79,27 @@ function parse(block) {
   }
 }
 
-function apply(frame, { onToken, onCitations }) {
+function apply(frame, { onToken, onCitations, onDone }) {
   if (!frame) return;
   const { event, payload } = frame;
   if (event === "token") onToken?.(payload.t);
   else if (event === "citations") onCitations?.(payload);
+  else if (event === "done") onDone?.({ cached: !!payload.cached });
   else if (event === "error") throw new Error(payload.message);
 }
 
-/** True when the server answers /api/health. Never throws. */
-export async function healthy() {
+/**
+ * What the server is and what it allows. Never throws — an unreachable server is
+ * a state the UI shows, not an error it handles.
+ * @returns {Promise<{online: boolean, writes: boolean}>} writes: a BA can confirm here
+ */
+export async function health() {
   try {
-    return (await fetch("/api/health")).ok;
+    const res = await fetch("/api/health");
+    if (!res.ok) return { online: false, writes: false };
+    const body = await res.json();
+    return { online: true, writes: !!body.writes };
   } catch {
-    return false;
+    return { online: false, writes: false };
   }
 }

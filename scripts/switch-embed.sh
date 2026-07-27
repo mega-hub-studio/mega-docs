@@ -86,13 +86,10 @@ say "3/5  dropping the old index ($DIR/$DB)"
 (cd "$DIR" && rm -f "$DB" "$DB-wal" "$DB-shm")
 
 say "4/5  re-ingesting $DOCS at $EMBED_DIM dim"
-# Relative to DIR when the corpus lives inside it: the stored path is what the UI
-# prints beside every citation, so an absolute one leaks the server's layout.
-case $DOCS in
-"$DIR"/*) ARG=${DOCS#"$DIR"/} ;;
-*) ARG=$DOCS ;;
-esac
-(cd "$DIR" && "$INGEST" "$ARG") || fail "ingest failed — the index is now empty; fix and re-run $INGEST $ARG"
+# Run from DIR so .env and DB_PATH resolve the way the service sees them. The stored
+# document path needs no massaging here: ingest stores it relative to CORPUS_DIR, so
+# an absolute argument produces the same identity as a relative one (cmd/ingest.docPath).
+(cd "$DIR" && "$INGEST" "$DOCS") || fail "ingest failed — the index is now empty; fix and re-run $INGEST $DOCS"
 
 if [ -z "$SERVICE" ]; then
 	printf '\n\033[32m✓ embeddings now %s (%s) — start the server when you are ready\033[0m\n' "$EMBED_MODEL" "$EMBED_URL"

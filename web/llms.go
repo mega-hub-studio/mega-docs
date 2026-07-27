@@ -75,6 +75,15 @@ func LLMs(siteBase string) ([]byte, error) {
 		"first.\n")
 	b.WriteString("- Changing the embedding model requires a full re-index — vectors from " +
 		"two models are not comparable.\n")
+	b.WriteString("- Reading is open; two actions are not. Confirming a BA's answer into " +
+		"the documents and dismissing a question need `BA_PASS`. An unset `BA_PASS` " +
+		"means the instance has no write surface at all, not open writes.\n")
+	b.WriteString("- The SQLite file is derived. `CORPUS_DIR` (default `docs`) is the " +
+		"source of truth, including the answers BAs confirm, which are written there as " +
+		"`qa/ticket-N.md` — so back up that directory (git), not the database.\n")
+	b.WriteString("- A repeated question is answered from a local cache: no provider " +
+		"call, no cost. Any ingest invalidates the whole cache, so a cached answer " +
+		"never outlives the sources it cites.\n")
 	return []byte(b.String()), nil
 }
 

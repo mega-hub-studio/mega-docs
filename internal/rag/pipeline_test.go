@@ -18,6 +18,13 @@ const dim = 16
 // so this exercises every layer the product does, minus the model itself.
 func engine(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
 	t.Helper()
+	return engineIn(t, p, t.TempDir())
+}
+
+// engineIn is engine() with a caller-chosen corpus directory, for the tests that
+// need to look at what a confirm wrote to disk.
+func engineIn(t *testing.T, p *aitest.Provider, corpusDir string) (*rag.Engine, *aitest.Provider) {
+	t.Helper()
 	if p == nil {
 		p = &aitest.Provider{}
 	}
@@ -31,7 +38,22 @@ func engine(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
 	}
 	t.Cleanup(func() { store.Close() })
 
-	return rag.New(store, ai.New(ai.Config{ChatBaseURL: base, APIKey: "test-key", EmbedModel: "embed-model", ChatModel: "chat-model"}), 3), prov
+	client := ai.New(ai.Config{
+		ChatBaseURL: base, APIKey: "test-key",
+		EmbedModel: "embed-model", ChatModel: "chat-model",
+	})
+	return rag.New(store, client, rag.Options{TopK: 3, CorpusDir: corpusDir}), prov
+}
+
+// ask is the common case: one question, the streamed text collected.
+func ask(t *testing.T, e *rag.Engine, question string) (string, rag.Reply, error) {
+	t.Helper()
+	var sb strings.Builder
+	reply, err := e.Answer(context.Background(), rag.Ask{
+		Question: question,
+		OnToken:  func(tok string) { sb.WriteString(tok) },
+	})
+	return sb.String(), reply, err
 }
 
 const retrievalDoc = `# Retrieval
@@ -69,18 +91,23 @@ func TestIngestThenAnswerCitesTheIngestedDocument(t *testing.T) {
 	}
 
 	var tokens []string
-	cites, err := e.Answer(ctx, "How does hybrid search rank results?", func(tok string) {
-		tokens = append(tokens, tok)
+	reply, err := e.Answer(ctx, rag.Ask{
+		Question: "How does hybrid search rank results?",
+		OnToken:  func(tok string) { tokens = append(tokens, tok) },
 	})
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
+	cites := reply.Citations
 
 	if got := strings.Join(tokens, ""); !strings.Contains(got, "RRF") {
 		t.Errorf("streamed answer = %q", got)
 	}
 	if len(tokens) < 3 {
 		t.Errorf("answer arrived in %d pieces; it should stream", len(tokens))
+	}
+	if reply.Cached {
+		t.Error("a first-time question was reported as cached")
 	}
 	if len(cites) == 0 {
 		t.Fatal("a grounded answer with no citations is the bug this whole app exists to avoid")
@@ -122,13 +149,12 @@ func TestIngestThenAnswerCitesTheIngestedDocument(t *testing.T) {
 func TestAnswerOnAnEmptyIndexSaysSoAndCitesNothing(t *testing.T) {
 	e, prov := engine(t, nil)
 
-	var got string
-	cites, err := e.Answer(context.Background(), "anything?", func(tok string) { got += tok })
+	got, reply, err := ask(t, e, "anything?")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
-	if len(cites) != 0 {
-		t.Errorf("citations on an empty index: %+v", cites)
+	if len(reply.Citations) != 0 {
+		t.Errorf("citations on an empty index: %+v", reply.Citations)
 	}
 	if got == "" {
 		t.Error("the user must be told something, not left with a blank answer")
@@ -202,7 +228,7 @@ func TestAnswerReportsAChatFailureAfterRetrievalSucceeded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cites, err := e.Answer(ctx, "hybrid search?", func(string) {})
+	_, reply, err := ask(t, e, "hybrid search?")
 	if err == nil {
 		t.Fatal("want the provider failure surfaced")
 	}
@@ -211,7 +237,7 @@ func TestAnswerReportsAChatFailureAfterRetrievalSucceeded(t *testing.T) {
 	}
 	// Retrieval worked, so the citations are still worth returning — the UI can
 	// show which sources it *would* have used.
-	if len(cites) == 0 {
+	if len(reply.Citations) == 0 {
 		t.Error("citations were dropped even though retrieval succeeded")
 	}
 }

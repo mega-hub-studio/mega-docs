@@ -12,6 +12,9 @@
 <meta name="theme-color" content="#07071c" />
 <meta name="color-scheme" content="dark" />
 <title>Knowledge Engine</title>
+<!-- Inline, so there is no second request and no 404 in every console: the ◈ mark
+     the empty state uses, in the primary accent, on the app's own ground. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2307071c'/><path d='M8 2l5 6-5 6-5-6z' fill='%2356d364'/></svg>">
 
 <!-- ══ Front-end assets ═══════════════════════════════════════════════════════
      Nothing below spells out a version or a hash. Both come from
@@ -58,7 +61,7 @@
   integrity="<%sri "dompurify" "dist/purify.min.js"%>" crossorigin="anonymous"></script>
 
 <!-- App shell: layout-only CSS (web/app/styles.css) and the conversation module
-     (web/app/app.js → chat.js · answer.js · viewport.js · library.js · session.js).
+     (web/app/app.js → chat.js · answer.js · viewport.js · library.js · session.js · qa.js).
      Native ES modules, so
      there is still no build step — the Go binary serves them from its embed FS. -->
 <link rel="stylesheet" href="/app/styles.css">
@@ -71,6 +74,7 @@
 <link rel="modulepreload" href="/app/viewport.js">
 <link rel="modulepreload" href="/app/library.js">
 <link rel="modulepreload" href="/app/session.js">
+<link rel="modulepreload" href="/app/qa.js">
 </head>
 <body>
 <!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
@@ -82,17 +86,27 @@
     <span class="badge clear" :data-accent="online ? 'good' : 'crit'"
       :aria-label="online ? 'Server online' : 'Server unreachable'">●</span>
     <span class="eyebrow">Knowledge Engine</span>
+
+    <!-- Two jobs, one screen. .segment is the library's single-choice control:
+         aria-pressed carries the state, since the fill alone isn't announced. -->
+    <div class="segment grow" role="group" aria-label="Mode">
+      <button type="button" :aria-pressed="String(mode === 'dev')" @click="setMode('dev')">ASK</button>
+      <button type="button" :aria-pressed="String(mode === 'ba')" @click="setMode('ba')">
+        BA<template v-if="queue.open"> · {{ queue.open }}</template>
+      </button>
+    </div>
+
     <!-- One link out, to the published guide on its own domain. The app does not
          serve the docs: a second copy inside the binary is noise here and a copy to
          drift. rel=noopener because it opens in a new tab. -->
-    <a class="btn ghost icon sm grow" href="<%.DocsURL%>" target="_blank"
+    <a class="btn ghost icon sm" href="<%.DocsURL%>" target="_blank"
       rel="noopener" aria-label="Guide (opens the documentation site)">
       <nes-icon name="info"></nes-icon></a>
-    <button class="btn ghost icon sm" v-if="turns.length" @click="reset"
+    <button class="btn ghost icon sm" v-if="turns.length && mode === 'dev'" @click="reset"
       aria-label="New question"><nes-icon name="plus"></nes-icon></button>
   </header>
 
-  <main>
+  <main v-if="mode === 'dev'">
     <!-- .empty ships the dashed panel + centred mono copy; the library's guidance
          is "always an action out", which on a phone means tappable starters. -->
     <div class="empty" v-if="!turns.length">
@@ -134,6 +148,38 @@
           </li>
         </ol>
       </details>
+
+      <!-- History. Every row here is an answer already paid for: asking it again
+           costs nothing, so the hit count is worth showing rather than hiding. -->
+      <details class="corpus" v-if="history.length">
+        <summary><span class="eyebrow">Asked before ({{ history.length }}) — free to repeat</span></summary>
+        <!-- .suggest is the library's tap-to-send recipe, the same one the starters
+             above use: a question is body copy, so it must not arrive as uppercase
+             mono chrome the way a .btn label would. -->
+        <div class="suggest">
+          <button class="suggest-item" v-for="h in history" :key="h.question"
+            @click="replay(h.question)">
+            {{ h.question }}
+            <span class="badge clear" v-if="h.hits" :title="h.hits + ' free repeats so far'">
+              {{ h.hits }}×</span>
+          </button>
+        </div>
+      </details>
+
+      <!-- What the team has already sent to a BA, so a gap doesn't get filed twice
+           and the person who filed it can see it land. -->
+      <details class="corpus" v-if="queue.tickets.length">
+        <summary><span class="eyebrow">Questions with a BA ({{ queue.open + queue.answered }} waiting)</span></summary>
+        <ol class="timeline">
+          <li v-for="t in queue.tickets" :key="t.id" :data-accent="status[t.status].accent">
+            <div class="time">#{{ t.id }} · {{ shortDate(t.updated_at) }}</div>
+            <div class="title">
+              <span class="badge" :class="status[t.status].badge">{{ status[t.status].label }}</span>
+            </div>
+            <p>{{ t.question }}</p>
+          </li>
+        </ol>
+      </details>
     </div>
 
     <article class="turn" v-for="t in turns" :key="t.id">
@@ -146,6 +192,10 @@
       <div class="a card" data-accent="blue" v-else :aria-busy="t.streaming ? 'true' : null">
         <div class="head">
           <span class="title">Answer</span>
+          <!-- A free answer must not look identical to a paid one, or nobody
+               learns that repeating a question is cheap. -->
+          <span class="badge todo" v-if="t.cached"
+            title="Served from this server's cache — no provider call, no cost">CACHED</span>
           <span class="spinner sm" v-if="t.streaming" aria-label="Generating"></span>
         </div>
 
@@ -167,17 +217,135 @@
               <nes-icon name="copy"></nes-icon></button>
             <button class="btn ghost xs icon" @click="regenerate(t)" aria-label="Regenerate answer">
               <nes-icon name="refresh"></nes-icon></button>
+            <!-- The whole loop starts here: one tap turns a bad answer into a
+                 question a BA can answer, with this answer attached as evidence. -->
+            <button class="btn ghost xs" v-if="!t.ticket" @click="askBA(t)"
+              title="Send this question to a BA — their answer joins the documents">
+              <nes-icon name="help"></nes-icon> ASK BA</button>
           </div>
           <div class="feedback-meta">
             <span v-if="t.citations.length">{{ t.citations.length }} SRC</span>
             <span v-if="t.ms">{{ t.ms }} MS</span>
           </div>
         </div>
+
+        <!-- Where that gap got to. The badge is the ticket's real state, refreshed
+             when a BA acts, so nobody has to ask whether it was picked up. -->
+        <div class="callout" :class="t.ticket.status === 'confirmed' ? 'tip' : 'memo'" v-if="t.ticket">
+          <span class="badge" :class="status[t.ticket.status].badge">{{ status[t.ticket.status].label }}</span>
+          <b>#{{ t.ticket.id }}</b> — {{ status[t.ticket.status].hint }}
+          <template v-if="t.ticket.status === 'confirmed'">
+            <code>{{ t.ticket.doc }}</code> — ask again to see it cited.
+          </template>
+        </div>
       </div>
     </article>
   </main>
 
-  <div class="dock" ref="dock">
+  <!-- ══ BA mode ═══════════════════════════════════════════════════════════════
+       The queue, and the one action that matters: publish this answer into the
+       corpus. Everything here is a library recipe — .segment, .stat, .card,
+       .field/.textarea, .badge, .callout, .steps, .datalist — so the app owns no
+       component styling of its own.
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <main v-else class="ba">
+    <!-- The pipeline, as counts rather than a decorative stage bar: a queue has
+         tickets in every state at once, so there is no single "current" step to
+         mark. These three numbers are the state, in the order work moves. -->
+    <div class="stats">
+      <div class="stat" data-accent="gold"><div class="n">{{ queue.open }}</div><div class="l">Open</div></div>
+      <div class="stat" data-accent="blue"><div class="n">{{ queue.answered }}</div><div class="l">Drafts</div></div>
+      <div class="stat" data-accent="good"><div class="n">{{ queue.confirmed }}</div><div class="l">In knowledge</div></div>
+    </div>
+
+    <!-- One line of orientation for a BA's first visit. The empty state covers the
+         "nothing waiting" case, so this only shows when there is work. -->
+    <div class="callout memo" v-if="queue.tickets.length">
+      <b>A DEV files what the documents couldn't answer.</b> Your answer becomes a document in
+      <code>docs/qa/</code>, indexed and cited by name — so the next person who asks gets it,
+      with a source.
+    </div>
+
+    <!-- Read-only instance: say so before an answer gets typed with nowhere to go. -->
+    <div class="callout gotcha" v-if="!writes">
+      <b>This instance is read-only.</b> Set <code>BA_PASS</code> in <code>.env</code> and restart to
+      answer tickets here. Until then the queue is visible but nothing can be published.
+    </div>
+
+    <!-- The password is the permission. Reads are open; confirming an answer into
+         the corpus is not, because this app has no accounts. -->
+    <form class="card" data-accent="gold" v-else-if="!unlocked" @submit.prevent="unlock">
+      <div class="head"><span class="title">Unlock writes</span></div>
+      <label class="field">
+        <span class="label">BA password</span>
+        <input class="input" type="password" v-model="passInput" autocomplete="current-password"
+          placeholder="BA_PASS">
+        <span class="hint">Kept for this tab only. Reading never needs it.</span>
+      </label>
+      <button class="btn" type="submit">UNLOCK</button>
+    </form>
+
+    <div class="empty" v-if="!queue.tickets.length">
+      <span class="icon">◈</span>
+      <span class="title">Nothing waiting</span>
+      <p>When the documents can't answer a question, the DEV who hit it files it here.</p>
+      <button class="btn ghost sm" @click="setMode('dev')">ASK A QUESTION</button>
+    </div>
+
+    <article class="card ticket" v-for="t in queue.tickets" :key="t.id"
+      :data-accent="status[t.status].accent">
+      <div class="head">
+        <span class="title">#{{ t.id }}</span>
+        <span class="badge" :class="status[t.status].badge">{{ status[t.status].label }}</span>
+        <span class="time">{{ shortDate(t.asked_at) }}</span>
+      </div>
+
+      <h2 class="q">{{ t.question }}</h2>
+
+      <!-- The evidence: what the engine said instead. Collapsed, because the BA
+           needs the question first and this only when the answer looks wrong. -->
+      <details class="corpus" v-if="t.miss">
+        <summary><span class="eyebrow">What the engine answered</span></summary>
+        <div class="callout gotcha">{{ t.miss }}</div>
+      </details>
+
+      <template v-if="t.status === 'open' || t.status === 'answered'">
+        <label class="field" v-if="unlocked">
+          <span class="label">Answer from the source of truth</span>
+          <textarea class="textarea" rows="4" v-model="drafts[t.id]"
+            placeholder="Markdown. Short and exact."></textarea>
+          <span class="hint">
+            Confirming writes <code>docs/qa/ticket-{{ t.id }}.md</code>, indexes it, and cites it
+            by name. Dismissing uses this box as the reason.
+          </span>
+        </label>
+        <div class="control-group" v-if="unlocked">
+          <button class="btn" @click="move(t, 'confirm')"
+            :disabled="!drafts[t.id] || working === t.id"
+            :aria-busy="working === t.id ? 'true' : null">CONFIRM INTO KNOWLEDGE</button>
+          <button class="btn soft" @click="move(t, 'draft')"
+            :disabled="!drafts[t.id] || working === t.id">SAVE DRAFT</button>
+          <button class="btn ghost" data-accent="crit" @click="move(t, 'reject')"
+            :disabled="working === t.id">DISMISS</button>
+        </div>
+        <p v-else-if="writes">Unlock above to answer this.</p>
+      </template>
+
+      <dl class="datalist" v-else-if="t.status === 'confirmed'">
+        <dt>Answer</dt><dd>{{ t.answer }}</dd>
+        <dt>Document</dt><dd><code>{{ t.doc }}</code></dd>
+        <dt>Confirmed</dt><dd>{{ shortDate(t.updated_at) }}</dd>
+      </dl>
+
+      <div class="callout memo" v-else>
+        <b>Dismissed.</b> {{ t.note || "No reason recorded." }}
+      </div>
+    </article>
+  </main>
+
+  <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes
+       away rather than sitting there disabled. -->
+  <div class="dock" ref="dock" v-show="mode === 'dev'">
     <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing
          textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
          only listens for nes:submit / nes:stop, so none of that is reimplemented. -->

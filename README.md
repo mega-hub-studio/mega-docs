@@ -4,10 +4,13 @@ Self-hosted RAG for internal technical/business docs. One Go binary + one SQLite
 file. Semantic + keyword hybrid search, grounded answers, citations.
 
 ```
-[md/txt docs] → ingest (chunk → embed → SQLite) 
+[md/txt docs] → ingest (chunk → embed → SQLite)
                                    │
 [Vue chat] ──SSE──> /api/chat ──hybrid search (vec + BM25, RRF)──┘
+                        ├─> answer cache hit → free, no provider call
                         └─> LLM (OpenAI-compatible) → grounded stream + citations
+
+no answer? → DEV files a ticket → BA confirms → docs/qa/ticket-N.md → indexed
 ```
 
 Everything ships in the `knowledge` binary (Vue UI is embedded via `go:embed`).
@@ -93,13 +96,15 @@ internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templa
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
 internal/ai       one OpenAI-compatible client (embeddings + chat streaming)
 internal/aitest   a fake provider over httptest — the whole pipeline, no key needed
-internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF
+internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF,
+                  tickets (the QA state machine) and the answer cache
 internal/config   env → Config, with defaults
 
 web/              index.html · docs.html · dev.html · deploy.html (Go templates,
                   shared head in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
-                  app.js · chat.js · answer.js · viewport.js · library.js · session.js
+                  app.js · chat.js · answer.js · viewport.js · library.js ·
+                  session.js · qa.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -120,6 +125,9 @@ web/vendor/       `make vendor` output (gitignored)
 | a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
 | anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
 | what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
+| a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
+| anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on the corpus signature |
+| a BA/DEV screen | `web/index.html` + `web/app/qa.js` | the loop's transport in one module, the markup in library recipes |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
@@ -130,23 +138,34 @@ web/vendor/       `make vendor` output (gitignored)
 
 ### The two seams that make it testable
 
-`internal/server` depends on a narrow interface, not on the engine:
+`internal/server` depends on narrow interfaces, not on the engine — split by side, so
+a test of the read path fakes nothing it doesn't use:
 
 ```go
-type Answerer interface {
-    Answer(ctx context.Context, question string, onToken func(string)) ([]rag.Citation, error)
+type Answerer interface {                       // read
+    Answer(ctx context.Context, a rag.Ask) (rag.Reply, error)
     Corpus(limit int) (db.Corpus, error)
+}
+type Knowledge interface {                      // the QA loop — optional (nil = no write routes)
+    Queue(limit int) (db.Queue, error)
+    OpenTicket(question, miss string) (db.Ticket, error)
+    Draft(id int64, answer string) (db.Ticket, error)
+    Confirm(ctx context.Context, id int64, answer string) (db.Ticket, error)
+    Reject(id int64, note string) (db.Ticket, error)
+    History(limit int) ([]db.Cached, error)
 }
 ```
 
-So the whole HTTP surface — SSE framing, cache headers, 400s — is covered by
-`go test` with a fake, needing no API key and no database. On the front end, the
-same idea: `app.js` never sees an `AbortController`, a `TextDecoder`, a
-`ResizeObserver` or `visualViewport`. It says
+So the whole HTTP surface — SSE framing, cache headers, the write gate, 400s — is
+covered by `go test` with a fake, needing no API key and no database. On the front
+end, the same idea: `app.js` never sees an `AbortController`, a `TextDecoder`, a
+`ResizeObserver` or `visualViewport`, and never learns where the BA password is kept.
+It says
 
 ```js
-const run = ask(question, { onToken, onCitations });   // chat.js
+const run = ask(question, { onToken, onCitations, onDone, fresh });  // chat.js
 run.stop();                                            // resolves, never throws
+await qa.act(id, "confirm", { answer });               // qa.js: throws WrongPass on 401/403
 view.scrollToEnd();                                    // viewport.js: follows, unless the reader scrolled up
 ```
 
@@ -216,11 +235,41 @@ runtime problem.
   flushed on `pagehide`, because a phone backgrounds a tab far more often than it
   closes one.
 
-## Phase-1 hooks already in place
+## The QA loop: a gap becomes a document
 
-The schema carries `status (draft|approved)` and `version` on every chunk, and
-retrieval already boosts `approved` chunks. Wiring up a BA approval UI later is
-additive — no migration, no re-architecture.
+The most useful thing the system does is turn a question it *couldn't* answer into
+one it can, without anyone editing a file by hand:
+
+```
+DEV asks → answer wrong/missing → "Ask BA"      ticket: open
+BA answers → "Confirm into knowledge"           docs/qa/ticket-N.md, indexed, approved
+next DEV asks → retrieved with a citation       and free on the repeat
+```
+
+- **Four states, each reached by one action:** `open` · `answered` (a draft that
+  survives a backgrounded phone) · `confirmed` · `rejected` (with the reason, so a
+  question is never just swallowed). Asking the same question twice returns the same
+  ticket, so one gap is one item on the BA's list.
+- **A confirm writes a file, not a database row.** `CORPUS_DIR/qa/ticket-N.md` is
+  reviewable in a diff, lives in git with the rest of the documents, and is what keeps
+  `knowledge.db` derived — `ingest docs` rebuilds everything.
+- **Confirmed chunks are `approved`**, which is what the long-dormant retrieval boost
+  was for: the one part of the corpus a named human vouched for wins a tie.
+- **Reads are open, publishing is not.** `BA_PASS` gates confirm and dismiss. Empty
+  means the instance has *no* write surface at all — forgetting a secret must not be
+  how you end up without one.
+
+## Repeat questions are free
+
+An answer is cached under the question and a **corpus signature** (document count,
+chunk count, newest `updated_at`). A repeat skips *both* provider calls — no
+embedding, no completion — and the UI marks it `CACHED` so a free answer never looks
+like a paid one.
+
+Any ingest, including a BA confirm, changes that signature and drops the whole cache,
+so a cached answer can never outlive the sources it cites. There is no TTL to tune.
+Misses and cut-off streams are never cached: those are exactly what someone retries,
+and remembering them would make one bad answer permanent. Regenerate always pays.
 
 ## Caveats (read before first build)
 
@@ -228,14 +277,16 @@ additive — no migration, no re-architecture.
   about the `github.com/asg017/sqlite-vec-go-bindings` version or the
   `sqlite_vec.Auto()` / `SerializeFloat32` API, check the current README for
   that module and adjust the version in `go.mod` / the calls in
-  `internal/db/store.go`. This scaffold was not compiled in this environment.
+  `internal/db/store.go`.
 - **FTS5 build tag.** Uses `-tags sqlite_fts5`. If your `go-sqlite3` version
   wants `-tags fts5` instead, change it in the `Makefile`.
 - **Access control is minimal.** The server binds `127.0.0.1` by default and offers
-  optional HTTP Basic auth (`AUTH_PASS`); there are no per-user permissions and no
-  audit trail. To let the team reach it from anywhere, publish it through a tailnet
-  or a Cloudflare Tunnel rather than opening a port — see the
-  **[Deploy page](https://mega-hub-studio.github.io/mega-docs/deploy.html)**.
+  optional HTTP Basic auth (`AUTH_PASS`); there are no accounts, no per-user
+  permissions and no audit trail. The one privileged action — a BA confirming an
+  answer into the corpus — is gated by a second shared password (`BA_PASS`), which is
+  a permission boundary, not an identity. To let the team reach it from anywhere,
+  publish it through a tailnet or a Cloudflare Tunnel rather than opening a port — see
+  the **[Deploy page](https://mega-hub-studio.github.io/mega-docs/deploy.html)**.
 
 ## Frontend assets (CDN, pinned)
 

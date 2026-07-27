@@ -16,10 +16,10 @@ import (
 	"knowledge-engine/internal/rag"
 )
 
-// Answerer is the one thing the HTTP layer needs from the RAG engine.
-// *rag.Engine satisfies it; tests pass a fake.
+// Answerer is the read side of the RAG engine — all the HTTP layer needs to answer
+// a question. *rag.Engine satisfies it; tests pass a fake.
 type Answerer interface {
-	Answer(ctx context.Context, question string, onToken func(string)) ([]rag.Citation, error)
+	Answer(ctx context.Context, a rag.Ask) (rag.Reply, error)
 	// Corpus answers "what does this engine know?" — without it, an empty index
 	// is indistinguishable from a broken retriever.
 	Corpus(limit int) (db.Corpus, error)
@@ -27,10 +27,12 @@ type Answerer interface {
 
 // Deps is everything the handler set needs.
 type Deps struct {
-	Answers Answerer // the RAG engine
-	Index   []byte   // index.html, already rendered for the configured asset base
-	Assets  fs.FS    // embedded static tree: app/… and vendor/…
-	Auth    Auth     // optional Basic credentials; zero value = open
+	Answers Answerer  // the RAG engine, read side
+	Know    Knowledge // the QA loop; nil leaves those routes unregistered
+	Index   []byte    // index.html, already rendered for the configured asset base
+	Assets  fs.FS     // embedded static tree: app/… and vendor/…
+	Auth    Auth      // optional Basic credentials; zero value = open
+	BAPass  BAPass    // gates the two write actions; empty = no write surface
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -39,21 +41,30 @@ type Deps struct {
 // domain, so it is not served here — one surface, one job.
 //
 //	GET  /            index.html          revalidated (it pins asset versions)
-//	GET  /api/health  {"ok":true}  — always open, so probes need no secret
-//	POST /api/chat    SSE: token · citations · done · error
+//	GET  /api/health  {"ok":true,"writes":bool} — open, so probes need no secret
+//	POST /api/chat    SSE: cached · token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
+//	GET  /api/tickets · POST /api/tickets · POST /api/tickets/{id}/{action}
+//	GET  /api/history answers still free to replay
 //	GET  /app/…       app modules + CSS   revalidated, ETag'd from the binary
 //	GET  /vendor/…    vendored CDN assets immutable (version is in the path)
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
+	// One field, and the UI needs it: whether BA mode can do anything here. That
+	// this instance *has* a password configured is not a secret — that it is
+	// read-only is exactly what a BA needs to be told before typing an answer.
+	health := fmt.Sprintf(`{"ok":true,"writes":%t}`, d.BAPass.enabled())
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		w.Write([]byte(health))
 	})
 
 	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers))
 	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))
+	if d.Know != nil {
+		tickets(mux, d.Know, d.BAPass)
+	}
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))

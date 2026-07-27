@@ -20,6 +20,17 @@ cannot disagree with them, and it lists every section with its URL.
 The app binary does **not** serve these pages — it is the chat app and nothing else,
 and it carries one link out to the published guide. Do not add doc routes to it.
 
+## Two facts that are easy to get wrong
+
+1. **`knowledge.db` is derived, `CORPUS_DIR` is the source of truth.** `ingest docs`
+   rebuilds the database, and a BA-confirmed answer is written to
+   `CORPUS_DIR/qa/ticket-N.md` precisely so that stays true. When asked about backups,
+   the answer is "put the documents directory in git", not "copy the database".
+2. **Reads are open; two actions are gated.** `BA_PASS` guards confirming an answer
+   into the corpus and dismissing a ticket. An unset `BA_PASS` means the instance has
+   *no* write surface — not open writes. Asking, reading the queue and filing a gap
+   never need a password.
+
 ## Documentation for the design system
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
