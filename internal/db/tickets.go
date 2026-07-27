@@ -122,6 +122,8 @@ func (s *Store) update(id int64, query string, args ...any) (Ticket, error) {
 	return s.Ticket(id)
 }
 
+// Ticket returns one ticket by id, or ErrNoTicket when there is none — so a caller can
+// tell "gone" from "broken" without inspecting the error text.
 func (s *Store) Ticket(id int64) (Ticket, error) {
 	return scanTicket(s.db.QueryRow(`SELECT `+ticketCols+` FROM tickets WHERE id=?`, id))
 }

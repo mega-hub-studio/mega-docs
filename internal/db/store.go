@@ -1,3 +1,6 @@
+// Package db is the only place that knows SQLite: sqlite-vec for embeddings, FTS5 for
+// keywords, hybrid retrieval fused with RRF, the QA ticket state machine, and the answer
+// cache. Nothing above it imports a driver, and it imports nothing of the domain.
 package db
 
 import (
@@ -9,16 +12,24 @@ import (
 	"strings"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+	// Registered for its side effect: the "sqlite3" driver name this package opens.
 	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:embed schema.sql
 var schema string
 
+// Store is an open database. One value per process; the zero value is not usable — call
+// Open, which also applies the schema.
 type Store struct {
 	db  *sql.DB
 	dim int
 }
+
+// statusApproved is the chunk status a BA confirm produces. The SQL statements spell it
+// out because there it is part of a query; in Go it is compared against, so it is a
+// constant — a typo in a string comparison is a boost that silently never applies.
+const statusApproved = "approved"
 
 // Hit is one retrieved chunk with provenance for citation.
 type Hit struct {
@@ -59,6 +70,7 @@ func (s *Store) migrate() error {
 	return err
 }
 
+// Close releases the underlying database handle.
 func (s *Store) Close() error { return s.db.Close() }
 
 // UpsertDocument replaces a document and all its chunks (idempotent re-ingest).
@@ -128,75 +140,111 @@ func (s *Store) InsertChunk(docID int64, heading, content string, ord int, emb [
 // degrades the answer without saying so.
 func (s *Store) Search(qEmb []float32, qText string, k int, scope string) ([]Hit, error) {
 	const pool = 40 // candidates pulled from each retriever before fusion
-	const rrfK = 60.0
 
-	inVec, scopeArgs := scopeFilter("chunk_id", scope)
-	inFTS, _ := scopeFilter("rowid", scope)
+	vecOrder, err := s.vectorCandidates(qEmb, scope, pool)
+	if err != nil {
+		return nil, err
+	}
+	// The keyword leg is best-effort by design: a query FTS5 refuses must cost the
+	// answer some recall, never the whole answer, because the vector leg can still
+	// carry it. So this one returns no error to check.
+	ftsOrder := s.keywordCandidates(qText, scope, pool)
 
-	// 1) Vector candidates
+	score := fuse(vecOrder, ftsOrder)
+	if len(score) == 0 {
+		return nil, nil
+	}
+	return s.hits(score, k)
+}
+
+// vectorCandidates returns chunk ids by embedding distance, nearest first.
+func (s *Store) vectorCandidates(qEmb []float32, scope string, pool int) ([]int, error) {
 	blob, err := sqlite_vec.SerializeFloat32(qEmb)
 	if err != nil {
 		return nil, err
 	}
-	vrows, err := s.db.Query(
-		`SELECT chunk_id FROM vec_chunks WHERE embedding MATCH ? AND k = ?`+inVec+
+	within, args := scopeFilter("chunk_id", scope)
+	//nolint:gosec // G202: `within` is a constant SQL fragment from scopeFilter with ?
+	// placeholders; every value, including the scope, is bound as a parameter.
+	rows, err := s.db.Query(
+		`SELECT chunk_id FROM vec_chunks WHERE embedding MATCH ? AND k = ?`+within+
 			` ORDER BY distance`,
-		append([]any{blob, pool}, scopeArgs...)...)
+		append([]any{blob, pool}, args...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vec search: %w", err)
 	}
-	var vecOrder []int
-	for vrows.Next() {
+	defer rows.Close()
+
+	var order []int
+	for rows.Next() {
 		var id int
-		if err := vrows.Scan(&id); err != nil {
-			vrows.Close()
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		vecOrder = append(vecOrder, id)
+		order = append(order, id)
 	}
-	vrows.Close()
+	// A failed iteration returns the rows it managed to read, which is indistinguishable
+	// from a corpus that simply had fewer matches — so it has to be an error.
+	return order, rows.Err()
+}
 
-	// 2) Keyword candidates (BM25)
-	var ftsOrder []int
-	if match := toFTSQuery(qText); match != "" {
-		frows, err := s.db.Query(
-			`SELECT rowid FROM fts_chunks WHERE fts_chunks MATCH ?`+inFTS+
-				` ORDER BY rank LIMIT ?`,
-			append(append([]any{match}, scopeArgs...), pool)...)
-		if err == nil {
-			for frows.Next() {
-				var id int
-				if err := frows.Scan(&id); err == nil {
-					ftsOrder = append(ftsOrder, id)
-				}
-			}
-			frows.Close()
+// keywordCandidates returns chunk ids by BM25 rank, best first. Best-effort: an empty
+// result and a refused query are the same answer here, because the vector leg is still
+// in play. See the call in Search.
+func (s *Store) keywordCandidates(qText, scope string, pool int) []int {
+	match := toFTSQuery(qText)
+	if match == "" {
+		return nil
+	}
+	within, args := scopeFilter("rowid", scope)
+	//nolint:gosec // G202: same as vectorCandidates — fixed fragment, bound values.
+	rows, err := s.db.Query(
+		`SELECT rowid FROM fts_chunks WHERE fts_chunks MATCH ?`+within+
+			` ORDER BY rank LIMIT ?`,
+		append(append([]any{match}, args...), pool)...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var order []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err == nil {
+			order = append(order, id)
 		}
 	}
+	// Best-effort, deliberately: rows.Err() is read so a truncated iteration is not
+	// mistaken for the end of the results, and then discarded, because the caller can
+	// still answer from the vector leg. This is the one place in the store that does
+	// that, and it is why keywordCandidates returns no error.
+	_ = rows.Err()
+	return order
+}
 
-	// 3) Reciprocal Rank Fusion
+// fuse combines two ranked id lists with Reciprocal Rank Fusion: a chunk both
+// retrievers found beats one that only ranks highly in either.
+func fuse(rankings ...[]int) map[int]float64 {
+	const rrfK = 60.0
+
 	score := map[int]float64{}
-	for rank, id := range vecOrder {
-		score[id] += 1.0 / (rrfK + float64(rank))
+	for _, order := range rankings {
+		for rank, id := range order {
+			score[id] += 1.0 / (rrfK + float64(rank))
+		}
 	}
-	for rank, id := range ftsOrder {
-		score[id] += 1.0 / (rrfK + float64(rank))
-	}
-	if len(score) == 0 {
-		return nil, nil
-	}
+	return score
+}
 
-	ids := make([]int, 0, len(score))
+// hits loads the bodies and provenance for the fused ids, best score first, capped at k.
+// Approved chunks — the answers a BA confirmed — get a small boost, so a human-vouched
+// section wins a tie against one that merely mentions the same words.
+func (s *Store) hits(score map[int]float64, k int) ([]Hit, error) {
+	args := make([]any, 0, len(score))
 	for id := range score {
-		ids = append(ids, id)
+		args = append(args, id)
 	}
-
-	// 4) Load chunk bodies + provenance
-	placeholders := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(args)), ",")
 	rows, err := s.db.Query(fmt.Sprintf(
 		`SELECT c.id, d.path, c.heading, c.content, c.status
 		 FROM chunks c JOIN documents d ON d.id = c.document_id
@@ -213,10 +261,13 @@ func (s *Store) Search(qEmb []float32, qText string, k int, scope string) ([]Hit
 			return nil, err
 		}
 		h.Score = score[h.ChunkID]
-		if h.Status == "approved" {
+		if h.Status == statusApproved {
 			h.Score *= 1.2 // a person vouched for this one
 		}
 		hits = append(hits, h)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	sort.Slice(hits, func(i, j int) bool { return hits[i].Score > hits[j].Score })
 	if len(hits) > k {

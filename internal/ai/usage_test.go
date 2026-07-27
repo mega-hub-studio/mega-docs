@@ -36,12 +36,12 @@ func TestChatStreamReadsTheUsageFrame(t *testing.T) {
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
 				for _, f := range c.frames {
-					w.Write([]byte("data: " + f + "\n\n"))
+					_, _ = w.Write([]byte("data: " + f + "\n\n"))
 				}
-				w.Write([]byte("data: [DONE]\n\n"))
+				_, _ = w.Write([]byte("data: [DONE]\n\n"))
 			}))
 			defer srv.Close()
 
@@ -68,9 +68,9 @@ func TestChatStreamReadsTheUsageFrame(t *testing.T) {
 // A usage frame must not be mistaken for content: it has an empty choices array,
 // and a client that forwarded it would print JSON into the answer.
 func TestTheUsageFrameStreamsNoTokens(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":9}}` + "\n\n"))
-		w.Write([]byte("data: [DONE]\n\n"))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":9}}` + "\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	}))
 	defer srv.Close()
 

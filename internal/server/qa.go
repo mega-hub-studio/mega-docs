@@ -47,7 +47,7 @@ func (p BAPass) enabled() bool { return p != "" }
 // 401 when the password is wrong (retry with a different one).
 func (p BAPass) gate(h http.HandlerFunc) http.HandlerFunc {
 	if !p.enabled() {
-		return func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "writes are disabled: BA_PASS is not set on this instance", http.StatusForbidden)
 		}
 	}

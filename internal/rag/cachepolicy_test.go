@@ -1,3 +1,6 @@
+// Package rag's internal tests. In-package on purpose: the cache policy they pin
+// (isMiss, and the prompt carrying the sentinel) is unexported, and testing it through
+// the public API would test the provider stub instead.
 package rag
 
 import "testing"

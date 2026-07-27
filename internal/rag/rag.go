@@ -14,6 +14,9 @@ import (
 	"knowledge-engine/internal/db"
 )
 
+// Engine is the domain: it chunks and embeds documents, retrieves grounded context,
+// streams an answer, and runs the QA loop that turns a gap into a document. It knows
+// nothing about HTTP.
 type Engine struct {
 	store     *db.Store
 	ai        *ai.Client
@@ -28,6 +31,8 @@ type Options struct {
 	CorpusDir string // where documents live on disk; "" disables writes (Confirm)
 }
 
+// New builds the engine. A TopK of zero means the default; an empty CorpusDir means the
+// instance cannot write, so Confirm and Import fail loudly instead of half-working.
 func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 	if opt.TopK <= 0 {
 		opt.TopK = 6

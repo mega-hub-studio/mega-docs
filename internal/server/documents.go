@@ -44,7 +44,7 @@ func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
 			http.Error(w, "the upload was too large or malformed", http.StatusBadRequest)
 			return
 		}
-		defer r.MultipartForm.RemoveAll()
+		defer func() { _ = r.MultipartForm.RemoveAll() }() // temp files; a failed cleanup is the OS's problem
 
 		files := r.MultipartForm.File["files"]
 		if len(files) == 0 {

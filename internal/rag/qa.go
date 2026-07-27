@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -85,13 +86,16 @@ func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticke
 // writeDoc puts a file in the corpus directory, refusing to leave the tree.
 func (e *Engine) writeDoc(rel, content string) error {
 	if e.corpusDir == "" {
-		return fmt.Errorf("no corpus directory configured: set CORPUS_DIR to the folder ingest reads")
+		return errors.New("no corpus directory configured: set CORPUS_DIR to the folder ingest reads")
 	}
 	full := filepath.Join(e.corpusDir, rel)
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+	// 0750/0600: a confirmed answer is a business document written by the service, and
+	// the service is the only thing that reads it back. Nothing else on the host needs
+	// to, so nothing else is given the chance.
+	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 		return fmt.Errorf("%s: %w", filepath.Dir(full), err)
 	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("writing %s: %w", full, err)
 	}
 	return nil
@@ -130,6 +134,8 @@ func (e *Engine) sig() (string, error) {
 func (e *Engine) History(limit int) ([]db.Cached, error) {
 	sig, err := e.sig()
 	if err != nil {
+		//nolint:nilerr // documented above: an unreadable signature means "no history",
+		// never a failed request. The panel is a convenience, the answer is the product.
 		return []db.Cached{}, nil
 	}
 	return e.store.History(sig, limit)

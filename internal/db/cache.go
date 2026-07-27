@@ -63,10 +63,11 @@ func cacheKey(scope, question string) string {
 // what it was retrieved from, and a History row has to replay under the same scope or
 // the "free" it advertises is a different answer.
 func scopeOf(key string) string {
-	if i := strings.IndexByte(key, '\x1f'); i >= 0 {
-		return key[:i]
+	scope, _, found := strings.Cut(key, "\x1f")
+	if !found {
+		return ""
 	}
-	return ""
+	return scope
 }
 
 // Cached returns a stored answer for this question in this scope, and counts the hit.

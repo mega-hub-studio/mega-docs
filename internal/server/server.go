@@ -77,9 +77,11 @@ func New(d Deps) http.Handler {
 	// that rule is about what a *document* answer may contain.
 	health := fmt.Sprintf(`{"ok":true,"writes":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
 		d.BAPass.enabled(), d.Runtime.Model, d.Runtime.Window, d.Runtime.PriceIn, d.Runtime.PriceOut)
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(health))
+		// The body is a constant; a failed write means the probe hung up, which is its
+		// business, not ours.
+		_, _ = w.Write([]byte(health))
 	})
 
 	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers))
@@ -141,7 +143,9 @@ func etag(b []byte) string {
 // etagFS hashes every file under root, so any edit anywhere changes the tag.
 func etagFS(fsys fs.FS, root string) string {
 	h := sha256.New()
-	fs.WalkDir(fsys, root, func(path string, e fs.DirEntry, err error) error {
+	// The tree is an embed.FS: a read cannot fail at runtime, and if it somehow did the
+	// tag would simply change, which is the safe direction for a cache key.
+	_ = fs.WalkDir(fsys, root, func(path string, e fs.DirEntry, err error) error {
 		if err != nil || e.IsDir() {
 			return err
 		}
@@ -149,7 +153,7 @@ func etagFS(fsys fs.FS, root string) string {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(h, "%s:%x\n", path, sha256.Sum256(b))
+		_, _ = fmt.Fprintf(h, "%s:%x\n", path, sha256.Sum256(b)) // writing to a hash cannot fail
 		return nil
 	})
 	return fmt.Sprintf(`"%x"`, h.Sum(nil)[:16])

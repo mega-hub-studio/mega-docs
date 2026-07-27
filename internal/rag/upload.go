@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -30,13 +31,7 @@ var TextExts = []string{".md", ".markdown", ".txt"}
 
 // IsText reports whether a filename is one the engine can index.
 func IsText(name string) bool {
-	ext := strings.ToLower(filepath.Ext(name))
-	for _, e := range TextExts {
-		if ext == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(TextExts, strings.ToLower(filepath.Ext(name)))
 }
 
 // MaxDepth caps how deep an imported path may nest. Folders are what a reader
@@ -52,7 +47,7 @@ const MaxDepth = 4
 //
 // Re-uploading the same path updates that document in place rather than creating a
 // second one — the same identity rule ingest uses, so the two agree.
-func (e *Engine) Upload(ctx context.Context, name string, content string) (Uploaded, error) {
+func (e *Engine) Upload(ctx context.Context, name, content string) (Uploaded, error) {
 	rel, err := SafePath(name)
 	if err != nil {
 		return Uploaded{}, err

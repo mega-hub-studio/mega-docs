@@ -219,8 +219,10 @@ func TestQAEndpointsAreAbsentWithoutTheLoopWired(t *testing.T) {
 	// Deps.Know is optional; nothing may 500 because it was left nil.
 	h := New(Deps{Answers: &fakeAnswers{}, Index: []byte("x"), Assets: fstest.MapFS{}})
 	for _, c := range []struct{ method, path string }{
-		{"GET", "/api/tickets"}, {"POST", "/api/tickets"},
-		{"POST", "/api/tickets/1/confirm"}, {"GET", "/api/history"},
+		{"GET", "/api/tickets"},
+		{"POST", "/api/tickets"},
+		{"POST", "/api/tickets/1/confirm"},
+		{"GET", "/api/history"},
 	} {
 		if w := do(t, h, c.method, c.path, "{}", nil); w.Code != http.StatusNotFound {
 			t.Errorf("%s %s = %d, want 404", c.method, c.path, w.Code)

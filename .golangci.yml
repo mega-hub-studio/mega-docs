@@ -1,0 +1,188 @@
+# golangci-lint for this repo. Derived from .claude/skills/golang-lint/assets/.golangci.yml,
+# with every deviation stated — a config nobody can explain is a config people disable.
+#
+# The rule this file exists to protect: `make lint` says nothing unless something is
+# actually wrong. The stock config reported 591 issues here, 420 of them whitespace and
+# missing t.Parallel(). A gate that always shouts is a gate everybody learns to ignore.
+version: "2"
+
+run:
+  # sqlite-vec and FTS5 are cgo behind a build tag. Without it the linter analyses a
+  # tree that does not compile and reports nonsense.
+  build-tags:
+    - sqlite_fts5
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 50
+
+linters:
+  enable:
+    # correctness
+    - govet
+    - staticcheck
+    - unused
+    - errcheck
+    - errorlint
+    - nilerr
+    - forcetypeassert
+    - copyloopvar
+    - durationcheck
+    - reassign
+    # style
+    - gocritic
+    - revive
+    - whitespace
+    - godot
+    - misspell
+    - dupword
+    - predeclared
+    - errname
+    - asciicheck
+    # complexity
+    - gocyclo
+    - nestif
+    - funlen
+    # performance
+    - perfsprint
+    - unconvert
+    - ineffassign
+    - goconst
+    # security & resources
+    - gosec
+    - bidichk
+    - bodyclose
+    - noctx
+    - containedctx
+    - fatcontext
+    - sqlclosecheck
+    - rowserrcheck
+    # modernisation
+    - modernize
+    - intrange
+    - usestdlibvars
+    - exhaustive
+    - nolintlint
+    # tests
+    - thelper
+    - usetesting
+
+  disable:
+    # ── dropped from the recommended set, each for a reason ──────────────────────
+    # wsl_v5: 304 findings, all of them "put a blank line here". This repo's comments
+    # carry the structure instead, and its style is set by the surrounding code.
+    - wsl_v5
+    # paralleltest: 116 findings. Every test here owns a real SQLite file or an
+    # httptest provider; the suite runs in under a second, so parallelism would buy
+    # nothing and make a failure harder to read.
+    - paralleltest
+    # dupl: test setup repeats on purpose — a test that shares a fixture with another
+    # test fails for reasons that are not in it.
+    - dupl
+    # noctx: 33 findings, all of them database/sql calls in internal/db that could take
+    # a Context. Deliberately not threaded through: every query here is a local SQLite
+    # read measured in microseconds, the cancellable work is the provider call (which
+    # does take ctx), and the change would touch every method of the store for no
+    # measurable gain. Turn this back on the day a query gets slow enough to want
+    # cancelling, or the store stops being a local file.
+    - noctx
+    # sloglint / loggercheck / testifylint: no slog, no testify. Nothing to check.
+    - sloglint
+    - loggercheck
+    - testifylint
+    # exptostd: no golang.org/x/exp import.
+    - exptostd
+    # Kept off for the reasons the recommended config already gives.
+    - lll
+    - prealloc
+    - wrapcheck
+    - err113
+    - mnd
+    - iface
+    - nakedret
+    - noinlineerr
+    - gocognit
+    - cyclop
+    - depguard
+    - goheader
+    - importas
+    - funcorder
+    - godoclint
+    - varnamelen
+    - exhaustruct
+    - gochecknoglobals
+    - gochecknoinits
+    - unparam
+    - makezero
+    - testpackage
+    - embeddedstructfieldcheck
+    - iotamixing
+    - unqueryvet
+    - recvcheck
+    - mirror
+    - protogetter
+    - spancheck
+    - zerologlint
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      # A failed Close on a read path, or a Rollback after a successful Commit, has
+      # nothing a caller can do about it. Every *other* ignored error is written as
+      # `_ =` at the call site, where a reader can see the decision.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Tx).Rollback
+        - (*knowledge-engine/internal/db.Store).Close
+    funlen:
+      lines: 120
+      statements: 80
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+    gocyclo:
+      # 16, not 13. Four functions sit at 14–16 and every branch in them is a rule the
+      # tests name one by one: SafePath (what a document path may be), SplitMarkdown
+      # (how a document is cut), Engine.Answer (the cache/retrieve/stream path).
+      # Splitting them would move the branches, not remove them.
+      min-complexity: 16
+    gosec:
+      excludes:
+        # G706 log injection: the only sink is a human reading `journalctl`. There is no
+        # log pipeline to poison, and a newline in a file name is not a threat model.
+        - G706
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+  exclusions:
+    rules:
+      # A test's branches are its assertions, and its literals read better in place than
+      # behind a name declared thirty lines up.
+      - path: _test\.go
+        linters: [gocyclo, goconst, funlen]
+      # G304 "file inclusion via variable" is the job description of an ingest CLI and
+      # of config.Load reading .env. The path validation that does matter lives in
+      # rag.SafePath and is tested there.
+      - path: (cmd/ingest/|internal/config/)
+        linters: [gosec]
+        text: "G304|G703"
+      # Tests read fixtures they just wrote, in a t.TempDir().
+      - path: _test\.go
+        linters: [gosec]
+        text: "G304|G104"
+
+formatters:
+  enable:
+    - gofmt
+  disable:
+    # gofumpt classifies an import path whose first segment has no dot as stdlib, and
+    # this module is named `knowledge-engine` — so it merged every internal import into
+    # the std group, which is exactly backwards from how this repo reads. gofmt alone
+    # keeps the two groups apart. (Renaming the module to its repository URL would fix
+    # the heuristic *and* the stale product name; it rewrites the import line of every
+    # file, so it is a decision of its own, not a formatting side effect.)
+    - gofumpt

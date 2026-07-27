@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -22,7 +23,7 @@ import (
 func LLMs(siteBase string) ([]byte, error) {
 	siteBase = strings.TrimSuffix(siteBase, "/")
 	if siteBase == "" {
-		return nil, fmt.Errorf("web: empty site base for llms.txt")
+		return nil, errors.New("web: empty site base for llms.txt")
 	}
 
 	type entry struct {

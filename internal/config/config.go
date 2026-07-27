@@ -1,12 +1,18 @@
+// Package config turns the environment into one Config value, with defaults, and reads
+// .env so a secret never has to appear on a command line.
 package config
 
 import (
 	"bufio"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 )
 
+// Config is every knob this app has, resolved once at startup. A zero value in a
+// display field (Window, PriceIn, PriceOut) means "unknown" and the UI prints nothing
+// rather than a zero.
 type Config struct {
 	BindAddr   string
 	Port       string
@@ -43,6 +49,9 @@ const (
 	DefaultSiteURL = "https://mega-hub-studio.github.io/mega-docs"
 )
 
+// Load reads .env (if present) into the environment, then the environment into a Config.
+// Existing environment variables win over .env, so a systemd unit or a one-off
+// `KEY=value ./bin/server` overrides the file rather than fighting it.
 func Load() Config {
 	loadDotEnv(".env")
 	return Config{
@@ -130,7 +139,11 @@ func loadDotEnv(path string) {
 		}
 		k, v = strings.TrimSpace(k), strings.Trim(strings.TrimSpace(v), `"'`)
 		if os.Getenv(k) == "" {
-			os.Setenv(k, v)
+			// Only fails on an invalid name, which means the .env line is malformed —
+			// worth saying, because the setting silently not applying is the symptom.
+			if err := os.Setenv(k, v); err != nil {
+				log.Printf(".env: skipping %q: %v", k, err)
+			}
 		}
 	}
 }

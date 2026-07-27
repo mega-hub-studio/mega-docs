@@ -76,7 +76,7 @@ func TestCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := s.InsertChunk(authID, "H", "auth body", i, vec(1, 0, 0, 0)); err != nil {
 			t.Fatal(err)
 		}
@@ -139,12 +139,12 @@ func TestScopedSearchRanksWithinTheScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		if err := s.InsertChunk(loud, "FAQ", "refund window and refund policy", i, vec(1, float32(i)*0.001, 0, 0)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := s.InsertChunk(quiet, "Rules", "a refund inside the booking calendar", i, vec(0, 0, 1, float32(i)*0.001)); err != nil {
 			t.Fatal(err)
 		}

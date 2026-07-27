@@ -25,7 +25,9 @@ Every Go command needs the build tags — `sqlite-vec` and FTS5 are cgo, and a p
 
 ```bash
 make deps                  # go mod tidy
-make check                 # THE GATE: tests, gofmt, go vet, staticcheck, deadcode, credential scan
+make check                 # THE GATE: tests, gofmt, go vet, golangci-lint, deadcode, credential scan
+make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
+make lint-fix              # …applying what it can fix; read the diff
 make build                 # bin/knowledge + bin/ingest
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
@@ -176,6 +178,13 @@ with one link out to the published site. Do not add doc routes to it.
   [`web/vendor.sha384`](web/vendor.sha384), which drives both the page's `integrity`
   attributes and `make vendor`. A half-finished bump fails at **startup**, not in a
   browser.
+- **Linting is configured, not inherited.** [`.golangci.yml`](.golangci.yml) starts from
+  the vendored `golang-lint` skill's config and turns off five linters *with the reason
+  written next to each*: whitespace rules that fight this repo's comment style, missing
+  `t.Parallel()` on tests that own real files, `noctx` on a store whose queries are
+  microseconds of local SQLite. The tree is at **zero findings**, so a new one is a new
+  fact rather than background noise — keep it that way, and if a rule has to go, say why
+  in the file.
 - `make check` runs in CI on every push and pull request
   ([`.github/workflows/check.yml`](.github/workflows/check.yml)), with staticcheck and
   deadcode installed so nothing is skipped. It runs `make vendor` first, because

@@ -285,7 +285,7 @@ func TestAuthAcceptsCorrectCredentialsAndRejectsWrongOnes(t *testing.T) {
 		"pass as user": {"s3cret", "team", http.StatusUnauthorized},
 	}
 	for name, c := range cases {
-		r := httptest.NewRequest("GET", "/", nil)
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.SetBasicAuth(c.user, c.pass)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -302,14 +302,14 @@ func TestGuideRoutesAreNotServed(t *testing.T) {
 	h := newTestServer(&fakeAnswers{})
 	for _, path := range []string{"/docs", "/dev", "/deploy", "/llms.txt"} {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 		if w.Code != http.StatusNotFound {
 			t.Errorf("%s returned %d — the app should not serve the guide", path, w.Code)
 		}
 	}
 	// The app itself still answers, so this is not just a broken mux.
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	if w.Code != 200 {
 		t.Errorf("the app root returned %d", w.Code)
 	}

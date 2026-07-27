@@ -2,26 +2,39 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean
+.PHONY: deps check test lint lint-fix dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean
 
 deps:
 	go mod tidy
 
-# Everything CI should gate on: formatting, vet, tests.
+# Everything CI should gate on: formatting, vet, tests, linters.
 check: test secrets
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed in:"; gofmt -l .; exit 1; }
 	go vet -tags "$(TAGS)" ./...
+	@$(MAKE) --no-print-directory lint
 	@$(MAKE) --no-print-directory dead
 
-# Dead code has a way of accumulating quietly. staticcheck catches unused
-# declarations; deadcode catches functions no binary can reach. Missing tools are
-# reported as skipped — but a *finding* must fail the build, so neither is written
-# as `tool || echo skipped` (that turns a non-zero exit into a cheerful message).
-# deadcode only reports, so its output is what decides the exit code.
+# golangci-lint, configured by .golangci.yml — which explains every linter it turns off,
+# because the stock config reports 591 issues on this tree and a gate that always shouts
+# is a gate nobody reads. It currently reports zero; a new finding means a new fact.
+# staticcheck runs inside it, which is why `dead` no longer runs it separately.
+lint:
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else echo "  skipped golangci-lint (go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
+
+# Same linters, applying the fixes they know how to make. Read the diff: the formatters
+# are opinionated and one of them (gofumpt) is turned off here for a reason .golangci.yml
+# spells out.
+lint-fix:
+	golangci-lint run --fix ./...
+
+# What no linter finds: a function no binary can reach. staticcheck's unused only sees
+# within a package, and it now runs inside `lint` anyway; deadcode does whole-program
+# reachability from the two mains. A missing tool is reported as skipped — but a
+# *finding* must fail the build, which is why this is not written as `tool || echo`
+# (that turns a non-zero exit into a cheerful message).
 dead:
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck -tags "$(TAGS)" ./...; \
-	else echo "  skipped staticcheck (go install honnef.co/go/tools/cmd/staticcheck@latest)"; fi
 	@if command -v deadcode >/dev/null 2>&1; then \
 		out=$$(deadcode -tags "$(TAGS)" ./cmd/...); \
 		if [ -n "$$out" ]; then echo "$$out"; echo "^ unreachable from any binary"; exit 1; fi; \

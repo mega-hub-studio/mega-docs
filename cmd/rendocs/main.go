@@ -41,7 +41,9 @@ func main() {
 	// without the other is how an agent ends up reading a stale index.
 	pages["llms.txt"] = func() ([]byte, error) { return web.LLMs(*site) }
 
-	if err := os.MkdirAll(*dir, 0o755); err != nil {
+	// 0750/0600: the output is a build artifact, read by whoever ran the build (the
+	// Pages workflow uploads it as the same user). No other account needs it.
+	if err := os.MkdirAll(*dir, 0o750); err != nil {
 		die(err)
 	}
 	for name, build := range pages {
@@ -50,7 +52,7 @@ func main() {
 			die(err)
 		}
 		path := filepath.Join(*dir, name)
-		if err := os.WriteFile(path, page, 0o644); err != nil {
+		if err := os.WriteFile(path, page, 0o600); err != nil {
 			die(err)
 		}
 		fmt.Fprintf(os.Stderr, "rendocs: wrote %s (%d bytes)\n", path, len(page))

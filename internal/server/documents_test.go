@@ -46,9 +46,9 @@ func form(t *testing.T, files map[string]string) (string, string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Write([]byte(content))
+		_, _ = f.Write([]byte(content))
 	}
-	w.Close()
+	_ = w.Close()
 	return buf.String(), w.FormDataContentType()
 }
 
@@ -61,7 +61,7 @@ func postFiles(t *testing.T, h http.Handler, pass string, files map[string]strin
 	}
 	w := do(t, h, "POST", "/api/documents", body, hdr)
 	var out importResult
-	json.Unmarshal(w.Body.Bytes(), &out)
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
 	return w.Code, out
 }
 

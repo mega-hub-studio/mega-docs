@@ -57,6 +57,7 @@ func New(p *Provider) (*Provider, string) {
 	return p, p.server.URL
 }
 
+// Close shuts the test server down. Safe to call twice.
 func (p *Provider) Close() { p.server.Close() }
 
 // Embedded reports the input batches the provider was asked to embed.
@@ -136,7 +137,7 @@ func (p *Provider) embeddings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": items})
+	_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": items})
 }
 
 func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +175,7 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 	flusher, _ := w.(http.Flusher)
 	frame := func(v any) {
 		b, _ := json.Marshal(v)
-		fmt.Fprintf(w, "data: %s\n\n", b)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", b)
 		if flusher != nil {
 			flusher.Flush()
 		}
@@ -182,7 +183,7 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 
 	// A real stream is noisy: comment lines and blank separators show up between
 	// frames, and the client has to skip them.
-	fmt.Fprint(w, ": ping\n\n")
+	_, _ = fmt.Fprint(w, ": ping\n\n")
 	for i, tok := range strings.Fields(p.Reply) {
 		if i > 0 {
 			tok = " " + tok
@@ -193,7 +194,7 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 		frame(map[string]any{"error": map[string]string{"message": p.MidStreamError}})
 		return
 	}
-	fmt.Fprint(w, "data: [DONE]\n\n")
+	_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 }
 
 // Vector is a deterministic pseudo-embedding: same text in, same vector out, and
@@ -203,8 +204,8 @@ func Vector(text string, dim int) []float32 {
 	v := make([]float32, dim)
 	for _, word := range strings.Fields(strings.ToLower(text)) {
 		h := fnv.New32a()
-		h.Write([]byte(word))
-		v[int(h.Sum32())%dim] += 1
+		_, _ = h.Write([]byte(word)) // hash writes never fail
+		v[int(h.Sum32())%dim]++
 	}
 	// keep it unit-ish so cosine/L2 distances behave
 	var sum float32
@@ -228,7 +229,7 @@ func sqrt32(f float32) float32 {
 	}
 	// Newton, plenty for a test fixture
 	x := f
-	for i := 0; i < 12; i++ {
+	for range 12 {
 		x = 0.5 * (x + f/x)
 	}
 	return x

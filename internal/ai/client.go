@@ -33,6 +33,9 @@ const (
 	initialSSELineSize = 64 << 10
 )
 
+// Client is one OpenAI-compatible provider: embeddings, streaming chat, and what the
+// completion cost. Chat and embeddings may live at different base URLs with different
+// keys, because a coding-agent gateway often serves chat only.
 type Client struct {
 	ChatBaseURL  string // e.g. https://api.openai.com/v1
 	EmbedBaseURL string // usually the same; split when a gateway lacks /embeddings
@@ -60,6 +63,9 @@ type Config struct {
 	EmbedModel, ChatModel string
 }
 
+// New builds a client from cfg, filling the embedding side from the chat side wherever
+// cfg leaves it empty — one provider serving both endpoints is the common case, and two
+// places to configure it is two places to get it wrong.
 func New(cfg Config) *Client {
 	chat := strings.TrimRight(cfg.ChatBaseURL, "/")
 	embed := strings.TrimRight(cfg.EmbedBaseURL, "/")
@@ -147,6 +153,7 @@ func (c *Client) Embed(ctx context.Context, inputs []string) ([][]float32, error
 	return vecs, nil
 }
 
+// Msg is one chat message in the provider's wire format.
 type Msg struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`

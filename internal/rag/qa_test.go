@@ -142,7 +142,7 @@ func TestHistoryCountsHitsSoTheSavingIsVisible(t *testing.T) {
 	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if _, _, err := ask(t, e, "hybrid search?"); err != nil {
 			t.Fatal(err)
 		}

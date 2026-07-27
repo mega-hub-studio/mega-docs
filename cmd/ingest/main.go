@@ -1,7 +1,15 @@
+// Command ingest indexes a folder of documents into the database the server reads.
+//
+// Only .md / .txt / .markdown are indexed: converting PDF and DOCX belongs in the tool
+// that is good at it (Docling, MarkItDown), not in this binary.
+//
+// Usage: ingest <file-or-dir> [<file-or-dir> ...]
 package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,18 +24,28 @@ import (
 // Usage: ingest <file-or-dir> [<file-or-dir> ...]
 // Only .md / .txt files are indexed. Convert PDF/DOCX to markdown first
 // (Docling / MarkItDown) — keep the Go binary clean.
+// main exists only to turn an error into an exit code — see run(), and the same note
+// in cmd/server: os.Exit and log.Fatal skip deferred calls, including the one that
+// closes the database.
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("usage: ingest <file-or-dir> ...")
+	if err := run(os.Args[1:]); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string) error {
+	if len(args) == 0 {
+		log.Print("usage: ingest <file-or-dir> [<file-or-dir> ...]")
+		return errors.New("no paths given")
 	}
 	cfg := config.Load()
 	if cfg.APIKey == "" {
-		log.Fatal("AI_API_KEY not set (see .env)")
+		return errors.New("AI_API_KEY not set (see .env)")
 	}
 
 	store, err := db.Open(cfg.DBPath, cfg.EmbedDim)
 	if err != nil {
-		log.Fatalf("db: %v", err)
+		return fmt.Errorf("db: %w", err)
 	}
 	defer store.Close()
 
@@ -38,24 +56,7 @@ func main() {
 	}), rag.Options{TopK: cfg.TopK})
 	ctx := context.Background()
 
-	var files []string
-	for _, arg := range os.Args[1:] {
-		info, err := os.Stat(arg)
-		if err != nil {
-			log.Printf("skip %s: %v", arg, err)
-			continue
-		}
-		if info.IsDir() {
-			filepath.WalkDir(arg, func(p string, d os.DirEntry, err error) error {
-				if err == nil && !d.IsDir() && isDoc(p) {
-					files = append(files, p)
-				}
-				return nil
-			})
-		} else if isDoc(arg) {
-			files = append(files, arg)
-		}
-	}
+	files := collect(args)
 
 	var indexed, chunks, failed int
 	for _, f := range files {
@@ -81,13 +82,51 @@ func main() {
 	// with a server that looks ready and answers "not in the documents" forever.
 	log.Printf("done: %d/%d files, %d chunks", indexed, len(files), chunks)
 	if failed > 0 {
-		log.Printf("%d file(s) failed — the index is incomplete", failed)
-		os.Exit(1)
+		return fmt.Errorf("%d file(s) failed — the index is incomplete", failed)
 	}
 	if chunks == 0 {
-		log.Print("nothing was indexed: no chunks were written")
-		os.Exit(1)
+		return errors.New("nothing was indexed: no chunks were written")
 	}
+	return nil
+}
+
+// collect expands the arguments into the list of files to index: a file if it is one we
+// can read, everything indexable underneath if it is a folder.
+//
+// Nothing here fails the run. A path that cannot be read is named and skipped, because
+// one unreadable file in a corpus of hundreds is not a reason to index none of them —
+// but it is a reason to say so, and the count at the end tells the rest of the story.
+func collect(args []string) []string {
+	var files []string
+	for _, arg := range args {
+		info, err := os.Stat(arg)
+		if err != nil {
+			log.Printf("skip %s: %v", arg, err)
+			continue
+		}
+		if !info.IsDir() {
+			if isDoc(arg) {
+				files = append(files, arg)
+			}
+			continue
+		}
+		// Walk errors are reported, not swallowed. A folder the process cannot read used
+		// to produce "0 files" with no reason given, which reads as an empty corpus
+		// rather than as a permission problem.
+		if err := filepath.WalkDir(arg, func(p string, d os.DirEntry, err error) error {
+			if err != nil {
+				log.Printf("skip %s: %v", p, err)
+				return nil // one unreadable entry must not abandon the rest
+			}
+			if !d.IsDir() && isDoc(p) {
+				files = append(files, p)
+			}
+			return nil
+		}); err != nil {
+			log.Printf("walk %s: %v", arg, err)
+		}
+	}
+	return files
 }
 
 func isDoc(p string) bool {

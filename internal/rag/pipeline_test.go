@@ -184,7 +184,7 @@ func TestIngestBatchesLargeDocumentsWithoutMisalignment(t *testing.T) {
 
 	var sb strings.Builder
 	sb.WriteString("# Big\n\n")
-	for i := 0; i < 70; i++ {
+	for i := range 70 {
 		// Distinct heading + body so a mispaired vector is detectable, and each body
 		// over minChars so the chunker leaves 70 sections as 70 chunks — the point of
 		// this test is the batching, not the merging.

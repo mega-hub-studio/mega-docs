@@ -61,7 +61,7 @@ func TestASectionBigEnoughToStandAloneIsLeftAlone(t *testing.T) {
 func TestNoChunkExceedsMaxChars(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("# Doc\n")
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		b.WriteString("\n## Section\n")
 		b.WriteString(strings.Repeat("x", 400))
 		b.WriteString("\n")
@@ -111,7 +111,7 @@ func TestALongTableIsSplitAndEveryPartKeepsItsHeader(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("# Rules\n\n## Business rules\n")
 	b.WriteString("| Code | Rule | Handling |\n|---|---|---|\n")
-	for i := 0; i < 120; i++ {
+	for range 120 {
 		b.WriteString("| BR-")
 		b.WriteString(strings.Repeat("0", 2))
 		b.WriteString(" | a rule that is long enough to matter | handled by the server |\n")

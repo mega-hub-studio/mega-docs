@@ -51,7 +51,7 @@ func diagram(name string) (string, error) {
 	return string(b), nil
 }
 
-// Static tree served straight to the browser:
+// FS is the static tree served straight to the browser:
 //
 //	app/     the app shell — styles.css + the ES modules (no build step)
 //	vendor/  third-party assets, laid out exactly like the CDN paths
@@ -93,22 +93,38 @@ func Index(assetBase, docsURL string) ([]byte, error) {
 	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, docsURL: docsURL})
 }
 
-// Docs, Dev and Deploy render the three guide pages. Same asset plumbing as Index,
-// so they resolve from the same pinned CDN. Only cmd/rendocs calls these: the guide
-// is published as static files, not served by the app.
+// The three guide pages, by the name that identifies each one in a template, a URL and
+// a nav entry — one spelling, so a new page cannot half-exist.
+const (
+	pageDocs   = "docs"
+	pageDev    = "dev"
+	pageDeploy = "deploy"
+)
+
+// Docs renders the Guide page. It, Dev and Deploy share Index's asset plumbing, so all
+// four resolve from the same pinned CDN. Only cmd/rendocs calls the three guide pages:
+// the guide is published as static files, never served by the app.
 func Docs(assetBase string, nav Nav) ([]byte, error) {
-	return render(page{name: "docs", tmpl: docsTmpl, base: assetBase, nav: nav,
-		id: "docs", title: "Guide / Hướng dẫn"})
+	return render(page{
+		name: pageDocs, tmpl: docsTmpl, base: assetBase, nav: nav,
+		id: pageDocs, title: "Guide / Hướng dẫn",
+	})
 }
 
+// Dev renders the Dev page — see Docs.
 func Dev(assetBase string, nav Nav) ([]byte, error) {
-	return render(page{name: "dev", tmpl: devTmpl, base: assetBase, nav: nav,
-		id: "dev", title: "Dev / Cho dev"})
+	return render(page{
+		name: pageDev, tmpl: devTmpl, base: assetBase, nav: nav,
+		id: pageDev, title: "Dev / Cho dev",
+	})
 }
 
+// Deploy renders the Deploy runbook — see Docs.
 func Deploy(assetBase string, nav Nav) ([]byte, error) {
-	return render(page{name: "deploy", tmpl: deployTmpl, base: assetBase, nav: nav,
-		id: "deploy", title: "Deploy / Triển khai"})
+	return render(page{
+		name: pageDeploy, tmpl: deployTmpl, base: assetBase, nav: nav,
+		id: pageDeploy, title: "Deploy / Triển khai",
+	})
 }
 
 type page struct {
@@ -181,8 +197,10 @@ func render(pg page) ([]byte, error) {
 		GuideURL, DevURL, DeployURL string
 		Page, Title                 string
 		Remote                      bool
-	}{base, origin, pg.docsURL, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
-		pg.id, pg.title, remote}); err != nil {
+	}{
+		base, origin, pg.docsURL, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
+		pg.id, pg.title, remote,
+	}); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

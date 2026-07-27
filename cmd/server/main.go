@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -18,19 +19,29 @@ import (
 	"knowledge-engine/web"
 )
 
+// main exists only to turn an error into an exit code. Everything else is run(), so
+// that `defer store.Close()` actually runs: log.Fatal calls os.Exit, which skips every
+// deferred call in the frame — and for a WAL database that means the last checkpoint
+// never happens.
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	cfg := config.Load()
 
 	store, err := db.Open(cfg.DBPath, cfg.EmbedDim)
 	if err != nil {
-		log.Fatalf("db: %v", err)
+		return fmt.Errorf("db: %w", err)
 	}
 	defer store.Close()
 
 	// The page is rendered once, for whichever asset base is configured.
 	index, err := web.Index(cfg.AssetBase, cfg.SiteURL)
 	if err != nil {
-		log.Fatalf("frontend: %v", err)
+		return fmt.Errorf("frontend: %w", err)
 	}
 	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
 		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
@@ -64,7 +75,7 @@ func main() {
 	log.Printf("mega-docs on http://%s (assets: %s, auth: %s, writes: %s)",
 		addr, cfg.AssetBase, describe(auth), writes(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
-	log.Fatal(srv.ListenAndServe())
+	return srv.ListenAndServe()
 }
 
 func describe(a server.Auth) string {

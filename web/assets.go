@@ -2,6 +2,7 @@ package web
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -48,7 +49,7 @@ func parsePins(src string) (pins, error) {
 		p.digest[path] = strings.TrimSpace(sri)
 	}
 	if len(p.digest) == 0 {
-		return p, fmt.Errorf("vendor.sha384: no pins found")
+		return p, errors.New("vendor.sha384: no pins found")
 	}
 	return p, nil
 }
