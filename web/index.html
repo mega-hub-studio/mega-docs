@@ -304,6 +304,46 @@
       <button class="btn" type="submit">UNLOCK</button>
     </form>
 
+    <!-- ══ Import ═════════════════════════════════════════════════════════════
+         The other way a document enters the corpus, behind the same password as a
+         confirm: this app has no accounts, so an open import would let anyone who
+         reaches the port rewrite what everyone else reads.
+         A drop zone *and* a button, because a drop is invisible to anyone who
+         doesn't already know it works — and impossible from a phone.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <section class="card drop" data-accent="blue" v-if="online && writes && unlocked"
+      :data-over="String(dragging)"
+      @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false"
+      @drop.prevent="importDocs($event.dataTransfer.files)">
+      <div class="head">
+        <span class="title">Import documents</span>
+        <span class="badge todo">{{ accept }}</span>
+      </div>
+      <p>Written into <code>docs/</code> and indexed immediately. The same file name
+        updates that document in place, so re-importing a corrected version replaces it
+        instead of adding a second copy.</p>
+
+      <label class="btn">
+        <input type="file" :accept="accept" multiple hidden @change="pickDocs" :disabled="importing">
+        {{ importing ? 'IMPORTING…' : 'CHOOSE FILES — OR DROP THEM HERE' }}
+      </label>
+
+      <!-- Per file, both outcomes in one list: a batch where seven landed and one
+           was a PDF is the normal case, and the user needs to see which. -->
+      <dl class="datalist" v-if="imported">
+        <template v-for="d in imported.uploaded" :key="d.path">
+          <dt><span class="badge clear">INDEXED</span></dt>
+          <dd><code>{{ d.path }}</code> — {{ d.chunks }} sections</dd>
+        </template>
+        <template v-for="f in imported.failed" :key="f.name">
+          <dt><span class="badge crit">SKIPPED</span></dt>
+          <dd><code>{{ f.name }}</code> — {{ f.error }}</dd>
+        </template>
+      </dl>
+
+      <p class="hint">PDF or DOCX? Convert first — <code>markitdown spec.pdf &gt; spec.md</code>.</p>
+    </section>
+
     <div class="empty" v-if="!queue.tickets.length">
       <span class="icon">◈</span>
       <span class="title">Nothing waiting</span>

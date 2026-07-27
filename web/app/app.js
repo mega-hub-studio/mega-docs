@@ -20,6 +20,7 @@ import { bindViewport } from "./viewport.js";
 import { loadCorpus, shortDate } from "./library.js";
 import * as session from "./session.js";
 import * as qa from "./qa.js";
+import * as upload from "./upload.js";
 
 const STARTERS = [
   "How does retrieval stay grounded?",
@@ -76,6 +77,12 @@ export function boot(ds) {
         working: 0, // id of the ticket currently being published
         history: [],
         status: qa.STATUS,
+
+        /* ── importing documents ── */
+        accept: upload.ACCEPT,
+        importing: false,
+        dragging: false, // a drop target that doesn't light up reads as inert
+        imported: null, // {uploaded, failed, chunks} from the last import
       };
     },
 
@@ -231,6 +238,49 @@ export function boot(ds) {
         } finally {
           this.working = 0;
         }
+      },
+
+      /** Import .md/.txt straight into the corpus. Same gate as a confirm. */
+      async importDocs(files) {
+        const { ok, rejected } = upload.sort(files);
+        this.dragging = false;
+        if (!ok.length) {
+          ds.toast(`<b>Nothing to import.</b> Only ${upload.ACCEPT} — convert a PDF first.`, { accent: "warn" });
+          return;
+        }
+        this.importing = true;
+        this.imported = null;
+        try {
+          const r = await upload.send(ok);
+          // A file the browser filtered never reached the server, but to the person
+          // who dropped it there is one list, so they arrive in one.
+          r.failed = [...r.failed, ...rejected.map((f) => ({ name: f.name, error: `not ${upload.ACCEPT}` }))];
+          this.imported = r;
+          if (r.uploaded.length) {
+            ds.toast(
+              `<b>${r.uploaded.length} document(s) indexed.</b> ${r.chunks} sections — ask about them now.`,
+              { accent: "good" },
+            );
+            this.refreshCorpus();
+          } else {
+            ds.toast("<b>Nothing was indexed.</b> See the list below.", { accent: "crit" });
+          }
+        } catch (e) {
+          if (e instanceof qa.WrongPass) {
+            this.unlocked = false;
+            ds.toast(`<b>Locked.</b> ${e.message}`, { accent: "crit" });
+          } else {
+            ds.toast(`<b>${e.message}</b>`, { accent: "crit" });
+          }
+        } finally {
+          this.importing = false;
+        }
+      },
+
+      /** The file picker and a drop end in the same place. */
+      pickDocs(e) {
+        this.importDocs(e.target.files);
+        e.target.value = ""; // so picking the same file twice still fires
       },
 
       /** Reflect a confirm on the DEV side without a reload. */

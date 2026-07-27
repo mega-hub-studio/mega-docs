@@ -44,7 +44,7 @@ func main() {
 	}), rag.Options{TopK: cfg.TopK, CorpusDir: cfg.CorpusDir})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	handler := server.New(server.Deps{
-		Answers: engine, Know: engine, Index: index, Assets: web.FS,
+		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
 		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
 	})
 

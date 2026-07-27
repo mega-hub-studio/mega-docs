@@ -126,6 +126,24 @@ main.ba {
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
 
+/* ── BA mode: the import card ──
+   The card, the badge and the datalist are library recipes. Two things are not,
+   because a drop target is not a component the design system has:
+     · the dashed edge, which is the only affordance saying "you can drop here"
+     · the state while a file is over it — without it the page looks inert at the
+       exact moment the user is asking whether it works
+   The <label> wraps a hidden <input type=file>, so the library's own .btn is the
+   picker and no button styling is duplicated here. */
+.drop {
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  border-style: dashed;
+}
+.drop[data-over="true"] { border-style: solid; border-color: var(--primary); }
+/* A label is not focusable, so keyboard users reach the input; give it the same
+   visible ring the library puts on a focused control. */
+.drop .btn:focus-within { outline: var(--bw-2) solid var(--primary); outline-offset: 2px; }
+.drop .datalist code { overflow-wrap: anywhere; }
+
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
   position: fixed; inset-block-end: 0; inset-inline: 0; z-index: var(--z-dock);

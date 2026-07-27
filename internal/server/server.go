@@ -29,10 +29,11 @@ type Answerer interface {
 type Deps struct {
 	Answers Answerer  // the RAG engine, read side
 	Know    Knowledge // the QA loop; nil leaves those routes unregistered
+	Docs    Importer  // document import; nil leaves that route unregistered
 	Index   []byte    // index.html, already rendered for the configured asset base
 	Assets  fs.FS     // embedded static tree: app/… and vendor/…
 	Auth    Auth      // optional Basic credentials; zero value = open
-	BAPass  BAPass    // gates the two write actions; empty = no write surface
+	BAPass  BAPass    // gates the write actions; empty = no write surface
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -45,6 +46,7 @@ type Deps struct {
 //	POST /api/chat    SSE: cached · token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /api/tickets · POST /api/tickets · POST /api/tickets/{id}/{action}
+//	POST /api/documents  import .md/.txt into the corpus — same gate as a confirm
 //	GET  /api/history answers still free to replay
 //	GET  /app/…       app modules + CSS   revalidated, ETag'd from the binary
 //	GET  /vendor/…    vendored CDN assets immutable (version is in the path)
@@ -64,6 +66,9 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))
 	if d.Know != nil {
 		tickets(mux, d.Know, d.BAPass)
+	}
+	if d.Docs != nil {
+		documents(mux, d.Docs, d.BAPass)
 	}
 
 	// "/{$}" matches only the root, so the file servers below never see it.

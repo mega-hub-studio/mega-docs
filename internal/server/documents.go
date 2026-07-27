@@ -1,0 +1,105 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+
+	"knowledge-engine/internal/rag"
+)
+
+// Importer is the import side of the engine: a document arriving over HTTP instead
+// of from the host's disk. Separate from Knowledge so the QA loop and the import
+// surface can be faked — and refused — independently.
+type Importer interface {
+	Upload(ctx context.Context, name, content string) (rag.Uploaded, error)
+}
+
+const (
+	// maxDoc caps one document. Markdown that a person wrote and a person will
+	// read; well past a long spec, well short of something that belongs in object
+	// storage.
+	maxDoc = 2 << 20 // 2 MiB
+	// maxImport caps the whole request, so "select all" in a folder of the wrong
+	// kind of file cannot spend the process's memory before the per-file check runs.
+	maxImport = 16 << 20 // 16 MiB
+)
+
+// documents wires the import route. One endpoint, behind the same password as a
+// confirm, because both change what every reader is told.
+//
+//	POST /api/documents   multipart/form-data, field "files" (repeatable)
+//	                   → {"uploaded":[{"path","chunks"}],"failed":[{"name","error"}]}
+//
+// Partial success is reported, not hidden: importing eight files where one is a PDF
+// should index the seven and name the eighth, rather than failing the batch and
+// leaving the user to guess which one was wrong.
+func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
+	mux.HandleFunc("POST /api/documents", pass.gate(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxImport)
+		if err := r.ParseMultipartForm(maxDoc); err != nil {
+			http.Error(w, "the upload was too large or malformed", http.StatusBadRequest)
+			return
+		}
+		defer r.MultipartForm.RemoveAll()
+
+		files := r.MultipartForm.File["files"]
+		if len(files) == 0 {
+			http.Error(w, `no files: send them as multipart field "files"`, http.StatusBadRequest)
+			return
+		}
+
+		out := importResult{Uploaded: []rag.Uploaded{}, Failed: []importFailure{}}
+		for _, fh := range files {
+			doc, err := readUpload(r.Context(), imp, fh)
+			if err != nil {
+				out.Failed = append(out.Failed, importFailure{Name: fh.Filename, Error: err.Error()})
+				continue
+			}
+			out.Uploaded = append(out.Uploaded, doc)
+			out.Chunks += doc.Chunks
+		}
+		// Nothing landed: this was a failed request, not a successful one that
+		// happens to report failures — a client should be able to tell by status.
+		if len(out.Uploaded) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		writeJSON(w, out)
+	}))
+}
+
+type importResult struct {
+	Uploaded []rag.Uploaded  `json:"uploaded"`
+	Failed   []importFailure `json:"failed"`
+	Chunks   int             `json:"chunks"`
+}
+
+type importFailure struct {
+	Name  string `json:"name"`
+	Error string `json:"error"`
+}
+
+// readUpload validates before it reads: the name decides whether the bytes are
+// worth pulling into memory at all, and a 40 MB PDF should be refused on its
+// extension rather than on its size.
+func readUpload(ctx context.Context, imp Importer, fh *multipart.FileHeader) (rag.Uploaded, error) {
+	if _, err := rag.SafeName(fh.Filename); err != nil {
+		return rag.Uploaded{}, err
+	}
+	if fh.Size > maxDoc {
+		return rag.Uploaded{}, fmt.Errorf("%s is %d KB — the limit is %d KB", fh.Filename, fh.Size>>10, maxDoc>>10)
+	}
+	f, err := fh.Open()
+	if err != nil {
+		return rag.Uploaded{}, fmt.Errorf("%s could not be read", fh.Filename)
+	}
+	defer f.Close()
+
+	body, err := io.ReadAll(io.LimitReader(f, maxDoc))
+	if err != nil {
+		return rag.Uploaded{}, fmt.Errorf("%s could not be read", fh.Filename)
+	}
+	return imp.Upload(ctx, fh.Filename, string(body))
+}
