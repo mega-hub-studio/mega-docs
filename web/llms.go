@@ -26,18 +26,6 @@ func LLMs(siteBase string) ([]byte, error) {
 		return nil, errors.New("web: empty site base for llms.txt")
 	}
 
-	type entry struct {
-		file  string
-		build func(string, Nav) ([]byte, error)
-	}
-	// Ordered, unlike a map: an index that shuffles between builds is a useless diff.
-	order := []entry{
-		{"index.html", Docs},
-		{strings.TrimPrefix(StaticNav.BA, "./"), BA},
-		{strings.TrimPrefix(StaticNav.Dev, "./"), Dev},
-		{strings.TrimPrefix(StaticNav.Deploy, "./"), Deploy},
-	}
-
 	var b strings.Builder
 	b.WriteString("# mega-docs\n\n")
 	b.WriteString("> Self-hosted RAG over a team's own documents: ask a question, get an " +
@@ -49,20 +37,20 @@ func LLMs(siteBase string) ([]byte, error) {
 		"prefer them over recalled details.\n\n## Docs\n")
 
 	var sections []string
-	for _, e := range order {
-		page, err := e.build("https://cdn.jsdelivr.net/npm", StaticNav)
+	for _, e := range Pages() {
+		page, err := e.Build("https://cdn.jsdelivr.net/npm", StaticNav)
 		if err != nil {
-			return nil, fmt.Errorf("llms.txt: %s: %w", e.file, err)
+			return nil, fmt.Errorf("llms.txt: %s: %w", e.File, err)
 		}
 		html := string(page)
 		title := firstMatch(reH1, html)
 		if title == "" {
-			return nil, fmt.Errorf("llms.txt: %s has no English h1", e.file)
+			return nil, fmt.Errorf("llms.txt: %s has no English h1", e.File)
 		}
-		fmt.Fprintf(&b, "- [%s](%s/%s): %s\n", title, siteBase, e.file, firstMatch(reLede, html))
+		fmt.Fprintf(&b, "- [%s](%s/%s): %s\n", title, siteBase, e.File, firstMatch(reLede, html))
 
 		for _, h := range reH2.FindAllStringSubmatch(html, -1) {
-			sections = append(sections, fmt.Sprintf("- %s — %s/%s", clean(h[1]), siteBase, e.file))
+			sections = append(sections, fmt.Sprintf("- %s — %s/%s", clean(h[1]), siteBase, e.File))
 		}
 	}
 

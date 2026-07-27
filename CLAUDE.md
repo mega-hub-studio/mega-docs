@@ -197,6 +197,10 @@ a runtime error.
 - **A Vue `computed` name that collides with a `data` key silently loses.** `data`
   wins and every field reads `undefined`, with no console error.
 - **`cp` over a running binary fails with `Text file busy`.** Install with `mv`.
+- **A stale `golangci-lint` on PATH makes the gate lie.** CI installs `@latest`; an
+  older binary installed locally reports zero while CI fails (it happened on `goconst`
+  and a new `gosec` rule). `make lint` prints the version it used — compare it with the
+  one in [`check.yml`](.github/workflows/check.yml) before trusting a green run.
 - **Numbers the UI shows must be measured, not estimated.** Token counts come from
   the provider's own usage frame; `CONTEXT_WINDOW` and `PRICE_IN`/`PRICE_OUT` are
   zero by default and the status line prints *nothing* rather than a zero — an

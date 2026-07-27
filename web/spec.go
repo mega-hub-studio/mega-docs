@@ -101,33 +101,23 @@ func Spec(siteBase string) ([]byte, error) {
 // own parser eventually checks something else.
 func Features(siteBase string) ([]Feature, error) {
 	siteBase = strings.TrimSuffix(siteBase, "/")
-	pages := []struct {
-		file  string
-		build func(string, Nav) ([]byte, error)
-	}{
-		{"index.html", Docs},
-		{strings.TrimPrefix(StaticNav.BA, "./"), BA},
-		{strings.TrimPrefix(StaticNav.Dev, "./"), Dev},
-		{strings.TrimPrefix(StaticNav.Deploy, "./"), Deploy},
-	}
-
 	var out []Feature
 	seen := map[string]string{}
-	for _, p := range pages {
-		page, err := p.build("https://cdn.jsdelivr.net/npm", StaticNav)
+	for _, p := range Pages() {
+		page, err := p.Build("https://cdn.jsdelivr.net/npm", StaticNav)
 		if err != nil {
-			return nil, fmt.Errorf("spec: %s: %w", p.file, err)
+			return nil, fmt.Errorf("spec: %s: %w", p.File, err)
 		}
-		fs, err := sectionsOf(string(page), p.file, siteBase)
+		fs, err := sectionsOf(string(page), p.File, siteBase)
 		if err != nil {
 			return nil, err
 		}
 		for _, f := range fs {
 			if where, dup := seen[f.ID]; dup {
 				return nil, fmt.Errorf("spec: two sections claim data-feature=%q (%s and %s): "+
-					"an id is how a change is addressed, so it has to be unique", f.ID, where, p.file)
+					"an id is how a change is addressed, so it has to be unique", f.ID, where, p.File)
 			}
-			seen[f.ID] = p.file
+			seen[f.ID] = p.File
 			out = append(out, f)
 		}
 	}

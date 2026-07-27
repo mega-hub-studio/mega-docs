@@ -18,8 +18,12 @@ check: test secrets
 # because the stock config reports 591 issues on this tree and a gate that always shouts
 # is a gate nobody reads. It currently reports zero; a new finding means a new fact.
 # staticcheck runs inside it, which is why `dead` no longer runs it separately.
+# Prints the version it used. CI installs @latest, so an older binary left on PATH
+# locally passes what CI then fails — that happened, on goconst and a new gosec rule,
+# after the gate had already gone green here.
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint version | head -1; \
 		golangci-lint run ./...; \
 	else echo "  skipped golangci-lint (go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
 

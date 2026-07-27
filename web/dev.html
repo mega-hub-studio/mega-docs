@@ -811,8 +811,8 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>một mục</th><td>một <code>&lt;section&gt;</code> trong trang, đủ hai ngôn ngữ; gắn annotation nếu nó ứng với code</td></tr>
           <tr lang="en"><th>a sub-module inside a section</th><td>an <code>&lt;h3&gt;</code>; <code>&lt;nes-toc&gt;</code> indexes h2 and h3, so it gets its own row in the rail</td></tr>
           <tr lang="vi"><th>một mục con trong mục</th><td>một <code>&lt;h3&gt;</code>; <code>&lt;nes-toc&gt;</code> index cả h2 và h3, nên nó có dòng riêng trong thanh mục lục</td></tr>
-          <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one line in <code>cmd/rendocs</code></td></tr>
-          <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một dòng trong <code>cmd/rendocs</code></td></tr>
+          <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one entry in <code>web.Pages</code> — which <code>cmd/rendocs</code>, <code>llms.txt</code> and <code>spec.json</code> all walk</td></tr>
+          <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một entry trong <code>web.Pages</code> — <code>cmd/rendocs</code>, <code>llms.txt</code> và <code>spec.json</code> đều đi qua danh sách đó</td></tr>
           <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; the SVG is committed and a test fails if its source drifts</td></tr>
           <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; SVG được commit và có test đỏ nếu source lệch</td></tr>
         </tbody>

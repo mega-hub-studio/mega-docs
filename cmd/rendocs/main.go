@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"knowledge-engine/web"
 )
@@ -28,15 +27,14 @@ func main() {
 	flag.Parse()
 
 	// StaticNav links the pages to each other by file name and drops the "Open app"
-	// button — there is no app next to a static page.
-	// Keyed by the file name StaticNav points at, so a page and the link to it cannot
-	// drift. index.html rather than docs.html: it is the site's landing page.
+	// button — there is no app next to a static page. web.Pages is the one list of what
+	// gets published, so this command cannot publish a different set than llms.txt and
+	// spec.json describe.
 	nav := web.StaticNav
-	pages := map[string]func() ([]byte, error){
-		"index.html":                         func() ([]byte, error) { return web.Docs(*base, nav) },
-		strings.TrimPrefix(nav.BA, "./"):     func() ([]byte, error) { return web.BA(*base, nav) },
-		strings.TrimPrefix(nav.Dev, "./"):    func() ([]byte, error) { return web.Dev(*base, nav) },
-		strings.TrimPrefix(nav.Deploy, "./"): func() ([]byte, error) { return web.Deploy(*base, nav) },
+	pages := map[string]func() ([]byte, error){}
+	for _, page := range web.Pages() {
+		build := page.Build // captured per iteration, or every entry renders the last page
+		pages[page.File] = func() ([]byte, error) { return build(*base, nav) }
 	}
 	// llms.txt rides along with the pages: it is derived from them, so publishing one
 	// without the other is how an agent ends up reading a stale index.

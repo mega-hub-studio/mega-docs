@@ -179,7 +179,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a feature | its page `<section>` **first**, with `data-feature`/`data-api`/`data-env`/`data-test` | `make check` is red until those names exist — the docs are the input, not the write-up |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
 | a sub-module inside a section | an `<h3>` in that section | `<nes-toc>` indexes h2+h3, so it appears in the rail on its own |
-| a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the guide is static, so the app needs no change at all |
+| a whole guide page (new role) | a field on `web.Nav` + a render func + one entry in `web.Pages` | `cmd/rendocs`, `llms.txt` and `spec.json` all walk that one list, so they cannot publish different sets |
 | something an AI agent must know | [`AGENTS.md`](AGENTS.md) | `llms.txt` is generated; this is the hand-written part, and its pins are tested |
 
 ### The two seams that make it testable

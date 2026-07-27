@@ -145,16 +145,16 @@ func TestSpecJSONIsGeneratedFromThePages(t *testing.T) {
 
 	// Every page must contribute: a page with no annotated section is a page whose
 	// features live only in prose, which is how the drift starts.
-	for _, page := range []string{"index.html", "ba.html", "dev.html", "deploy.html"} {
+	for _, page := range Pages() {
 		found := false
 		for _, f := range doc.Features {
-			if strings.Contains(f.URL, "/"+page+"#") {
+			if strings.Contains(f.URL, "/"+page.File+"#") {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("%s declares no feature", page)
+			t.Errorf("%s declares no feature", page.File)
 		}
 	}
 }
@@ -201,47 +201,54 @@ func codeFacts(t *testing.T) (tests, routes, knobs map[string]bool) {
 	t.Helper()
 	tests, routes, knobs = map[string]bool{}, map[string]bool{}, map[string]bool{}
 
-	root := ".."
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	// The walk only collects paths; the files are read afterwards. Reading inside a
+	// WalkDir callback is a symlink race (gosec G122) — and here it would also mean the
+	// three extractors run interleaved with directory traversal for no reason.
+	var files []string
+	err := filepath.WalkDir("..", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			// vendor/ and the tool caches hold third-party Go that would add thousands
-			// of irrelevant test names.
+			// These hold third-party or generated Go that would add thousands of
+			// irrelevant test names.
 			switch d.Name() {
 			case ".git", ".cache", "vendor", "node_modules", "bin":
 				return fs.SkipDir
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
+		if strings.HasSuffix(path, ".go") {
+			files = append(files, path)
 		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking the tree: %v", err)
+	}
+
+	for _, path := range files {
 		src, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			t.Fatalf("reading %s: %v", path, err)
 		}
-		for _, m := range reTestFunc.FindAllStringSubmatch(string(src), -1) {
+		text := string(src)
+		for _, m := range reTestFunc.FindAllStringSubmatch(text, -1) {
 			tests[m[1]] = true
 		}
 		if strings.Contains(path, filepath.Join("internal", "server")) {
-			for _, m := range reRoute.FindAllStringSubmatch(string(src), -1) {
+			for _, m := range reRoute.FindAllStringSubmatch(text, -1) {
 				routes[m[1]] = true
 			}
 		}
 		if strings.Contains(path, filepath.Join("internal", "config")) &&
 			!strings.HasSuffix(path, "_test.go") {
-			for _, m := range reKnob.FindAllStringSubmatch(string(src), -1) {
+			for _, m := range reKnob.FindAllStringSubmatch(text, -1) {
 				knobs[m[1]] = true
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("reading the tree: %v", err)
 	}
-	// A silent empty set would make every check below pass for the wrong reason.
+	// A silent empty set would make every check above pass for the wrong reason.
 	if len(tests) < 100 || len(routes) < 8 || len(knobs) < 15 {
 		t.Fatalf("read %d tests, %d routes, %d knobs — the extractor stopped matching, "+
 			"so nothing below is being checked", len(tests), len(routes), len(knobs))
@@ -295,15 +302,10 @@ func TestTheExtractorFindsWhatItClaims(t *testing.T) {
 // appears on the path and on its label), which is its business and not a collision with
 // the page.
 func TestNoDiagramIdCollidesWithASectionId(t *testing.T) {
-	for _, page := range []struct {
-		file  string
-		build func(string, Nav) ([]byte, error)
-	}{
-		{"index.html", Docs}, {"ba.html", BA}, {"dev.html", Dev}, {"deploy.html", Deploy},
-	} {
-		rendered, err := page.build("https://cdn.jsdelivr.net/npm", StaticNav)
+	for _, page := range Pages() {
+		rendered, err := page.Build("https://cdn.jsdelivr.net/npm", StaticNav)
 		if err != nil {
-			t.Fatalf("%s: %v", page.file, err)
+			t.Fatalf("%s: %v", page.File, err)
 		}
 		html := string(rendered)
 		sections := map[string]bool{}
@@ -316,7 +318,7 @@ func TestNoDiagramIdCollidesWithASectionId(t *testing.T) {
 			if sections[m[1]] {
 				t.Errorf("%s: the inlined diagram and a section both use id %q. Rename "+
 					"web/%s.mmd: mermaid's <style> is scoped to the svg id, so its rules "+
-					"apply to the section too.", page.file, m[1], m[1])
+					"apply to the section too.", page.File, m[1], m[1])
 			}
 		}
 	}

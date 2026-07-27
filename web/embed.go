@@ -73,10 +73,32 @@ var FS embed.FS
 //	Dev     "where do I change X, and how do I test it?"   — DEV
 //	Deploy  "how do we run this for the team?"             — whoever hosts it
 //
-// To add a page: a field here, an address in StaticNav, a render func, and one line
-// in cmd/rendocs.
+// To add a page: a field here, an address in StaticNav, a render func, and one entry
+// in Pages.
 type Nav struct {
 	Guide, BA, Dev, Deploy string
+}
+
+// Page is one published page: the name it is published under, and what renders it.
+type Page struct {
+	File  string
+	Build func(assetBase string, nav Nav) ([]byte, error)
+}
+
+// Pages is every page of the guide, in reading order — the one list cmd/rendocs,
+// llms.txt and spec.json all walk. Ordered rather than a map, because two of those are
+// generated files and an index that shuffles between builds is a useless diff.
+//
+// It exists because there were three copies of it, and a fourth page would have had to be
+// added to each: the risk is not the typing, it is a spec that covers three pages while
+// the site publishes four.
+func Pages() []Page {
+	return []Page{
+		{"index.html", Docs}, // the site's landing page, so index rather than docs
+		{strings.TrimPrefix(StaticNav.BA, "./"), BA},
+		{strings.TrimPrefix(StaticNav.Dev, "./"), Dev},
+		{strings.TrimPrefix(StaticNav.Deploy, "./"), Deploy},
+	}
 }
 
 // StaticNav is how the published site addresses its own pages. It is the only Nav:
