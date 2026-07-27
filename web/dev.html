@@ -814,7 +814,9 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one entry in <code>web.Pages</code> — which <code>cmd/rendocs</code>, <code>llms.txt</code> and <code>spec.json</code> all walk</td></tr>
           <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một entry trong <code>web.Pages</code> — <code>cmd/rendocs</code>, <code>llms.txt</code> và <code>spec.json</code> đều đi qua danh sách đó</td></tr>
           <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; the SVG is committed and a test fails if its source drifts</td></tr>
+          <tr lang="en"><th>confidence that it looks right</th><td><code>make check-ui</code> — renders these pages, serves them and measures them in Chromium at 390 and 1440, both languages: characters per box, the gap between every pair of blocks, the index, the finder</td></tr>
           <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; SVG được commit và có test đỏ nếu source lệch</td></tr>
+          <tr lang="vi"><th>chắc chắn là nhìn đúng</th><td><code>make check-ui</code> — render các trang này, serve rồi đo bằng Chromium ở 390 và 1440, cả hai ngôn ngữ: số ký tự mỗi ô, khoảng cách giữa mọi cặp block, mục lục, ô tìm kiếm</td></tr>
         </tbody>
       </table>
     </div>

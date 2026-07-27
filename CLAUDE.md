@@ -74,6 +74,7 @@ make check                 # THE GATE: tests, gofmt, go vet, golangci-lint, dead
 make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
 make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # optional: eslint + @antfu/eslint-config, installed into .cache/
+make check-ui              # optional: renders the guide, serves it, measures it in Chromium
 make build                 # bin/knowledge + bin/ingest
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
@@ -197,6 +198,15 @@ a runtime error.
 - **A Vue `computed` name that collides with a `data` key silently loses.** `data`
   wins and every field reads `undefined`, with no console error.
 - **`cp` over a running binary fails with `Text file busy`.** Install with `mv`.
+- **`.steps` in 8bit-nes is a stage bar, not an instruction list.** It is
+  `display: inline-flex` with mono uppercase `<li>`s, for "STAGE 1 · 2 · 3". Used for a
+  numbered list with paragraphs it renders as uppercase columns four characters wide on a
+  phone — which shipped. Numbered instructions on the docs pages are `.step` blocks;
+  `make check-ui` fails on `main .steps > li`.
+- **`nes-toc` sets `z-index: 20` on itself.** The sticky header has to sit above it or a
+  popup opened from the header (the section finder) renders behind the index bar: visible,
+  untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the
+  header's stacking context.
 - **A stale `golangci-lint` on PATH makes the gate lie.** CI installs `@latest`; an
   older binary installed locally reports zero while CI fails (it happened on `goconst`
   and a new `gosec` rule). `make lint` prints the version it used — compare it with the
@@ -242,6 +252,13 @@ Three rules keep the layers from leaking:
 
 Composables read `Vue` *inside* the function (`const { ref } = Vue`), never at module
 scope: the global is a classic script and a module body can evaluate before it exists.
+
+On the **docs pages** (`web/docsbase.html`) spacing is one rule, not per-recipe margins:
+`--flow` for every block that follows another, `--sp-5` above an `h3`, `--sp-7` between
+sections. Before that there were four different gaps and 31 pairs of blocks touching at
+0px on one phone screen. A table row is a block below 40rem — the column headings are
+copied onto the cells by the foot script — because at 390px a three-column grid gives each
+value about four characters. `make check-ui` measures all of it.
 
 The design system (8bit-nes) owns components; `web/app/styles.css` owns layout only.
 Before writing CSS, check the pinned `llms.txt` for a recipe that already exists —

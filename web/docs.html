@@ -67,40 +67,49 @@
         đó là cái cửa, không phải tính năng.</span>
     </div>
 
-    <ol class="steps">
-      <li>
-        <b lang="en">Ask with the document's own words</b>
-        <b lang="vi">Hỏi bằng đúng từ trong tài liệu</b>
-        <p lang="en">Half of retrieval is keyword matching, so an error code, a config key
-          or a rule ID beats a paraphrase. Empty screen? The suggested questions are named
-          after the biggest documents actually indexed — tap one and you have proved the
-          whole chain works.</p>
-        <p lang="vi">Một nửa của truy xuất là khớp từ khoá, nên mã lỗi, tên config hay mã
-          quy định ăn hơn diễn giải lại. Màn hình trống? Các câu gợi ý được đặt theo tên
-          những tài liệu lớn nhất đang có trong index — bấm một câu là bạn đã chứng minh cả
-          chuỗi chạy được.</p>
-      </li>
-      <li>
-        <b lang="en">Open the citation</b>
-        <b lang="vi">Mở dẫn nguồn</b>
-        <p lang="en">Every <code>[1]</code> links to the file the sentence came from. That
-          one tap <i>is</i> the quality check: the answer is exactly as good as the section
-          it cites. No citation means treat it as a lead, not a fact.</p>
-        <p lang="vi">Mỗi <code>[1]</code> dẫn tới file mà câu đó lấy ra. Một cú bấm đó
-          <i>chính là</i> việc kiểm chất lượng: câu trả lời tốt đúng bằng đoạn nó dẫn.
-          Không có dẫn nguồn thì coi như gợi ý, chưa phải sự thật.</p>
-      </li>
-      <li>
-        <b lang="en">Missing? File it — one tap</b>
-        <b lang="vi">Thiếu? Báo lại — một cú bấm</b>
-        <p lang="en"><b>Ask BA</b> under a wrong or missing answer sends the question
-          <i>and</i> the answer that failed. A BA answers it once, and from then on it is a
-          document the next person retrieves with a citation — free, from the cache.</p>
-        <p lang="vi"><b>Ask BA</b> ở dưới câu trả lời sai/thiếu sẽ gửi cả câu hỏi
-          <i>và</i> câu trả lời đã sai. Một BA trả lời một lần, và từ đó nó là tài liệu mà
-          người sau truy xuất được kèm dẫn nguồn — miễn phí, từ cache.</p>
-      </li>
-    </ol>
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+            <b lang="en">Ask with the document's own words</b>
+            <b lang="vi">Hỏi bằng đúng từ trong tài liệu</b>
+            <p lang="en">Half of retrieval is keyword matching, so an error code, a config key
+              or a rule ID beats a paraphrase. Empty screen? The suggested questions are named
+              after the biggest documents actually indexed — tap one and you have proved the
+              whole chain works.</p>
+            <p lang="vi">Một nửa của truy xuất là khớp từ khoá, nên mã lỗi, tên config hay mã
+              quy định ăn hơn diễn giải lại. Màn hình trống? Các câu gợi ý được đặt theo tên
+              những tài liệu lớn nhất đang có trong index — bấm một câu là bạn đã chứng minh cả
+              chuỗi chạy được.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+            <b lang="en">Open the citation</b>
+            <b lang="vi">Mở dẫn nguồn</b>
+            <p lang="en">Every <code>[1]</code> links to the file the sentence came from. That
+              one tap <i>is</i> the quality check: the answer is exactly as good as the section
+              it cites. No citation means treat it as a lead, not a fact.</p>
+            <p lang="vi">Mỗi <code>[1]</code> dẫn tới file mà câu đó lấy ra. Một cú bấm đó
+              <i>chính là</i> việc kiểm chất lượng: câu trả lời tốt đúng bằng đoạn nó dẫn.
+              Không có dẫn nguồn thì coi như gợi ý, chưa phải sự thật.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+            <b lang="en">Missing? File it — one tap</b>
+            <b lang="vi">Thiếu? Báo lại — một cú bấm</b>
+            <p lang="en"><b>Ask BA</b> under a wrong or missing answer sends the question
+              <i>and</i> the answer that failed. A BA answers it once, and from then on it is a
+              document the next person retrieves with a citation — free, from the cache.</p>
+            <p lang="vi"><b>Ask BA</b> ở dưới câu trả lời sai/thiếu sẽ gửi cả câu hỏi
+              <i>và</i> câu trả lời đã sai. Một BA trả lời một lần, và từ đó nó là tài liệu mà
+              người sau truy xuất được kèm dẫn nguồn — miễn phí, từ cache.</p>
+      </div>
+    </div>
 
     <div class="callout tip">
       <b lang="en">That is the 20% that covers 80%.</b>
@@ -495,14 +504,29 @@
           data, home, a hotel — with no VPN to switch on and off by hand.</p>
         <p lang="vi">Cài một lần duy nhất. Sau đó địa chỉ dùng được từ bất cứ đâu — 4G,
           ở nhà, khách sạn — không phải bật/tắt VPN bằng tay.</p>
-        <ol class="steps">
-          <li lang="en">Ask the host to invite you to the company tailnet — you will get an email</li>
-          <li lang="vi">Nhờ người host mời bạn vào tailnet công ty — bạn sẽ nhận email</li>
-          <li lang="en">Install the Tailscale app (App Store · Play Store · desktop) and sign in with the company account</li>
-          <li lang="vi">Cài app Tailscale (App Store · Play Store · desktop) rồi đăng nhập bằng tài khoản công ty</li>
-          <li lang="en">Leave it connected — the toggle stays on; that is the whole maintenance</li>
-          <li lang="vi">Để nó kết nối — bật sẵn là xong, không phải làm gì thêm</li>
-        </ol>
+        <div class="step">
+          <span class="num">1</span>
+          <div class="body">
+              <p lang="en">Ask the host to invite you to the company tailnet — you will get an email</p>
+              <p lang="vi">Nhờ người host mời bạn vào tailnet công ty — bạn sẽ nhận email</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="num">2</span>
+          <div class="body">
+              <p lang="en">Install the Tailscale app (App Store · Play Store · desktop) and sign in with the company account</p>
+              <p lang="vi">Cài app Tailscale (App Store · Play Store · desktop) rồi đăng nhập bằng tài khoản công ty</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="num">3</span>
+          <div class="body">
+              <p lang="en">Leave it connected — the toggle stays on; that is the whole maintenance</p>
+              <p lang="vi">Để nó kết nối — bật sẵn là xong, không phải làm gì thêm</p>
+          </div>
+        </div>
         <p lang="en">No password prompt on the app itself: the tailnet already knows who
           you are, which is why this is the recommended door.</p>
         <p lang="vi">App sẽ không hỏi mật khẩu: tailnet đã biết bạn là ai, đó là lý do đây

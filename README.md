@@ -175,6 +175,7 @@ web/vendor/       `make vendor` output (gitignored)
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
+| a layout rule on the **docs** pages | `web/docsbase.html` | one `--flow` gap for every block; run `make check-ui` after |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 | a feature | its page `<section>` **first**, with `data-feature`/`data-api`/`data-env`/`data-test` | `make check` is red until those names exist — the docs are the input, not the write-up |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |

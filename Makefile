@@ -2,7 +2,7 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean
+.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui
 
 deps:
 	go mod tidy
@@ -37,6 +37,12 @@ lint:
 # Not part of `make check`: the architecture rules that catch this codebase's real mistakes
 # are in web/frontend_test.go and cost nothing. See the note at the top of eslint.config.mjs.
 JS_CACHE := .cache/eslint
+# The browser check: what a screenshot shows, measured. Not in `check` — it needs a
+# browser, and this product needs no Node at all (see CLAUDE.md rule 14). Run it after
+# touching a docs page, a recipe or docsbase.html.
+check-ui:
+	@./scripts/check-docs-ui.sh
+
 lint-js:
 	@command -v npm >/dev/null 2>&1 || { echo "  skipped lint-js (needs npm; the product does not)"; exit 0; }
 	@mkdir -p $(JS_CACHE)

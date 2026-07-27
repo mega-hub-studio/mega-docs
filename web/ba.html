@@ -280,47 +280,60 @@
       <code>.md</code> hoặc <code>.txt</code> vào tab BA, có thể chọn thư mục. Mỗi file
       được index ngay khi tới, và hỏi được luôn.</p>
 
-    <ol class="steps">
-      <li>
-        <b lang="en">Convert anything that is not text</b>
-        <b lang="vi">Chuyển mọi thứ không phải text</b>
-        <p lang="en">PDF, DOCX and spreadsheets are refused by name, not silently. Convert
-          first — the tool that is good at it does a better job than a Go binary
-          would.</p>
-        <p lang="vi">PDF, DOCX, spreadsheet sẽ bị từ chối kèm tên file, không im lặng bỏ
-          qua. Chuyển trước — công cụ chuyên làm việc đó tốt hơn một binary Go.</p>
-      </li>
-      <li>
-        <b lang="en">Pick the folder before dropping</b>
-        <b lang="vi">Chọn thư mục trước khi kéo vào</b>
-        <p lang="en">The folder is the scope a reader will click, so it is worth ten
-          seconds. The box suggests the folders that already exist — take one rather than
-          inventing a fourth spelling of the same domain.</p>
-        <p lang="vi">Thư mục chính là scope người đọc sẽ bấm, nên đáng bỏ ra mười giây. Ô
-          nhập gợi ý các thư mục đã có — chọn một cái thay vì đặt thêm cách viết thứ tư
-          cho cùng một domain.</p>
-      </li>
-      <li>
-        <b lang="en">Watch the bar, then read the list</b>
-        <b lang="vi">Xem thanh tiến trình, rồi đọc danh sách</b>
-        <p lang="en">One request per file, so the progress is real rather than animated.
-          Afterwards every file is listed: <span class="badge clear">INDEXED</span> with
-          its section count, or <span class="badge warn">SKIPPED</span> with the
-          reason.</p>
-        <p lang="vi">Mỗi file một request, nên tiến trình là thật chứ không phải hoạt hoạ.
-          Sau đó mọi file đều được liệt kê: <span class="badge clear">INDEXED</span> kèm số
-          đoạn, hoặc <span class="badge warn">SKIPPED</span> kèm lý do.</p>
-      </li>
-      <li>
-        <b lang="en">Re-import to correct, never to duplicate</b>
-        <b lang="vi">Import lại để sửa, không bao giờ tạo bản trùng</b>
-        <p lang="en">The same path updates that document in place. There is no duplicate to
-          clean up, and the old sections stop being retrievable the moment the new ones
-          land.</p>
-        <p lang="vi">Cùng một đường dẫn thì cập nhật tại chỗ. Không có bản trùng phải dọn,
-          và các đoạn cũ hết truy xuất được ngay khi đoạn mới vào.</p>
-      </li>
-    </ol>
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+          <b lang="en">Convert anything that is not text</b>
+          <b lang="vi">Chuyển mọi thứ không phải text</b>
+          <p lang="en">PDF, DOCX and spreadsheets are refused by name, not silently. Convert
+            first — the tool that is good at it does a better job than a Go binary
+            would.</p>
+          <p lang="vi">PDF, DOCX, spreadsheet sẽ bị từ chối kèm tên file, không im lặng bỏ
+            qua. Chuyển trước — công cụ chuyên làm việc đó tốt hơn một binary Go.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+          <b lang="en">Pick the folder before dropping</b>
+          <b lang="vi">Chọn thư mục trước khi kéo vào</b>
+          <p lang="en">The folder is the scope a reader will click, so it is worth ten
+            seconds. The box suggests the folders that already exist — take one rather than
+            inventing a fourth spelling of the same domain.</p>
+          <p lang="vi">Thư mục chính là scope người đọc sẽ bấm, nên đáng bỏ ra mười giây. Ô
+            nhập gợi ý các thư mục đã có — chọn một cái thay vì đặt thêm cách viết thứ tư
+            cho cùng một domain.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+          <b lang="en">Watch the bar, then read the list</b>
+          <b lang="vi">Xem thanh tiến trình, rồi đọc danh sách</b>
+          <p lang="en">One request per file, so the progress is real rather than animated.
+            Afterwards every file is listed: <span class="badge clear">INDEXED</span> with
+            its section count, or <span class="badge warn">SKIPPED</span> with the
+            reason.</p>
+          <p lang="vi">Mỗi file một request, nên tiến trình là thật chứ không phải hoạt hoạ.
+            Sau đó mọi file đều được liệt kê: <span class="badge clear">INDEXED</span> kèm số
+            đoạn, hoặc <span class="badge warn">SKIPPED</span> kèm lý do.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">4</span>
+      <div class="body">
+          <b lang="en">Re-import to correct, never to duplicate</b>
+          <b lang="vi">Import lại để sửa, không bao giờ tạo bản trùng</b>
+          <p lang="en">The same path updates that document in place. There is no duplicate to
+            clean up, and the old sections stop being retrievable the moment the new ones
+            land.</p>
+          <p lang="vi">Cùng một đường dẫn thì cập nhật tại chỗ. Không có bản trùng phải dọn,
+            và các đoạn cũ hết truy xuất được ngay khi đoạn mới vào.</p>
+      </div>
+    </div>
 
     <div class="callout warn">
       <b lang="en">Everyone who can reach the app can read everything in it.</b>

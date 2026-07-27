@@ -57,9 +57,13 @@
   }
 
   .bar {
-    /* z-index stays well under the system's --z-overlay (100) so a toast or modal
-       from the design system still lands above the sticky header. */
-    position: sticky; inset-block-start: 0; z-index: 10;
+    /* Above <nes-toc>, which sets z-index: 20 on itself — the header holds the section
+       finder, and a combobox popup that opens *behind* the index bar is a menu you can
+       see and cannot tap (measured: the toc bar intercepted the click). The popup's own
+       z-index cannot fix it, because it is inside this element's stacking context.
+       Still well under the system's --z-overlay (100), so a toast or modal from the
+       design system lands above the header. */
+    position: sticky; inset-block-start: 0; z-index: 30;
     /* wrap, because three page links plus the language toggle plus the app link are
        wider than a 390px phone — it must take a second row, never a scrollbar */
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3);
@@ -69,6 +73,13 @@
     border-block-end: var(--bw-2) solid var(--line);
   }
   .bar .spacer { margin-inline-start: auto; }
+  /* The finder takes the free width of whatever row it lands on — the whole second row
+     on a phone, the middle of the single row on a laptop — and stops growing before it
+     turns into a search bar the width of a desk. min-inline-size: 0 because a flex item
+     with an input inside it will not otherwise shrink below the input's intrinsic
+     width, which is what pushed the language toggle off a 360px screen. */
+  .find { flex: 1 1 9rem; min-inline-size: 0; max-inline-size: 20rem; }
+  .find[hidden] { display: none; }
   /* icon + words as one unit, so they never wrap apart */
   .brand { display: inline-flex; align-items: center; gap: var(--sp-2); }
   /* This bar already takes two rows on a phone — three page links plus the language
@@ -134,6 +145,29 @@
     .page > nes-toc { grid-column: 2; grid-row: 1; margin-inline: 0; }
   }
 
+  /* ── one vertical rhythm for the whole article ──
+     Every recipe used to bring its own margin — .table-wrap sp-3, .step sp-4,
+     .callout + .callout sp-3, the terminal inside a step sp-2 — and anything with no
+     rule of its own (a paragraph after a terminal, a callout after a table, a second
+     paragraph) got nothing at all. Measured on a phone that came out as four different
+     gaps plus 31 pairs of blocks touching at 0px, in one scroll.
+     So spacing is stated once, here, for every block that follows another one — in the
+     article, inside a step's body, inside a tab panel and inside a card. Headings keep
+     their own larger rhythm (their selectors are more specific), and section-to-section
+     stays sp-7. A recipe that needs a different gap from now on says why. */
+  :root { --flow: var(--sp-4); }
+  main > * + *,
+  main > section > * + *,
+  .step > .body > * + *,
+  .card > * + *,
+  nes-tabs section > * + * { margin-block-start: var(--flow); }
+  /* Both languages are in the DOM and the hidden one still counts as a sibling, so the
+     *visible* first block of a container is its second child half the time. Zero the
+     first pair, or a Vietnamese reader gets a 16px dent at the top of every tab panel. */
+  .step > .body > *:nth-child(-n+2),
+  .card > *:nth-child(-n+2),
+  nes-tabs section > *:nth-child(-n+2) { margin-block-start: 0; }
+
   main > section { margin-block-start: var(--sp-7); }
   main > section > h2 {
     font-family: var(--font-mono); font-size: var(--fs-h2);
@@ -151,7 +185,9 @@
     font-family: var(--font-mono); font-size: var(--fs-h3);
     text-transform: uppercase; letter-spacing: var(--ls-chrome);
     color: var(--muted);
-    margin-block: var(--sp-5) var(--sp-3);
+    /* below it, the flow rule does the spacing — a second value here would only ever
+       be the one that loses to margin collapsing */
+    margin-block: var(--sp-5) 0;
   }
   p, li { overflow-wrap: anywhere; }
   /* Small text in a wide column reads badly: at 13.5px the 820px column ran to ~117
@@ -188,10 +224,9 @@
   /* the link to the other page is a control, not a word in a sentence: at the end
      of a page on a phone it is the thing you reach for, so it gets a thumb-sized
      target instead of a 17px inline hit box. */
-  .next { margin-block-start: var(--sp-3); }
 
   /* the step ladder: a number chip, then what to do */
-  .step { display: flex; gap: var(--sp-3); margin-block-start: var(--sp-4); }
+  .step { display: flex; gap: var(--sp-3); }
   .step > .num {
     flex: none; inline-size: 1.75rem; block-size: 1.75rem;
     display: grid; place-items: center;
@@ -200,18 +235,78 @@
     border: var(--bw-2) solid var(--primary-d); box-shadow: var(--sh-2);
   }
   .step > .body { flex: 1; min-inline-size: 0; }
-  .step .terminal { margin-block-start: var(--sp-2); }
 
-  /* Tables are the system's .table-wrap + .table — it already scrolls inside
-     itself rather than widening a phone, and it already frames the box, which is
-     what tells you there is more to the right. Only two page-local additions: the
-     wrapper's rhythm, and cells that top-align because these rows wrap to several
-     lines (the component assumes short ones). */
-  .table-wrap { margin-block-start: var(--sp-3); }
+  /* Tables are the system's .table-wrap + .table — it frames the box and scrolls
+     inside itself rather than widening a phone. Page-local additions: the wrapper's
+     rhythm, and cells that top-align because these rows wrap to several lines (the
+     component assumes short ones). */
   .table td { vertical-align: top; }
   .table td code { white-space: nowrap; }
+  /* No column narrower than 14 characters. A three-column row inside an 820px reading
+     column gave its last column 17 characters — "never, so probes need no secret" over
+     three lines — because the route cell is `nowrap` and the middle one is a paragraph.
+     A floor makes the table wider than its wrapper instead, and .table-wrap already
+     scrolls inside its own frame, which is the honest trade: the border says there is
+     more, and the page never widens. Below 40rem the rows are blocks, so it does not
+     apply there. */
+  @media (min-width: 40rem) {
+    .table th, .table td { min-inline-size: 14ch; }
+  }
 
-  .grid { display: grid; gap: var(--sp-3); margin-block-start: var(--sp-3); }
+  /* ── a table on a phone is a list of rows, not a grid ──
+     Scrolling sideways was the wrong answer at 390px. `.table th` is `white-space:
+     nowrap`, so a row header takes its full width and a three-column row left about
+     four characters for each value — every cell wrapped one word per line, which is
+     what the published page actually looked like on an iPhone.
+     Below 40rem each row becomes a block: the row header is its title, each value is a
+     labelled line under it, and nothing scrolls in either axis. The labels are the
+     column headings, copied onto the cells by the foot script (per language, from the
+     `thead` row of that language) — a stacked value with no label is an answer with no
+     question. With JS off the values still read in order, which is why this is an
+     enhancement rather than a dependency. */
+  @media (max-width: 39.999rem) {
+    main .table,
+    main .table > tbody,
+    main .table > tbody > tr,
+    main .table > tbody > tr > th,
+    main .table > tbody > tr > td { display: block; }
+    main .table > thead { display: none; }
+    main .table > tbody > tr {
+      padding: var(--sp-3);
+      border-block-end: var(--bw-2) solid var(--line-hi);
+    }
+    main .table > tbody > tr:last-child { border-block-end: 0; }
+    /* the row header becomes the block's title: it wraps like prose now, and it keeps
+       the mono/tracked idiom the column headings use elsewhere on the page */
+    main .table > tbody > tr > th {
+      white-space: normal;
+      padding: 0 0 var(--sp-2);
+      background: none;
+      border: 0;
+      color: var(--ink);
+    }
+    main .table > tbody > tr > td {
+      padding: 0;
+      border: 0;
+      max-inline-size: none;
+    }
+    main .table > tbody > tr > td + td { margin-block-start: var(--sp-3); }
+    main .table > tbody > tr > td[data-label-en]::before {
+      content: attr(data-label-en);
+      display: block;
+      margin-block-end: 2px;
+      font-family: var(--font-mono); font-size: var(--fs-label); font-weight: 700;
+      text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
+    }
+    :root[data-lang="vi"] main .table > tbody > tr > td[data-label-vi]::before {
+      content: attr(data-label-vi);
+    }
+    /* A long unbroken token (a path, a URL, a digest) is the one thing that can still
+       widen the page once the grid is gone. */
+    main .table code { white-space: normal; overflow-wrap: anywhere; }
+  }
+
+  .grid { display: grid; gap: var(--sp-3); }
   @media (min-width: 640px) {
     main { padding-inline: var(--sp-4); }
     .grid.two { grid-template-columns: 1fr 1fr; }
@@ -231,12 +326,18 @@
      you read the step explaining it. Cap the box so the diagram and the walkthrough
      sit on screen together; .mermaid-view already scrolls inside itself, and the
      walkthrough brings the focused node into view. */
-  .mermaid-view { max-block-size: 48svh; margin-block-start: var(--sp-3); }
+  .mermaid-view { max-block-size: 48svh; }
   @media (min-width: 640px) { .mermaid-view { max-block-size: none; } }
-  nes-walkthrough { display: block; margin-block-start: var(--sp-3); }
+  nes-walkthrough { display: block; }
   /* .steps is only ever seen with JS off — script folds it into the walkthrough and
      removes it. Its titles live in data-title, so surface them there, in the same
-     mono/tracked idiom as a section heading. */
+     mono/tracked idiom as a section heading.
+     `display: block` because the design system's `.steps` is a horizontal STAGE 1 · 2 · 3
+     progression (inline-flex, mono, uppercase, short labels). That recipe and this
+     fallback share a class name and nothing else; without this line the fallback laid
+     its paragraphs out side by side. Numbered instructions on these pages are `.step`
+     blocks — one recipe, and the only one. */
+  .steps { display: block; }
   .steps > [data-title] { margin-block-start: var(--sp-4); }
   .steps > [data-title]::before {
     content: attr(data-title);
@@ -244,9 +345,7 @@
     font-family: var(--font-mono); font-size: var(--fs-label); font-weight: 700;
     text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
   }
-  .callout + .callout { margin-block-start: var(--sp-3); }
-  nes-tabs { display: block; margin-block-start: var(--sp-3); }
-  nes-tabs section > *:first-child { margin-block-start: 0; }
+  nes-tabs { display: block; }
 </style>
 </head>
 <body>
@@ -266,6 +365,12 @@
     <a class="btn ghost sm<%if eq .Page "deploy"%> active<%end%>" href="<%.DeployURL%>"
       ><span lang="en">Deploy</span><span lang="vi">Triển khai</span></a>
   </nav>
+  <!-- The bar wraps to two rows on a phone, and the second one held nothing but the
+       language toggle pushed to the right. It holds the section finder now: the same
+       index <nes-toc> builds, as a combobox, so a heading is one word away instead of a
+       scroll away. Built by the foot script (after the index exists, and again on every
+       language change), which is why this is an empty box in the markup. -->
+  <div class="find" id="find" hidden></div>
   <button class="btn ghost sm spacer" id="lang" aria-label="Switch language">
     <span lang="en">VI</span><span lang="vi">EN</span>
   </button>
@@ -310,12 +415,53 @@
   // label rebuild came last and the collapsed bar stayed blank for good: measured on a
   // phone, every page, after one tap on VI/EN. (The component's own fix is to forget
   // the active id when it rebuilds; until a release carries it, the order does it.)
+  // The finder is the index in one field: <nes-toc> has already resolved every heading
+  // to an id for the reading language, so the options are its own rows. Nothing is
+  // fetched, nothing is indexed twice, and it cannot list a section that is not there.
+  //
+  // Rebuilt per language rather than updated: the component reads its options once, from
+  // a child JSON payload (the same contract as <nes-tree>), so replacing the element is
+  // the supported way to change them.
+  const find = document.getElementById("find");
+  const FIND = {
+    en: { ph: "Find a section…", label: "Find a section on this page" },
+    vi: { ph: "Tìm mục trong trang…", label: "Tìm một mục trong trang này" },
+  };
+  const buildFind = (lang) => {
+    const rows = [...document.querySelectorAll("nes-toc nav.outline a")];
+    // No index (a short page, or JS-built rows not there yet) means no finder: an empty
+    // combobox is worse than no combobox.
+    find.hidden = rows.length === 0;
+    if (find.hidden) {
+      find.replaceChildren();
+      return;
+    }
+    const menu = document.createElement("nes-input-menu");
+    menu.setAttribute("placeholder", FIND[lang].ph);
+    menu.setAttribute("aria-label", FIND[lang].label);
+    const opts = document.createElement("script");
+    opts.type = "application/json";
+    opts.textContent = JSON.stringify(rows.map((a) => ({ value: a.textContent.trim() })));
+    menu.appendChild(opts);
+    // Typing emits too, with whatever is half-typed — so only an exact hit navigates.
+    // That is a pick from the list, or a heading typed out in full, and nothing else.
+    menu.addEventListener("nes:change", (e) => {
+      const row = rows.find((a) => a.textContent.trim() === e.detail.value);
+      if (!row) return;
+      location.hash = row.getAttribute("href");
+      menu.querySelector("input")?.blur();
+    });
+    find.replaceChildren(menu);
+  };
+
   const pick = (lang) => {
     document.documentElement.dataset.lang = lang;
     document.documentElement.lang = lang;
     store.set("lang", lang);
     setIf("label", TOC_LABEL[lang]);
     setIf("levels", `h2[lang="${lang}"], h3[lang="${lang}"]`);
+    // After the index, always: the options are its rows, and their text just changed.
+    buildFind(lang);
   };
 
   pick(store.get("lang") || (navigator.language?.startsWith("vi") ? "vi" : "en"));
@@ -323,6 +469,27 @@
   document.getElementById("lang").addEventListener("click", () => {
     pick(document.documentElement.dataset.lang === "vi" ? "en" : "vi");
   });
+
+  // Below 40rem every table row is a block, so each value needs the column heading it
+  // answers (see the stacked-table rules above). The headings are already on the page —
+  // in the `thead` row of each language — so they are copied onto the cells by index
+  // rather than typed a second time into every row.
+  for (const table of document.querySelectorAll("main table.table")) {
+    const heads = {};
+    for (const lang of ["en", "vi"]) {
+      const row = table.querySelector(`thead tr[lang="${lang}"]`);
+      if (row) heads[lang] = [...row.children].map((c) => c.textContent.trim());
+    }
+    for (const row of table.querySelectorAll("tbody tr")) {
+      [...row.children].forEach((cell, i) => {
+        for (const lang of ["en", "vi"]) {
+          const label = heads[lang]?.[i];
+          // The first cell is the row's own title, so it labels itself.
+          if (label && i > 0) cell.setAttribute(`data-label-${lang}`, label);
+        }
+      });
+    }
+  }
 
   // The index sticks below the header and a jumped-to heading has to clear it. The
   // header wraps to a second row on a narrow phone, so its height is measured rather
