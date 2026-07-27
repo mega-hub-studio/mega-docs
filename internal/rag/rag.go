@@ -90,14 +90,35 @@ type Citation struct {
 // no-retrieval shortcut, and the rule that a miss is never cached.
 const NoAnswer = "Không tìm thấy thông tin này trong tài liệu."
 
-const systemPrompt = `You are a precise technical knowledge assistant for an internal engineering team.
+// isMiss reports whether a reply *is* the no-answer, rather than merely containing
+// it.
+//
+// The distinction is the difference between two very different replies. A miss must
+// not be cached: it is what someone retries, and remembering it turns one gap into a
+// permanent one. But a partial answer — half the question answered, the other half
+// named as uncovered — is a real answer that cost a real completion, and models put
+// the sentence inside one however firmly the prompt reserves it. Matching on
+// "contains" threw those away, so the most expensive answers were the only ones
+// never cached. Caching them is safe: the signature includes the corpus, so the day
+// the missing document arrives, the answer is invalidated with everything else.
+func isMiss(s string) bool { return strings.TrimSpace(s) == NoAnswer }
+
+// systemPrompt is the whole of the model's brief. Every line is here because its
+// absence produced a wrong answer, not because it sounded prudent — a rule the model
+// never needed still costs tokens on every question and dilutes the ones that matter.
+//
+// Each CONTEXT entry names the file and section it came from, so the rules below can
+// talk about sources as things the model can actually see.
+const systemPrompt = `You are a precise knowledge assistant over one organisation's own documents — engineering, product, business and support alike.
 
 RULES:
 - Answer ONLY from the CONTEXT below. Never use outside knowledge.
-- If the context does not contain the answer, say exactly: "` + NoAnswer + `"
+- If the context contains nothing that answers the question, reply with exactly this sentence and nothing else: "` + NoAnswer + `"
+- If the context answers part of the question, answer that part and name the missing part in your own words. Do not fill the gap, and do not use the sentence above — it is reserved for answering nothing at all.
+- Cite every claim with [n]. Cite only sources you actually used, and never a number that is not in the CONTEXT.
+- If two sources disagree, say so and cite both. Do not silently pick one.
 - Be concise and scientific. Prefer short paragraphs, code, and bullet points.
-- Cite every claim with [n] referring to the numbered sources.
-- Answer in the language of the question.`
+- Answer in the language of the question, but never translate an identifier: file paths, commands, config keys, error codes, field names and code stay exactly as written.`
 
 // Ask is one question and how to answer it. A struct rather than three parameters
 // because the next flag added here shouldn't change every call site.
@@ -177,7 +198,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// Only cache a grounded, complete answer. A cut-off stream or an ungrounded
 	// reply is exactly what someone will retry, and a cache that remembers it turns
 	// one bad answer into a permanent one.
-	if sigErr == nil && full.Len() > 0 && !strings.Contains(full.String(), NoAnswer) {
+	if sigErr == nil && full.Len() > 0 && !isMiss(full.String()) {
 		raw, _ := json.Marshal(cites)
 		_ = e.store.Cache(sig, db.Cached{Question: question, Answer: full.String(), Citations: raw})
 	}

@@ -2,6 +2,8 @@ package rag
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,16 +103,26 @@ func qaMarkdown(question, answer string) string {
 	return fmt.Sprintf("# %s\n\n%s\n", strings.TrimSpace(question), strings.TrimSpace(answer))
 }
 
-// sig identifies everything a cached answer depends on: the corpus it cited *and*
-// the model that wrote it. The store only knows the corpus, so the model is appended
-// here — without it, changing CHAT_MODEL keeps serving the old model's answers until
-// something happens to re-index, which reads as the setting having no effect.
+// promptSig fingerprints the instructions an answer was produced under. Computed
+// from the constant itself rather than a version anyone has to remember to bump —
+// an editor who forgets would leave every cached answer claiming rules it was never
+// given.
+var promptSig = func() string {
+	sum := sha256.Sum256([]byte(systemPrompt))
+	return hex.EncodeToString(sum[:4])
+}()
+
+// sig identifies everything a cached answer depends on: the corpus it cited, the
+// model that wrote it, and the rules it was written under. The store only knows the
+// corpus, so the other two are appended here — without them, changing CHAT_MODEL or
+// the prompt keeps serving answers from the old one until something happens to
+// re-index, which reads as the setting having no effect.
 func (e *Engine) sig() (string, error) {
 	s, err := e.store.Sig()
 	if err != nil {
 		return "", err
 	}
-	return s + "|" + e.ai.ChatModel, nil
+	return s + "|" + e.ai.ChatModel + "|" + promptSig, nil
 }
 
 // History lists the answers still free to replay. Empty rather than an error when

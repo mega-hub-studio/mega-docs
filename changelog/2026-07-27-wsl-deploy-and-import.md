@@ -97,6 +97,34 @@ three checks are `defaultPrevented` on all three drag events, `--fill` moving
 0% → 66.7% with the text going "1 of 3" → "3 of 3", and a wrong password leaving
 `importCardLeaked: false`.
 
+### The system prompt, and two cache-policy bugs behind it
+
+The prompt gained four rules, each answering a failure the old five did not cover:
+partial coverage (answer the part that is covered, name the part that is not),
+disagreeing sources (say so and cite both), citation discipline (never a number
+that is not in the CONTEXT), and identifiers verbatim (a Vietnamese answer over
+English documents must not translate `CORPUS_DIR` or a command). The persona also
+stopped saying "engineering team" — the corpus now spans business, product and
+support, and BA/PM are the primary readers.
+
+Changing it surfaced two bugs of the same family as the `CHAT_MODEL` one:
+
+1. **The prompt was not in the cache signature.** Edit the rules and every cached
+   answer keeps claiming instructions it was never given. `sig()` now appends
+   `promptSig`, a hash of the constant — computed, not a version number someone has
+   to remember to bump.
+2. **A partial answer was never cacheable.** The skip rule was
+   `strings.Contains(reply, NoAnswer)`, and a model asked to name the uncovered part
+   reaches for exactly that sentence however firmly the prompt reserves it —
+   measured, on gpt-4o-mini, after two attempts at wording it away. So the most
+   expensive answers the engine produces were the only ones it never remembered.
+   `isMiss` now matches a reply that *is* the sentinel, and caching a partial answer
+   is safe because the signature carries the corpus: the day the missing document
+   arrives, it is invalidated with everything else.
+
+The lesson worth keeping: a prompt cannot enforce an invariant the code depends on.
+Reserve the sentence in the prompt for readability, but recognise a miss in code.
+
 ### Corpus structure
 
 `/opt/knowledge/docs/README.md` is the convention and is itself indexed, so the
