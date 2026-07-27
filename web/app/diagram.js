@@ -47,8 +47,8 @@ export function isDiagram(source) {
 export function hasDiagram(markdown) {
   let inFence = false;
   for (const line of String(markdown || "").split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      if (!inFence && /^\s*(```|~~~)\s*mermaid\b/i.test(line)) return true;
+    if (/^\s*(?:```|~~~)/.test(line)) {
+      if (!inFence && /^\s*(?:```|~~~)\s*mermaid\b/i.test(line)) return true;
       inFence = !inFence;
       continue;
     }
@@ -102,7 +102,7 @@ export function zoomInto(into, host) {
   if (!into || !svg) return false;
   const copy = svg.cloneNode(true);
   const box = svg.getAttribute("viewBox")?.trim().split(/[\s,]+/);
-  const width = box?.length >= 4 ? Math.round(parseFloat(box[2])) : 0;
+  const width = box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0;
   if (width) {
     copy.style.inlineSize = `${width}px`;
     copy.style.maxInlineSize = "none";

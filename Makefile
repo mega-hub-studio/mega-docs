@@ -2,7 +2,7 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test lint lint-fix dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean
+.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean
 
 deps:
 	go mod tidy
@@ -22,6 +22,26 @@ lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run ./...; \
 	else echo "  skipped golangci-lint (go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
+
+# The JavaScript net, on demand and with nothing committed for it.
+#
+# eslint + @antfu/eslint-config are installed into .cache/ — the same throwaway tool cache
+# `make diagram` uses for mermaid — because they are 255 packages the product does not
+# need, and this repo has no package.json for exactly that reason. The config itself is
+# tracked (eslint.config.mjs) and explains what it turns off.
+#
+# Not part of `make check`: the architecture rules that catch this codebase's real mistakes
+# are in web/frontend_test.go and cost nothing. See the note at the top of eslint.config.mjs.
+JS_CACHE := .cache/eslint
+lint-js:
+	@command -v npm >/dev/null 2>&1 || { echo "  skipped lint-js (needs npm; the product does not)"; exit 0; }
+	@mkdir -p $(JS_CACHE)
+	@cp eslint.config.mjs $(JS_CACHE)/
+	@[ -d $(JS_CACHE)/node_modules ] || { \
+		printf '{ "name":"eslint-cache","private":true,"type":"module" }\n' > $(JS_CACHE)/package.json; \
+		echo "  installing eslint into $(JS_CACHE) (once)"; \
+		(cd $(JS_CACHE) && npm i -D --silent eslint@9 @antfu/eslint-config@latest); }
+	$(JS_CACHE)/node_modules/.bin/eslint --config $(JS_CACHE)/eslint.config.mjs web/app
 
 # Same linters, applying the fixes they know how to make. Read the diff: the formatters
 # are opinionated and one of them (gofumpt) is turned off here for a reason .golangci.yml

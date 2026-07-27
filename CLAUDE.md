@@ -17,6 +17,34 @@ don't cover.
 Start a task by reading the changelog entry for the deployment you are touching.
 State that lives outside git is recorded there and nowhere else.
 
+## Critical rules
+
+Non-negotiable, and each one names what enforces it. A rule with no enforcer is a hope —
+if you add one here, add its check in the same commit or mark it `prose only` honestly.
+
+| # | Rule | Enforced by |
+|---|---|---|
+| 1 | `CORPUS_DIR` is the source of truth; `knowledge.db` is derived. A confirmed answer is written as a **file** first, then indexed | `TestConfirmedAnswerBecomesAFileAndThenACitation` |
+| 2 | Reads are open, writes are gated. An unset `BA_PASS` means **no write surface**, not open writes | `internal/server` tests (403 unset · 401 wrong) |
+| 3 | The cache signature covers everything an answer depends on — corpus, chat model, prompt hash — and the **scope** lives in the key, not the signature | `TestTheSameQuestionInAnotherScopeIsAnotherAnswer`, `TestIndexingInvalidatesTheCache` |
+| 4 | A scope filters **both** retrievers before they rank, never after fusion | `TestScopedSearchRanksWithinTheScope` |
+| 5 | A miss is never cached; a partial answer always is | `TestOnlyAWholeMissSkipsTheCache` |
+| 6 | `cmd/ingest.docPath` and `rag.SafePath` agree: one document, one identity | `cmd/ingest` + `rag` path tests |
+| 7 | The version and digest of every front-end asset live only in `web/vendor.sha384` | `TestVendorTreeMatchesTheManifest`, `TestAgentNotesPinMatchesTheManifest` |
+| 8 | No credential in a tracked file | `make secrets` |
+| 9 | Plumbing (`web/app/*.js`) never touches Vue | `TestPlumbingDoesNotImportVue` |
+| 10 | A composable never imports another composable | `TestComposablesDoNotImportEachOther` |
+| 11 | A component holds no branches — props, emits, compose, return | `TestComponentsHoldNoLogic` |
+| 12 | Everything a template binds exists in the code behind it | `TestTemplatesBindNothingUndefined` |
+| 13 | Go lint stays at **zero** findings | `make lint` (in `make check`, and in CI) |
+| 14 | The product needs no Node and no build step | *prose only* — the day it stops being true, `make build` will tell you |
+
+Rules 9–12 exist because the Vue 3.5 refactor made three new mistakes possible that nothing
+else would catch: a template binding with no definition renders blank with no error, a
+component quietly reabsorbing logic undoes the split, and one composable importing another
+turns a flat set of files into a graph. All four were mutation-tested — each fails, with an
+actionable message, when its rule is broken.
+
 ## Commands
 
 Every Go command needs the build tags — `sqlite-vec` and FTS5 are cgo, and a plain
@@ -28,6 +56,7 @@ make deps                  # go mod tidy
 make check                 # THE GATE: tests, gofmt, go vet, golangci-lint, deadcode, credential scan
 make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
 make lint-fix              # …applying what it can fix; read the diff
+make lint-js               # optional: eslint + @antfu/eslint-config, installed into .cache/
 make build                 # bin/knowledge + bin/ingest
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
