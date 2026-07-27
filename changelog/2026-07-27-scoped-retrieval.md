@@ -5,6 +5,11 @@ It was deliberately not started while the corpus held three documents about this
 project; five real handoff documents landed in `docs/booking/**`, three folders deep,
 which is the corpus a scope filter can actually be judged against.
 
+Those documents were removed from this repository shortly afterwards, and `docs/*` is
+now gitignored — correctly: this repo is public, and a corpus belongs in a private one.
+Everything measured below was measured against them while they were in the tree (471
+sections), which is why the numbers name a corpus you will not find here.
+
 ---
 
 ## What it does
