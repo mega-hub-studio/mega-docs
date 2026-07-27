@@ -258,6 +258,19 @@
       <div class="stat" data-accent="good"><div class="n">{{ queue.confirmed }}</div><div class="l">In knowledge</div></div>
     </div>
 
+    <!-- Unreachable is not read-only. Both arrive as writes:false, and saying
+         "set BA_PASS" to someone whose Wi-Fi dropped sends them to fix the server. -->
+    <div class="callout gotcha" v-if="!online" role="alert">
+      <b>Can't reach the server.</b> The queue below is the last state this page saw.
+      Nothing can be published until it answers again.
+    </div>
+
+    <!-- Read-only instance: say so before an answer gets typed with nowhere to go. -->
+    <div class="callout gotcha" v-else-if="!writes">
+      <b>This instance is read-only.</b> Set <code>BA_PASS</code> in <code>.env</code> and restart to
+      answer tickets here. Until then the queue is visible but nothing can be published.
+    </div>
+
     <!-- One line of orientation for a BA's first visit. The empty state covers the
          "nothing waiting" case, so this only shows when there is work. -->
     <div class="callout memo" v-if="queue.tickets.length">
@@ -266,15 +279,12 @@
       with a source.
     </div>
 
-    <!-- Read-only instance: say so before an answer gets typed with nowhere to go. -->
-    <div class="callout gotcha" v-if="!writes">
-      <b>This instance is read-only.</b> Set <code>BA_PASS</code> in <code>.env</code> and restart to
-      answer tickets here. Until then the queue is visible but nothing can be published.
-    </div>
-
     <!-- The password is the permission. Reads are open; confirming an answer into
-         the corpus is not, because this app has no accounts. -->
-    <form class="card" data-accent="gold" v-else-if="!unlocked" @submit.prevent="unlock">
+         the corpus is not, because this app has no accounts.
+         Spelled out rather than chained to the callouts above: a v-else-if here would
+         silently change meaning the next time something is inserted between them. -->
+    <form class="card" data-accent="gold" v-if="online && writes && !unlocked"
+      @submit.prevent="unlock">
       <div class="head"><span class="title">Unlock writes</span></div>
       <label class="field">
         <span class="label">BA password</span>
