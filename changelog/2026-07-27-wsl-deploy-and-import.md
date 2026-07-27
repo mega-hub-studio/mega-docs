@@ -13,12 +13,22 @@ A WSL2 host (Ubuntu 24.04, systemd as PID 1), reachable on the owner's tailnet.
 | | |
 |---|---|
 | URL | `https://tonytlinux.taile61671.ts.net:8443` |
-| Deploy dir | `/opt/knowledge` — mode 750, owned by `tonytlinux` |
-| Binaries | `/opt/knowledge/bin/{knowledge,ingest,corpus-sync}` |
-| Corpus (`CORPUS_DIR`) | `/opt/knowledge/docs` — **its own git repo** |
+| Deploy dir | `/opt/knowledge` — **a clone of this repo**, mode 750, owned by `tonytlinux` |
+| Corpus (`CORPUS_DIR=corpus`) | `/opt/knowledge/corpus` — its own git repo, nested and locally excluded |
+| Index (`DB_PATH=state/…`) | `/opt/knowledge/state/knowledge.db` — derived |
 | Units | `knowledge.service` · `corpus-sync.path` · `corpus-sync.timer` |
-| Build tree | `~/msh/mega-docs` (this repo) — **not** the deploy dir |
 | Provider | OpenAI for both: `gpt-4o-mini` chat, `text-embedding-3-small` 1536 |
+
+**Three things, three lifecycles — which is why the deploy directory has three
+places and not one.** The code is public and tracks a fast-moving upstream; the
+corpus is private and changes at the business's pace; the index is derived and
+belongs to neither. Putting the corpus in the code repo publishes it (that repo
+answers an anonymous `git-upload-pack` with 200), makes every upstream merge touch a
+tree containing company documents, and turns each BA confirm into a machine commit on
+the code history.
+
+`corpus/` and `state/` are hidden from the outer checkout via
+`.git/info/exclude` — local to the deploy, so the repo itself needs no change.
 
 `EMBED_BASE_URL` and `EMBED_API_KEY` are deliberately **empty**: one provider serves
 both endpoints, so splitting them would be two places to get wrong. Secrets live in
@@ -30,20 +40,24 @@ not reach the process, and BA mode plus import are both dead.
 
 ### Deploying a change
 
-The deploy dir is not a git clone, so the four lines on the Deploy page do not apply
-verbatim:
+Exactly the four lines on the Deploy page, because the deploy directory *is* a
+checkout:
 
 ```bash
-cd ~/msh/mega-docs && git pull origin main
-make check && make build
-sudo systemctl stop knowledge
-cp bin/knowledge /opt/knowledge/bin/knowledge.new && mv -f /opt/knowledge/bin/knowledge.new /opt/knowledge/bin/knowledge
-cp bin/ingest /opt/knowledge/bin/
-sudo systemctl start knowledge && curl -s localhost:8080/api/health
+cd /opt/knowledge && git pull origin main
+make build
+sudo systemctl restart knowledge
+curl -s localhost:8080/api/health      # {"ok":true,"writes":true}
 ```
 
-`mv`, not `cp`, for the server binary: the running process holds the inode and `cp`
-fails with `Text file busy`.
+Two consequences worth knowing. Only **committed** code can be deployed — there is no
+copy step to smuggle a working tree through, which is the point. And the service
+cannot write to what it runs: `ReadWritePaths` lists `corpus/` and `state/` only, so
+`make build` (run by a human) writes `bin/`, and the process cannot.
+
+Building while the old binary runs is fine; `systemctl restart` picks up the new
+inode. `cp` over a running binary would not — it fails with `Text file busy`, which is
+why the previous layout needed `mv`.
 
 ---
 
@@ -127,9 +141,15 @@ Reserve the sentence in the prompt for readability, but recognise a miss in code
 
 ### Corpus structure
 
-`/opt/knowledge/docs/README.md` is the convention and is itself indexed, so the
-corpus answers questions about its own layout. Top level: `business/` `product/`
-`engineering/` `support/`, plus `qa/` which belongs to the app.
+Top level: `business/` `product/` `engineering/` `support/`, plus `qa/` which belongs
+to the app.
+
+The convention itself lives in `/opt/knowledge/.system-docs/corpus-convention.md` —
+**outside `CORPUS_DIR`, so it is not indexed**. It used to be `docs/README.md` and was
+indexed, which is exactly how "list every document and the folder structure" became an
+answerable question. Nothing describing the app is in the corpus any more; grounding
+does most of the domain lock, and the prompt rule is the second layer for a document
+that tries prompt injection.
 
 The rule that matters: **level 1 is the scope a reader will click**, folder names are
 ASCII kebab-case (two spellings of one domain are two scopes and split the corpus
@@ -146,10 +166,16 @@ Two failures found by testing it, both fixed, both worth remembering:
 
 1. **A `.path` unit stops watching while the service it triggered runs**, so a file
    written during that window raises no event and waits for the next unrelated
-   change. The script now loops until the tree is clean, and `corpus-sync.timer`
-   (15 min) is the backstop. That timer is affordable precisely because it costs a
+   change. The script now loops until the tree is clean.
+2. **A `.path` unit is not recursive**, which only became visible once the corpus
+   became a tree: `PathModified=/opt/knowledge/corpus` fires for a file written
+   directly in it and misses `corpus/support/faq/nested.md` — where imports land.
+   Enumerating folders would break the first time a BA makes a new one, so
+   `corpus-sync.timer` was promoted from 15-minute backstop to the **guarantee** at
+   two minutes, with the watcher kept as the fast path. Measured: a nested import is
+   committed ~115s later. Affordable because waking to find nothing costs a
    `git status`, not an embedding call.
-2. An earlier version piped `curl` into a counter, so **the pipeline's status was
+3. An earlier version piped `curl` into a counter, so **the pipeline's status was
    the counter's**: a rejected key was reported as "0-dim vectors". Same trap
    `scripts/smoke.sh` warns about.
 
