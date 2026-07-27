@@ -31,7 +31,7 @@ func engine(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
 	}
 	t.Cleanup(func() { store.Close() })
 
-	return rag.New(store, ai.New(base, "", "test-key", "embed-model", "chat-model"), 3), prov
+	return rag.New(store, ai.New(ai.Config{ChatBaseURL: base, APIKey: "test-key", EmbedModel: "embed-model", ChatModel: "chat-model"}), 3), prov
 }
 
 const retrievalDoc = `# Retrieval

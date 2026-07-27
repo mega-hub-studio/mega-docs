@@ -16,6 +16,7 @@ type Config struct {
 	BaseURL    string
 	EmbedURL   string
 	APIKey     string
+	EmbedKey   string
 	EmbedModel string
 	ChatModel  string
 	EmbedDim   int
@@ -51,8 +52,11 @@ func Load() Config {
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
 		// Empty means "same as chat". Split it when a gateway serves
 		// /chat/completions but not /embeddings — a RAG index needs both.
-		EmbedURL:   env("EMBED_BASE_URL", ""),
-		APIKey:     env("AI_API_KEY", ""),
+		EmbedURL: env("EMBED_BASE_URL", ""),
+		APIKey:   env("AI_API_KEY", ""),
+		// Only needed when EMBED_BASE_URL is a different provider: one key is not
+		// valid at two vendors.
+		EmbedKey:   env("EMBED_API_KEY", ""),
 		EmbedModel: env("EMBED_MODEL", "text-embedding-3-small"),
 		ChatModel:  env("CHAT_MODEL", "gpt-4o-mini"),
 		EmbedDim:   envInt("EMBED_DIM", 1536),

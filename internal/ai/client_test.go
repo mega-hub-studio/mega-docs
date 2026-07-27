@@ -13,13 +13,13 @@ func newClient(t *testing.T, p *aitest.Provider) *ai.Client {
 	t.Helper()
 	prov, base := aitest.New(p)
 	t.Cleanup(prov.Close)
-	return ai.New(base, "", "test-key", "embed-model", "chat-model")
+	return ai.New(ai.Config{ChatBaseURL: base, APIKey: "test-key", EmbedModel: "embed-model", ChatModel: "chat-model"})
 }
 
 func TestEmbedReturnsOneVectorPerInputInOrder(t *testing.T) {
 	prov, base := aitest.New(&aitest.Provider{Dim: 8})
 	defer prov.Close()
-	c := ai.New(base, "", "k", "embed-model", "chat-model")
+	c := ai.New(ai.Config{ChatBaseURL: base, APIKey: "k", EmbedModel: "embed-model", ChatModel: "chat-model"})
 
 	inputs := []string{"alpha", "beta", "gamma"}
 	vecs, err := c.Embed(context.Background(), inputs)
@@ -84,7 +84,7 @@ func TestEmbedRejectsAShortResponse(t *testing.T) {
 func TestEmbedOnEmptyInputMakesNoCall(t *testing.T) {
 	prov, base := aitest.New(nil)
 	defer prov.Close()
-	c := ai.New(base, "", "k", "e", "c")
+	c := ai.New(ai.Config{ChatBaseURL: base, APIKey: "k", EmbedModel: "e", ChatModel: "c"})
 
 	vecs, err := c.Embed(context.Background(), nil)
 	if err != nil || vecs != nil {
@@ -114,7 +114,7 @@ func TestEmbedExplainsAProviderWithoutEmbeddings(t *testing.T) {
 func TestChatStreamDeliversTokensInOrderAndSkipsNoise(t *testing.T) {
 	prov, base := aitest.New(&aitest.Provider{Reply: "Hybrid search wins [1]."})
 	defer prov.Close()
-	c := ai.New(base, "", "k", "e", "chat-model")
+	c := ai.New(ai.Config{ChatBaseURL: base, APIKey: "k", EmbedModel: "e", ChatModel: "chat-model"})
 
 	var got []string
 	err := c.ChatStream(context.Background(),
@@ -173,7 +173,7 @@ func TestEmbedAndChatCanUseDifferentProviders(t *testing.T) {
 	embedder, embedBase := aitest.New(&aitest.Provider{Dim: 4})
 	defer embedder.Close()
 
-	c := ai.New(chatBase, embedBase, "k", "e", "c")
+	c := ai.New(ai.Config{ChatBaseURL: chatBase, EmbedBaseURL: embedBase, APIKey: "k", EmbedModel: "e", ChatModel: "c"})
 
 	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
 		t.Fatalf("embeddings should have gone to the embed provider: %v", err)
@@ -189,7 +189,7 @@ func TestEmbedAndChatCanUseDifferentProviders(t *testing.T) {
 func TestTrailingSlashesInBaseURLsDoNotDoubleUp(t *testing.T) {
 	prov, base := aitest.New(&aitest.Provider{Dim: 4})
 	defer prov.Close()
-	c := ai.New(base+"/", base+"/", "k", "e", "c")
+	c := ai.New(ai.Config{ChatBaseURL: base + "/", EmbedBaseURL: base + "/", APIKey: "k", EmbedModel: "e", ChatModel: "c"})
 
 	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
 		t.Errorf("a trailing slash broke the URL: %v", err)
@@ -200,10 +200,57 @@ func TestMissingAPIKeySendsNoAuthorizationHeader(t *testing.T) {
 	// A local Ollama needs no key; sending "Bearer " would be worse than nothing.
 	// The fake rejects a malformed Bearer header, so a 401 here proves it was absent.
 	c := newClient(t, &aitest.Provider{Dim: 4})
-	keyless := ai.New(strings.TrimSuffix(c.EmbedBaseURL, "/"), "", "", "e", "c")
+	keyless := ai.New(ai.Config{
+		ChatBaseURL: strings.TrimSuffix(c.EmbedBaseURL, "/"),
+		EmbedModel:  "e", ChatModel: "c",
+	})
 
 	_, err := keyless.Embed(context.Background(), []string{"x"})
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Errorf("want the fake's 401 (no auth header sent), got: %v", err)
+	}
+}
+
+// Splitting the base URL is only half of it: if chat and embeddings are different
+// vendors, one key is not valid at both. Each host must get its own.
+func TestEmbedAndChatCanUseDifferentKeys(t *testing.T) {
+	chatOnly, chatBase := aitest.New(&aitest.Provider{NoEmbeddings: true, Reply: "ok"})
+	defer chatOnly.Close()
+	embedder, embedBase := aitest.New(&aitest.Provider{Dim: 4})
+	defer embedder.Close()
+
+	c := ai.New(ai.Config{
+		ChatBaseURL: chatBase, EmbedBaseURL: embedBase,
+		APIKey: "chat-key", EmbedAPIKey: "embed-key",
+		EmbedModel: "e", ChatModel: "c",
+	})
+	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.ChatStream(context.Background(),
+		[]ai.Msg{{Role: "user", Content: "q"}}, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := embedder.Tokens(); len(got) != 1 || got[0] != "embed-key" {
+		t.Errorf("embed provider saw %v, want [embed-key] — the chat key leaked", got)
+	}
+	if got := chatOnly.Tokens(); len(got) != 1 || got[0] != "chat-key" {
+		t.Errorf("chat provider saw %v, want [chat-key]", got)
+	}
+}
+
+// The common case is one provider for both, so an unset embed key must fall back
+// rather than sending nothing and 401ing.
+func TestEmbedKeyDefaultsToTheMainKey(t *testing.T) {
+	prov, base := aitest.New(&aitest.Provider{Dim: 4})
+	defer prov.Close()
+	c := ai.New(ai.Config{ChatBaseURL: base, APIKey: "only-key", EmbedModel: "e", ChatModel: "c"})
+
+	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := prov.Tokens(); len(got) != 1 || got[0] != "only-key" {
+		t.Errorf("embed request carried %v, want [only-key]", got)
 	}
 }

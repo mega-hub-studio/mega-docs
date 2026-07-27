@@ -35,6 +35,7 @@ type Provider struct {
 	mu       sync.Mutex
 	embedded [][]string // every batch of inputs it was asked to embed
 	chats    []string   // every chat request's last user message
+	tokens   []string   // the bearer token of every request, in order
 	server   *httptest.Server
 }
 
@@ -65,6 +66,15 @@ func (p *Provider) Embedded() [][]string {
 	return p.embedded
 }
 
+// Tokens reports the bearer token of every request this provider received. Chat and
+// embeddings can be two different vendors, so a test needs to know that each host
+// was handed its own key and not the other's.
+func (p *Provider) Tokens() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.tokens
+}
+
 // Chats reports the user message of each chat request, in order.
 func (p *Provider) Chats() []string {
 	p.mu.Lock()
@@ -72,12 +82,24 @@ func (p *Provider) Chats() []string {
 	return p.chats
 }
 
+// record notes the bearer token and reports whether one was present at all.
+func (p *Provider) record(r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return false
+	}
+	p.mu.Lock()
+	p.tokens = append(p.tokens, strings.TrimPrefix(auth, "Bearer "))
+	p.mu.Unlock()
+	return true
+}
+
 func (p *Provider) embeddings(w http.ResponseWriter, r *http.Request) {
 	if p.NoEmbeddings {
 		http.Error(w, `{"error":{"message":"unknown endpoint"}}`, http.StatusNotFound)
 		return
 	}
-	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+	if !p.record(r) {
 		http.Error(w, `{"error":{"message":"missing key"}}`, http.StatusUnauthorized)
 		return
 	}
@@ -118,6 +140,9 @@ func (p *Provider) embeddings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
+	// Recorded, not required: the missing-key path is covered on /embeddings, and
+	// demanding one here would change what existing chat tests exercise.
+	p.record(r)
 	if p.ChatStatus != 0 {
 		http.Error(w, `{"error":{"message":"upstream is down"}}`, p.ChatStatus)
 		return

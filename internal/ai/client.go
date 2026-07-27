@@ -37,6 +37,7 @@ type Client struct {
 	ChatBaseURL  string // e.g. https://api.openai.com/v1
 	EmbedBaseURL string // usually the same; split when a gateway lacks /embeddings
 	APIKey       string
+	EmbedAPIKey  string // set only when embeddings live on a different provider
 	EmbedModel   string
 	ChatModel    string
 
@@ -44,19 +45,38 @@ type Client struct {
 	chatHTTP  *http.Client
 }
 
-// New builds a client. embedBaseURL may be empty, in which case chat's base URL
-// is used for both.
-func New(chatBaseURL, embedBaseURL, apiKey, embedModel, chatModel string) *Client {
-	chatBaseURL = strings.TrimRight(chatBaseURL, "/")
-	if embedBaseURL == "" {
-		embedBaseURL = chatBaseURL
+// Config names what a client needs. A struct rather than positional arguments
+// because the fields are all strings and two pairs of them are interchangeable at
+// the type level — swapping EmbedModel and ChatModel, or the two keys, would compile
+// and then quietly use the wrong one.
+type Config struct {
+	// ChatBaseURL is required. EmbedBaseURL is optional and defaults to it, which is
+	// the common case: one provider serving both endpoints.
+	ChatBaseURL, EmbedBaseURL string
+	// APIKey authenticates both endpoints unless EmbedAPIKey is set. That matters when
+	// the two base URLs are different providers: a gateway's key is not valid at
+	// OpenAI, so splitting the URL without splitting the key just fails auth.
+	APIKey, EmbedAPIKey   string
+	EmbedModel, ChatModel string
+}
+
+func New(cfg Config) *Client {
+	chat := strings.TrimRight(cfg.ChatBaseURL, "/")
+	embed := strings.TrimRight(cfg.EmbedBaseURL, "/")
+	if embed == "" {
+		embed = chat
+	}
+	key := cfg.EmbedAPIKey
+	if key == "" {
+		key = cfg.APIKey
 	}
 	return &Client{
-		ChatBaseURL:  chatBaseURL,
-		EmbedBaseURL: strings.TrimRight(embedBaseURL, "/"),
-		APIKey:       apiKey,
-		EmbedModel:   embedModel,
-		ChatModel:    chatModel,
+		ChatBaseURL:  chat,
+		EmbedBaseURL: embed,
+		APIKey:       cfg.APIKey,
+		EmbedAPIKey:  key,
+		EmbedModel:   cfg.EmbedModel,
+		ChatModel:    cfg.ChatModel,
 		embedHTTP:    &http.Client{Timeout: embedTimeout},
 		chatHTTP: &http.Client{
 			Transport: &http.Transport{ResponseHeaderTimeout: chatHeaderTimeout},
@@ -64,7 +84,9 @@ func New(chatBaseURL, embedBaseURL, apiKey, embedModel, chatModel string) *Clien
 	}
 }
 
-func (c *Client) post(ctx context.Context, hc *http.Client, base, path string, body any) (*http.Response, error) {
+// post sends to one endpoint with that endpoint's key — embeddings and chat can be
+// different providers, so the key travels with the base URL, not with the client.
+func (c *Client) post(ctx context.Context, hc *http.Client, base, key, path string, body any) (*http.Response, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("encode request: %w", err)
@@ -74,8 +96,8 @@ func (c *Client) post(ctx context.Context, hc *http.Client, base, path string, b
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
 	}
 	return hc.Do(req)
 }
@@ -85,7 +107,7 @@ func (c *Client) Embed(ctx context.Context, inputs []string) ([][]float32, error
 	if len(inputs) == 0 {
 		return nil, nil
 	}
-	resp, err := c.post(ctx, c.embedHTTP, c.EmbedBaseURL, "/embeddings", map[string]any{
+	resp, err := c.post(ctx, c.embedHTTP, c.EmbedBaseURL, c.EmbedAPIKey, "/embeddings", map[string]any{
 		"model": c.EmbedModel,
 		"input": inputs,
 	})
@@ -132,7 +154,7 @@ type Msg struct {
 
 // ChatStream streams the assistant reply token-by-token to onToken.
 func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string)) error {
-	resp, err := c.post(ctx, c.chatHTTP, c.ChatBaseURL, "/chat/completions", map[string]any{
+	resp, err := c.post(ctx, c.chatHTTP, c.ChatBaseURL, c.APIKey, "/chat/completions", map[string]any{
 		"model":       c.ChatModel,
 		"messages":    msgs,
 		"stream":      true,

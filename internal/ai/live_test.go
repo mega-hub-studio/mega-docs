@@ -33,7 +33,7 @@ func liveClient(t *testing.T) (*ai.Client, config.Config) {
 		embed = cfg.BaseURL + "  (same as chat)"
 	}
 	t.Logf("embeddings: %s  (%s)", embed, cfg.EmbedModel)
-	return ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg
+	return ai.New(ai.Config{ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL, APIKey: cfg.APIKey, EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel}), cfg
 }
 
 func TestLiveEmbeddings(t *testing.T) {

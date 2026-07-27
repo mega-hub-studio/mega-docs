@@ -151,10 +151,19 @@ view.scrollToEnd();                            // viewport.js</span></div>
         <b lang="vi">Đổi provider hoặc model</b>
         <p lang="en"><code>AI_BASE_URL</code> / <code>EMBED_BASE_URL</code> and the
           model names. Chat and embeddings may live on different hosts — coding-agent
-          gateways often serve chat only.</p>
+          gateways often serve chat only. When they are different <i>vendors</i>, set
+          <code>EMBED_API_KEY</code> too: one key is not valid at two providers, so
+          splitting the URL alone just fails auth.</p>
         <p lang="vi"><code>AI_BASE_URL</code> / <code>EMBED_BASE_URL</code> và tên
           model. Chat và embeddings có thể ở hai host khác nhau — gateway cho coding
-          agent thường chỉ có chat.</p>
+          agent thường chỉ có chat. Nếu là <i>hai nhà cung cấp khác nhau</i>, set thêm
+          <code>EMBED_API_KEY</code>: một key không dùng được ở hai provider, tách URL
+          mà không tách key thì chỉ lỗi auth.</p>
+        <div class="terminal"><span class="out"># chat stays where it is, embeddings go to OpenAI
+EMBED_BASE_URL=https://api.openai.com/v1
+EMBED_API_KEY=sk-…
+EMBED_MODEL=text-embedding-3-small
+EMBED_DIM=1536</span></div>
         <div class="callout gotcha">
           <b lang="en">Changing the embedding model means a full re-index.</b>
           <span lang="en">Vectors from two models are not comparable.

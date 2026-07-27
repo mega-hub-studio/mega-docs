@@ -31,7 +31,11 @@ func main() {
 	}
 	defer store.Close()
 
-	engine := rag.New(store, ai.New(cfg.BaseURL, cfg.EmbedURL, cfg.APIKey, cfg.EmbedModel, cfg.ChatModel), cfg.TopK)
+	engine := rag.New(store, ai.New(ai.Config{
+		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
+		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
+		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
+	}), cfg.TopK)
 	ctx := context.Background()
 
 	var files []string
