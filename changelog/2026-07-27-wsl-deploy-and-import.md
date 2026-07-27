@@ -1,0 +1,194 @@
+# 2026-07-27 — First deployment (WSL host) and the document import surface
+
+Two things happened: the engine was deployed for a team, and it grew a way to get
+documents into it from the browser. Everything below is the state a next session
+inherits.
+
+---
+
+## 1. What is running
+
+A WSL2 host (Ubuntu 24.04, systemd as PID 1), reachable on the owner's tailnet.
+
+| | |
+|---|---|
+| URL | `https://tonytlinux.taile61671.ts.net:8443` |
+| Deploy dir | `/opt/knowledge` — mode 750, owned by `tonytlinux` |
+| Binaries | `/opt/knowledge/bin/{knowledge,ingest,corpus-sync}` |
+| Corpus (`CORPUS_DIR`) | `/opt/knowledge/docs` — **its own git repo** |
+| Units | `knowledge.service` · `corpus-sync.path` · `corpus-sync.timer` |
+| Build tree | `~/msh/mega-docs` (this repo) — **not** the deploy dir |
+| Provider | OpenAI for both: `gpt-4o-mini` chat, `text-embedding-3-small` 1536 |
+
+`EMBED_BASE_URL` and `EMBED_API_KEY` are deliberately **empty**: one provider serves
+both endpoints, so splitting them would be two places to get wrong. Secrets live in
+`/opt/knowledge/.env` (mode 600) — `AI_API_KEY` and `BA_PASS`. Never copy either
+into this repo.
+
+Health must report `{"ok":true,"writes":true}`. `writes:false` means `BA_PASS` did
+not reach the process, and BA mode plus import are both dead.
+
+### Deploying a change
+
+The deploy dir is not a git clone, so the four lines on the Deploy page do not apply
+verbatim:
+
+```bash
+cd ~/msh/mega-docs && git pull origin main
+make check && make build
+sudo systemctl stop knowledge
+cp bin/knowledge /opt/knowledge/bin/knowledge.new && mv -f /opt/knowledge/bin/knowledge.new /opt/knowledge/bin/knowledge
+cp bin/ingest /opt/knowledge/bin/
+sudo systemctl start knowledge && curl -s localhost:8080/api/health
+```
+
+`mv`, not `cp`, for the server binary: the running process holds the inode and `cp`
+fails with `Text file busy`.
+
+---
+
+## 2. What was built
+
+### Import (`POST /api/documents`)
+
+`web/app/upload.js` · `internal/server/documents.go` · `internal/rag/upload.go`
+
+Multipart, field `files` (repeatable) plus an optional `dir`. Behind the **same
+`BAPass` gate as a confirm** — the app has no accounts, so an open import lets
+anyone who reaches the port rewrite what everyone reads. `Deps.Docs` is nil-able the
+way `Deps.Know` is, so the route disappears rather than half-works.
+
+Decisions worth not relitigating:
+
+- **Partial success is reported, not hidden.** Eight files where one is a PDF →
+  seven indexed, the eighth named. `200` if anything landed, `400` if nothing did,
+  and the `400` body still lists every file, so the UI renders one list either way.
+- **Folders are kept** (`rag.SafePath`). They are the scope a reader browses, so
+  flattening a path destroys the structure the tree UI needs. Validation is
+  structural and per segment — not a blocklist: no `..`, no hidden segment, no
+  absolute path or drive letter, `MaxDepth` 4 segments, and `qa/` is refused so an
+  import cannot impersonate an answer a BA vouched for.
+- **The chosen `dir` is joined *before* validation**, so `../` in the folder box is
+  exactly as harmless as `../` in a file name.
+- Re-importing the same path updates that document in place — the same identity rule
+  `cmd/ingest.docPath` uses, so the CLI and the browser cannot disagree.
+
+### Corpus structure
+
+`/opt/knowledge/docs/README.md` is the convention and is itself indexed, so the
+corpus answers questions about its own layout. Top level: `business/` `product/`
+`engineering/` `support/`, plus `qa/` which belongs to the app.
+
+The rule that matters: **level 1 is the scope a reader will click**, folder names are
+ASCII kebab-case (two spellings of one domain are two scopes and split the corpus
+silently), file names may be Vietnamese, three folders deep maximum.
+
+### Git sync (`scripts/corpus-sync.sh`)
+
+A `.path` unit watching `docs/` and `docs/qa/` commits whatever lands there, from
+either write path, and pushes if a remote exists. Event-driven rather than a timer,
+because there is nothing to do until a file changes — the Deploy page's argument
+against a re-index schedule applies here too.
+
+Two failures found by testing it, both fixed, both worth remembering:
+
+1. **A `.path` unit stops watching while the service it triggered runs**, so a file
+   written during that window raises no event and waits for the next unrelated
+   change. The script now loops until the tree is clean, and `corpus-sync.timer`
+   (15 min) is the backstop. That timer is affordable precisely because it costs a
+   `git status`, not an embedding call.
+2. An earlier version piped `curl` into a counter, so **the pipeline's status was
+   the counter's**: a rejected key was reported as "0-dim vectors". Same trap
+   `scripts/smoke.sh` warns about.
+
+### `scripts/switch-embed.sh`
+
+Moves embeddings to another provider: validates the key against the new endpoint
+**before** dropping the index, then re-ingests. `DIR=/opt/knowledge SERVICE=knowledge
+make switch-embed`.
+
+---
+
+## 3. Open work
+
+### a. The corpus has no remote — set this up first
+
+`/opt/knowledge/docs` is a local git repo with no `origin`, so nothing is backed up
+off the box and "expose the SoT to the cloud" is not done.
+
+```bash
+cd /opt/knowledge/docs && git remote add origin git@github.com:<org>/<corpus>.git
+git push -u origin main
+```
+
+**The remote must be private.** `mega-hub-studio/mega-docs` is public (anonymous
+`git-upload-pack` returns 200, and Pages serves from it) — internal business
+documents pushed there are published. The corpus repo is a *different* repo from
+this one, on purpose.
+
+Done when: a BA confirm or a browser import appears in the remote within ~15 minutes
+with no human action.
+
+### b. Tree UI + scoped retrieval
+
+The requested end state: a folder tree in the app, click a branch, ask a question
+scoped to it.
+
+- The data already exists — `GET /api/corpus` returns full paths, so the tree is
+  derivable client-side with no API change. `web/app/upload.js` already has
+  `folders()` doing exactly this collapse for the import picker.
+- The real work is retrieval: `POST /api/chat` needs a `scope`, and hybrid search in
+  `internal/db` needs a path-prefix filter that applies to **both** the vector and
+  the FTS side before RRF fuses them. Filtering after fusion returns fewer than
+  `TOP_K` results and silently degrades the answer.
+- Not started deliberately: with only three documents indexed there is nothing to
+  verify a scope filter against.
+
+### c. The corpus is still mostly empty
+
+Three documents, all about this project. No real business or engineering material has
+been loaded yet — the owner has that. Until then, any retrieval-quality judgement is
+about the wrong corpus.
+
+### d. Fork divergence
+
+`internal/server/server.go`, `web/index.html`, `web/app/app.js` and `styles.css` now
+carry local changes, and upstream moves fast (2.8k lines landed in one hour on the
+day of this deployment). Upstream has already adopted `scripts/switch-embed.sh` from
+this fork, so proposing the import surface upstream is likely cheaper than carrying
+it. Expect conflicts in those four files on every pull.
+
+---
+
+## 4. Host quirks that cost time
+
+| Quirk | Workaround |
+|---|---|
+| `proxy.golang.org` unreachable from this network (github and `sum.golang.org` are fine) | `GOPROXY=direct` on every `go` command, or `go env -w GOPROXY=direct` once |
+| `make live` cannot see the repo `.env` — `go test ./internal/ai/` runs with CWD in the package dir, and `config.Load()` reads `./.env` | `set -a; . ./.env; set +a; make live` |
+| Tailnet root `/` is taken by another service on `127.0.0.1:9119` | published on `--https=8443`; `--set-path` is not an option, the app serves absolute `/app/…` URLs |
+| Changing `CHAT_MODEL` serves stale answers | the answer cache keys on the normalised question and invalidates on `corpus_sig` only — the model is not in the key. `sqlite3 knowledge.db 'DELETE FROM answers'` after a model change |
+| systemd only runs while the WSL distro is up | the host has a separate always-on mechanism for that; `knowledge.service` rides on it |
+
+The cache one is a genuine upstream gap, not a local misconfiguration: folding the
+chat model into `corpus_sig` would fix it at the source.
+
+---
+
+## 5. Verifying
+
+```bash
+make check                                   # the gate — never skip it
+curl -s localhost:8080/api/health            # {"ok":true,"writes":true}
+curl -s localhost:8080/api/corpus            # what is indexed, with full paths
+cd /opt/knowledge/docs && git log --oneline  # every confirm and import, in order
+systemctl is-active knowledge corpus-sync.path corpus-sync.timer
+```
+
+The import path end-to-end, without a browser (`$PASS` from
+`/opt/knowledge/.env`, never from a command line in a shared transcript):
+
+```bash
+curl -sS -X POST https://tonytlinux.taile61671.ts.net:8443/api/documents \
+  -H "X-BA-Pass: $PASS" -F "dir=business/pricing" -F "files=@note.md"
+```
