@@ -42,15 +42,14 @@ make build && ./bin/knowledge
 The binary *is* the web server — the UI is embedded, so there is no frontend to
 deploy separately.
 
-The bilingual (EN/VI) guide is published as static pages and also ships inside the
-binary. One page per role, because each role arrives with a different question:
+The bilingual (EN/VI) guide is published as static pages on its own domain. One page
+per role, because each role arrives with a different question:
 
 | | Guide | Dev | Deploy |
 |---|---|---|---|
 | Answers | "what is this, can I trust this answer?" | "where do I change X?" | "how do we run it for the team?" |
 | For | everyone, then BA / PM / support | DEV | whoever hosts it |
-| Published by CI | [/](https://mega-hub-studio.github.io/mega-docs/) | [/dev.html](https://mega-hub-studio.github.io/mega-docs/dev.html) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
-| On a running instance | `/docs` | `/dev` | `/deploy` |
+| Published at | [/](https://mega-hub-studio.github.io/mega-docs/) | [/dev.html](https://mega-hub-studio.github.io/mega-docs/dev.html) | [/deploy.html](https://mega-hub-studio.github.io/mega-docs/deploy.html) |
 
 The Guide opens with a router, so nobody has to read a page that is not theirs.
 
@@ -70,10 +69,10 @@ the full reference rather than restating it. **Deploy** is letting the team in
 (Tailscale / Cloudflare Tunnel / LAN), where to run it, systemd, backups and the
 settings table.
 
-Both hosts render the same `web/{docs,dev,deploy}.html` through the same template —
-one source, no copy to drift — and locally you can build them with
-`go run ./cmd/rendocs -d /tmp/site`. On a running instance they also ship inside the
-binary, so they work on an air-gapped box.
+The app binary does **not** serve the guide. Documentation has its own domain, and a
+second copy inside the app is noise on the one surface people came to use — plus a
+copy to drift. The app carries a single link out to the published guide. Build the
+pages locally with `go run ./cmd/rendocs -d /tmp/site -base /vendor`.
 
 *Live, and published by CI on every push to `main` that touches the guide. If you
 fork this: turn Pages on once under Settings → Pages → Source **GitHub Actions**. A
@@ -126,7 +125,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
-| a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the server routes whatever is in its `Pages` map, so it needs no change |
+| a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the guide is static, so the app needs no change at all |
 | something an AI agent must know | [`AGENTS.md`](AGENTS.md) | `llms.txt` is generated; this is the hand-written part, and its pins are tested |
 
 ### The two seams that make it testable
@@ -179,10 +178,7 @@ in seconds if `/embeddings` is missing, which is the one gap that stops ingest d
 | route | returns |
 |---|---|
 | `GET /` | the UI (revalidated with an ETag — it pins the asset versions) |
-| `GET /docs` | the guide (EN/VI) — how it works, quick start, using it well, troubleshooting |
-| `GET /dev` | the dev page — where things live, the two seams, testing, the knobs |
-| `GET /deploy` | the deployment page — Tailscale / Cloudflare / LAN, systemd, ops |
-| `GET /llms.txt` | the [llmstxt.org](https://llmstxt.org) index for AI agents, generated from the pages |
+
 | `GET /api/health` | `{"ok":true}` — drives the light in the top bar |
 | `POST /api/chat` | SSE: `token` · `citations` · `done`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed |

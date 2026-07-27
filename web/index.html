@@ -82,7 +82,11 @@
     <span class="badge clear" :data-accent="online ? 'good' : 'crit'"
       :aria-label="online ? 'Server online' : 'Server unreachable'">●</span>
     <span class="eyebrow">Knowledge Engine</span>
-    <a class="btn ghost icon sm grow" href="/docs" aria-label="Guide">
+    <!-- One link out, to the published guide on its own domain. The app does not
+         serve the docs: a second copy inside the binary is noise here and a copy to
+         drift. rel=noopener because it opens in a new tab. -->
+    <a class="btn ghost icon sm grow" href="<%.DocsURL%>" target="_blank"
+      rel="noopener" aria-label="Guide (opens the documentation site)">
       <nes-icon name="info"></nes-icon></a>
     <button class="btn ghost icon sm" v-if="turns.length" @click="reset"
       aria-label="New question"><nes-icon name="plus"></nes-icon></button>

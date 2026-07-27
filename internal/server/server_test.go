@@ -292,54 +292,22 @@ func TestAuthAcceptsCorrectCredentialsAndRejectsWrongOnes(t *testing.T) {
 	}
 }
 
-// Guide pages are routed from a map keyed by address, so adding a role needs no
-// change in this package. What must hold: every entry is served, an entry that is
-// nil or absent is a 404 rather than a blank 200, and the pages are ETag'd like the
-// index (a doc page changes only when the binary does).
-func TestPagesMapIsRoutedByAddress(t *testing.T) {
-	h := New(Deps{
-		Answers: fakeAnswers{},
-		Index:   []byte("<html>index</html>"),
-		Pages: map[string][]byte{
-			"/docs":     []byte("<html>guide</html>"),
-			"/dev":      []byte("<html>dev</html>"),
-			"/deploy":   []byte("<html>deploy</html>"),
-			"/llms.txt": []byte("# index\n"), // plain text, not HTML
-			"/nope":     nil,                 // a page that failed to render must not become a route
-		},
-		Assets: fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
-	})
-
-	for path, want := range map[string]string{
-		"/docs": "guide", "/dev": "dev", "/deploy": "deploy",
-	} {
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
-		if w.Code != 200 {
-			t.Errorf("%s: got %d, want 200", path, w.Code)
-			continue
-		}
-		if !strings.Contains(w.Body.String(), want) {
-			t.Errorf("%s served the wrong page: %q", path, w.Body.String())
-		}
-		if w.Header().Get("ETag") == "" {
-			t.Errorf("%s went out without an ETag", path)
-		}
-	}
-
-	// llms.txt must not go out as text/html: a browser would try to render it and an
-	// agent would have to guess.
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/llms.txt", nil))
-	if ct := w.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
-		t.Errorf("/llms.txt served as %q, want text/plain", ct)
-	}
-
-	for _, path := range []string{"/nope", "/unknown"} {
+// The guide is documentation on its own public domain, deliberately not served by
+// the app: one surface, one job. So these must be 404s, not a second copy of the
+// docs — and this is the test that notices if someone wires them back in.
+func TestGuideRoutesAreNotServed(t *testing.T) {
+	h := newTestServer(fakeAnswers{})
+	for _, path := range []string{"/docs", "/dev", "/deploy", "/llms.txt"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != http.StatusNotFound {
-			t.Errorf("%s: got %d, want 404", path, w.Code)
+			t.Errorf("%s returned %d — the app should not serve the guide", path, w.Code)
 		}
+	}
+	// The app itself still answers, so this is not just a broken mux.
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	if w.Code != 200 {
+		t.Errorf("the app root returned %d", w.Code)
 	}
 }

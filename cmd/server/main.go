@@ -28,33 +28,9 @@ func main() {
 	defer store.Close()
 
 	// The page is rendered once, for whichever asset base is configured.
-	index, err := web.Index(cfg.AssetBase)
+	index, err := web.Index(cfg.AssetBase, cfg.SiteURL)
 	if err != nil {
 		log.Fatalf("frontend: %v", err)
-	}
-	// One entry per guide page, keyed by the same address web.ServedNav hands the
-	// markup — so a page and its route cannot drift apart.
-	nav := web.ServedNav
-	pages := map[string][]byte{}
-	for route, build := range map[string]func(string, web.Nav) ([]byte, error){
-		nav.Guide:  web.Docs,
-		nav.Dev:    web.Dev,
-		nav.Deploy: web.Deploy,
-	} {
-		page, err := build(cfg.AssetBase, nav)
-		if err != nil {
-			log.Fatalf("guide page %s: %v", route, err)
-		}
-		pages[route] = page
-	}
-	// The same machine index the published site serves, so an agent pointed at a
-	// running instance — the only source on an air-gapped box — finds it too. Absolute
-	// URLs are the public site's: llms.txt is an index of the documentation, not of
-	// this particular host.
-	if llms, err := web.LLMs(cfg.SiteURL); err != nil {
-		log.Fatalf("llms.txt: %v", err)
-	} else {
-		pages["/llms.txt"] = llms
 	}
 	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
 		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
@@ -68,7 +44,7 @@ func main() {
 	}), cfg.TopK)
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	handler := server.New(server.Deps{
-		Answers: engine, Index: index, Pages: pages, Assets: web.FS, Auth: auth,
+		Answers: engine, Index: index, Assets: web.FS, Auth: auth,
 	})
 
 	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)

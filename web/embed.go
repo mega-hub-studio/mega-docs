@@ -62,11 +62,7 @@ func diagram(name string) (string, error) {
 //go:embed all:vendor
 var FS embed.FS
 
-// Index renders index.html for one asset base — "https://cdn.jsdelivr.net/npm"
-// (the default) or "/vendor" when the assets ship inside this binary. Rendering
-// happens once at startup, so serving a request is just bytes.
-// Nav is where the guide's pages live. They differ per host: the binary serves
-// /docs, /dev and /deploy, while a static build uses relative file names.
+// Nav is where the guide's pages live, relative to each other.
 //
 // One page per role, because each role arrives with a different question:
 //
@@ -74,26 +70,32 @@ var FS embed.FS
 //	Dev     "where do I change X, and how do I test it?"   — DEV
 //	Deploy  "how do we run this for the team?"             — whoever hosts it
 //
-// To add a page: a field here, an address in both Navs, a render func, and one line
-// in cmd/rendocs and cmd/server. Nothing in the markup learns which host it is on.
+// To add a page: a field here, an address in StaticNav, a render func, and one line
+// in cmd/rendocs.
 type Nav struct {
-	Guide, Dev, Deploy, App string
+	Guide, Dev, Deploy string
 }
 
-// ServedNav is how the running binary addresses its own pages.
-var ServedNav = Nav{Guide: "/docs", Dev: "/dev", Deploy: "/deploy", App: "/"}
-
-// StaticNav is how a file-based host (GitHub Pages) addresses them. App is empty:
-// there is no app to open next to a static page.
+// StaticNav is how the published site addresses its own pages. It is the only Nav:
+// the guide is documentation, published once at a public URL, and the app binary
+// does not serve it. There is deliberately no link from the guide back to an app —
+// an instance lives behind a tailnet or a tunnel, and a public page must not
+// hardcode somebody's private address.
 var StaticNav = Nav{Guide: "./index.html", Dev: "./dev.html", Deploy: "./deploy.html"}
 
-func Index(assetBase string) ([]byte, error) {
-	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, nav: ServedNav})
+// Index renders the app shell. docsURL is the published guide, which the app links
+// out to rather than hosting: the docs have their own domain, and serving a second
+// copy from the app is noise plus a copy to drift.
+// The asset base is "https://cdn.jsdelivr.net/npm" (the default) or "/vendor" when
+// the assets ship inside this binary. Rendering happens once at startup, so serving a
+// request is just bytes.
+func Index(assetBase, docsURL string) ([]byte, error) {
+	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, docsURL: docsURL})
 }
 
-// Docs renders the guide page, Deploy the deployment page. Same asset plumbing as
-// Index, so both load from the same pinned CDN — or from /vendor, which keeps the
-// guide readable on an air-gapped box.
+// Docs, Dev and Deploy render the three guide pages. Same asset plumbing as Index,
+// so they resolve from the same pinned CDN. Only cmd/rendocs calls these: the guide
+// is published as static files, not served by the app.
 func Docs(assetBase string, nav Nav) ([]byte, error) {
 	return render(page{name: "docs", tmpl: docsTmpl, base: assetBase, nav: nav,
 		id: "docs", title: "Guide / Hướng dẫn"})
@@ -112,6 +114,7 @@ func Deploy(assetBase string, nav Nav) ([]byte, error) {
 type page struct {
 	name, tmpl, base string
 	nav              Nav
+	docsURL          string // index.html only: the outbound link to the guide
 	id, title        string // guide pages only; index.html uses neither
 }
 
@@ -173,11 +176,12 @@ func render(pg page) ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, struct {
-		Base, Origin                         string
-		AppLink, GuideURL, DevURL, DeployURL string
-		Page, Title                          string
-		Remote                               bool
-	}{base, origin, pg.nav.App, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
+		Base, Origin                string
+		DocsURL                     string
+		GuideURL, DevURL, DeployURL string
+		Page, Title                 string
+		Remote                      bool
+	}{base, origin, pg.docsURL, pg.nav.Guide, pg.nav.Dev, pg.nav.Deploy,
 		pg.id, pg.title, remote}); err != nil {
 		return nil, err
 	}

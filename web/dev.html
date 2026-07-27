@@ -218,12 +218,15 @@ EMBED_DIM=1536</span></div>
         </tbody>
       </table>
     </div>
-    <p lang="en">The server needs no change for a new page: it routes whatever is in
-      its <code>Pages</code> map, keyed by the same <code>Nav</code> the markup links
-      with, so a route and its page cannot drift apart.</p>
-    <p lang="vi">Server không cần sửa gì khi thêm trang: nó route theo map
-      <code>Pages</code>, khoá bằng đúng <code>Nav</code> mà markup dùng để link, nên
-      route và trang không thể lệch nhau.</p>
+    <p lang="en">The app needs no change for a new page, because it does not serve
+      the guide at all: this is documentation on its own domain, and the app is the
+      chat box with one link out to it. <code>cmd/rendocs</code> keys its output on
+      the same <code>Nav</code> the markup links with, so a file and the link to it
+      cannot drift apart.</p>
+    <p lang="vi">App không cần sửa gì khi thêm trang, vì nó không serve guide chút
+      nào: đây là tài liệu ở domain riêng, còn app là hộp chat với một link trỏ ra.
+      <code>cmd/rendocs</code> khoá output bằng đúng <code>Nav</code> mà markup dùng
+      để link, nên file và link tới nó không thể lệch nhau.</p>
   </section>
 
   <p class="separator"></p>

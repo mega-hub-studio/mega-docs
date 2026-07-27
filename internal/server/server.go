@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"strings"
 	"time"
 
 	"knowledge-engine/internal/db"
@@ -30,19 +29,16 @@ type Answerer interface {
 type Deps struct {
 	Answers Answerer // the RAG engine
 	Index   []byte   // index.html, already rendered for the configured asset base
-	// Pages maps a route to an already-rendered guide page, e.g. "/docs". A map
-	// rather than a field per page: adding one to the guide should not need a change
-	// here at all. Nil or empty is fine — the routes simply don't exist.
-	Pages  map[string][]byte
-	Assets fs.FS // embedded static tree: app/… and vendor/…
-	Auth   Auth  // optional Basic credentials; zero value = open
+	Assets  fs.FS    // embedded static tree: app/… and vendor/…
+	Auth    Auth     // optional Basic credentials; zero value = open
 }
 
 // New wires the routes and returns the whole app as one handler.
 //
+// This is the app and nothing else. The guide is documentation with its own public
+// domain, so it is not served here — one surface, one job.
+//
 //	GET  /            index.html          revalidated (it pins asset versions)
-//	GET  /docs · /dev · /deploy   the bilingual guide, one page per role (EN/VI)
-//	GET  /llms.txt    the llmstxt.org index for AI agents (text/plain)
 //	GET  /api/health  {"ok":true}  — always open, so probes need no secret
 //	POST /api/chat    SSE: token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
@@ -61,12 +57,6 @@ func New(d Deps) http.Handler {
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))
-	for path, page := range d.Pages {
-		if page != nil {
-			mux.Handle("GET "+path, revalidate(etag(page), serveBytes(page, contentType(path))))
-		}
-	}
-
 	// The app tree changes only when the binary does, so one ETag over the whole
 	// tree is enough to invalidate it — and costs one 304 instead of a re-download.
 	files := http.FileServerFS(d.Assets)
@@ -74,16 +64,6 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /vendor/", immutable(files))
 
 	return guard(d.Auth, mux)
-}
-
-// contentType picks the type from the route. The Pages map holds HTML pages and
-// /llms.txt, and serving that as text/html makes a browser try to render it and an
-// agent guess — so the one plain-text route says so.
-func contentType(route string) string {
-	if strings.HasSuffix(route, ".txt") {
-		return "text/plain; charset=utf-8"
-	}
-	return "text/html; charset=utf-8"
 }
 
 func serveBytes(b []byte, contentType string) http.Handler {

@@ -17,8 +17,8 @@ be wrong or out of date.
 Start at `llms.txt`. It is generated from the published pages by `cmd/rendocs`, so it
 cannot disagree with them, and it lists every section with its URL.
 
-Those pages also ship inside the binary (`/docs`, `/dev`, `/deploy`), so a running
-instance is a valid source too — and the only one on an air-gapped box.
+The app binary does **not** serve these pages — it is the chat app and nothing else,
+and it carries one link out to the published guide. Do not add doc routes to it.
 
 ## Documentation for the design system
 

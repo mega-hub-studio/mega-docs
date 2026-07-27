@@ -13,7 +13,7 @@ import (
 // Versions are read from the manifest, not written here: this asserts the wiring,
 // so bumping a dependency stays a one-line change in web/vendor.sha384.
 func TestIndexSubstitutesRemoteAssetBase(t *testing.T) {
-	out, err := Index("https://cdn.jsdelivr.net/npm")
+	out, err := Index("https://cdn.jsdelivr.net/npm", "https://example.test/docs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func pinnedDigest(t *testing.T, pkg, file string) string {
 }
 
 func TestIndexSubstitutesVendorBaseAndDropsPreconnect(t *testing.T) {
-	out, err := Index("/vendor/") // trailing slash must not double up
+	out, err := Index("/vendor/", "https://example.test/docs") // trailing slash must not double up
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestIndexSubstitutesVendorBaseAndDropsPreconnect(t *testing.T) {
 // {{ }} passes through untouched — if this ever regresses, the UI renders literal
 // mustaches or the template fails to parse.
 func TestIndexLeavesVueInterpolationAlone(t *testing.T) {
-	out, err := Index("/vendor")
+	out, err := Index("/vendor", "https://example.test/docs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestIndexLeavesVueInterpolationAlone(t *testing.T) {
 }
 
 func TestIndexRejectsEmptyBase(t *testing.T) {
-	if _, err := Index(""); err == nil {
+	if _, err := Index("", "https://example.test/docs"); err == nil {
 		t.Error("want an error for an empty asset base")
 	}
 }
@@ -121,7 +121,7 @@ func TestAppShellIsEmbedded(t *testing.T) {
 
 // index.html references the shell by path; keep the two in step.
 func TestIndexReferencesTheEmbeddedShell(t *testing.T) {
-	out, err := Index("/vendor")
+	out, err := Index("/vendor", "https://example.test/docs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestHasVendorReportsEmptyTree(t *testing.T) {
 
 func TestDocsRendersForBothAssetBases(t *testing.T) {
 	for _, base := range []string{"https://cdn.jsdelivr.net/npm", "/vendor"} {
-		out, err := Docs(base, ServedNav)
+		out, err := Docs(base, StaticNav)
 		if err != nil {
 			t.Fatalf("Docs(%q): %v", base, err)
 		}
@@ -163,9 +163,10 @@ func TestDocsRendersForBothAssetBases(t *testing.T) {
 	}
 }
 
-// The static build for GitHub Pages must omit the "Open app" button — a static
-// host has no app to open — while keeping every asset pinned and SRI-verified.
-func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
+// The guide is documentation on a public domain; the app lives behind a tailnet or
+// a tunnel. So no guide page may link to an app instance — a public page must not
+// carry somebody's private address — while every asset stays pinned and SRI-verified.
+func TestGuideNeverLinksAnAppInstance(t *testing.T) {
 	out, err := Docs("https://cdn.jsdelivr.net/npm", StaticNav)
 	if err != nil {
 		t.Fatal(err)
@@ -174,9 +175,11 @@ func TestDocsForStaticHostingOmitsTheAppLink(t *testing.T) {
 
 	// Asserted on markup, not on the words: the phrase also appears in the shipped
 	// stylesheet's comments, so a bare substring check passes and fails for the wrong
-	// reasons. What must be absent is a link whose target is the app.
-	if strings.Contains(page, `href="`+ServedNav.App+`"`) {
-		t.Error("the app link survived a build with no app to link to")
+	// reasons. What must be absent is any link to a served app.
+	for _, bad := range []string{`href="/"`, "ts.net", ":8443"} {
+		if strings.Contains(page, bad) {
+			t.Errorf("guide page links an app instance (%q) — that address is private", bad)
+		}
 	}
 	if strings.Contains(page, "<%") {
 		t.Error("an unrendered action was left in the output")
@@ -222,7 +225,7 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 		{"dev", Dev, "Deploy", "Change it"},
 		{"deploy", Deploy, "Guide", "Run it for the team"},
 	} {
-		out, err := tc.build("/vendor", ServedNav)
+		out, err := tc.build("/vendor", StaticNav)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
@@ -323,21 +326,14 @@ func TestCommittedDiagramsMatchTheirSource(t *testing.T) {
 	}
 }
 
-// Static hosting links by file name; the served binary links by route.
-func TestNavAddressesMatchTheHost(t *testing.T) {
-	static, err := Deploy("https://cdn.jsdelivr.net/npm", StaticNav)
+// The published site is file-based, so pages address each other by file name.
+func TestGuidePagesLinkEachOtherByFileName(t *testing.T) {
+	out, err := Deploy("https://cdn.jsdelivr.net/npm", StaticNav)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(static), `href="./index.html"`) {
-		t.Error("static build should link the guide by file name")
-	}
-	served, err := Deploy("/vendor", ServedNav)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(served), `href="/docs"`) {
-		t.Error("served build should link the guide by route")
+	if !strings.Contains(string(out), `href="./index.html"`) {
+		t.Error("pages should link each other by file name on a static host")
 	}
 }
 
@@ -345,7 +341,7 @@ func TestNavAddressesMatchTheHost(t *testing.T) {
 // means adding a field here, and the easy mistake is leaving one of the two Navs
 // unset — which renders href="" and silently links to the current page.
 func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
-	for host, nav := range map[string]Nav{"served": ServedNav, "static": StaticNav} {
+	for host, nav := range map[string]Nav{"static": StaticNav} {
 		seen := map[string]string{}
 		for label, addr := range map[string]string{
 			"Guide": nav.Guide, "Dev": nav.Dev, "Deploy": nav.Deploy,
@@ -365,11 +361,11 @@ func TestEveryNavAddressIsSetAndDistinct(t *testing.T) {
 	for name, build := range map[string]func(string, Nav) ([]byte, error){
 		"guide": Docs, "dev": Dev, "deploy": Deploy,
 	} {
-		out, err := build("/vendor", ServedNav)
+		out, err := build("/vendor", StaticNav)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		for _, addr := range []string{ServedNav.Guide, ServedNav.Dev, ServedNav.Deploy} {
+		for _, addr := range []string{StaticNav.Guide, StaticNav.Dev, StaticNav.Deploy} {
 			if !strings.Contains(string(out), `href="`+addr+`"`) {
 				t.Errorf("%s page never links %s", name, addr)
 			}

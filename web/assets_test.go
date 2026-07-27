@@ -26,7 +26,7 @@ func TestPinsParseRealManifest(t *testing.T) {
 // Every file index.html asks for must be pinned, and every pinned file must be
 // something `make vendor` can place — the two lists cannot drift apart.
 func TestEveryAssetThePageUsesIsPinned(t *testing.T) {
-	if _, err := Index("/vendor"); err != nil {
+	if _, err := Index("/vendor", "https://example.test/docs"); err != nil {
 		t.Fatalf("rendering failed, so some asset is unpinned: %v", err)
 	}
 }
