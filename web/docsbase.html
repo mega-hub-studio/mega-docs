@@ -76,8 +76,12 @@
      design system already uses for a selected control */
   .pages .active { color: var(--ink); border-color: var(--primary); }
 
+  /* The reading column and the index rail, as one pair of knobs: the grid below
+     tracks them, so widening the page is one step instead of three that can disagree. */
+  :root { --col: 820px; --rail: 19rem; }
+
   main {
-    max-inline-size: 820px; margin-inline: auto;
+    max-inline-size: var(--col); margin-inline: auto;
     padding: var(--sp-5) var(--sp-3) var(--sp-7);
   }
 
@@ -102,13 +106,17 @@
      the bar). In bar shape the heading must clear two sticky things, the header and
      the collapsed bar itself; in rail shape there is no bar in the way. */
   :root { --toc-offset: calc(var(--bar-h, 3.5rem) + var(--ctrl-h-lg) + var(--sp-3)); }
-  /* 74rem is the component's own rail-at default, so the rail column appears exactly
-     when it stops being a bar — one breakpoint, not two that can disagree. */
-  @media (min-width: 74rem) {
+  /* 80rem, matching the rail-at attribute on the element: the rail column appears
+     exactly when the component stops being a bar — one width, told to both, so they
+     cannot disagree. Not the component's 74rem default, because a 19rem rail (what the
+     deepest index row needs to stay on one line) plus the reading column leaves only
+     10px of gutter there. Below this the reader gets the collapsed bar, which is the
+     right shape for a narrow laptop anyway. */
+  @media (min-width: 80rem) {
     :root { --toc-offset: calc(var(--bar-h, 3.5rem) + var(--sp-4)); }
     .page {
       display: grid; align-items: start; justify-content: center;
-      grid-template-columns: minmax(0, 820px) 15rem;
+      grid-template-columns: minmax(0, var(--col)) var(--rail);
       gap: var(--sp-6);
     }
     /* DOM order is toc-then-main (mobile wants the bar above the article), so both
@@ -145,6 +153,30 @@
      column, because those need the width. No effect on a phone, where the column is
      already narrower than the cap. */
   main p, main li { max-inline-size: 52ch; }
+
+  /* ── desktop upgrade ──
+     The system's type scale has no responsive step, so the phone size was also the
+     27-inch size: 13.5px body, and a 52ch measure that left a 364px text column
+     inside an 820px one — most of the empty space on a wide screen came from that,
+     not from the page margins. Step the small end up and let the measure grow with
+     it; 62ch at 15px is ~480px, still inside the 45–75 characters a reader tracks.
+     This is the mirror of the ≤480px step-down above, and the same rule applies:
+     only the sizes, never a component. */
+  @media (min-width: 64rem) {
+    :root {
+      --fs-body: .9375rem;   /* 13.5 → 15px */
+      --fs-chip: .75rem;     /* 11   → 12px */
+      --fs-label: .625rem;   /*  9   → 10px */
+      --fs-h3: .8125rem;     /* 12   → 13px */
+    }
+    main p, main li { max-inline-size: 62ch; }
+  }
+  /* Past 1440px the gutters were wider than the rail. Give the width to the content
+     that actually needs it — tables, terminals, the diagram — and to the index, whose
+     deepest rows were wrapping to two lines. */
+  @media (min-width: 90rem) {
+    :root { --col: 960px; }
+  }
   .lede { color: var(--muted); font-size: var(--fs-body); }
   /* the link to the other page is a control, not a word in a sentence: at the end
      of a page on a phone it is the thing you reach for, so it gets a thumb-sized
@@ -234,7 +266,7 @@
      script keeps it in step with the language toggle (both attributes are observed,
      so setting them rebuilds the index; no manual refresh). It hides itself below
      `min` headings, so a short page costs nothing. -->
-<nes-toc levels='h2[lang="en"], h3[lang="en"]' label="On this page"></nes-toc>
+<nes-toc levels='h2[lang="en"], h3[lang="en"]' label="On this page" rail-at="80rem"></nes-toc>
 <%end%>
 
 <%define "foot"%></div>
