@@ -191,11 +191,11 @@ make switch-embed`.
 
 ### a. The corpus has no remote — set this up first
 
-`/opt/knowledge/docs` is a local git repo with no `origin`, so nothing is backed up
+`/opt/knowledge/corpus` is a local git repo with no `origin`, so nothing is backed up
 off the box and "expose the SoT to the cloud" is not done.
 
 ```bash
-cd /opt/knowledge/docs && git remote add origin git@github.com:<org>/<corpus>.git
+cd /opt/knowledge/corpus && git remote add origin git@github.com:<org>/<corpus>.git
 git push -u origin main
 ```
 
