@@ -16,3 +16,10 @@ web/vendor/*
 # Build-time-only tool cache (mermaid for `make diagram`) — never a dependency
 # of the product, so it is fetched on demand and not committed.
 .cache/
+
+# The dev corpus. `docs/` is CORPUS_DIR's default, so it is where a real document
+# lands the moment anyone runs `make ingest` or imports through the app on a laptop —
+# and this repository is public. Track the folder, never its contents: a deployment
+# keeps its corpus in a private repo of its own (see changelog/).
+docs/*
+!docs/.gitkeep
