@@ -152,20 +152,40 @@ type Msg struct {
 	Content string `json:"content"`
 }
 
-// ChatStream streams the assistant reply token-by-token to onToken.
-func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string)) error {
+// Usage is what the provider said one completion cost. Zero fields mean it
+// reported nothing — never that nothing was spent, so a caller showing a number
+// must check before believing it.
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
+// Reported is false when the provider sent no usage block, which is the case for
+// several OpenAI-compatible gateways.
+func (u Usage) Reported() bool { return u.PromptTokens > 0 || u.CompletionTokens > 0 }
+
+// ChatStream streams the assistant reply token-by-token to onToken and returns what
+// the provider said it cost.
+//
+// stream_options.include_usage asks OpenAI to append a final frame with the token
+// counts; providers that don't know the field ignore it, and providers that don't
+// answer it leave Usage zero. That is the whole reason Usage has Reported(): a UI
+// must be able to tell "free" from "unmeasured".
+func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string)) (Usage, error) {
+	var usage Usage
 	resp, err := c.post(ctx, c.chatHTTP, c.ChatBaseURL, c.APIKey, "/chat/completions", map[string]any{
-		"model":       c.ChatModel,
-		"messages":    msgs,
-		"stream":      true,
-		"temperature": 0.1,
+		"model":          c.ChatModel,
+		"messages":       msgs,
+		"stream":         true,
+		"temperature":    0.1,
+		"stream_options": map[string]any{"include_usage": true},
 	})
 	if err != nil {
-		return err
+		return usage, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return apiErr("chat", c.ChatBaseURL, resp)
+		return usage, apiErr("chat", c.ChatBaseURL, resp)
 	}
 
 	sc := bufio.NewScanner(resp.Body)
@@ -177,7 +197,7 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 		}
 		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if data == "[DONE]" {
-			return nil
+			return usage, nil
 		}
 		var chunk struct {
 			Choices []struct {
@@ -185,6 +205,9 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 					Content string `json:"content"`
 				} `json:"delta"`
 			} `json:"choices"`
+			// The usage frame arrives last and carries no choices, so it must be
+			// read from the same loop rather than after it.
+			Usage *Usage `json:"usage"`
 			Error *struct {
 				Message string `json:"message"`
 			} `json:"error"`
@@ -195,7 +218,10 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 		// Some providers report a mid-stream failure as a data frame rather than
 		// an HTTP status; swallowing it would look like a short answer.
 		if chunk.Error != nil && chunk.Error.Message != "" {
-			return fmt.Errorf("chat: %s", chunk.Error.Message)
+			return usage, fmt.Errorf("chat: %s", chunk.Error.Message)
+		}
+		if chunk.Usage != nil {
+			usage = *chunk.Usage
 		}
 		for _, ch := range chunk.Choices {
 			if ch.Delta.Content != "" {
@@ -203,7 +229,7 @@ func (c *Client) ChatStream(ctx context.Context, msgs []Msg, onToken func(string
 			}
 		}
 	}
-	return sc.Err()
+	return usage, sc.Err()
 }
 
 // apiErr names the base URL, because "404 on /embeddings" is nearly always a

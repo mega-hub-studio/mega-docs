@@ -46,6 +46,10 @@ func main() {
 	handler := server.New(server.Deps{
 		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
 		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
+		Runtime: server.Runtime{
+			Model: cfg.ChatModel, Window: cfg.Window,
+			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
+		},
 	})
 
 	addr := net.JoinHostPort(cfg.BindAddr, cfg.Port)

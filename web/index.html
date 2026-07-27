@@ -268,8 +268,36 @@
          only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
     <!-- `busy` reaches it as an attribute via a watcher, not :busy — see app.js. -->
     <nes-chat-prompt ref="prompt"
-      placeholder="Ask about the system…" aria-label="Question"
+      placeholder="Ask the documents…" aria-label="Question"
       @nes:submit="ask($event.detail.value)" @nes:stop="stop"></nes-chat-prompt>
+
+    <!-- ══ Status line ════════════════════════════════════════════════════════
+         The library's ambient bottom strip: a run-state light, then what the last
+         answer actually was. It lives *inside* the dock so viewport.js keeps
+         measuring one height (--dock-h) and the conversation still clears it.
+
+         Every field is measured, never estimated. Tokens come from the provider's
+         own usage frame; the percentage only appears when CONTEXT_WINDOW says what
+         the window is; the cost only appears when PRICE_IN / PRICE_OUT say what a
+         token costs. A cached answer says "free" because it is — no completion was
+         bought. Unknown prints nothing at all, because a zero would read as a fact.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="statusline" :data-state="statusLine.state" role="status" aria-live="polite">
+      <span class="sl-state">{{ statusLine.label }}</span>
+      <span class="sl-item" v-if="runtime.model" :title="'Chat model: ' + runtime.model">
+        <nes-icon name="cpu" aria-hidden="true"></nes-icon>{{ runtime.model }}
+      </span>
+      <span class="sl-item" v-if="statusLine.tokens" title="Prompt + completion tokens the provider reported">
+        <nes-icon name="layers" aria-hidden="true"></nes-icon>{{ statusLine.tokens }}
+      </span>
+      <span class="sl-item" v-if="statusLine.refs" title="Sources this answer cited">
+        <nes-icon name="link" aria-hidden="true"></nes-icon>{{ statusLine.refs }}
+      </span>
+      <span class="sl-end">
+        <span class="sl-item" v-if="statusLine.elapsed">{{ statusLine.elapsed }}</span>
+        <span class="sl-item" v-if="statusLine.cost" :title="statusLine.costTitle">{{ statusLine.cost }}</span>
+      </span>
+    </div>
   </div>
 </div>
 

@@ -36,6 +36,18 @@ type Deps struct {
 	Assets  fs.FS     // embedded static tree: app/… and vendor/…
 	Auth    Auth      // optional Basic credentials; zero value = open
 	BAPass  BAPass    // gates the write actions; empty = no write surface
+	Runtime Runtime   // what the status line reports; zero values simply hide fields
+}
+
+// Runtime is what an answer costs and what produced it — everything the status line
+// shows that the engine cannot infer per request. Zero means "unknown", and the UI
+// prints nothing rather than a zero, because a cost of $0.00 and an unmeasured cost
+// are different facts.
+type Runtime struct {
+	Model    string
+	Window   int
+	PriceIn  float64
+	PriceOut float64
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -55,10 +67,16 @@ type Deps struct {
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	// One field, and the UI needs it: whether BA mode can do anything here. That
-	// this instance *has* a password configured is not a secret — that it is
-	// read-only is exactly what a BA needs to be told before typing an answer.
-	health := fmt.Sprintf(`{"ok":true,"writes":%t}`, d.BAPass.enabled())
+	// What the status line needs before the first question, plus the one field BA
+	// mode needs: whether it can do anything here. That this instance *has* a
+	// password configured is not a secret — that it is read-only is exactly what a
+	// BA needs to be told before typing an answer.
+	//
+	// The model name and prices are deliberate disclosure, not a leak: an operator
+	// asked for them on screen. The engine itself still refuses to discuss them —
+	// that rule is about what a *document* answer may contain.
+	health := fmt.Sprintf(`{"ok":true,"writes":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
+		d.BAPass.enabled(), d.Runtime.Model, d.Runtime.Window, d.Runtime.PriceIn, d.Runtime.PriceOut)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(health))

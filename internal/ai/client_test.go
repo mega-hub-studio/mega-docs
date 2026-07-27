@@ -117,7 +117,7 @@ func TestChatStreamDeliversTokensInOrderAndSkipsNoise(t *testing.T) {
 	c := ai.New(ai.Config{ChatBaseURL: base, APIKey: "k", EmbedModel: "e", ChatModel: "chat-model"})
 
 	var got []string
-	err := c.ChatStream(context.Background(),
+	_, err := c.ChatStream(context.Background(),
 		[]ai.Msg{{Role: "system", Content: "ctx"}, {Role: "user", Content: "why?"}},
 		func(tok string) { got = append(got, tok) })
 	if err != nil {
@@ -140,7 +140,7 @@ func TestChatStreamSurfacesAMidStreamError(t *testing.T) {
 	c := newClient(t, &aitest.Provider{Reply: "partial answer", MidStreamError: "context length exceeded"})
 
 	var got string
-	err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}},
+	_, err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}},
 		func(tok string) { got += tok })
 	if err == nil {
 		t.Fatal("want an error from the mid-stream frame")
@@ -156,7 +156,7 @@ func TestChatStreamSurfacesAMidStreamError(t *testing.T) {
 func TestChatStreamReportsHTTPFailureWithTheBaseURL(t *testing.T) {
 	c := newClient(t, &aitest.Provider{ChatStatus: 502})
 
-	err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}}, func(string) {})
+	_, err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}}, func(string) {})
 	if err == nil {
 		t.Fatal("want an error")
 	}
@@ -178,7 +178,7 @@ func TestEmbedAndChatCanUseDifferentProviders(t *testing.T) {
 	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
 		t.Fatalf("embeddings should have gone to the embed provider: %v", err)
 	}
-	if err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}}, func(string) {}); err != nil {
+	if _, err := c.ChatStream(context.Background(), []ai.Msg{{Role: "user", Content: "q"}}, func(string) {}); err != nil {
 		t.Fatalf("chat should have gone to the chat provider: %v", err)
 	}
 	if len(embedder.Embedded()) != 1 || len(chatOnly.Chats()) != 1 {
@@ -227,7 +227,7 @@ func TestEmbedAndChatCanUseDifferentKeys(t *testing.T) {
 	if _, err := c.Embed(context.Background(), []string{"x"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.ChatStream(context.Background(),
+	if _, err := c.ChatStream(context.Background(),
 		[]ai.Msg{{Role: "user", Content: "q"}}, func(string) {}); err != nil {
 		t.Fatal(err)
 	}

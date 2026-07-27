@@ -33,7 +33,7 @@ const MODE_KEY = "ke.mode"; // a BA reopening the app wants the queue, not the p
 let seq = 0;
 const newTurn = (q) => ({
   id: ++seq, q, a: "", citations: [], streaming: true, error: "", ms: 0,
-  cached: false,
+  cached: false, in: 0, out: 0,
   ticket: null, // the gap filed from this answer, once there is one
 });
 
@@ -64,6 +64,8 @@ export function boot(ds) {
            only BA mode touches lives in ba.js. ── */
         mode: localStorage.getItem(MODE_KEY) === "ba" ? "ba" : "dev",
         writes: false, // does this instance allow a BA to confirm at all
+        // What the bottom strip reports. Filled by checkHealth; zeros stay hidden.
+        runtime: { model: "", window: 0, priceIn: 0, priceOut: 0 },
         queue: { tickets: [], open: 0, answered: 0, confirmed: 0, rejected: 0 },
         history: [],
         status: qa.STATUS,
@@ -78,6 +80,52 @@ export function boot(ds) {
       if (this.turns.length) this.view.scrollToEnd({ force: true });
       addEventListener("online", () => this.checkHealth());
       addEventListener("offline", () => (this.online = false));
+    },
+
+    computed: {
+      /** The bottom strip, assembled from what is actually known.
+       *
+       *  Nothing here is estimated. A field whose input is missing is left empty and
+       *  the markup drops it, because an unmeasured cost and a cost of nothing look
+       *  the same on screen and are not the same fact. */
+      statusLine() {
+        const t = this.turns.at(-1);
+        const state = !this.online ? "error"
+          : this.busy ? "running"
+          : t?.error ? "error"
+          : t ? "done"
+          : "queued";
+        const label = { error: "ERROR", running: "ASKING", done: "READY", queued: "IDLE" }[state];
+        const s = {
+          state,
+          label: this.online ? label : "OFFLINE",
+          tokens: "", refs: 0, elapsed: "", cost: "", costTitle: "",
+        };
+        if (!t || t.streaming) return s;
+
+        s.refs = t.citations.length;
+        if (t.ms) s.elapsed = t.ms >= 1000 ? (t.ms / 1000).toFixed(1) + "s" : t.ms + "ms";
+
+        const total = (t.in || 0) + (t.out || 0);
+        if (total) {
+          s.tokens = total.toLocaleString() + " tok";
+          // Only claim a share of the window when the operator said how big it is.
+          if (this.runtime.window > 0) {
+            s.tokens += " \u00b7 " + Math.round((total / this.runtime.window) * 100) + "%";
+          }
+        }
+        if (t.cached) {
+          s.cost = "cached \u00b7 free";
+          s.costTitle = "Served from the answer cache \u2014 no completion was bought";
+        } else if (total && (this.runtime.priceIn || this.runtime.priceOut)) {
+          const usd = ((t.in || 0) * this.runtime.priceIn + (t.out || 0) * this.runtime.priceOut) / 1e6;
+          // Four decimals: one internal question costs a fraction of a cent, and
+          // rounding it to $0.00 hides the only number anyone would act on.
+          s.cost = "$" + usd.toFixed(4);
+          s.costTitle = t.in + " in + " + t.out + " out at $" + this.runtime.priceIn + " / $" + this.runtime.priceOut + " per 1M";
+        }
+        return s;
+      },
     },
 
     watch: {
@@ -133,7 +181,7 @@ export function boot(ds) {
        *  a real call: the user asked again because the cached answer was wrong. */
       async regenerate(turn) {
         if (this.busy) return;
-        Object.assign(turn, { a: "", citations: [], error: "", ms: 0, streaming: true, cached: false });
+        Object.assign(turn, { a: "", citations: [], error: "", ms: 0, streaming: true, cached: false, in: 0, out: 0 });
         await this.stream(turn, { fresh: true });
       },
 
@@ -230,7 +278,7 @@ export function boot(ds) {
             this.view.scrollToEnd();
           },
           onCitations: (c) => (turn.citations = c),
-          onDone: ({ cached }) => (turn.cached = cached),
+          onDone: ({ cached, in: tin, out }) => Object.assign(turn, { cached, in: tin, out }),
         });
         try {
           await this.run.done; // a stop() resolves quietly; only real errors throw
@@ -247,9 +295,10 @@ export function boot(ds) {
       },
 
       async checkHealth() {
-        const { online, writes } = await health();
-        this.online = online;
-        this.writes = writes;
+        const h = await health();
+        this.online = h.online;
+        this.writes = h.writes;
+        this.runtime = { model: h.model, window: h.window, priceIn: h.priceIn, priceOut: h.priceOut };
       },
     },
   });

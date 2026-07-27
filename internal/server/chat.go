@@ -53,13 +53,23 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 			reply.Citations = []rag.Citation{}
 		}
 		s.send("citations", reply.Citations)
-		// cached rides on `done` rather than its own event: it is known only once
-		// the answer is complete, and one frame keeps the client's switch small.
-		// A struct, not a map, so the frame's field order is stable.
-		s.send("done", struct {
+		// cached and the token counts ride on `done` rather than their own events:
+		// both are known only once the answer is complete, and one frame keeps the
+		// client's switch small. A struct, not a map, so the field order is stable.
+		//
+		// The counts are omitted when the provider reported none, so the status line
+		// can distinguish "free, it was cached" from "spent, but unmeasured" — a
+		// zero printed as a cost would be a lie in the second case.
+		done := struct {
 			Done   bool `json:"done"`
 			Cached bool `json:"cached"`
-		}{true, reply.Cached})
+			In     int  `json:"in,omitempty"`
+			Out    int  `json:"out,omitempty"`
+		}{Done: true, Cached: reply.Cached}
+		if reply.Usage.Reported() {
+			done.In, done.Out = reply.Usage.PromptTokens, reply.Usage.CompletionTokens
+		}
+		s.send("done", done)
 	}
 }
 

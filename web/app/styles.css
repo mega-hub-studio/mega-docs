@@ -160,6 +160,15 @@ main.ba {
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
 .dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+/* The status line sits inside the dock, under the prompt, so viewport.js keeps
+   measuring one height and the conversation still clears everything fixed. The
+   strip, its light and its items are all .statusline — this only undoes the dock's
+   own inline padding so the strip spans the full width the way an ambient bar
+   should, and widens it back out to the reading column. */
+.dock .statusline {
+  margin: var(--sp-3) calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
+  padding-block-end: max(var(--sp-1), env(safe-area-inset-bottom));
+}
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
@@ -167,6 +176,7 @@ main.ba {
   main { padding: var(--sp-5) var(--sp-4) calc(var(--dock-h, 5rem) + var(--sp-6)); }
   .empty { margin-block-start: 12vh; }
   .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
+  .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
 }
 

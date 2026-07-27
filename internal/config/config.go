@@ -22,6 +22,9 @@ type Config struct {
 	ChatModel  string
 	EmbedDim   int
 	TopK       int
+	Window     int     // context window of ChatModel, in tokens; 0 = unknown
+	PriceIn    float64 // USD per 1M prompt tokens; 0 = don't price answers
+	PriceOut   float64 // USD per 1M completion tokens
 	AuthUser   string
 	AuthPass   string
 	BAPass     string
@@ -67,8 +70,14 @@ func Load() Config {
 		ChatModel:  env("CHAT_MODEL", "gpt-4o-mini"),
 		EmbedDim:   envInt("EMBED_DIM", 1536),
 		TopK:       envInt("TOP_K", 6),
-		AuthUser:   env("AUTH_USER", "team"),
-		AuthPass:   env("AUTH_PASS", ""), // empty = no auth
+		// The status line shows what an answer cost. None of it is guessed: a
+		// window of 0 hides the percentage, and prices of 0 hide the money — an
+		// invented number in either place is worse than a blank.
+		Window:   envInt("CONTEXT_WINDOW", 0),
+		PriceIn:  envFloat("PRICE_IN", 0),
+		PriceOut: envFloat("PRICE_OUT", 0),
+		AuthUser: env("AUTH_USER", "team"),
+		AuthPass: env("AUTH_PASS", ""), // empty = no auth
 		// Gates the two actions that change what the engine will say. Empty means
 		// the instance has no write surface at all — reads still work, BA mode says
 		// it is read-only. Deliberately separate from AUTH_PASS: everyone who can
@@ -80,6 +89,15 @@ func Load() Config {
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func envFloat(k string, def float64) float64 {
+	if v := os.Getenv(k); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
 	}
 	return def
 }

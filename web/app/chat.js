@@ -84,7 +84,7 @@ function apply(frame, { onToken, onCitations, onDone }) {
   const { event, payload } = frame;
   if (event === "token") onToken?.(payload.t);
   else if (event === "citations") onCitations?.(payload);
-  else if (event === "done") onDone?.({ cached: !!payload.cached });
+  else if (event === "done") onDone?.({ cached: !!payload.cached, in: payload.in || 0, out: payload.out || 0 });
   else if (event === "error") throw new Error(payload.message);
 }
 
@@ -98,8 +98,18 @@ export async function health() {
     const res = await fetch("/api/health");
     if (!res.ok) return { online: false, writes: false };
     const body = await res.json();
-    return { online: true, writes: !!body.writes };
+    // The runtime fields are what the status line reports. Absent or zero means
+    // "unknown", and the strip prints nothing rather than a zero — an unmeasured
+    // cost and a cost of nothing are different facts.
+    return {
+      online: true,
+      writes: !!body.writes,
+      model: body.model || "",
+      window: body.window || 0,
+      priceIn: body.price_in || 0,
+      priceOut: body.price_out || 0,
+    };
   } catch {
-    return { online: false, writes: false };
+    return { online: false, writes: false, model: "", window: 0, priceIn: 0, priceOut: 0 };
   }
 }
