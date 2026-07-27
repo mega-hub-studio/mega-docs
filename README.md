@@ -122,6 +122,11 @@ web/app/use/      one composable per concern, and nothing else in them
                   runtime.js       online · writes · model and prices
                   statusline.js    the bottom strip, as one computed object
                   diagrams.js      the lazy renderer and the zoom viewer
+                  gate.js          the BA password, and what a refused write means
+                  importer.js      files, real progress, partial success
+                  tickets.js       draft · confirm · reject, and the drafts being typed
+                  nestree.js       corpus paths → nodes, and driving <nes-tree>
+                  toast.js         the injected design-system helper, with a no-op default
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -147,7 +152,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
 | anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + scope, under a signature of corpus + chat model + prompt |
 | retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `web/app/tree.js` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
-| a BA-screen behaviour | `web/app/ba.js` | its own component with its own state; the shell only passes what both screens render |
+| a BA-screen behaviour | `web/app/use/gate.js`, `use/importer.js` or `use/tickets.js` | the screen is headless — 54 lines of props, emits and composition; the behaviour is in one of these three |
 | a chat-screen behaviour | `web/app/use/conversation.js` | the thread owns ask/stream/stop/reset; `app.js` only wires it |
 | document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |

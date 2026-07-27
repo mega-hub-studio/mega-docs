@@ -162,17 +162,32 @@ that ships the compiler, so in-DOM templates work), the Go binary serves `web/ap
 its embed FS, and there is no build step to run. **`make build` before testing the built
 artifact**, or you are debugging the old bytes.
 
-State is one composable per concern in `web/app/use/` — `conversation` (turns, streaming,
-persistence), `corpus`, `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`. `app.js`
-is wiring: it creates them, hands each what it needs, and returns what the template
-binds. Two rules keep that honest:
+Four layers, and the rule for each is one sentence. Put a change in the lowest layer that
+can hold it:
+
+| layer | files | may contain | may not |
+|---|---|---|---|
+| **plumbing** | `chat.js` `qa.js` `upload.js` `answer.js` `diagram.js` `library.js` `session.js` `viewport.js` | fetch, SSE, storage, markdown, DOM maths | any Vue import — these run in a bare console |
+| **logic** | `use/*.js` | reactive state and every branch | another composable's state, or markup |
+| **components** | `ba.js` `tree.js` | props, emits, compose, return | branches — a component with an `if` is a composable nobody wrote yet |
+| **wiring** | `app.js` | who gets what, and what the template binds | logic of its own |
+
+One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
+`scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
+`importer`, `tickets`, `nestree`, `toast`.
+
+Three rules keep the layers from leaking:
 
 - **A composable never reaches for another's state.** What it needs arrives as an
   argument — `useConversation` gets the scope, a scroll function and an `onSettled`
-  callback, not the corpus. The shell is the only place that knows the whole picture.
+  callback, not the corpus. Reactive inputs it does not own arrive as *getters*
+  (`documents: () => props.documents`), so it never holds a stale array.
+- **A component is a contract, not a place to work.** `ba.js` is 54 lines: four props, two
+  emits, three composables, one return. Its logic moved to `use/gate.js`,
+  `use/importer.js` and `use/tickets.js`, where each piece is readable alone.
 - **Everything the template names must be in the returned object.** A missing key is
-  `undefined` at render time with no error — the same trap as a `computed` colliding with
-  a `data` key in the old Options API. When you add a binding, add it to the return.
+  `undefined` at render with no error — the same trap as a `computed` colliding with a
+  `data` key in the old Options API. When you add a binding, add it to the return.
 
 Composables read `Vue` *inside* the function (`const { ref } = Vue`), never at module
 scope: the global is a classic script and a module body can evaluate before it exists.
