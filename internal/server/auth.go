@@ -50,7 +50,7 @@ func guard(a Auth, h http.Handler) http.Handler {
 				return
 			}
 		}
-		w.Header().Set("WWW-Authenticate", `Basic realm="Knowledge Engine", charset="UTF-8"`)
+		w.Header().Set("WWW-Authenticate", `Basic realm="mega-docs", charset="UTF-8"`)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 }

@@ -37,7 +37,7 @@ func LLMs(siteBase string) ([]byte, error) {
 	}
 
 	var b strings.Builder
-	b.WriteString("# Knowledge Engine\n\n")
+	b.WriteString("# mega-docs\n\n")
 	b.WriteString("> Self-hosted RAG over a team's own documents: ask a question, get an " +
 		"answer built only from what was indexed, with a citation back to the file it " +
 		"came from. One Go binary, one SQLite file — no Docker, no Node, no vector " +

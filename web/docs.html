@@ -164,12 +164,192 @@
 
   </section>
 
+  <!-- ══ getting in (team member, not host) ════════════════════════════════════
+       The docs told the host how to publish it and everyone what it does, but never
+       how a person who was simply *told to use it* gets in. That reader installs
+       nothing for the app itself — what they install depends on the door their team
+       chose, which is why the three doors are tabs rather than a list of steps.
+       The host's side of each door stays on the Deploy page: one copy, no drift. -->
+  <section id="access">
+    <h2 lang="en">Getting in, the first time</h2>
+    <h2 lang="vi">Vào app lần đầu</h2>
+    <p class="lede" lang="en">The app is a web page on your team's own network. There is
+      nothing to install for it and no account to create — but the address is not public,
+      so getting in starts with one question to whoever hosts it.</p>
+    <p class="lede" lang="vi">App là một trang web nằm trong mạng nội bộ của team. Không
+      phải cài gì cho nó và không phải tạo tài khoản — nhưng địa chỉ không công khai, nên
+      việc đầu tiên là hỏi người host một câu.</p>
+
+    <h3 lang="en">What you need before anything</h3>
+    <h3 lang="vi">Cần có trước khi bắt đầu</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>You need</th><th>Where it comes from</th></tr>
+          <tr lang="vi"><th>Bạn cần</th><th>Lấy từ đâu</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>The address</th><td>Whoever hosts it. It is an internal address, so it will not be found by searching.</td></tr>
+          <tr lang="vi"><th>Địa chỉ</th><td>Người host. Đây là địa chỉ nội bộ, tìm trên Google sẽ không ra.</td></tr>
+          <tr lang="en"><th>Which door your team uses</th><td>The same person. Tailscale · Cloudflare Access · office wifi — this is the only thing that decides what you install.</td></tr>
+          <tr lang="vi"><th>Team đi qua cửa nào</th><td>Cũng người đó. Tailscale · Cloudflare Access · wifi công ty — đây là thứ duy nhất quyết định bạn phải cài gì.</td></tr>
+          <tr lang="en"><th>A browser, with JavaScript on</th><td>Any current one. Answers stream in, so the page needs script; there is no app to download.</td></tr>
+          <tr lang="vi"><th>Một browser, có bật JavaScript</th><td>Bản nào hiện hành cũng được. Câu trả lời chạy về dần nên trang cần script; không có app nào phải tải.</td></tr>
+          <tr lang="en"><th>BA only: the BA password</th><td>The host. Needed <i>only</i> to confirm an answer into the documents — asking never needs it.</td></tr>
+          <tr lang="vi"><th>Chỉ BA: mật khẩu BA</th><td>Người host. <i>Chỉ</i> cần khi confirm câu trả lời vào tài liệu — hỏi thì không bao giờ cần.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 lang="en">The door your team chose</h3>
+    <h3 lang="vi">Cửa mà team bạn chọn</h3>
+    <nes-tabs>
+      <section data-label="Tailscale" selected>
+        <p lang="en">One install, once. Then the address works from anywhere — mobile
+          data, home, a hotel — with no VPN to switch on and off by hand.</p>
+        <p lang="vi">Cài một lần duy nhất. Sau đó địa chỉ dùng được từ bất cứ đâu — 4G,
+          ở nhà, khách sạn — không phải bật/tắt VPN bằng tay.</p>
+        <ol class="steps">
+          <li lang="en">Ask the host to invite you to the company tailnet — you will get an email</li>
+          <li lang="vi">Nhờ người host mời bạn vào tailnet công ty — bạn sẽ nhận email</li>
+          <li lang="en">Install the Tailscale app (App Store · Play Store · desktop) and sign in with the company account</li>
+          <li lang="vi">Cài app Tailscale (App Store · Play Store · desktop) rồi đăng nhập bằng tài khoản công ty</li>
+          <li lang="en">Leave it connected — the toggle stays on; that is the whole maintenance</li>
+          <li lang="vi">Để nó kết nối — bật sẵn là xong, không phải làm gì thêm</li>
+        </ol>
+        <p lang="en">No password prompt on the app itself: the tailnet already knows who
+          you are, which is why this is the recommended door.</p>
+        <p lang="vi">App sẽ không hỏi mật khẩu: tailnet đã biết bạn là ai, đó là lý do đây
+          là cửa được khuyến nghị.</p>
+      </section>
+
+      <section data-label="Cloudflare">
+        <p lang="en">Nothing to install. Open the address and the browser asks you to sign
+          in with Google or Microsoft first; after that it behaves like any internal site.</p>
+        <p lang="vi">Không phải cài gì. Mở địa chỉ, browser sẽ yêu cầu đăng nhập Google
+          hoặc Microsoft trước; sau đó dùng như mọi trang nội bộ khác.</p>
+        <p lang="en">If the sign-in refuses you, your email is outside the policy — that is
+          for the host to widen, not something you can retry around.</p>
+        <p lang="vi">Nếu đăng nhập bị từ chối, email của bạn nằm ngoài policy — người host
+          phải mở thêm, bạn thử lại cũng không được.</p>
+      </section>
+
+      <section data-label="Office wifi">
+        <p lang="en">Nothing to install, but you have to be <b>on the office network</b> —
+          from home it simply will not load. The browser will ask for a username and
+          password; both come from the host.</p>
+        <p lang="vi">Không phải cài gì, nhưng bạn phải <b>ở trong mạng công ty</b> — từ nhà
+          thì đơn giản là không mở được. Browser sẽ hỏi username và mật khẩu; cả hai lấy
+          từ người host.</p>
+        <div class="callout warn">
+          <b lang="en">Save it in the keychain, not in a chat message.</b>
+          <span lang="en">It is one password shared by everyone who reads, so it should
+            live in your browser's password manager and nowhere else.</span>
+          <b lang="vi">Lưu vào keychain, đừng gửi qua chat.</b>
+          <span lang="vi">Đây là một mật khẩu dùng chung cho tất cả người đọc, nên để
+            trong password manager của browser, không để chỗ nào khác.</span>
+        </div>
+      </section>
+    </nes-tabs>
+
+    <h3 lang="en">Then: three steps and a check</h3>
+    <h3 lang="vi">Rồi: ba bước và một lần kiểm</h3>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Get through the door</b>
+        <b lang="vi">Qua cửa trước</b>
+        <p lang="en">Whatever your team's tab above says. Do this first: every "the page
+          won't load" turns out to be this step.</p>
+        <p lang="vi">Theo đúng tab của team bạn ở trên. Làm bước này trước: mọi ca "không
+          mở được trang" đều nằm ở đây.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Open the address</b>
+        <b lang="vi">Mở địa chỉ</b>
+        <p lang="en">In a normal browser tab. Nothing to configure on first open — no
+          settings, no profile, no key.</p>
+        <p lang="vi">Bằng một tab browser bình thường. Lần đầu không phải cấu hình gì —
+          không setting, không profile, không key.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">Check three things, then ask</b>
+        <b lang="vi">Kiểm ba thứ, rồi hỏi</b>
+        <p lang="en">The dot at the top left is <b>green</b> (the server answered), the
+          empty screen names <b>how many documents</b> are indexed, and there are
+          <b>tappable starter questions</b>. All three, and you are done — type a question.</p>
+        <p lang="vi">Đèn góc trên bên trái <b>xanh</b> (server đã trả lời), màn hình trống
+          ghi <b>có bao nhiêu tài liệu</b> đã index, và có <b>câu hỏi mẫu bấm được</b>. Đủ
+          ba thứ là xong — gõ câu hỏi của bạn.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">On a phone, put it on the home screen.</b>
+      <span lang="en">iOS Safari: Share → <i>Add to Home Screen</i>. Android Chrome:
+        ⋮ → <i>Add to Home screen</i>. It adds a shortcut, not an app to update — but it
+        means never typing an internal address again, which is the difference between
+        using this daily and forgetting it exists.</span>
+      <b lang="vi">Trên điện thoại, đưa ra home screen.</b>
+      <span lang="vi">iOS Safari: Share → <i>Add to Home Screen</i>. Android Chrome:
+        ⋮ → <i>Add to Home screen</i>. Nó tạo shortcut, không phải app phải cập nhật —
+        nhưng nhờ vậy không bao giờ phải gõ lại địa chỉ nội bộ, và đó là khác biệt giữa
+        dùng hằng ngày với quên mất là có nó.</span>
+    </div>
+
+    <h3 lang="en">If it doesn't open</h3>
+    <h3 lang="vi">Nếu không mở được</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>What you see</th><th>What it means</th><th>What to do</th></tr>
+          <tr lang="vi"><th>Bạn thấy</th><th>Nghĩa là</th><th>Làm gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>Nothing loads · times out</th><td>You are not through the door.</td><td>Tailscale connected? Signed in? On the office wifi? Address exactly as given?</td></tr>
+          <tr lang="vi"><th>Không load · timeout</th><td>Bạn chưa qua cửa.</td><td>Tailscale đã kết nối? Đã đăng nhập? Đang ở wifi công ty? Địa chỉ đúng y như được cho?</td></tr>
+          <tr lang="en"><th>The browser asks for a username and password</th><td>Basic auth is on — expected on the office-wifi door.</td><td>Ask the host for it, then let the browser remember it.</td></tr>
+          <tr lang="vi"><th>Browser hỏi username và mật khẩu</th><td>Basic auth đang bật — bình thường với cửa wifi công ty.</td><td>Xin người host, rồi cho browser ghi nhớ.</td></tr>
+          <tr lang="en"><th>The page loads, the dot is <b>red</b></th><td>You are in. The server is down — not your connection.</td><td>Tell whoever hosts it; there is nothing to fix on your side.</td></tr>
+          <tr lang="vi"><th>Trang load được, đèn <b>đỏ</b></th><td>Bạn đã vào. Server đang chết — không phải mạng của bạn.</td><td>Báo người host; phía bạn không có gì để sửa.</td></tr>
+          <tr lang="en"><th>Green dot, but "Nothing is indexed yet"</th><td>It is running with no documents in it.</td><td>Ask the host to index them — see <a href="#loop">When the answer isn't there</a> for the rest of that loop.</td></tr>
+          <tr lang="vi"><th>Đèn xanh, nhưng báo "Nothing is indexed yet"</th><td>Nó đang chạy nhưng chưa có tài liệu nào.</td><td>Nhờ người host index — phần còn lại của vòng này ở <a href="#loop">Khi câu trả lời chưa có</a>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">Hosting it is a different job.</b>
+      <span lang="en">Choosing the door, opening it for the team and keeping it running is
+        on the <a href="<%.DeployURL%>">Deploy</a> page — including the commands for each
+        of the three options above. Nothing from there is repeated here, so the two cannot
+        drift apart.</span>
+      <b lang="vi">Host là việc khác.</b>
+      <span lang="vi">Chọn cửa, mở cửa cho team và giữ cho nó chạy nằm ở trang
+        <a href="<%.DeployURL%>">Triển khai</a> — gồm cả lệnh cho từng phương án ở trên.
+        Không có gì từ đó bị nhắc lại ở đây, nên hai bên không lệch nhau được.</span>
+    </div>
+  </section>
+
   <!-- ══ quick start ═══════════════════════════════════════════════════════ -->
   <section>
     <h2 lang="en">Quick start</h2>
     <h2 lang="vi">Bắt đầu nhanh</h2>
-    <p class="lede" lang="en">Three commands, on the machine that will hold the index.</p>
-    <p class="lede" lang="vi">Ba lệnh, trên máy sẽ giữ index.</p>
+    <p class="lede" lang="en">Three commands, on the machine that will hold the index —
+      for whoever runs it. If someone else runs it for your team, you want
+      <a href="#access">Getting in</a> above instead.</p>
+    <p class="lede" lang="vi">Ba lệnh, trên máy sẽ giữ index — dành cho người chạy hệ
+      thống. Nếu team bạn có người khác chạy, hãy xem
+      <a href="#access">Vào app lần đầu</a> ở trên.</p>
 
     <div class="step">
       <span class="num">1</span>
@@ -207,7 +387,7 @@ done: 8/8 files, 74 chunks</span></div>
       <div class="body">
         <b lang="en">Start it</b>
         <b lang="vi">Chạy</b>
-        <div class="terminal"><span class="cmd">make build &amp;&amp; ./bin/knowledge</span><span class="out">Knowledge Engine on http://127.0.0.1:8080</span></div>
+        <div class="terminal"><span class="cmd">make build &amp;&amp; ./bin/knowledge</span><span class="out">mega-docs on http://127.0.0.1:8080</span></div>
         <p lang="en">The UI is compiled into the binary, so there is nothing else
           to deploy. Verify the whole chain any time with
           <code>make smoke</code>: it indexes a fixture, asks a question only

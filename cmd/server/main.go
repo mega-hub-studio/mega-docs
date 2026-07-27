@@ -1,4 +1,4 @@
-// Command server runs the Knowledge Engine: a RAG chat API plus the embedded UI.
+// Command server runs mega-docs: a RAG chat API plus the embedded UI.
 //
 // This file is wiring only — config in, dependencies constructed, handler served.
 // Retrieval lives in internal/rag, HTTP in internal/server, the UI in web/.
@@ -57,7 +57,7 @@ func main() {
 		// here would cut it off mid-generation.
 	}
 
-	log.Printf("Knowledge Engine on http://%s (assets: %s, auth: %s, writes: %s)",
+	log.Printf("mega-docs on http://%s (assets: %s, auth: %s, writes: %s)",
 		addr, cfg.AssetBase, describe(auth), writes(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
 	log.Fatal(srv.ListenAndServe())

@@ -1,4 +1,8 @@
-# Knowledge Engine — MVP
+# mega-docs
+
+*The binary, the database and the systemd unit are still named `knowledge` — renaming
+those would break a running deployment for no user-visible gain. `mega-docs` is the
+product name: what the app's header, its tab title and this documentation say.*
 
 Self-hosted RAG for internal technical/business docs. One Go binary + one SQLite
 file. Semantic + keyword hybrid search, grounded answers, citations.

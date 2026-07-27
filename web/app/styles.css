@@ -42,11 +42,11 @@ html {
   border-block-end: var(--bw-2) solid var(--line);
 }
 .bar .grow { margin-inline-start: auto; }
-/* 360px is unforgiving: the product name is the first thing worth losing, since
-   the tab title and the mode switch both still say where you are. */
-@media (max-width: 400px) {
-  .bar .eyebrow { display: none; }
-}
+/* the mark and the words are one unit, so they never wrap apart */
+.brand { display: inline-flex; align-items: center; gap: var(--sp-2); }
+/* No width rule for the brand: measured at 320 · 360 · 390px with a conversation
+   open (so the New-question button is in the bar too), the mark and the words both fit
+   with the segment unsqueezed and nothing clipped. The name stays visible. */
 
 /* ── conversation column ── */
 main {

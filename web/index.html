@@ -11,10 +11,13 @@
   content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#07071c" />
 <meta name="color-scheme" content="dark" />
-<title>Knowledge Engine</title>
-<!-- Inline, so there is no second request and no 404 in every console: the ◈ mark
-     the empty state uses, in the primary accent, on the app's own ground. -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2307071c'/><path d='M8 2l5 6-5 6-5-6z' fill='%2356d364'/></svg>">
+<title>mega-docs</title>
+<!-- the name the home-screen shortcut shows; the guide tells people to add one -->
+<meta name="apple-mobile-web-app-title" content="mega-docs">
+<!-- Inline, so there is no second request and no 404 in every console. It is the
+     *same* mark as the header's — 8bit-nes's `layers` glyph, copied verbatim from the
+     icon set rather than redrawn, so the tab and the bar cannot drift apart. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2307071c'/><g fill='%23c2c6f3'><path d='M8 1.5 14.5 5 8 8.5 1.5 5z'/><path fill='none' stroke='%23c2c6f3' stroke-width='1.3' d='M1.5 8 8 11.5 14.5 8 M1.5 11 8 14.5 14.5 11'/></g></svg>">
 
 <!-- ══ Front-end assets ═══════════════════════════════════════════════════════
      Nothing below spells out a version or a hash. Both come from
@@ -85,7 +88,13 @@
     <!-- the light tracks /api/health, so it means something -->
     <span class="badge clear" :data-accent="online ? 'good' : 'crit'"
       :aria-label="online ? 'Server online' : 'Server unreachable'">●</span>
-    <span class="eyebrow">Knowledge Engine</span>
+    <!-- The mark: a stack of documents, which is what this is. Muted on purpose —
+         .eyebrow's own treatment — because the only green in this bar means something
+         (the health dot, the selected mode) and a logo is not a status. -->
+    <span class="brand">
+      <nes-icon name="layers" aria-hidden="true"></nes-icon>
+      <span class="eyebrow">mega-docs</span>
+    </span>
 
     <!-- Two jobs, one screen. .segment is the library's single-choice control:
          aria-pressed carries the state, since the fill alone isn't announced. -->
