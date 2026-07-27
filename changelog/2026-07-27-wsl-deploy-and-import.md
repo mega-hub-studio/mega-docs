@@ -189,23 +189,63 @@ make switch-embed`.
 
 ## 3. Open work
 
-### a. The corpus has no remote — set this up first
+### a. The corpus has no remote — **deliberately deferred**
 
-`/opt/knowledge/corpus` is a local git repo with no `origin`, so nothing is backed up
-off the box and "expose the SoT to the cloud" is not done.
+`/opt/knowledge/corpus` is a local git repo with no `origin`. It is versioned and
+committed on every write, but it lives on one machine: that is a history, not a
+backup. Deferred on purpose while the corpus is still being reshaped daily —
+pointing a remote at a tree whose layout is still moving buys nothing and costs a
+repo to keep tidy. Do it when the folder structure has stopped changing.
+
+Everything it needs is already verified, so the setup is four commands and not a
+project:
 
 ```bash
-cd /opt/knowledge/corpus && git remote add origin git@github.com:<org>/<corpus>.git
+# 1. create a PRIVATE repo, no README (this history already exists)
+# 2. wire it — SSH, not HTTPS
+cd /opt/knowledge/corpus
+git remote add origin git@github.com:<org>/<corpus>.git
 git push -u origin main
+# 3. prove the automated push works
+sudo systemctl start corpus-sync.service && journalctl -u corpus-sync.service -n 3
+# 4. prove it is private: this must answer 404, not 200
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://github.com/<org>/<corpus>/info/refs?service=git-upload-pack"
 ```
 
-**The remote must be private.** `mega-hub-studio/mega-docs` is public (anonymous
-`git-upload-pack` returns 200, and Pages serves from it) — internal business
-documents pushed there are published. The corpus repo is a *different* repo from
-this one, on purpose.
+Why those specifics, so nobody re-derives them:
 
-Done when: a BA confirm or a browser import appears in the remote within ~15 minutes
-with no human action.
+- **SSH, never HTTPS.** The push runs from a systemd unit with no terminal. An HTTPS
+  remote would need a credential helper that isn't there, and `corpus-sync.sh` treats
+  a push failure as non-fatal — so it would fail *silently* forever.
+- It works today: `ssh -o BatchMode=yes -T git@github.com` authenticates with no
+  agent, `~/.ssh/config` maps `github.com` to `id_ed25519_github`, and
+  `corpus-sync.service` carries no `ProtectHome`, so it can read that key.
+- The branch is already `main`, matching the script's default.
+- **The remote must be private.** The code repo is public; that is the whole reason
+  the corpus is a separate repo.
+
+Done when: a BA confirm or a browser import reaches the remote within ~2 minutes with
+no human action.
+
+### a2. The documents were purged from the public repo's history
+
+The five booking handoffs were committed to the public code repo before the split
+existed. `git rm` took them out of HEAD; `git filter-repo --path docs/booking
+--invert-paths` took them out of all 52 commits, verified by scanning **every blob**
+in the rewritten history for their content (`Developer Handoff`, `UI-BL-01`,
+`Deposits Unpaid`, `Waiting List` → zero hits; the only remaining mentions of the
+*path* are these changelog files, which is prose).
+
+Two things follow. A clone made before the rewrite still holds the old objects, so
+the deploy was repaired with `git fetch && git reset --hard origin/main` rather than
+`git pull` — the SHAs changed. And a backup bundle of the pre-rewrite history sits at
+`~/mega-docs-backup-999885b.bundle`; delete it once you are satisfied, because it
+contains exactly what the rewrite removed.
+
+The guard that stops this recurring is not the rewrite — it is `docs/*` +
+`!docs/.gitkeep` in [`.gitignore`](../.gitignore). `docs/` is `CORPUS_DIR`'s default,
+so it is where a real document lands the moment anyone runs `make ingest` on a laptop.
 
 ### b. Tree UI + scoped retrieval — **done**, see `2026-07-27-scoped-retrieval.md`
 
