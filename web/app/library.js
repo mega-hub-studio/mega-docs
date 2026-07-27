@@ -32,6 +32,33 @@ export async function loadCorpus() {
   }
 }
 
+/**
+ * Three questions worth tapping first, derived from the corpus itself.
+ *
+ * They used to be three hardcoded questions about this engine ("How do I ingest a
+ * PDF?") — which, over a corpus of booking specifications, is a first screen that
+ * advertises the wrong subject and returns "not in the documents" for all three.
+ *
+ * The biggest documents are the ones most likely to answer something, and "what does
+ * it cover?" is the question that proves the whole loop — retrieval, grounding,
+ * citation — in one tap.
+ *
+ * @param {Corpus} corpus
+ * @returns {string[]}
+ */
+export function starters(corpus) {
+  return [...(corpus.documents || [])]
+    .sort((a, b) => b.chunks - a.chunks)
+    .slice(0, 3)
+    .map((d) => `What does ${title(d)} cover?`);
+}
+
+/** A file name is not a sentence: "booking-list_v2.md" → "booking list v2". */
+function title(doc) {
+  const name = doc.title || (doc.path || "").split("/").pop() || "";
+  return name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim();
+}
+
 /** "2026-07-25T09:10:11Z" → "25 Jul" — dense enough for a phone row. */
 export function shortDate(iso) {
   const d = new Date((iso || "").replace(" ", "T") + (iso?.endsWith("Z") ? "" : "Z"));

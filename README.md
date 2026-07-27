@@ -123,6 +123,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a new API endpoint | `internal/server` | routing and transport live in one place |
 | a new dependency version | `web/vendor.sha384` | one line drives the URL, the digest and vendoring |
 | better retrieval / prompting | `internal/rag` | the domain never imports HTTP |
+| how a document is cut into sections | `internal/rag/chunk.go` | small sections merge, oversized ones split by paragraph then by line; **changing it needs a re-ingest** |
 | a new provider | `internal/ai` | one client, one seam; probe it with `make live` |
 | a provider quirk to survive | `internal/aitest` | fault injection lives with the fake, not in each test |
 | a UI action | `web/app/app.js` | it's intent; plumbing lives in its own module |

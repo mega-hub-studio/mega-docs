@@ -204,6 +204,29 @@ view.scrollToEnd();                            // viewport.js</span></div>
     <div class="step">
       <span class="num">2</span>
       <div class="body">
+        <b lang="en">Answer quality → how a document is cut into sections</b>
+        <b lang="vi">Chất lượng trả lời → cách tài liệu được cắt thành đoạn</b>
+        <p lang="en"><code>minChars</code> / <code>maxChars</code> in
+          <code>internal/rag/chunk.go</code>. A section under <code>minChars</code> is
+          merged with the ones next to it, and an oversized one is split by paragraph and
+          then by line — a markdown table keeps its header row in every part. Measured on
+          five specification documents: the old rule left 228 of 471 chunks under 300
+          characters and ten tables over the limit, the largest 11,651. <b>Costs a
+          re-ingest</b>: existing rows keep the old cut until
+          <code>./bin/ingest corpus</code> runs again.</p>
+        <p lang="vi"><code>minChars</code> / <code>maxChars</code> trong
+          <code>internal/rag/chunk.go</code>. Đoạn nhỏ hơn <code>minChars</code> sẽ được gộp
+          với các đoạn kế bên, đoạn quá lớn bị cắt theo paragraph rồi theo dòng — bảng
+          markdown giữ lại dòng header ở mọi phần. Đo trên năm tài liệu đặc tả: luật cũ để
+          lại 228/471 đoạn dưới 300 ký tự và mười cái bảng vượt hạn mức, lớn nhất 11.651.
+          <b>Phải ingest lại</b>: dữ liệu đang có vẫn theo cách cắt cũ tới khi chạy lại
+          <code>./bin/ingest corpus</code>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
         <b lang="en">Grounding → the prompt</b>
         <b lang="vi">Mức căn cứ → prompt</b>
         <p lang="en"><code>internal/rag</code>. This is where "answer only from these
@@ -216,7 +239,7 @@ view.scrollToEnd();                            // viewport.js</span></div>
     </div>
 
     <div class="step">
-      <span class="num">3</span>
+      <span class="num">4</span>
       <div class="body">
         <b lang="en">A different provider or model</b>
         <b lang="vi">Đổi provider hoặc model</b>
@@ -249,7 +272,7 @@ EMBED_DIM=1536</span></div>
     </div>
 
     <div class="step">
-      <span class="num">4</span>
+      <span class="num">5</span>
       <div class="body">
         <b lang="en">Who may write, and where their answers land</b>
         <b lang="vi">Ai được ghi, và câu trả lời của họ đi đâu</b>
@@ -284,7 +307,7 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     </div>
 
     <div class="step">
-      <span class="num">5</span>
+      <span class="num">6</span>
       <div class="body">
         <b lang="en">The UI</b>
         <b lang="vi">Giao diện</b>

@@ -1,0 +1,68 @@
+name: check
+
+# `make check` on every push and pull request — the same gate a human runs before
+# deploying, in the one place nobody can skip.
+#
+# Why this exists: until now the tests only ran on a laptop and on the deploy host,
+# so a broken commit reached `main` looking fine and failed at `make check` *during*
+# a deployment — after the pull, with the service already stopped. The invariants
+# worth protecting are the ones that fail silently (a scope that stops filtering, a
+# cache that answers one folder from another), and those are exactly the ones nobody
+# re-tests by hand.
+#
+# The build needs cgo: sqlite-vec and FTS5 are C. ubuntu-latest ships gcc, so the
+# Makefile's own TAGS and CGO_ENABLED=1 are all that is required — no apt install.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      # web/vendor/ is gitignored (the assets are fetched, never committed), and one
+      # test asserts the tree matches every pin in web/vendor.sha384. Without this
+      # step that test fails on a fresh checkout for a reason that has nothing to do
+      # with the change being tested.
+      - name: Vendor the pinned front-end assets
+        run: make vendor
+
+      # staticcheck and deadcode are optional in the Makefile — it skips them with a
+      # note when they are absent. On CI they are cheap, and the whole point is to not
+      # skip anything, so install them first.
+      #
+      # Both @latest currently need Go >= 1.25 to *build*, which is newer than the
+      # 1.22 this module targets. That is fine and deliberate: GOTOOLCHAIN defaults to
+      # auto, so `go install` fetches the toolchain it needs for the tool only, and
+      # the module keeps compiling against its own version. Verified locally on Go
+      # 1.24.7 with staticcheck 2026.1 — both run clean on this tree.
+      - name: Install the optional linters
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install golang.org/x/tools/cmd/deadcode@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: make check
+        run: make check
+
+      # The gate proves the code is correct; this proves it still builds into the two
+      # binaries a deploy actually installs.
+      - name: make build
+        run: make build

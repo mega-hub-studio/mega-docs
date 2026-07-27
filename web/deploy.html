@@ -228,6 +228,28 @@
       <b>dựng lại được</b> — <code>CORPUS_DIR</code> mới là nguồn sự thật, gồm cả câu trả
       lời đã confirm. Chi phí duy nhất là embed lại, còn cache câu trả lời tự dựng lại
       khi có người hỏi.</p>
+
+    <div class="callout memo">
+      <b lang="en">Three kinds of change need that same rebuild.</b>
+      <span lang="en">There is no schema migration and deliberately so — the database is
+        derived, so the upgrade path is to rebuild it. (1) A change to how documents are
+        <i>split</i> into sections: the existing rows were split by the old rule and stay
+        that way until re-ingested. (2) A new database column: <code>schema.sql</code> is
+        <code>CREATE TABLE IF NOT EXISTS</code>, so an existing table never gains one, and
+        queries naming it fail at runtime while passing on a fresh file. (3) A change to
+        how a document path is stored. Everything else — a prompt edit, a new model, a
+        retrieval parameter — invalidates the answer cache on its own and needs
+        nothing.</span>
+      <b lang="vi">Ba loại thay đổi cần dựng lại như trên.</b>
+      <span lang="vi">Không có migration schema, và đó là chủ ý — database là thứ dựng lại
+        được, nên cách nâng cấp là dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành
+        đoạn: các dòng đang có vẫn theo luật cũ tới khi ingest lại. (2) Thêm column mới:
+        <code>schema.sql</code> chỉ có <code>CREATE TABLE IF NOT EXISTS</code>, nên bảng đã
+        tồn tại sẽ không bao giờ có column đó, và query gọi tên nó sẽ lỗi lúc chạy dù test
+        trên file mới vẫn xanh. (3) Thay đổi cách lưu path tài liệu. Còn lại — sửa prompt,
+        đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không cần
+        gì thêm.</span>
+    </div>
   </section>
 
   <!-- ══ settings ══════════════════════════════════════════════════════════ -->

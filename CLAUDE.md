@@ -115,6 +115,29 @@ a `TextDecoder` or `visualViewport`.
    must agree: relative to `CORPUS_DIR`, folders kept, `..`/absolute/hidden/`qa/`
    refused. Two spellings of one file become two documents, each cited separately.
 
+### The schema has no migrations — on purpose
+
+`schema.sql` is `CREATE TABLE IF NOT EXISTS` only, and it is applied on every start.
+That means **a new column never reaches a database that already exists**: the table is
+there, so the statement does nothing, and every query naming the column fails at
+runtime on the deployed instance while passing locally against a fresh file.
+
+There is no migration runner because there does not need to be one — invariant 1 says
+the database is derived. The upgrade path for a schema change is to rebuild:
+
+```bash
+sudo systemctl stop knowledge
+rm -f state/knowledge.db state/knowledge.db-wal state/knowledge.db-shm
+./bin/ingest corpus            # re-embeds everything: costs one provider bill
+sudo systemctl start knowledge
+```
+
+So the real cost of a column is one re-ingest, and the two ways to avoid paying it are
+worth trying first: derive the value at query time, or encode it in an existing column
+(the scope lives inside `answers.q_norm` for exactly this reason). Write the rebuild
+into the changelog entry for any change that needs it, or the next person meets it as
+a runtime error.
+
 ### Traps that have already cost time
 
 - **The `NoAnswer` sentinel is not a substring test.** A reply that *is* the sentence
@@ -153,6 +176,10 @@ with one link out to the published site. Do not add doc routes to it.
   [`web/vendor.sha384`](web/vendor.sha384), which drives both the page's `integrity`
   attributes and `make vendor`. A half-finished bump fails at **startup**, not in a
   browser.
+- `make check` runs in CI on every push and pull request
+  ([`.github/workflows/check.yml`](.github/workflows/check.yml)), with staticcheck and
+  deadcode installed so nothing is skipped. It runs `make vendor` first, because
+  `web/vendor/` is gitignored and one test asserts the tree matches every pin.
 - Comments explain *why*, and name the failure that motivated the code. This repo's
   existing comments are the style guide; match their density and voice.
 - Vendored Go style skills (`.agents/skills/`, `.claude/skills/`) come from

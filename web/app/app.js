@@ -18,17 +18,11 @@ import { ask as askServer, health } from "./chat.js";
 import { answerHtml, fileName } from "./answer.js";
 import * as diagram from "./diagram.js";
 import { bindViewport } from "./viewport.js";
-import { loadCorpus, shortDate } from "./library.js";
+import { loadCorpus, shortDate, starters } from "./library.js";
 import * as session from "./session.js";
 import * as qa from "./qa.js";
 import { BaScreen } from "./ba.js";
 import { CorpusTree } from "./tree.js";
-
-const STARTERS = [
-  "How does retrieval stay grounded?",
-  "How do I ingest a PDF?",
-  "Which env vars change answer quality?",
-];
 
 const MODE_KEY = "ke.mode"; // a BA reopening the app wants the queue, not the prompt
 const SCOPE_KEY = "ke.scope"; // the folder being asked about outlives a reload, like the thread
@@ -58,7 +52,6 @@ export function boot(ds) {
         turns,
         busy: false,
         online: true,
-        starters: STARTERS,
         corpus: { state: "loading", docs: 0, chunks: 0, approved: 0, documents: [] },
         // Which part of the corpus questions are answered from. "" is all of it, and
         // is what every question was before this control existed.
@@ -96,6 +89,11 @@ export function boot(ds) {
        *  Nothing here is estimated. A field whose input is missing is left empty and
        *  the markup drops it, because an unmeasured cost and a cost of nothing look
        *  the same on screen and are not the same fact. */
+      /** Tap-to-send questions about the documents that are actually indexed. */
+      starters() {
+        return starters(this.corpus);
+      },
+
       statusLine() {
         const t = this.turns.at(-1);
         const state = !this.online ? "error"

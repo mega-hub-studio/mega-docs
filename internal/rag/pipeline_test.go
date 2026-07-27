@@ -185,7 +185,9 @@ func TestIngestBatchesLargeDocumentsWithoutMisalignment(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("# Big\n\n")
 	for i := 0; i < 70; i++ {
-		// distinct heading + body so a mispaired vector is detectable
+		// Distinct heading + body so a mispaired vector is detectable, and each body
+		// over minChars so the chunker leaves 70 sections as 70 chunks — the point of
+		// this test is the batching, not the merging.
 		sb.WriteString("## Section ")
 		sb.WriteString(strings.Repeat("x", i%5+1))
 		sb.WriteString("\n")
@@ -193,7 +195,9 @@ func TestIngestBatchesLargeDocumentsWithoutMisalignment(t *testing.T) {
 		sb.WriteString(strings.Repeat("y", i%7+1))
 		sb.WriteString(" number ")
 		sb.WriteString(strings.Repeat("z", i%3+1))
-		sb.WriteString(".\n\n")
+		sb.WriteString(". ")
+		sb.WriteString(strings.Repeat("padding so this section stands on its own. ", 15))
+		sb.WriteString("\n\n")
 	}
 
 	n, err := e.Ingest(ctx, "docs/big.md", sb.String())
