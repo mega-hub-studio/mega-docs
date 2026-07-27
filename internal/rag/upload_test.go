@@ -10,65 +10,86 @@ import (
 // The corpus directory is a boundary. A browser can send any string as a file
 // name, so every way out of the tree is checked here rather than trusted to the
 // caller.
-func TestSafeNameRefusesEscapes(t *testing.T) {
+func TestSafePathRefusesEscapes(t *testing.T) {
 	for _, in := range []string{
 		"../secret.md",
 		"../../etc/passwd.md",
-		"/etc/passwd.md",
-		`C:\Windows\notes.md`,
-		"docs/../../x.md",
-		"qa/ticket-1.md", // must not be able to impersonate a confirmed answer
+		"business/../../x.md",
+		"./../x.md",
+		".hidden.md",
+		"business/.git/config.md",
+		"qa/ticket-1.md",  // reserved: must not impersonate a confirmed answer
+		"QA/ticket-99.md", // …in any spelling
 	} {
-		got, err := rag.SafeName(in)
-		if err != nil {
-			continue // refused outright is fine
-		}
-		if strings.ContainsAny(got, `/\`) || strings.Contains(got, "..") {
-			t.Errorf("SafeName(%q) = %q — still a path", in, got)
+		if got, err := rag.SafePath(in); err == nil {
+			t.Errorf("SafePath(%q) = %q, want an error", in, got)
 		}
 	}
 }
 
-func TestSafeNameKeepsThePlainName(t *testing.T) {
+// Folders are the point: they are what a reader browses and scopes a question to,
+// so an import must be able to create them — and only them.
+func TestSafePathKeepsTheFolders(t *testing.T) {
 	for in, want := range map[string]string{
 		"spec.md":                     "spec.md",
-		"  onboarding.txt  ":          "onboarding.txt",
-		"docs/api/spec.md":            "spec.md",
-		"Quy trình nghỉ phép.md":      "Quy trình nghỉ phép.md", // Vietnamese survives
+		"business/pricing.md":         "business/pricing.md",
+		"business/pricing/2026.md":    "business/pricing/2026.md",
+		"  engineering/runbook.txt  ": "engineering/runbook.txt",
+		"/business/pricing.md":        "business/pricing.md",    // absolute is made relative
+		"business//pricing.md":        "business/pricing.md",    // empty segment collapses
+		`C:\docs\spec.md`:             "docs/spec.md",           // Windows path
+		`business\pricing.md`:         "business/pricing.md",    // Windows separator
+		"Quy trình/nghỉ phép.md":      "Quy trình/nghỉ phép.md", // Vietnamese survives
 		"REPORT.MARKDOWN":             "REPORT.MARKDOWN",
-		`\\server\share\handbook.txt`: "handbook.txt",
 	} {
-		got, err := rag.SafeName(in)
+		got, err := rag.SafePath(in)
 		if err != nil {
-			t.Errorf("SafeName(%q) errored: %v", in, err)
+			t.Errorf("SafePath(%q) errored: %v", in, err)
 			continue
 		}
 		if got != want {
-			t.Errorf("SafeName(%q) = %q, want %q", in, got, want)
+			t.Errorf("SafePath(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// A tree nobody can hold in their head is not a scope. The limit is stated in the
+// error, because the fix is to flatten a folder, not to guess.
+func TestSafePathCapsTheDepth(t *testing.T) {
+	ok := "a/b/c/deep.md" // MaxDepth = 4 segments
+	if _, err := rag.SafePath(ok); err != nil {
+		t.Errorf("SafePath(%q) errored: %v", ok, err)
+	}
+	tooDeep := "a/b/c/d/deep.md"
+	err := errOf(rag.SafePath(tooDeep))
+	if err == nil {
+		t.Fatalf("SafePath(%q) was accepted", tooDeep)
+	}
+	if !strings.Contains(err.Error(), "limit") {
+		t.Errorf("the depth error should state the limit, got %q", err)
 	}
 }
 
 // The formats are the product's promise ("only .md and .txt"), and the rejection
 // has to say what to do instead — a user holding a PDF needs the next step, not a
 // restatement of the rule.
-func TestSafeNameRefusesOtherFormats(t *testing.T) {
-	for _, in := range []string{"spec.pdf", "report.docx", "sheet.xlsx", "archive.zip", "noext"} {
-		_, err := rag.SafeName(in)
+func TestSafePathRefusesOtherFormats(t *testing.T) {
+	for _, in := range []string{"spec.pdf", "business/report.docx", "sheet.xlsx", "archive.zip", "noext"} {
+		err := errOf(rag.SafePath(in))
 		if err == nil {
-			t.Errorf("SafeName(%q) was accepted", in)
+			t.Errorf("SafePath(%q) was accepted", in)
 			continue
 		}
 		if !strings.Contains(err.Error(), "markitdown") && in != "noext" {
-			t.Errorf("SafeName(%q) error should point at the conversion step, got %q", in, err)
+			t.Errorf("SafePath(%q) error should point at the conversion step, got %q", in, err)
 		}
 	}
 }
 
-func TestSafeNameRefusesHiddenAndEmpty(t *testing.T) {
-	for _, in := range []string{"", "   ", ".", "..", ".env", ".hidden.md"} {
-		if got, err := rag.SafeName(in); err == nil {
-			t.Errorf("SafeName(%q) = %q, want an error", in, got)
+func TestSafePathRefusesEmpty(t *testing.T) {
+	for _, in := range []string{"", "   ", "/", "//", "."} {
+		if got, err := rag.SafePath(in); err == nil {
+			t.Errorf("SafePath(%q) = %q, want an error", in, got)
 		}
 	}
 }
@@ -83,3 +104,5 @@ func TestIsText(t *testing.T) {
 		}
 	}
 }
+
+func errOf(_ string, err error) error { return err }

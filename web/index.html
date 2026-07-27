@@ -78,6 +78,7 @@
 <link rel="modulepreload" href="/app/library.js">
 <link rel="modulepreload" href="/app/session.js">
 <link rel="modulepreload" href="/app/qa.js">
+<link rel="modulepreload" href="/app/upload.js">
 </head>
 <body>
 <!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
@@ -323,10 +324,30 @@
         updates that document in place, so re-importing a corrected version replaces it
         instead of adding a second copy.</p>
 
-      <label class="btn">
-        <input type="file" :accept="accept" multiple hidden @change="pickDocs" :disabled="importing">
-        {{ importing ? 'IMPORTING…' : 'CHOOSE FILES — OR DROP THEM HERE' }}
+      <!-- The folder is the scope. A reader later browses this tree and asks a
+           question against one branch, so choosing it at import time is not
+           filing — it is what makes the answer findable. Existing folders are
+           offered, because a fourth spelling of "engineering" is a fourth scope. -->
+      <label class="field">
+        <span class="label">Folder</span>
+        <input class="input" v-model="importDir" list="corpus-folders" placeholder="business/pricing"
+          autocapitalize="off" autocorrect="off" spellcheck="false">
+        <datalist id="corpus-folders">
+          <option v-for="f in folders" :key="f" :value="f"></option>
+        </datalist>
+        <span class="hint">Empty = the top level. Picking a whole folder keeps its own structure.</span>
       </label>
+
+      <div class="control-group">
+        <label class="btn">
+          <input type="file" :accept="accept" multiple hidden @change="pickDocs" :disabled="importing">
+          {{ importing ? 'IMPORTING…' : 'CHOOSE FILES' }}
+        </label>
+        <label class="btn ghost">
+          <input type="file" webkitdirectory multiple hidden @change="pickDocs" :disabled="importing">
+          CHOOSE A FOLDER
+        </label>
+      </div>
 
       <!-- Per file, both outcomes in one list: a batch where seven landed and one
            was a PDF is the normal case, and the user needs to see which. -->

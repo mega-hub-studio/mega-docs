@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"path"
 
 	"knowledge-engine/internal/rag"
 )
@@ -51,9 +52,15 @@ func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
 			return
 		}
 
+		// The folder the batch lands in. Sent separately from the file name because
+		// a browser only reveals a relative path when a whole directory was picked —
+		// for loose files the folder is a choice the person makes, and it is the one
+		// thing that decides what a reader can later scope a question to.
+		dir := r.FormValue("dir")
+
 		out := importResult{Uploaded: []rag.Uploaded{}, Failed: []importFailure{}}
 		for _, fh := range files {
-			doc, err := readUpload(r.Context(), imp, fh)
+			doc, err := readUpload(r.Context(), imp, dir, fh)
 			if err != nil {
 				out.Failed = append(out.Failed, importFailure{Name: fh.Filename, Error: err.Error()})
 				continue
@@ -84,8 +91,12 @@ type importFailure struct {
 // readUpload validates before it reads: the name decides whether the bytes are
 // worth pulling into memory at all, and a 40 MB PDF should be refused on its
 // extension rather than on its size.
-func readUpload(ctx context.Context, imp Importer, fh *multipart.FileHeader) (rag.Uploaded, error) {
-	if _, err := rag.SafeName(fh.Filename); err != nil {
+func readUpload(ctx context.Context, imp Importer, dir string, fh *multipart.FileHeader) (rag.Uploaded, error) {
+	// The chosen folder is prefixed here, so the engine still receives one path and
+	// applies one rule to it. Joining before validation is what makes "../" in the
+	// folder box as harmless as "../" in a file name.
+	name := path.Join(dir, fh.Filename)
+	if _, err := rag.SafePath(name); err != nil {
 		return rag.Uploaded{}, err
 	}
 	if fh.Size > maxDoc {
@@ -101,5 +112,5 @@ func readUpload(ctx context.Context, imp Importer, fh *multipart.FileHeader) (ra
 	if err != nil {
 		return rag.Uploaded{}, fmt.Errorf("%s could not be read", fh.Filename)
 	}
-	return imp.Upload(ctx, fh.Filename, string(body))
+	return imp.Upload(ctx, name, string(body))
 }

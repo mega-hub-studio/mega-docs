@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -38,16 +39,21 @@ func IsText(name string) bool {
 	return false
 }
 
+// MaxDepth caps how deep an imported path may nest. Folders are what a reader
+// scopes a question to, and a tree nobody can hold in their head is not a scope —
+// three levels is already "business / pricing / 2026".
+const MaxDepth = 4
+
 // Upload writes one document into the corpus and indexes it.
 //
-// The stored path is derived from the file name alone, never from what the client
-// sent as a path: a browser is free to submit "../../etc/passwd" or an absolute
-// path, and the corpus directory is a boundary, not a suggestion.
+// Folders are kept, because they are the structure a reader browses and scopes a
+// question to — but every segment is sanitised, and the corpus directory is a
+// boundary, not a suggestion: a browser is free to submit "../../etc/passwd".
 //
-// Re-uploading the same name updates that document in place rather than creating a
+// Re-uploading the same path updates that document in place rather than creating a
 // second one — the same identity rule ingest uses, so the two agree.
 func (e *Engine) Upload(ctx context.Context, name string, content string) (Uploaded, error) {
-	rel, err := SafeName(name)
+	rel, err := SafePath(name)
 	if err != nil {
 		return Uploaded{}, err
 	}
@@ -69,35 +75,71 @@ func (e *Engine) Upload(ctx context.Context, name string, content string) (Uploa
 	return Uploaded{Path: rel, Chunks: n}, nil
 }
 
-// SafeName reduces whatever a client sent to a plain file name inside the corpus.
+// SafePath turns whatever a client sent into a relative path inside the corpus.
 //
-// Only the base name survives, so no input can traverse out of the tree or land in
-// qa/ and impersonate a confirmed answer. What remains is checked for the one thing
-// a name still has to be: a text document this engine can read.
-func SafeName(name string) (string, error) {
-	// Windows separators too: filepath.Base is a no-op on "C:\docs\spec.md" under
-	// Linux, and the whole string would become one file name.
-	name = strings.TrimSpace(name)
-	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
-		name = name[i+1:]
+// Folders survive — "business/pricing/2026.md" stays that — because the tree is
+// what a reader browses and scopes a question to. Everything that could take the
+// path somewhere else does not:
+//
+//   - a leading "/" or a drive letter, which would make it absolute
+//   - any ".." segment, the way out of the tree
+//   - a "." segment or a dot-prefixed name, which hides a file from the folder
+//     it is supposed to appear in
+//   - the reserved qa/ folder, so an import cannot impersonate an answer a BA
+//     vouched for (those carry an approval boost in retrieval)
+//
+// The check is per segment and structural, not a blocklist of strings: it is the
+// resulting path that has to be inside the tree, whatever spelling produced it.
+func SafePath(name string) (string, error) {
+	// Windows separators first: under Linux filepath treats "docs\spec.md" as one
+	// file name, and the backslashes would end up in the stored path.
+	clean := strings.ReplaceAll(strings.TrimSpace(name), `\`, "/")
+	// A drive letter or UNC prefix is absolute on the machine it came from; keep
+	// only what follows so it lands in the corpus like any other path.
+	if i := strings.Index(clean, ":"); i >= 0 && i <= 2 {
+		clean = clean[i+1:]
 	}
-	name = strings.TrimSpace(filepath.Base(name))
 
-	// A leading dot is how a name becomes invisible in the corpus folder, and "."
-	// / ".." survive Base unchanged.
-	if name == "" || strings.HasPrefix(name, ".") {
+	var segs []string
+	for _, s := range strings.Split(clean, "/") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue // leading "/", "//", trailing "/"
+		}
+		if s == "." || s == ".." {
+			return "", fmt.Errorf("%q walks outside the documents folder", name)
+		}
+		if strings.HasPrefix(s, ".") {
+			return "", fmt.Errorf("%q has a hidden segment (%s)", name, s)
+		}
+		// A path is read by people in citations and in a file browser; a control
+		// character makes both unreadable. Vietnamese and spaces are fine.
+		for _, r := range s {
+			if unicode.IsControl(r) {
+				return "", fmt.Errorf("%q contains a control character", name)
+			}
+		}
+		segs = append(segs, s)
+	}
+	if len(segs) == 0 {
 		return "", fmt.Errorf("%q is not a usable file name", name)
 	}
-	if !IsText(name) {
+	if len(segs) > MaxDepth {
+		return "", fmt.Errorf("%s is %d folders deep — the limit is %d", clean, len(segs)-1, MaxDepth-1)
+	}
+	if !IsText(segs[len(segs)-1]) {
 		return "", fmt.Errorf("%s is not a %s file — convert it first (markitdown spec.pdf > spec.md)",
-			name, strings.Join(TextExts, " / "))
+			segs[len(segs)-1], strings.Join(TextExts, " / "))
 	}
-	// Control characters would make the citation line unreadable and the file
-	// awkward to open by hand; everything else, including Vietnamese, is fine.
-	for _, r := range name {
-		if unicode.IsControl(r) {
-			return "", fmt.Errorf("%q contains a control character", name)
-		}
+	if strings.EqualFold(segs[0], QADir) {
+		return "", fmt.Errorf("%s/ holds answers a BA confirmed — import into another folder", QADir)
 	}
-	return name, nil
+
+	rel := path.Join(segs...)
+	// Belt and braces: whatever the segment rules missed, the result must still be
+	// a relative path that stays put.
+	if filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("%q walks outside the documents folder", name)
+	}
+	return rel, nil
 }

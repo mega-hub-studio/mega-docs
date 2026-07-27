@@ -17,6 +17,22 @@ export const ACCEPT = ".md,.markdown,.txt";
 
 const EXTS = [".md", ".markdown", ".txt"];
 
+/**
+ * The folders already in the corpus, deepest paths collapsed to each level, so the
+ * picker suggests the structure that exists instead of inviting a fourth spelling
+ * of "engineering".
+ * @param {{path: string}[]} documents from /api/corpus
+ */
+export function folders(documents = []) {
+  const seen = new Set();
+  for (const d of documents) {
+    const parts = String(d.path || "").split("/");
+    parts.pop(); // the file name
+    for (let i = 1; i <= parts.length; i++) seen.add(parts.slice(0, i).join("/"));
+  }
+  return [...seen].sort();
+}
+
 /** Split a drop into what can be sent and what cannot, so the UI can say both. */
 export function sort(files) {
   const ok = [];
@@ -33,9 +49,13 @@ export function sort(files) {
  * @throws {WrongPass} when the password is missing, wrong, or writes are off
  * @returns {Promise<{uploaded: {path: string, chunks: number}[], failed: {name: string, error: string}[], chunks: number}>}
  */
-export async function send(files) {
+export async function send(files, dir = "") {
   const body = new FormData();
-  for (const f of files) body.append("files", f, f.name);
+  if (dir.trim()) body.append("dir", dir.trim());
+  // webkitRelativePath is set when a *folder* was picked, and it carries the
+  // structure the person already built on their own disk — keep it rather than
+  // flattening a tree they organised.
+  for (const f of files) body.append("files", f, f.webkitRelativePath || f.name);
 
   let res;
   try {

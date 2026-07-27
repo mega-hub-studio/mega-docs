@@ -80,6 +80,7 @@ export function boot(ds) {
 
         /* ── importing documents ── */
         accept: upload.ACCEPT,
+        importDir: "", // the folder this batch lands in — the scope a reader browses
         importing: false,
         dragging: false, // a drop target that doesn't light up reads as inert
         imported: null, // {uploaded, failed, chunks} from the last import
@@ -94,6 +95,14 @@ export function boot(ds) {
       if (this.turns.length) this.view.scrollToEnd({ force: true });
       addEventListener("online", () => this.checkHealth());
       addEventListener("offline", () => (this.online = false));
+    },
+
+    computed: {
+      /** The folders that already exist, so the import picker suggests the
+       *  structure rather than inviting a fourth spelling of "engineering". */
+      folders() {
+        return upload.folders(this.corpus.documents);
+      },
     },
 
     watch: {
@@ -251,7 +260,7 @@ export function boot(ds) {
         this.importing = true;
         this.imported = null;
         try {
-          const r = await upload.send(ok);
+          const r = await upload.send(ok, this.importDir);
           // A file the browser filtered never reached the server, but to the person
           // who dropped it there is one list, so they arrive in one.
           r.failed = [...r.failed, ...rejected.map((f) => ({ name: f.name, error: `not ${upload.ACCEPT}` }))];
