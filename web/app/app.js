@@ -20,7 +20,7 @@ import { bindViewport } from "./viewport.js";
 import { loadCorpus, shortDate } from "./library.js";
 import * as session from "./session.js";
 import * as qa from "./qa.js";
-import * as upload from "./upload.js";
+import { BaScreen } from "./ba.js";
 
 const STARTERS = [
   "How does retrieval stay grounded?",
@@ -29,14 +29,6 @@ const STARTERS = [
 ];
 
 const MODE_KEY = "ke.mode"; // a BA reopening the app wants the queue, not the prompt
-
-/* What each transition means, said once. A confirm is the only one worth
-   celebrating: it is the moment a gap became part of the documents. */
-const TOASTS = {
-  draft: (t) => `<b>Draft saved.</b> Ticket #${t.id} is not published yet.`,
-  confirm: (t) => `<b>In the knowledge base.</b> ${t.doc} — the next question retrieves it.`,
-  reject: (t) => `<b>Dismissed #${t.id}.</b> It stays on the list, with your reason.`,
-};
 
 let seq = 0;
 const newTurn = (q) => ({
@@ -67,26 +59,14 @@ export function boot(ds) {
         corpus: { state: "loading", docs: 0, chunks: 0, approved: 0, documents: [] },
         showSources: false,
 
-        /* ── the QA loop ── */
+        /* ── the QA loop. Everything here is rendered by *both* screens — the
+           header badge, and the "questions with a BA" list on the ASK screen. What
+           only BA mode touches lives in ba.js. ── */
         mode: localStorage.getItem(MODE_KEY) === "ba" ? "ba" : "dev",
         writes: false, // does this instance allow a BA to confirm at all
-        unlocked: !!qa.pass(),
-        passInput: "",
         queue: { tickets: [], open: 0, answered: 0, confirmed: 0, rejected: 0 },
-        drafts: {}, // ticket id → the answer being typed, kept out of the server copy
-        working: 0, // id of the ticket currently being published
         history: [],
         status: qa.STATUS,
-
-        /* ── importing documents ── */
-        accept: upload.ACCEPT,
-        importDir: "", // the folder this batch lands in — the scope a reader browses
-        importing: false,
-        progress: { done: 0, total: 0 }, // real counts — the bar must not invent a position
-        dragging: false, // a drop target that doesn't light up reads as inert
-        imported: null, // {uploaded, failed, chunks} from the last import
-        unlocking: false,
-        unlockError: "",
       };
     },
 
@@ -98,14 +78,6 @@ export function boot(ds) {
       if (this.turns.length) this.view.scrollToEnd({ force: true });
       addEventListener("online", () => this.checkHealth());
       addEventListener("offline", () => (this.online = false));
-    },
-
-    computed: {
-      /** The folders that already exist, so the import picker suggests the
-       *  structure rather than inviting a fourth spelling of "engineering". */
-      folders() {
-        return upload.folders(this.corpus.documents);
-      },
     },
 
     watch: {
@@ -204,118 +176,25 @@ export function boot(ds) {
         }
       },
 
+      /** The queue and the history belong to the shell because both screens show
+       *  them. Failures stay silent: a stale badge beats an error banner over a
+       *  working conversation. */
       async refreshQueue() {
         try {
           this.queue = await qa.queue();
-          // Seed each editor from the server's copy, without letting a refresh
-          // overwrite an answer someone is halfway through typing.
-          for (const t of this.queue.tickets) {
-            if (this.drafts[t.id] === undefined) this.drafts[t.id] = t.answer || "";
-          }
           this.history = await qa.history();
         } catch {
-          /* the badge and the queue simply stay as they were */
+          /* the badge, the queue and the history stay as they were */
         }
       },
 
-      /** Check the password before saying it worked. Storing it unchecked is how a
-       *  typo used to survive until the first upload, and then look like a broken
-       *  import rather than a wrong password. */
-      async unlock() {
-        const candidate = this.passInput.trim();
-        if (!candidate) return;
-        this.unlockError = "";
-        this.unlocking = true;
-        try {
-          if (!(await upload.verify(candidate))) {
-            this.unlockError = "That password does not open the gate. Reads still work.";
-            return;
-          }
-          qa.setPass(candidate);
-          this.unlocked = !!qa.pass();
-          this.passInput = "";
-        } catch (e) {
-          this.unlockError = e.message;
-        } finally {
-          this.unlocking = false;
-        }
-      },
-
-      /** draft · confirm · reject — one path, so every outcome is handled once. */
-      async move(ticket, action) {
-        this.working = ticket.id;
-        const answer = (this.drafts[ticket.id] || "").trim();
-        try {
-          const updated = await qa.act(ticket.id, action, { answer, note: answer });
-          Object.assign(ticket, updated);
-          this.drafts[ticket.id] = updated.answer || "";
-          ds.toast(TOASTS[action](updated), { accent: action === "reject" ? "warn" : "good" });
-          // A confirm changes the corpus: the answer count, the cache, and what the
-          // next question retrieves all move with it.
-          if (action === "confirm") {
-            this.refreshCorpus();
-            this.markConfirmed(updated);
-          }
-          this.refreshQueue();
-        } catch (e) {
-          if (e instanceof qa.WrongPass) {
-            this.unlocked = false;
-            ds.toast(`<b>Locked.</b> ${e.message}`, { accent: "crit" });
-          } else {
-            ds.toast(`<b>${e.message}</b>`, { accent: "crit" });
-          }
-        } finally {
-          this.working = 0;
-        }
-      },
-
-      /** Import .md/.txt straight into the corpus. Same gate as a confirm. */
-      async importDocs(files) {
-        const { ok, rejected } = upload.sort(files);
-        this.dragging = false;
-        if (!ok.length) {
-          ds.toast(`<b>Nothing to import.</b> Only ${upload.ACCEPT} — convert a PDF first.`, { accent: "warn" });
-          return;
-        }
-        this.importing = true;
-        this.imported = null;
-        this.progress = { done: 0, total: ok.length };
-        try {
-          const r = await upload.send(ok, this.importDir, (done, total) => {
-            this.progress = { done, total };
-          });
-          // A file the browser filtered never reached the server, but to the person
-          // who dropped it there is one list, so they arrive in one.
-          r.failed = [...r.failed, ...rejected.map((f) => ({ name: f.name, error: `not ${upload.ACCEPT}` }))];
-          this.imported = r;
-          if (r.uploaded.length) {
-            ds.toast(
-              `<b>${r.uploaded.length} document(s) indexed.</b> ${r.chunks} sections — ask about them now.`,
-              { accent: "good" },
-            );
-            this.refreshCorpus();
-          } else {
-            ds.toast("<b>Nothing was indexed.</b> See the list below.", { accent: "crit" });
-          }
-        } catch (e) {
-          if (e instanceof qa.WrongPass) {
-            // Say why the card just went away. A toast alone is missed exactly
-            // when it matters — the thing being read is the card that vanished.
-            this.unlocked = false;
-            this.unlockError = `The server refused the password: ${e.message}`;
-            ds.toast(`<b>Locked.</b> ${e.message}`, { accent: "crit" });
-          } else {
-            ds.toast(`<b>${e.message}</b>`, { accent: "crit" });
-          }
-        } finally {
-          this.importing = false;
-        }
-      },
-
-      /** The file picker and a drop end in the same place. */
-      pickDocs(e) {
-        this.importDocs(e.target.files);
-        e.target.value = ""; // so picking the same file twice still fires
+      /** The BA screen moved something. What changed is never only one thing: a
+       *  confirm or an import changes the corpus, which invalidates the cache, which
+       *  empties the history — so refresh all three instead of reasoning about it. */
+      baChanged(ticket) {
+        this.refreshQueue();
+        this.refreshCorpus();
+        if (ticket) this.markConfirmed(ticket);
       },
 
       /** Reflect a confirm on the DEV side without a reload. */
@@ -378,5 +257,9 @@ export function boot(ds) {
   // In-browser compiler: don't try to resolve <nes-*> as Vue components. Must be
   // set before mount.
   app.config.compilerOptions.isCustomElement = (tag) => tag.startsWith("nes-");
+  app.component("ba-screen", BaScreen);
+  // ba.js cannot import toast(): the pinned, integrity-checked CDN URL lives in
+  // index.html alone, so the helper is injected the same way boot() receives it.
+  app.provide("toast", ds.toast);
   app.mount("#app");
 }

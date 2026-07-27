@@ -65,7 +65,8 @@
 
 <!-- App shell: layout-only CSS (web/app/styles.css) and the conversation module
      (web/app/app.js → chat.js · answer.js · viewport.js · library.js · session.js ·
-     qa.js · upload.js).
+     qa.js · ba.js → upload.js). The BA screen is a component with its own state; its
+     template is the #ba-screen block near the end of this file.
      Native ES modules, so
      there is still no build step — the Go binary serves them from its embed FS. -->
 <link rel="stylesheet" href="/app/styles.css">
@@ -80,6 +81,7 @@
 <link rel="modulepreload" href="/app/session.js">
 <link rel="modulepreload" href="/app/qa.js">
 <link rel="modulepreload" href="/app/upload.js">
+<link rel="modulepreload" href="/app/ba.js">
 </head>
 <body>
 <!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
@@ -253,13 +255,32 @@
     </article>
   </main>
 
+  <!-- The BA screen is its own component (web/app/ba.js) with its own state — 13 of
+       the app's 22 reactive keys belonged only to it. Template below, outside #app. -->
+  <ba-screen v-else :writes="writes" :online="online" :queue="queue"
+    :documents="corpus.documents" @changed="baChanged" @ask="setMode('dev')"></ba-screen>
+
+  <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes
+       away rather than sitting there disabled. -->
+  <div class="dock" ref="dock" v-show="mode === 'dev'">
+    <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing
+         textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
+         only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
+    <!-- `busy` reaches it as an attribute via a watcher, not :busy — see app.js. -->
+    <nes-chat-prompt ref="prompt"
+      placeholder="Ask about the system…" aria-label="Question"
+      @nes:submit="ask($event.detail.value)" @nes:stop="stop"></nes-chat-prompt>
+  </div>
+</div>
+
+<template id="ba-screen">
   <!-- ══ BA mode ═══════════════════════════════════════════════════════════════
        The queue, and the one action that matters: publish this answer into the
        corpus. Everything here is a library recipe — .segment, .stat, .card,
        .field/.textarea, .badge, .callout, .steps, .datalist — so the app owns no
        component styling of its own.
        ═══════════════════════════════════════════════════════════════════════ -->
-  <main v-else class="ba">
+  <main class="ba">
     <!-- The pipeline, as counts rather than a decorative stage bar: a queue has
          tickets in every state at once, so there is no single "current" step to
          mark. These three numbers are the state, in the order work moves. -->
@@ -393,7 +414,7 @@
       <span class="icon">◈</span>
       <span class="title">Nothing waiting</span>
       <p>When the documents can't answer a question, the DEV who hit it files it here.</p>
-      <button class="btn ghost sm" @click="setMode('dev')">ASK A QUESTION</button>
+      <button class="btn ghost sm" @click="$emit('ask')">ASK A QUESTION</button>
     </div>
 
     <article class="card ticket" v-for="t in queue.tickets" :key="t.id"
@@ -447,18 +468,7 @@
     </article>
   </main>
 
-  <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes
-       away rather than sitting there disabled. -->
-  <div class="dock" ref="dock" v-show="mode === 'dev'">
-    <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing
-         textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
-         only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
-    <!-- `busy` reaches it as an attribute via a watcher, not :busy — see app.js. -->
-    <nes-chat-prompt ref="prompt"
-      placeholder="Ask about the system…" aria-label="Question"
-      @nes:submit="ask($event.detail.value)" @nes:stop="stop"></nes-chat-prompt>
-  </div>
-</div>
+</template>
 
 <!-- type="module" is what makes the `defer` above safe: module scripts and deferred
      classic scripts run in document order, so Vue / marked / DOMPurify are always

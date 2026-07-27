@@ -108,7 +108,7 @@ web/              index.html · docs.html · dev.html · deploy.html (Go templat
                   shared head in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js ·
-                  session.js · qa.js · upload.js
+                  session.js · qa.js · ba.js · upload.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -131,7 +131,8 @@ web/vendor/       `make vendor` output (gitignored)
 | what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
 | a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
 | anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + corpus signature + chat model |
-| a BA/DEV screen | `web/index.html` + `web/app/qa.js` | the loop's transport in one module, the markup in library recipes |
+| a BA-screen behaviour | `web/app/ba.js` | its own component with its own state; the shell only passes what both screens render |
+| a chat-screen behaviour | `web/app/app.js` | the shell: turns, health, corpus, queue, mode |
 | document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |

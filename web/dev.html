@@ -99,6 +99,18 @@ type Importer interface {              // documents in, from the browser
 run.stop();                                    // resolves, never throws
 await qa.act(id, "confirm", { answer });       // qa.js — throws WrongPass on 401/403
 view.scrollToEnd();                            // viewport.js</span></div>
+    <p lang="en">The two screens are two components. <code>app.js</code> is the shell —
+      turns, health, corpus, the queue both screens list; <code>ba.js</code> owns what
+      only BA mode touches (drafts, the unlock form, import progress). Three crossings:
+      props down, one <code>changed</code> event up, and <code>toast</code> injected
+      because the pinned CDN URL lives in one file. In-DOM templates, so components still
+      cost no build step.</p>
+    <p lang="vi">Hai màn hình là hai component. <code>app.js</code> là lớp vỏ — lượt hỏi,
+      health, corpus, hàng đợi mà cả hai màn hình đều hiển thị; <code>ba.js</code> giữ
+      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Ba chỗ
+      giao nhau: props xuống, một event <code>changed</code> lên, và <code>toast</code>
+      được inject vì URL CDN đã pin chỉ nằm ở một file. Template in-DOM, nên component
+      vẫn không cần bước build.</p>
 
   </section>
 
