@@ -118,8 +118,9 @@ type Reply struct {
 // streaming so the UI can render source links.
 //
 // A repeat question is served from the cache: no embedding call, no completion, no
-// cost. The cache is keyed on the question and the corpus signature, so re-indexing
-// invalidates it rather than serving an answer whose sources have moved.
+// cost. The key is the question, the corpus signature and the chat model — so
+// re-indexing *or* changing the model invalidates it, rather than serving an answer
+// whose sources have moved or whose model has been replaced.
 func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	question := strings.TrimSpace(a.Question)
 	onToken := a.OnToken
@@ -128,7 +129,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	}
 
 	// A signature we can't read means "don't cache", never "fail the question".
-	sig, sigErr := e.store.Sig()
+	sig, sigErr := e.sig()
 	if sigErr == nil && !a.Fresh {
 		if c, ok, err := e.store.Cached(sig, question); err == nil && ok {
 			onToken(c.Answer)

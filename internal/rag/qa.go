@@ -101,10 +101,22 @@ func qaMarkdown(question, answer string) string {
 	return fmt.Sprintf("# %s\n\n%s\n", strings.TrimSpace(question), strings.TrimSpace(answer))
 }
 
+// sig identifies everything a cached answer depends on: the corpus it cited *and*
+// the model that wrote it. The store only knows the corpus, so the model is appended
+// here — without it, changing CHAT_MODEL keeps serving the old model's answers until
+// something happens to re-index, which reads as the setting having no effect.
+func (e *Engine) sig() (string, error) {
+	s, err := e.store.Sig()
+	if err != nil {
+		return "", err
+	}
+	return s + "|" + e.ai.ChatModel, nil
+}
+
 // History lists the answers still free to replay. Empty rather than an error when
 // the corpus signature can't be read: history is a convenience, not the product.
 func (e *Engine) History(limit int) ([]db.Cached, error) {
-	sig, err := e.store.Sig()
+	sig, err := e.sig()
 	if err != nil {
 		return []db.Cached{}, nil
 	}

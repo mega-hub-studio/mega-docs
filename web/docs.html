@@ -195,8 +195,8 @@
           <tr lang="vi"><th>Team đi qua cửa nào</th><td>Cũng người đó. Tailscale · Cloudflare Access · wifi công ty — đây là thứ duy nhất quyết định bạn phải cài gì.</td></tr>
           <tr lang="en"><th>A browser, with JavaScript on</th><td>Any current one. Answers stream in, so the page needs script; there is no app to download.</td></tr>
           <tr lang="vi"><th>Một browser, có bật JavaScript</th><td>Bản nào hiện hành cũng được. Câu trả lời chạy về dần nên trang cần script; không có app nào phải tải.</td></tr>
-          <tr lang="en"><th>BA only: the BA password</th><td>The host. Needed <i>only</i> to confirm an answer into the documents — asking never needs it.</td></tr>
-          <tr lang="vi"><th>Chỉ BA: mật khẩu BA</th><td>Người host. <i>Chỉ</i> cần khi confirm câu trả lời vào tài liệu — hỏi thì không bao giờ cần.</td></tr>
+          <tr lang="en"><th>BA only: the BA password</th><td>The host. Needed only to <i>change</i> what the engine says — confirming an answer, or importing a document. Asking never needs it.</td></tr>
+          <tr lang="vi"><th>Chỉ BA: mật khẩu BA</th><td>Người host. Chỉ cần khi <i>thay đổi</i> nội dung engine trả lời — confirm câu trả lời, hoặc import tài liệu. Hỏi thì không bao giờ cần.</td></tr>
         </tbody>
       </table>
     </div>
@@ -321,8 +321,8 @@
           <tr lang="vi"><th>Browser hỏi username và mật khẩu</th><td>Basic auth đang bật — bình thường với cửa wifi công ty.</td><td>Xin người host, rồi cho browser ghi nhớ.</td></tr>
           <tr lang="en"><th>The page loads, the dot is <b>red</b></th><td>You are in. The server is down — not your connection.</td><td>Tell whoever hosts it; there is nothing to fix on your side.</td></tr>
           <tr lang="vi"><th>Trang load được, đèn <b>đỏ</b></th><td>Bạn đã vào. Server đang chết — không phải mạng của bạn.</td><td>Báo người host; phía bạn không có gì để sửa.</td></tr>
-          <tr lang="en"><th>Green dot, but "Nothing is indexed yet"</th><td>It is running with no documents in it.</td><td>Ask the host to index them — see <a href="#loop">When the answer isn't there</a> for the rest of that loop.</td></tr>
-          <tr lang="vi"><th>Đèn xanh, nhưng báo "Nothing is indexed yet"</th><td>Nó đang chạy nhưng chưa có tài liệu nào.</td><td>Nhờ người host index — phần còn lại của vòng này ở <a href="#loop">Khi câu trả lời chưa có</a>.</td></tr>
+          <tr lang="en"><th>Green dot, but "Nothing is indexed yet"</th><td>It is running with no documents in it.</td><td>A BA can import <code>.md</code> / <code>.txt</code> from the <b>BA</b> tab; anything else is a message to the host.</td></tr>
+          <tr lang="vi"><th>Đèn xanh, nhưng báo "Nothing is indexed yet"</th><td>Nó đang chạy nhưng chưa có tài liệu nào.</td><td>BA có thể import <code>.md</code> / <code>.txt</code> ngay ở tab <b>BA</b>; định dạng khác thì nhắn người host.</td></tr>
         </tbody>
       </table>
     </div>
@@ -433,6 +433,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Báo thiếu tài liệu</th><td><b>Ask BA</b> ở dưới câu trả lời sai/thiếu sẽ tạo ticket, kèm luôn câu trả lời đó làm bằng chứng.</td></tr>
           <tr lang="en"><th>Answer a gap (BA mode)</th><td>The <b>BA</b> tab is the ticket queue. Confirming an answer writes it into the documents and indexes it.</td></tr>
           <tr lang="vi"><th>Trả lời phần thiếu (chế độ BA)</th><td>Tab <b>BA</b> là hàng đợi ticket. Xác nhận một câu trả lời sẽ ghi nó vào tài liệu và index luôn.</td></tr>
+          <tr lang="en"><th>Import a document (BA mode)</th><td>Drop <code>.md</code> / <code>.txt</code> files on the <b>BA</b> tab, optionally into a folder. Each one is indexed on arrival; a file that fails is named rather than silently skipped.</td></tr>
+          <tr lang="vi"><th>Import tài liệu (chế độ BA)</th><td>Kéo file <code>.md</code> / <code>.txt</code> vào tab <b>BA</b>, có thể chọn thư mục. Mỗi file được index ngay khi tới; file lỗi sẽ được nêu tên chứ không bị bỏ qua âm thầm.</td></tr>
           <tr lang="en"><th>Copy an answer</th><td>One button, the text without the markup.</td></tr>
           <tr lang="vi"><th>Copy câu trả lời</th><td>Một nút, lấy phần text không kèm markup.</td></tr>
           <tr lang="en"><th>See what is indexed</th><td>Document and section counts, plus the list of files. Three states: ready · nothing indexed · can't reach the server.</td></tr>
@@ -701,14 +703,14 @@ done: 8/8 files, 74 chunks</span></div>
     <div class="callout memo">
       <b lang="en">Confirming needs the BA password; asking never does.</b>
       <span lang="en">If the <b>BA</b> tab says the instance is read-only, ask whoever hosts
-        it to set <code>BA_PASS</code>. And note what a confirm is <i>not</i>: it publishes
-        one answer, not a whole document. Getting a file indexed is still a message to
-        whoever runs the server.</span>
+        it to set <code>BA_PASS</code>. The same password covers importing a document, so
+        a BA can add a whole <code>.md</code> file as well as answer one question — see
+        <b>What the app can do</b> above.</span>
       <b lang="vi">Confirm cần mật khẩu BA; hỏi thì không bao giờ cần.</b>
       <span lang="vi">Nếu tab <b>BA</b> báo instance chỉ-đọc, nhờ người host đặt
-        <code>BA_PASS</code>. Và lưu ý confirm <i>không phải</i> là gì: nó publish một câu
-        trả lời, không phải cả một tài liệu. Muốn index một file thì vẫn phải nhắn người
-        chạy server.</span>
+        <code>BA_PASS</code>. Cùng mật khẩu đó dùng cho import tài liệu, nên BA thêm được
+        cả một file <code>.md</code> chứ không chỉ trả lời một câu — xem
+        <b>App làm được những gì</b> ở trên.</span>
     </div>
   </section>
 

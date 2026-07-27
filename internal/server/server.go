@@ -1,6 +1,8 @@
 // Package server is the HTTP layer: routing, cache policy, and the SSE chat
 // endpoint. It knows nothing about SQLite, embeddings or templates — it is handed
-// an Answerer and the already-rendered page, so it can be tested with neither.
+// narrow interfaces and the already-rendered page, so it can be tested with neither.
+// The read side (Answerer) is required; the write sides (Knowledge, Importer) are
+// nil-able, and their routes disappear rather than half-work.
 package server
 
 import (

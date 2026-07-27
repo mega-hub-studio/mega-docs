@@ -30,8 +30,8 @@ type Knowledge interface {
 // is generous for that and far short of a document upload.
 const maxTicket = 64 << 10 // 64 KiB
 
-// BAPass gates the two actions that change what the engine will say: confirming an
-// answer into the corpus, and dismissing a question.
+// BAPass gates every action that changes what the engine will say: confirming an
+// answer into the corpus, dismissing a question, and importing a document.
 //
 // Reads stay open. This app has no accounts, so the password is the whole
 // difference between "anyone on the tailnet can read the documents" — which is the

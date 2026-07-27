@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"knowledge-engine/internal/ai"
 	"knowledge-engine/internal/aitest"
 	"knowledge-engine/internal/db"
 	"knowledge-engine/internal/rag"
@@ -395,5 +396,50 @@ func TestConfirmedAnswerIsReproducibleByIngest(t *testing.T) {
 	}
 	if c.Docs != 1 || c.Chunks == 0 {
 		t.Errorf("rebuilt corpus = %d docs / %d chunks", c.Docs, c.Chunks)
+	}
+}
+
+// The cache must not survive a model change. Reported from a real deployment: after
+// switching CHAT_MODEL the app kept answering from the old model, which reads as the
+// setting doing nothing.
+func TestChangingTheChatModelInvalidatesTheCache(t *testing.T) {
+	dir := t.TempDir()
+	store, err := db.Open(filepath.Join(dir, "models.db"), dim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	prov, base := aitest.New(&aitest.Provider{Dim: dim})
+	t.Cleanup(prov.Close)
+	engineFor := func(model string) *rag.Engine {
+		return rag.New(store, ai.New(ai.Config{
+			ChatBaseURL: base, APIKey: "test-key", EmbedModel: "embed-model", ChatModel: model,
+		}), rag.Options{TopK: 3, CorpusDir: dir})
+	}
+	old, updated := engineFor("gpt-4o-mini"), engineFor("gpt-4.1")
+
+	ctx := context.Background()
+	if _, err := old.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	const q = "hybrid search?"
+	if _, _, err := ask(t, old, q); err != nil {
+		t.Fatal(err)
+	}
+	if _, reply, _ := ask(t, old, q); !reply.Cached {
+		t.Fatal("same model, same question: expected a cache hit to compare against")
+	}
+	calls := len(prov.Chats())
+
+	_, reply, err := ask(t, updated, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Cached {
+		t.Error("the new model served the old model's answer from cache")
+	}
+	if len(prov.Chats()) != calls+1 {
+		t.Error("the new model never reached the provider")
 	}
 }

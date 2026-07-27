@@ -96,7 +96,7 @@ cmd/server        wiring only: config in, deps constructed, handler served (~50 
 cmd/ingest        the indexing CLI
 cmd/rendocs       renders every guide page + llms.txt to static files; no cgo
 
-internal/server   HTTP: routes, cache policy, SSE. Knows no SQLite and no templates.
+internal/server   HTTP: routes, cache policy, SSE, the BA write gate. No SQLite.
 internal/rag      the domain: chunk → embed → retrieve → grounded answer
 internal/ai       one OpenAI-compatible client (embeddings + chat streaming)
 internal/aitest   a fake provider over httptest — the whole pipeline, no key needed
@@ -108,7 +108,7 @@ web/              index.html · docs.html · dev.html · deploy.html (Go templat
                   shared head in docsbase.html) + embed.go + assets.go
 web/app/          the app shell — native ES modules, no build step
                   app.js · chat.js · answer.js · viewport.js · library.js ·
-                  session.js · qa.js
+                  session.js · qa.js · upload.js
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -130,8 +130,9 @@ web/vendor/       `make vendor` output (gitignored)
 | anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
 | what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
 | a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
-| anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on the corpus signature |
+| anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + corpus signature + chat model |
 | a BA/DEV screen | `web/index.html` + `web/app/qa.js` | the loop's transport in one module, the markup in library recipes |
+| document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
@@ -149,6 +150,9 @@ a test of the read path fakes nothing it doesn't use:
 type Answerer interface {                       // read
     Answer(ctx context.Context, a rag.Ask) (rag.Reply, error)
     Corpus(limit int) (db.Corpus, error)
+}
+type Importer interface {                       // documents in — optional, same gate
+    Import(ctx context.Context, dir string, files []File) (Result, error)
 }
 type Knowledge interface {                      // the QA loop — optional (nil = no write routes)
     Queue(limit int) (db.Queue, error)
@@ -259,9 +263,14 @@ next DEV asks → retrieved with a citation       and free on the repeat
   `knowledge.db` derived — `ingest docs` rebuilds everything.
 - **Confirmed chunks are `approved`**, which is what the long-dormant retrieval boost
   was for: the one part of the corpus a named human vouched for wins a tie.
-- **Reads are open, publishing is not.** `BA_PASS` gates confirm and dismiss. Empty
-  means the instance has *no* write surface at all — forgetting a secret must not be
-  how you end up without one.
+- **Reads are open, publishing is not.** `BA_PASS` gates confirm, dismiss and
+  `POST /api/documents`. Empty means the instance has *no* write surface at all —
+  forgetting a secret must not be how you end up without one.
+- **Two write paths, one identity rule.** A BA confirm writes `qa/ticket-N.md`; a
+  browser import writes the path the file was given, folders kept, validated per
+  segment (`rag.SafePath`: no `..`, no hidden or absolute segment, max 4 deep, and
+  `qa/` refused so an import cannot impersonate a vouched answer). Both then take the
+  same path identity as `cmd/ingest`, so CLI and browser cannot disagree.
 
 ## Repeat questions are free
 

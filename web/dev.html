@@ -59,11 +59,11 @@
 
     <h3 lang="en">Server ↔ engine</h3>
     <h3 lang="vi">Server ↔ engine</h3>
-    <p lang="en">The HTTP layer depends on two narrow interfaces, not the engine — split
-      by side, so a test of the read path fakes nothing it doesn't use. Every route, SSE
+    <p lang="en">The HTTP layer depends on narrow interfaces, not the engine — split by
+      side, so a test of the read path fakes nothing it doesn't use. Every route, SSE
       frame, write gate and 400 is covered by <code>go test</code> with a fake, needing
       no key and no database.</p>
-    <p lang="vi">Tầng HTTP phụ thuộc vào hai interface hẹp, không phải engine — chia theo
+    <p lang="vi">Tầng HTTP phụ thuộc vào các interface hẹp, không phải engine — chia theo
       từng bên, nên test đường đọc không phải fake thứ nó không dùng. Mọi route, frame
       SSE, cửa ghi và lỗi 400 đều test được bằng <code>go test</code> với fake, không
       cần key, không cần database.</p>
@@ -76,11 +76,16 @@ type Knowledge interface {             // the BA ⇄ DEV loop
     OpenTicket(question, miss string) (db.Ticket, error)
     Draft / Confirm / Reject           // one transition each
     History(limit int) ([]db.Cached, error)
+}
+type Importer interface {              // documents in, from the browser
+    Import(ctx, dir string, files []File) (Result, error)
 }</span></div>
-    <p lang="en"><code>Deps.Know</code> is optional: leave it nil and the ticket routes
-      simply aren't registered, so a read-only build has no write surface to secure.</p>
-    <p lang="vi"><code>Deps.Know</code> là tuỳ chọn: để nil thì các route ticket không
-      được đăng ký, nên bản chỉ-đọc không có chỗ ghi nào cần bảo vệ.</p>
+    <p lang="en"><code>Deps.Know</code> and <code>Deps.Docs</code> are both optional:
+      leave one nil and its routes simply aren't registered, so a read-only build has no
+      write surface to secure rather than a half-wired one.</p>
+    <p lang="vi"><code>Deps.Know</code> và <code>Deps.Docs</code> đều là tuỳ chọn: để nil
+      thì route của nó không được đăng ký, nên bản chỉ-đọc không có chỗ ghi nào cần bảo
+      vệ, thay vì có một nửa.</p>
 
     <h3 lang="en">App ↔ transport</h3>
     <h3 lang="vi">App ↔ transport</h3>
@@ -122,6 +127,8 @@ view.scrollToEnd();                            // viewport.js</span></div>
           <tr lang="vi"><th><code>GET · POST /api/tickets</code></th><td>đọc hàng đợi · báo phần thiếu</td><td>—</td></tr>
           <tr lang="en"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 wrong, 403 writes off</td></tr>
           <tr lang="vi"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 sai, 403 tắt ghi</td></tr>
+          <tr lang="en"><th><code>POST /api/documents</code></th><td>multipart import: <code>files</code> (repeatable) + optional <code>dir</code>. Partial success is reported — 200 if anything landed, 400 if nothing did, and both bodies list every file</td><td><code>X-BA-Pass</code></td></tr>
+          <tr lang="vi"><th><code>POST /api/documents</code></th><td>import multipart: <code>files</code> (lặp được) + <code>dir</code> tuỳ chọn. Thành công một phần vẫn được báo — 200 nếu có file nào vào, 400 nếu không file nào, và cả hai body đều liệt kê từng file</td><td><code>X-BA-Pass</code></td></tr>
           <tr lang="en"><th><code>GET /api/history</code></th><td>answers still free to replay, with hit counts</td><td>—</td></tr>
           <tr lang="vi"><th><code>GET /api/history</code></th><td>các câu trả lời còn lặp lại miễn phí, kèm số lần dùng</td><td>—</td></tr>
         </tbody>
