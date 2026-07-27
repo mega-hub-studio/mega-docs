@@ -46,7 +46,9 @@
        Pareto, deliberately: three moves cover almost every question anyone asks of
        this thing, and none of them is a command. The host's three commands moved to
        the Deploy page, where the person who runs them already is. -->
-  <section id="start">
+  <section id="start" data-feature="first-answer"
+           data-api="GET /api/health"
+           data-test="TestHealth,TestIndexReferencesTheEmbeddedShell">
     <h2 lang="en">Start in 60 seconds</h2>
     <h2 lang="vi">Bắt đầu trong 60 giây</h2>
     <p class="lede" lang="en">Three moves. They cover almost everything anyone asks of it,
@@ -240,7 +242,9 @@
        The one section that is about two roles at once, so it sits between "what the
        app can do" and the per-role advice. A table for the state machine, because
        a state whose label nobody can find is a state people work around. -->
-  <section id="loop">
+  <section id="loop" data-feature="gap-states"
+           data-api="GET /api/tickets"
+           data-test="TestFilingAGapNeedsNoPassword,TestConfirmedAnswerIsReproducibleByIngest">
     <h2 lang="en">When the answer isn't there</h2>
     <h2 lang="vi">Khi câu trả lời chưa có</h2>
     <p class="lede" lang="en">The most useful thing this system does is turn a question
@@ -361,7 +365,9 @@
   </div>
 
   <!-- ══ what the app can do ═══════════════════════════════════════════════ -->
-  <section id="features">
+  <section id="features" data-feature="corpus-visibility"
+           data-api="GET /api/corpus,POST /api/chat"
+           data-test="TestCorpusReportsWhatIsIndexed,TestRegenerateIgnoresTheCache">
     <h2 lang="en">What the app can do</h2>
     <h2 lang="vi">App làm được những gì</h2>
     <p class="lede" lang="en">The whole surface, so you know what to reach for. The
@@ -448,7 +454,9 @@
        nothing for the app itself — what they install depends on the door their team
        chose, which is why the three doors are tabs rather than a list of steps.
        The host's side of each door stays on the Deploy page: one copy, no drift. -->
-  <section id="access">
+  <section id="access" data-feature="reader-auth"
+           data-env="AUTH_USER,AUTH_PASS"
+           data-test="TestAuthAcceptsCorrectCredentialsAndRejectsWrongOnes,TestAuthChallengesEveryPathExceptHealth,TestNoAuthConfiguredLeavesEverythingOpen">
     <h2 lang="en">Getting in, the first time</h2>
     <h2 lang="vi">Vào app lần đầu</h2>
     <p class="lede" lang="en">The app is a web page on your team's own network. There is

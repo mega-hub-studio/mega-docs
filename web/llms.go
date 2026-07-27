@@ -66,6 +66,13 @@ func LLMs(siteBase string) ([]byte, error) {
 		}
 	}
 
+	b.WriteString("\n## Spec\n")
+	fmt.Fprintf(&b, "- [spec.json](%s/spec.json): every documented feature with the HTTP "+
+		"routes, environment variables and Go tests behind it, and a link to the section "+
+		"that defines it. Generated from the same markup as the pages; `make check` fails "+
+		"when a name in it is absent from the code, or when a route or variable in the "+
+		"code appears in no section. Start here to decide where a change belongs.\n", siteBase)
+
 	b.WriteString("\n## Sections\n")
 	b.WriteString(strings.Join(sections, "\n"))
 	b.WriteString("\n\n## Notes for agents\n")

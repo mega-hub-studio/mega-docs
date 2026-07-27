@@ -8,6 +8,7 @@ be wrong or out of date.
 
 | | URL |
 |---|---|
+| **Spec — start here** | <https://mega-hub-studio.github.io/mega-docs/spec.json> |
 | Machine index | <https://mega-hub-studio.github.io/mega-docs/llms.txt> |
 | Guide — what it is, quick start, how it works | <https://mega-hub-studio.github.io/mega-docs/> |
 | BA mode — asking, judging, scoping, answering a gap | <https://mega-hub-studio.github.io/mega-docs/ba.html> |
@@ -15,8 +16,17 @@ be wrong or out of date.
 | Deploy — hosting for a team | <https://mega-hub-studio.github.io/mega-docs/deploy.html> |
 | Full file-by-file reference | [`README.md`](README.md) |
 
-Start at `llms.txt`. It is generated from the published pages by `cmd/rendocs`, so it
-cannot disagree with them, and it lists every section with its URL.
+Start at `spec.json`: one entry per documented feature, each naming the section that
+defines it, the HTTP routes it is reached through, the environment variables that
+configure it, and the Go tests that fail when it breaks. Then `llms.txt` for the prose
+index. Both are generated from the published pages by `cmd/rendocs`, so neither can
+disagree with them.
+
+**Changing something here is spec-first.** Write the page section, declare its
+`data-feature` / `data-api` / `data-env` / `data-test` on the `<section>`, and `make check`
+stays red until those names exist in the code. An `/api/` route or a config variable that
+no section documents fails the build. The five steps are on the Dev page under
+["These pages are the spec"](https://mega-hub-studio.github.io/mega-docs/dev.html#spec).
 
 The app binary does **not** serve these pages — it is the chat app and nothing else,
 and it carries one link out to the published guide. Do not add doc routes to it.

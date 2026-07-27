@@ -63,7 +63,16 @@ that is not theirs. Each page is split into one section per feature, indexed by
 `<nes-toc>`; the two flows a reader has to hold in their head — how an answer is built,
 and how a gap becomes a document — are diagrams, rendered at build time from `web/*.mmd`.
 
-For AI agents there is [`AGENTS.md`](AGENTS.md) and a generated
+**The pages are also the spec.** A section that maps to code declares the mapping in its
+own markup — `data-feature`, `data-api`, `data-env`, `data-test` — and
+[`/spec.json`](https://mega-hub-studio.github.io/mega-docs/spec.json) is generated from
+those annotations: every feature with the routes, environment variables and tests behind
+it, and a link to the prose that defines it. The join is checked both ways, so an `/api/`
+route or a config variable that no section documents **fails `make check`**. That is the
+whole of "docs are the source of truth": write the section, declare the join, watch it go
+red, then implement. The steps are on the Dev page under *These pages are the spec*.
+
+For AI agents there is [`AGENTS.md`](AGENTS.md), the `spec.json` above, and a generated
 [`/llms.txt`](https://mega-hub-studio.github.io/mega-docs/llms.txt) — an
 [llmstxt.org](https://llmstxt.org) index of every page and section, built by
 `cmd/rendocs` from the pages themselves so it cannot drift from them. `AGENTS.md`
@@ -167,6 +176,7 @@ web/vendor/       `make vendor` output (gitignored)
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
 | a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
+| a feature | its page `<section>` **first**, with `data-feature`/`data-api`/`data-env`/`data-test` | `make check` is red until those names exist — the docs are the input, not the write-up |
 | a guide section | one `<section>` in that role's page | both languages inline; the toggle is CSS-only |
 | a sub-module inside a section | an `<h3>` in that section | `<nes-toc>` indexes h2+h3, so it appears in the rail on its own |
 | a whole guide page (new role) | a field on `web.Nav` + a render func + one line in `cmd/rendocs` | the guide is static, so the app needs no change at all |

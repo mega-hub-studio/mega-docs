@@ -38,6 +38,23 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 12 | Everything a template binds exists in the code behind it | `TestTemplatesBindNothingUndefined` |
 | 13 | Go lint stays at **zero** findings | `make lint` (in `make check`, and in CI) |
 | 14 | The product needs no Node and no build step | *prose only* — the day it stops being true, `make build` will tell you |
+| 15 | Every feature a section documents names its routes, knobs and tests — and every `/api/` route and every variable `internal/config` reads is named by some section | `TestEverySpecNameExistsInTheCode`, `TestEveryRouteAndKnobIsSpecified` |
+| 16 | `spec.json` and `llms.txt` are generated from the pages, never written by hand | `TestSpecJSONIsGeneratedFromThePages`, `TestLLMsIndexListsEveryPage` |
+
+Rules 15–16 are what make the guide pages the **spec** rather than a description of the
+code. A `<section>` that maps to code declares the mapping in its own markup:
+
+```html
+<section id="scope" data-feature="scope"
+         data-api="POST /api/chat" data-env="TOP_K"
+         data-test="TestScopedSearchRanksWithinTheScope">
+```
+
+`web/spec.go` collects those into the published `spec.json`; `web/spec_test.go` checks the
+join **both ways**. Adding an endpoint or an environment variable therefore fails `make
+check` until a section documents it — so the order of work is: write the section, declare
+the join, watch it go red, then implement. The full five steps are on the Dev page
+(`dev.html#spec`), which is also where an agent is pointed.
 
 Rules 9–12 exist because the Vue 3.5 refactor made three new mistakes possible that nothing
 else would catch: a template binding with no definition renders blank with no error, a
@@ -103,6 +120,7 @@ internal/aitest  a fake provider over httptest — the whole pipeline, no key ne
 internal/db      SQLite: sqlite-vec + FTS5, hybrid search with RRF, tickets, answer cache
 internal/config  env → Config, with defaults
 web/             Go templates + embedded ES modules; no build step
+                 spec.go → spec.json: the pages' own annotations, machine-readable
 ```
 
 ### The seams

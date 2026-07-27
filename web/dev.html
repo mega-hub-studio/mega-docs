@@ -49,7 +49,8 @@
   </section>
 
   <!-- ══ seams ═════════════════════════════════════════════════════════════ -->
-  <section>
+  <section id="seams" data-feature="seams"
+           data-test="TestQAEndpointsAreAbsentWithoutTheLoopWired,TestImportRouteAbsentWithoutAnImporter">
     <h2 lang="en">The two seams</h2>
     <h2 lang="vi">Hai đường nối</h2>
     <p class="lede" lang="en">These are why the codebase is testable. Learn these two
@@ -119,7 +120,10 @@ view.scrollToEnd();                            // viewport.js</span></div>
   <!-- ══ how an answer is built ═══════════════════════════════════════════════
        The pipeline as one picture, then the three rules that make each stage honest.
        Rendered from web/retrieval.mmd at build time — mermaid never reaches this page. -->
-  <section id="pipeline">
+  <section id="pipeline" data-feature="retrieval"
+           data-api="POST /api/chat"
+           data-env="TOP_K,CHAT_MODEL,EMBED_MODEL,EMBED_DIM"
+           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache">
     <h2 lang="en">How an answer is built</h2>
     <h2 lang="vi">Một câu trả lời được dựng thế nào</h2>
     <p class="lede" lang="en">One question, eight stages, and two of them can return early.
@@ -178,7 +182,9 @@ view.scrollToEnd();                            // viewport.js</span></div>
   </section>
 
   <!-- ══ http surface ══════════════════════════════════════════════════════════ -->
-  <section>
+  <section id="http" data-feature="http-surface"
+           data-api="GET /api/health,POST /api/chat,GET /api/corpus,GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action},GET /api/history,POST /api/documents"
+           data-test="TestChatRejectsBadRequests,TestABadTicketIdIs400,TestGuideRoutesAreNotServed">
     <h2 lang="en">The whole HTTP surface</h2>
     <h2 lang="vi">Toàn bộ mặt HTTP</h2>
     <p class="lede" lang="en">Every route the binary serves. It serves no documentation
@@ -218,7 +224,8 @@ view.scrollToEnd();                            // viewport.js</span></div>
   </section>
 
   <!-- ══ test ══════════════════════════════════════════════════════════════ -->
-  <section>
+  <section id="fakes" data-feature="fake-provider"
+           data-test="TestIngestThenAnswerCitesTheIngestedDocument,TestChatReportsEngineFailureInStream,TestAnswerReportsAChatFailureAfterRetrievalSucceeded">
     <h2 lang="en">Test without a key</h2>
     <h2 lang="vi">Test không cần key</h2>
     <p lang="en"><code>internal/aitest</code> serves a <b>fake OpenAI-compatible
@@ -244,7 +251,9 @@ view.scrollToEnd();                            // viewport.js</span></div>
   </section>
 
   <!-- ══ knobs ═════════════════════════════════════════════════════════════ -->
-  <section>
+  <section id="knobs" data-feature="knobs"
+           data-env="TOP_K,EMBED_MODEL,EMBED_DIM,EMBED_BASE_URL,EMBED_API_KEY,CORPUS_DIR"
+           data-test="TestNoChunkExceedsMaxChars,TestUndersizedSectionsMergeUntilTheyAreWorthRetrieving,TestEmbedAndChatCanUseDifferentProviders">
     <h2 lang="en">The knobs people actually turn</h2>
     <h2 lang="vi">Những nút thật sự hay bị xoay</h2>
     <p class="lede" lang="en">In rough order of how often, and what each one costs.</p>
@@ -389,7 +398,8 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
   <!-- ══ scoped retrieval ══════════════════════════════════════════════════════
        Two invariants a change here can break silently, so both are written down with
        the test that catches them. -->
-  <section>
+  <section id="scoping" data-feature="scope-internals"
+           data-test="TestScopedSearchRanksWithinTheScope,TestScopeTreatsWildcardsAsCharacters,TestHistoryRemembersTheScopeItWasAnsweredIn">
     <h2 lang="en">How a scoped answer stays honest</h2>
     <h2 lang="vi">Câu trả lời có scope giữ đúng bằng cách nào</h2>
     <p class="lede" lang="en">A scope is a promise — <i>answer from this folder</i> — and
@@ -490,7 +500,9 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
        The Guide explains the loop and the four states for both roles. This is only
        what a DEV does differently: three steps before filing, and what to expect
        back. Kept here rather than duplicated, so the two pages cannot drift. -->
-  <section>
+  <section id="filing" data-feature="filing"
+           data-api="POST /api/tickets"
+           data-test="TestFilingAGapNeedsNoPassword,TestTheSameGapFiledTwiceIsOneTicket,TestASettledTicketDoesNotBlockTheNextOne">
     <h2 lang="en">Filing a gap a BA can answer</h2>
     <h2 lang="vi">Báo gap sao cho BA trả lời được</h2>
     <p class="lede" lang="en">Your side of the QA loop. Three things before you file, so
@@ -568,7 +580,8 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
 
   <!-- ══ front-end architecture ═══════════════════════════════════════════════
        New because it is now real and enforced: four layers, four tests. -->
-  <section id="frontend">
+  <section id="frontend" data-feature="frontend-layers"
+           data-test="TestPlumbingDoesNotImportVue,TestComposablesDoNotImportEachOther,TestComponentsHoldNoLogic,TestTemplatesBindNothingUndefined">
     <h2 lang="en">The front end, in four layers</h2>
     <h2 lang="vi">Frontend, bốn tầng</h2>
     <p class="lede" lang="en">Vue 3.5 Composition API, no bundler, no
@@ -649,13 +662,144 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
   </section>
 
   <!-- ══ extend ════════════════════════════════════════════════════════════ -->
-  <section>
-    <h2 lang="en">Adding to these docs</h2>
-    <h2 lang="vi">Thêm vào tài liệu này</h2>
-    <p lang="en">The guide is one page per role, sharing one head partial. Growing it
-      is meant to be boring:</p>
-    <p lang="vi">Tài liệu này là một trang cho mỗi role, dùng chung một partial head.
-      Mở rộng nó cố tình làm cho nhàm:</p>
+  <!-- ══ spec-driven ═══════════════════════════════════════════════════════
+       Last, because it is the section that tells you where everything above came
+       from: these pages are the spec, and the build enforces the join. The diagram
+       is rendered from web/spec.mmd — mermaid never reaches this page. -->
+  <section id="spec" data-feature="spec-driven"
+           data-test="TestEverySpecNameExistsInTheCode,TestEveryRouteAndKnobIsSpecified,TestSpecJSONIsGeneratedFromThePages">
+    <h2 lang="en">These pages are the spec</h2>
+    <h2 lang="vi">Chính các trang này là spec</h2>
+    <p class="lede" lang="en">Not a description of the code — the input to it. A section
+      that maps to code declares that mapping in its own markup, and
+      <code>make check</code> fails while the mapping is wrong in either direction.</p>
+    <p class="lede" lang="vi">Không phải bản mô tả code — mà là đầu vào của code. Mục nào
+      ứng với code thì khai báo luôn trong markup của nó, và <code>make check</code> sẽ đỏ
+      khi mối nối đó sai ở bất kỳ chiều nào.</p>
+
+    <div class="mermaid-view"><%diagram "specflow"%></div>
+
+    <h3 lang="en">The five steps, in order</h3>
+    <h3 lang="vi">Năm bước, theo thứ tự</h3>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">Write the section first</b>
+        <b lang="vi">Viết mục tài liệu trước</b>
+        <p lang="en">On the page for its audience: Guide for everyone,
+          <code>ba.html</code> for a BA, this page for a DEV, <code>deploy.html</code> for
+          whoever hosts it. Both languages, inline — the toggle is CSS-only, so a missing
+          half is a visible gap rather than a silent one.</p>
+        <p lang="vi">Trên trang đúng đối tượng: Hướng dẫn cho mọi người,
+          <code>ba.html</code> cho BA, trang này cho DEV, <code>deploy.html</code> cho
+          người host. Viết cả hai ngôn ngữ ngay tại chỗ — toggle chỉ là CSS, nên thiếu một
+          nửa sẽ thấy ngay chứ không im lặng.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Declare the join on the <code>&lt;section&gt;</code></b>
+        <b lang="vi">Khai báo mối nối trên <code>&lt;section&gt;</code></b>
+        <div class="terminal"><span class="out">&lt;section id="scope" data-feature="scope"
+         data-api="POST /api/chat"
+         data-env="TOP_K"
+         data-test="TestScopedSearchRanksWithinTheScope"&gt;</span></div>
+        <p lang="en"><code>data-feature</code> is a stable id — how a change is addressed
+          in a conversation or a ticket. The other three are lists: routes, environment
+          variables, and the tests that fail when the feature breaks.</p>
+        <p lang="vi"><code>data-feature</code> là id ổn định — cách gọi tên một thay đổi
+          khi trao đổi hay khi mở ticket. Ba cái còn lại là danh sách: route, biến môi
+          trường, và các test sẽ đỏ khi tính năng bị hỏng.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">Run <code>make check</code> and read the red</b>
+        <b lang="vi">Chạy <code>make check</code> và đọc chỗ đỏ</b>
+        <p lang="en">It fails while a name you declared does not exist yet — so the test
+          name in the markup <i>is</i> the test you write next. That is the whole
+          mechanism: the spec is red until the code agrees with it.</p>
+        <p lang="vi">Nó đỏ khi một cái tên bạn khai báo còn chưa tồn tại — nên tên test
+          trong markup <i>chính là</i> test bạn viết tiếp. Cơ chế chỉ có thế: spec còn đỏ
+          thì code còn chưa khớp.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">4</span>
+      <div class="body">
+        <b lang="en">Implement until it is green</b>
+        <b lang="vi">Làm cho tới khi xanh</b>
+        <p lang="en">The documentation needs no second pass: it was the input, so it is
+          already correct when the build goes green. This is the step an agent harness can
+          take on its own — the spec says what to build and what must pass.</p>
+        <p lang="vi">Tài liệu không cần sửa lại lần nữa: nó là đầu vào, nên khi build xanh
+          là nó đã đúng. Đây là bước một AI agent có thể tự làm — spec đã nói rõ làm gì và
+          phải xanh ở đâu.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">5</span>
+      <div class="body">
+        <b lang="en">Nothing to publish by hand</b>
+        <b lang="vi">Không phải publish gì bằng tay</b>
+        <p lang="en"><code>spec.json</code> and <code>llms.txt</code> are regenerated from
+          the pages by <code>cmd/rendocs</code> on every push to <code>main</code>, next
+          to the pages themselves. There is no second copy to update, which is why there
+          is no second copy to forget.</p>
+        <p lang="vi"><code>spec.json</code> và <code>llms.txt</code> được sinh lại từ các
+          trang bởi <code>cmd/rendocs</code> mỗi lần push lên <code>main</code>, nằm ngay
+          cạnh các trang. Không có bản copy thứ hai để cập nhật, nên cũng không có bản thứ
+          hai để quên.</p>
+      </div>
+    </div>
+
+    <h3 lang="en">What the build refuses</h3>
+    <h3 lang="vi">Những gì build sẽ chặn</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>You did this</th><th>What fails, and what it says</th></tr>
+          <tr lang="vi"><th>Bạn làm thế này</th><th>Cái gì đỏ, và nó nói gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>named a test that doesn't exist</th><td><code>TestEverySpecNameExistsInTheCode</code> — names the section and the missing test</td></tr>
+          <tr lang="vi"><th>khai một test không tồn tại</th><td><code>TestEverySpecNameExistsInTheCode</code> — chỉ ra mục nào và test nào thiếu</td></tr>
+          <tr lang="en"><th>named a route the server never registers</th><td>same test — a route in prose that no <code>mux</code> line serves is a promise the app doesn't keep</td></tr>
+          <tr lang="vi"><th>khai một route server không đăng ký</th><td>cùng test đó — route chỉ có trong văn bản mà không có dòng <code>mux</code> nào là một lời hứa app không giữ</td></tr>
+          <tr lang="en"><th>added an <code>/api/</code> route and no section</th><td><code>TestEveryRouteAndKnobIsSpecified</code> — an undocumented endpoint is an endpoint nobody outside your head can call</td></tr>
+          <tr lang="vi"><th>thêm route <code>/api/</code> mà không có mục nào</th><td><code>TestEveryRouteAndKnobIsSpecified</code> — endpoint không tài liệu là endpoint ngoài đầu bạn không ai gọi được</td></tr>
+          <tr lang="en"><th>added an environment variable and no row</th><td>same test — every variable <code>internal/config</code> reads must appear in a section, and the settings table on the Deploy page is where they land</td></tr>
+          <tr lang="vi"><th>thêm biến môi trường mà không có dòng nào</th><td>cùng test đó — mọi biến <code>internal/config</code> đọc đều phải xuất hiện trong một mục, và bảng setting ở trang Triển khai là nơi chúng nằm</td></tr>
+          <tr lang="en"><th>annotated a section with no anchor, or reused a <code>data-feature</code></th><td><code>TestSpecJSONIsGeneratedFromThePages</code> — the spec links to prose, and an id is how a change is addressed</td></tr>
+          <tr lang="vi"><th>gắn annotation cho mục không có anchor, hoặc trùng <code>data-feature</code></th><td><code>TestSpecJSONIsGeneratedFromThePages</code> — spec trỏ về văn bản, và id là cách gọi tên một thay đổi</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">For an agent, start at <code>spec.json</code>.</b>
+      <span lang="en">One file: every feature, its section URL, its routes, its knobs and
+        the tests that hold it. <code>llms.txt</code> links it, and both are generated from
+        these pages, so neither can disagree with what you are reading.
+        <a href="https://mega-hub-studio.github.io/mega-docs/spec.json">spec.json</a> ·
+        <a href="https://mega-hub-studio.github.io/mega-docs/llms.txt">llms.txt</a></span>
+      <b lang="vi">Với AI agent, bắt đầu từ <code>spec.json</code>.</b>
+      <span lang="vi">Một file: mọi tính năng, URL mục tài liệu, route, biến cấu hình và
+        các test giữ nó. <code>llms.txt</code> có link tới nó, và cả hai đều sinh ra từ các
+        trang này, nên không cái nào lệch được so với thứ bạn đang đọc.
+        <a href="https://mega-hub-studio.github.io/mega-docs/spec.json">spec.json</a> ·
+        <a href="https://mega-hub-studio.github.io/mega-docs/llms.txt">llms.txt</a></span>
+    </div>
+
+    <h3 lang="en">Adding a page or a diagram</h3>
+    <h3 lang="vi">Thêm một trang hoặc một sơ đồ</h3>
     <div class="table-wrap">
       <table class="table">
         <thead>
@@ -663,24 +807,26 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>Để thêm…</th><th>Làm thế này</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>a section</th><td>one <code>&lt;section&gt;</code> in the page, both languages</td></tr>
-          <tr lang="vi"><th>một mục</th><td>một <code>&lt;section&gt;</code> trong trang, đủ hai ngôn ngữ</td></tr>
+          <tr lang="en"><th>a section</th><td>one <code>&lt;section&gt;</code> in the page, both languages; annotate it if it maps to code</td></tr>
+          <tr lang="vi"><th>một mục</th><td>một <code>&lt;section&gt;</code> trong trang, đủ hai ngôn ngữ; gắn annotation nếu nó ứng với code</td></tr>
+          <tr lang="en"><th>a sub-module inside a section</th><td>an <code>&lt;h3&gt;</code>; <code>&lt;nes-toc&gt;</code> indexes h2 and h3, so it gets its own row in the rail</td></tr>
+          <tr lang="vi"><th>một mục con trong mục</th><td>một <code>&lt;h3&gt;</code>; <code>&lt;nes-toc&gt;</code> index cả h2 và h3, nên nó có dòng riêng trong thanh mục lục</td></tr>
           <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one line in <code>cmd/rendocs</code></td></tr>
           <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một dòng trong <code>cmd/rendocs</code></td></tr>
-          <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; mermaid never ships to the browser</td></tr>
-          <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; mermaid không bao giờ tới browser</td></tr>
+          <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; the SVG is committed and a test fails if its source drifts</td></tr>
+          <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; SVG được commit và có test đỏ nếu source lệch</td></tr>
         </tbody>
       </table>
     </div>
-    <p lang="en">The app needs no change for a new page, because it does not serve
-      the guide at all: this is documentation on its own domain, and the app is the
-      chat box with one link out to it. <code>cmd/rendocs</code> keys its output on
-      the same <code>Nav</code> the markup links with, so a file and the link to it
-      cannot drift apart.</p>
-    <p lang="vi">App không cần sửa gì khi thêm trang, vì nó không serve guide chút
-      nào: đây là tài liệu ở domain riêng, còn app là hộp chat với một link trỏ ra.
-      <code>cmd/rendocs</code> khoá output bằng đúng <code>Nav</code> mà markup dùng
-      để link, nên file và link tới nó không thể lệch nhau.</p>
+    <p lang="en">The app needs no change for a new page, because it does not serve the
+      guide at all: this is documentation on its own domain, and the app is the chat box
+      with one link out to it. <code>cmd/rendocs</code> keys its output on the same
+      <code>Nav</code> the markup links with, so a file and the link to it cannot drift
+      apart.</p>
+    <p lang="vi">App không cần sửa gì khi thêm trang, vì nó không serve guide chút nào:
+      đây là tài liệu ở domain riêng, còn app là hộp chat với một link trỏ ra.
+      <code>cmd/rendocs</code> khoá output bằng đúng <code>Nav</code> mà markup dùng để
+      link, nên file và link tới nó không thể lệch nhau.</p>
   </section>
 
   <p class="separator"></p>

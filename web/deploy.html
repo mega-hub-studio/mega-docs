@@ -16,7 +16,9 @@
     <!-- ══ first install ═════════════════════════════════════════════════════════
        Moved here from the Guide: three commands belong on the page read by the person
        who types them, not on the one a BA opens. -->
-  <section id="install">
+  <section id="install" data-feature="install"
+           data-env="PORT,DB_PATH,CORPUS_DIR"
+           data-test="TestHealth,TestConfirmedAnswerIsReproducibleByIngest">
     <h2 lang="en">First install</h2>
     <h2 lang="vi">Cài đặt lần đầu</h2>
     <p class="lede" lang="en">Three commands on the machine that will hold the index.
@@ -75,9 +77,15 @@ done: 8/8 files, 74 chunks</span></div>
   </section>
 
   <!-- ══ let the team in ═══════════════════════════════════════════════════════ -->
-  <section id="access">
+  <section id="access" data-feature="expose"
+           data-env="BIND_ADDR,AUTH_USER,AUTH_PASS"
+           data-test="TestAuthChallengesEveryPathExceptHealth">
     <h2 lang="en">Let the team in</h2>
     <h2 lang="vi">Cho team truy cập</h2>
+    <p class="lede" lang="en">Three ways to give people the address, and the one setting
+      that decides who reaches the port.</p>
+    <p class="lede" lang="vi">Ba cách đưa địa chỉ cho người dùng, và một setting quyết định
+      ai chạm được vào port.</p>
 
     <div class="callout gotcha">
       <b lang="en">Read this first.</b>
@@ -314,9 +322,18 @@ done: 8/8 files, 74 chunks</span></div>
   </section>
 
   <!-- ══ settings ══════════════════════════════════════════════════════════ -->
-  <section>
+  <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
+       the build if one is missing: a knob nobody documented is a knob nobody finds. -->
+  <section id="settings" data-feature="settings"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,ASSET_BASE,SITE_URL,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
+           data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
+    <p class="lede" lang="en">Every variable the binary reads, its default, and the reason
+      you would change it. A missing row fails the build, so this table is the whole
+      list.</p>
+    <p class="lede" lang="vi">Mọi biến binary đọc, giá trị mặc định, và lý do bạn cần đổi.
+      Thiếu một dòng là build đỏ, nên bảng này là danh sách đầy đủ.</p>
     <div class="table-wrap">
       <table class="table">
         <thead>
@@ -344,6 +361,22 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>CONTEXT_WINDOW</code></th><td><code>0</code> (ẩn)</td><td>context window của model chat, tính theo token. Đặt vào thì status line hiện câu trả lời dùng bao nhiêu phần trăm; bỏ trống thì không hiện số đó, vì một con số đoán bừa còn tệ hơn không có</td></tr>
           <tr lang="en"><th><code>PRICE_IN</code> · <code>PRICE_OUT</code></th><td><code>0</code> (hidden)</td><td>USD per 1M prompt / completion tokens, from your provider's price list. Both zero means no money is shown at all — the token counts still are, because they come from the provider itself</td></tr>
           <tr lang="vi"><th><code>PRICE_IN</code> · <code>PRICE_OUT</code></th><td><code>0</code> (ẩn)</td><td>USD cho 1M token prompt / completion, lấy từ bảng giá của provider. Cả hai bằng 0 thì không hiện tiền — số token thì vẫn hiện, vì đó là do provider tự đếm</td></tr>
+          <tr lang="en"><th><code>PORT</code></th><td><code>8080</code></td><td>only if 8080 is taken — the tunnel and the reverse proxy both point at this</td></tr>
+          <tr lang="vi"><th><code>PORT</code></th><td><code>8080</code></td><td>chỉ khi 8080 đã bị chiếm — tunnel và reverse proxy đều trỏ vào đây</td></tr>
+          <tr lang="en"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>the name in the browser's password box. Only matters with <code>AUTH_PASS</code> set — one shared login, not per-person accounts</td></tr>
+          <tr lang="vi"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>tên hiện trong hộp mật khẩu của browser. Chỉ có tác dụng khi đã set <code>AUTH_PASS</code> — một tài khoản dùng chung, không phải mỗi người một tài khoản</td></tr>
+          <tr lang="en"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td>where the derived index lives. Put it on the same disk as the corpus; it is rebuildable, so it does not need a backup</td></tr>
+          <tr lang="vi"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td>nơi đặt index dẫn xuất. Để cùng ổ với corpus; nó dựng lại được nên không cần backup</td></tr>
+          <tr lang="en"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>any OpenAI-compatible provider — the URL up to and including <code>/v1</code></td></tr>
+          <tr lang="vi"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>bất kỳ provider tương thích OpenAI — URL tính tới cả <code>/v1</code></td></tr>
+          <tr lang="en"><th><code>AI_API_KEY</code></th><td>empty</td><td>required. Keep it in <code>.env</code> (mode 600), never on a command line — a shared terminal keeps history</td></tr>
+          <tr lang="vi"><th><code>AI_API_KEY</code></th><td>trống</td><td>bắt buộc. Giữ trong <code>.env</code> (quyền 600), đừng để trên dòng lệnh — terminal dùng chung có lưu history</td></tr>
+          <tr lang="en"><th><code>CHAT_MODEL</code></th><td><code>gpt-4o-mini</code></td><td>the model that writes the answer. Changing it invalidates the answer cache — deliberately, because the same question answers differently</td></tr>
+          <tr lang="vi"><th><code>CHAT_MODEL</code></th><td><code>gpt-4o-mini</code></td><td>model viết câu trả lời. Đổi nó là xoá cache — có chủ ý, vì cùng câu hỏi sẽ trả lời khác</td></tr>
+          <tr lang="en"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>the model that indexes. Changing it needs a full re-index and a matching <code>EMBED_DIM</code> — use <code>make switch-embed</code>, which validates the key before dropping anything</td></tr>
+          <tr lang="vi"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>model đi index. Đổi thì phải index lại toàn bộ và <code>EMBED_DIM</code> phải khớp — dùng <code>make switch-embed</code>, nó kiểm key trước khi xoá gì cả</td></tr>
+          <tr lang="en"><th><code>SITE_URL</code></th><td>the published guide</td><td>only if you fork the docs: it is the address the app links out to</td></tr>
+          <tr lang="vi"><th><code>SITE_URL</code></th><td>trang guide đã publish</td><td>chỉ khi bạn fork tài liệu: đây là địa chỉ app trỏ ra ngoài</td></tr>
           <tr lang="en"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> to serve the UI's assets from the binary</td></tr>
           <tr lang="vi"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> để binary tự phục vụ asset của UI</td></tr>
         </tbody>

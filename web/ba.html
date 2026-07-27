@@ -31,7 +31,9 @@
   </div>
 
   <!-- ══ 1 · ask ═══════════════════════════════════════════════════════════ -->
-  <section id="ask">
+  <section id="ask" data-feature="ask"
+           data-api="POST /api/chat" data-env="TOP_K"
+           data-test="TestChatStreamsTokensThenCitationsThenDone,TestOnlyTheSourcesTheAnswerCitedAreReturned">
     <h2 lang="en">1 · Ask so retrieval can find it</h2>
     <h2 lang="vi">1 · Hỏi sao cho truy xuất tìm được</h2>
     <p class="lede" lang="en">Half of search is keyword matching, so an exact term — an
@@ -71,7 +73,8 @@
   </section>
 
   <!-- ══ 2 · trust ═════════════════════════════════════════════════════════ -->
-  <section id="trust">
+  <section id="trust" data-feature="grounding"
+           data-test="TestAMissCitesNothingEvenWhenRetrievalFoundChunks,TestAnswerOnAnEmptyIndexSaysSoAndCitesNothing,TestThePromptCarriesTheExactSentinel">
     <h2 lang="en">2 · Decide whether to trust it</h2>
     <h2 lang="vi">2 · Quyết định có tin được hay không</h2>
     <p class="lede" lang="en">Every <code>[1]</code> is a link to the file the sentence
@@ -123,7 +126,9 @@
   </section>
 
   <!-- ══ 3 · scope ═════════════════════════════════════════════════════════ -->
-  <section id="scope">
+  <section id="scope" data-feature="scope"
+           data-api="POST /api/chat" data-env="TOP_K"
+           data-test="TestScopedSearchRanksWithinTheScope,TestTheSameQuestionInAnotherScopeIsAnotherAnswer,TestAScopeKeepsTheAnswerInsideIt">
     <h2 lang="en">3 · Narrow to one folder</h2>
     <h2 lang="vi">3 · Thu hẹp vào một thư mục</h2>
     <p class="lede" lang="en">The row above the box is the corpus. Tap a folder and the
@@ -182,7 +187,10 @@
   </section>
 
   <!-- ══ 4 · gap ═══════════════════════════════════════════════════════════ -->
-  <section id="gap">
+  <section id="gap" data-feature="qa-loop"
+           data-api="GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action}"
+           data-env="BA_PASS"
+           data-test="TestConfirmedAnswerBecomesAFileAndThenACitation,TestTheSameGapFiledTwiceIsOneTicket,TestConfirmAndRejectRequireThePassword,TestADraftSurvivesAndStaysOutOfRetrieval">
     <h2 lang="en">4 · File a gap, and answer one</h2>
     <h2 lang="vi">4 · Báo phần thiếu, và trả lời phần thiếu</h2>
     <p class="lede" lang="en">This is the loop that makes the thing get better instead of
@@ -260,7 +268,9 @@
   </section>
 
   <!-- ══ 5 · import ════════════════════════════════════════════════════════ -->
-  <section id="import">
+  <section id="import" data-feature="import"
+           data-api="POST /api/documents" data-env="BA_PASS,CORPUS_DIR"
+           data-test="TestImportIndexesEachFile,TestImportNeedsThePassword,TestImportReportsPartialFailure,TestOnlyTextDocumentsAreIngested">
     <h2 lang="en">5 · Import documents</h2>
     <h2 lang="vi">5 · Import tài liệu</h2>
     <p class="lede" lang="en">The other way a document enters the corpus: drop
@@ -323,7 +333,10 @@
   </section>
 
   <!-- ══ 6 · cost ══════════════════════════════════════════════════════════ -->
-  <section id="cost">
+  <section id="cost" data-feature="cost"
+           data-api="POST /api/chat,GET /api/history"
+           data-env="CONTEXT_WINDOW,PRICE_IN,PRICE_OUT"
+           data-test="TestChatStreamReadsTheUsageFrame,TestARepeatQuestionCostsNothing,TestHistoryCountsHitsSoTheSavingIsVisible">
     <h2 lang="en">6 · What an answer cost</h2>
     <h2 lang="vi">6 · Một câu trả lời tốn bao nhiêu</h2>
     <p class="lede" lang="en">The strip along the bottom. Nothing on it is estimated: a
@@ -381,9 +394,15 @@
   </section>
 
   <!-- ══ 7 · when it goes wrong ════════════════════════════════════════════ -->
-  <section id="stuck">
+  <section id="stuck" data-feature="health"
+           data-api="GET /api/health"
+           data-test="TestHealthAdvertisesWritesWhenConfigured,TestWithoutBAPassThereIsNoWriteSurfaceAtAll">
     <h2 lang="en">7 · When something's wrong</h2>
     <h2 lang="vi">7 · Khi có vấn đề</h2>
+    <p class="lede" lang="en">Four symptoms you can tell apart yourself, and what each one
+      actually is. None of them need a DEV.</p>
+    <p class="lede" lang="vi">Bốn dấu hiệu bạn tự phân biệt được, và thực chất mỗi cái là
+      gì. Không cái nào cần tới DEV.</p>
     <div class="table-wrap">
       <table class="table">
         <thead>

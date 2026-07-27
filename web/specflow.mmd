@@ -1,0 +1,15 @@
+%% Source of truth for the "spec first" diagram on the Dev page.
+%% Rendered to web/specflow.svg by `make diagram` — mermaid never ships to the browser.
+%%
+%% Same two constraints as the other three, both from the phone: keep it SHALLOW, and
+%% keep labels SHORT — this one is also read by whoever is deciding where a change goes,
+%% so each node names a file or a command rather than an abstraction.
+%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 28, "padding": 6, "useMaxWidth": true}}}%%
+graph TD
+  Need["a feature to build"] --> Sec["write the section"]
+  Sec --> Ann["annotate: api · env · test"]
+  Ann --> Check["make check"]
+  Check -->|red: names don't exist| Code["write the test, then the code"]
+  Code --> Check
+  Check -->|green| Spec["spec.json regenerates"]
+  Spec --> Agent["an agent reads it and implements"]

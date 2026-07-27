@@ -41,6 +41,11 @@ func main() {
 	// llms.txt rides along with the pages: it is derived from them, so publishing one
 	// without the other is how an agent ends up reading a stale index.
 	pages["llms.txt"] = func() ([]byte, error) { return web.LLMs(*site) }
+	// spec.json is the same idea one level deeper: the machine-readable join from each
+	// documented feature to the routes, environment variables and tests behind it,
+	// parsed out of the pages' own markup. An agent harness reads this to decide where a
+	// change belongs; web/spec_test.go is what keeps it true.
+	pages["spec.json"] = func() ([]byte, error) { return web.Spec(*site) }
 
 	// 0750/0600: the output is a build artifact, read by whoever ran the build (the
 	// Pages workflow uploads it as the same user). No other account needs it.
