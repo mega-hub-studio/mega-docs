@@ -34,8 +34,9 @@
 
         Bilingual without a build step or a rendering pass: both languages sit in
         the HTML, marked with a real `lang` attribute (which is also what a screen
-        reader wants), and one attribute on <html> decides which is visible. If
-        the JS never runs, you see both instead of nothing. ══ */
+        reader wants), and one attribute on <html> decides which is visible. That
+        attribute ships in the markup, so with JS off you get the whole page in
+        English — only the toggle needs script. ══ */
   html[data-lang="en"] [lang="vi"],
   html[data-lang="vi"] [lang="en"] { display: none; }
 
@@ -78,6 +79,44 @@
   main {
     max-inline-size: 820px; margin-inline: auto;
     padding: var(--sp-5) var(--sp-3) var(--sp-7);
+  }
+
+  /* ── "on this page" = <nes-toc>, the shipped Map of Content ──
+     The component owns both shapes and the scroll-spy: a collapsible sticky bar
+     naming the section you are in, becoming an open rail once there is room (it
+     sets that itself from rail-at). This file only says *where* it sits and how
+     far things must clear the sticky header — --bar-h is measured in the foot
+     script, because the header wraps to two rows on a narrow phone and a guessed
+     constant would either overlap the first heading or leave a gap. */
+  nes-toc {
+    --toc-top: var(--bar-h, 3.5rem);
+    margin-inline: var(--sp-3);
+  }
+  /* With JS off the component never builds, and never gets to hide itself — an empty
+     bordered strip above the article. It hides itself when it has nothing to show. */
+  nes-toc:empty { display: none; }
+  /* --toc-offset belongs on the root, not on <nes-toc>: the component writes
+     `scroll-margin: var(--toc-offset, 80px)` onto the *headings*, and those live in the
+     article column — a sibling of the toc, so a value scoped to the toc never reaches it
+     and the 80px fallback silently wins (measured: the first heading landed 8px under
+     the bar). In bar shape the heading must clear two sticky things, the header and
+     the collapsed bar itself; in rail shape there is no bar in the way. */
+  :root { --toc-offset: calc(var(--bar-h, 3.5rem) + var(--ctrl-h-lg) + var(--sp-3)); }
+  /* 74rem is the component's own rail-at default, so the rail column appears exactly
+     when it stops being a bar — one breakpoint, not two that can disagree. */
+  @media (min-width: 74rem) {
+    :root { --toc-offset: calc(var(--bar-h, 3.5rem) + var(--sp-4)); }
+    .page {
+      display: grid; align-items: start; justify-content: center;
+      grid-template-columns: minmax(0, 820px) 15rem;
+      gap: var(--sp-6);
+    }
+    /* DOM order is toc-then-main (mobile wants the bar above the article), so both
+       are placed explicitly rather than left to flow. Nothing else: in rail shape
+       the component already drops its collapsed bar, shows the label, and owns its
+       own height, scrolling and padding. */
+    .page > main { grid-column: 1; grid-row: 1; margin-inline: 0; }
+    .page > nes-toc { grid-column: 2; grid-row: 1; margin-inline: 0; }
   }
 
   main > section { margin-block-start: var(--sp-7); }
@@ -143,17 +182,12 @@
      be the target — a 44px-plus hit area without any extra rule */
   a.card { text-decoration: none; color: inherit; display: block; }
 
-  /* 8bit-nes styles headings, code and body but has no rule for `a` at all, so an
-     inline link in prose rendered identically to the text around it — same colour,
-     no underline, invisible as a link. Distinguish it on two channels, not colour
-     alone (WCAG 1.4.1): brighter ink *and* an underline. Still absent from 0.7.0
-     (verified against the published bytes), so this stays. */
-  main :is(p, li, td, th) a:not(.btn, .card) {
-    color: var(--ink);
-    text-decoration: underline;
-    text-decoration-thickness: var(--bw);
-    text-underline-offset: 2px;
-  }
+  /* This file used to carry two accessibility patches: an underline for prose links
+     (8bit-nes had no `a` rule at all) and a grown tap area for the 12px .wt-dot.
+     8bit-nes 0.7.1 ships both, verified against the published bytes — identical
+     computed decoration, and the same 40px effective hit area — so they are gone
+     rather than duplicated. Do not re-add one without measuring first. */
+
   /* A diagram taller than the phone would scroll its spotlit node off screen while
      you read the step explaining it. Cap the box so the diagram and the walkthrough
      sit on screen together; .mermaid-view already scrolls inside itself, and the
@@ -171,14 +205,6 @@
     font-family: var(--font-mono); font-size: var(--fs-label); font-weight: 700;
     text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
   }
-  /* A .wt-dot is a real control (it jumps to that step) but only 12px, under even
-     the 24px AA floor. Grow the tap area, not the dot. Still absent from 0.7.0
-     (verified against the published bytes), so this stays. */
-  @media (pointer: coarse) {
-    .wt-dot { position: relative; }
-    .wt-dot::after { content: ""; position: absolute; inset: -1rem; }
-  }
-
   .callout + .callout { margin-block-start: var(--sp-3); }
   nes-tabs { display: block; margin-block-start: var(--sp-3); }
   nes-tabs section > *:first-child { margin-block-start: 0; }
@@ -201,17 +227,43 @@
   </button>
 </header>
 
+<div class="page">
+<!-- The shipped Map of Content. Zero config except two things this page must own:
+     `levels` is language-scoped, because both languages sit in the DOM and an
+     unscoped h2,h3 would index every heading twice — half of them hidden. The foot
+     script keeps it in step with the language toggle (both attributes are observed,
+     so setting them rebuilds the index; no manual refresh). It hides itself below
+     `min` headings, so a short page costs nothing. -->
+<nes-toc levels='h2[lang="en"], h3[lang="en"]' label="On this page"></nes-toc>
 <%end%>
 
-<%define "foot"%><script type="module">
+<%define "foot"%></div>
+<script type="module">
   // Same convention as the 8-BIT NES docs: remember the choice, and default from
   // the browser's language on a first visit.
   import { store } from "<%url "8bit-nes" "elements.min.js"%>";
+
+  // Both languages are in the DOM, so the index has to be told which half counts.
+  // `levels` and `label` are observed attributes — setting them rebuilds the index,
+  // so there is nothing to call and nothing to keep in sync by hand.
+  const toc = document.querySelector("nes-toc");
+  const TOC_LABEL = { en: "On this page", vi: "Trên trang này" };
+
+  // Only write an attribute that actually changed. Writing the same value still
+  // fires attributeChangedCallback, and each rebuild replaces the bar's "current
+  // section" span while the component's active id stays the same — so its update is
+  // skipped and the fresh span is left blank. On a first load in English (what the
+  // markup already says) that would empty the bar before anyone scrolled.
+  const setIf = (name, value) => {
+    if (toc && toc.getAttribute(name) !== value) toc.setAttribute(name, value);
+  };
 
   const pick = (lang) => {
     document.documentElement.dataset.lang = lang;
     document.documentElement.lang = lang;
     store.set("lang", lang);
+    setIf("levels", `h2[lang="${lang}"], h3[lang="${lang}"]`);
+    setIf("label", TOC_LABEL[lang]);
   };
 
   pick(store.get("lang") || (navigator.language?.startsWith("vi") ? "vi" : "en"));
@@ -219,6 +271,15 @@
   document.getElementById("lang").addEventListener("click", () => {
     pick(document.documentElement.dataset.lang === "vi" ? "en" : "vi");
   });
+
+  // The index sticks below the header and a jumped-to heading has to clear it. The
+  // header wraps to a second row on a narrow phone, so its height is measured rather
+  // than assumed — a constant would either overlap the heading or leave a gap.
+  const bar = document.querySelector(".bar");
+  const measure = () =>
+    document.documentElement.style.setProperty("--bar-h", `${Math.round(bar.getBoundingClientRect().height)}px`);
+  measure();
+  new ResizeObserver(measure).observe(bar);
 </script>
 </body>
 </html>

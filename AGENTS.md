@@ -35,15 +35,15 @@ and it carries one link out to the published guide. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.7.0
+    8bit-nes@0.7.1
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.0/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.0/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.1/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.1/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.1/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -60,11 +60,12 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/app/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
-2. **Local overrides are deliberate and documented.** Where this repo does override
-   the design system, the comment says which upstream version still lacks the fix.
-   Do not "clean up" one without checking that comment — and if you bump the pin,
-   re-measure rather than assuming the release carries it. A release has already been
-   tagged twice without a fix it was expected to contain.
+2. **There are currently no local overrides of the design system.** `docsbase.html`
+   used to patch two accessibility gaps; 8bit-nes 0.7.1 ships both, so they were
+   removed after measuring, not assumed. If you add one back, say in a comment which
+   upstream version lacks the fix — and if you bump the pin, re-measure rather than
+   trusting the changelog. A release has already been tagged twice without a fix it
+   was expected to contain.
 
 ## Verifying, not guessing
 

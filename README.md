@@ -319,12 +319,12 @@ cost is re-embedding the corpus.
 
 The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
 `marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
-design system (**0.7.0**). All of it is version-pinned *and* hash-pinned:
+design system (**0.7.1**). All of it is version-pinned *and* hash-pinned:
 
 | | pin |
 |---|---|
 | one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
-| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.0` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
+| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.1` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
 | `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
 | `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
 | font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
@@ -337,20 +337,24 @@ half-finished bump (one file moved, the rest left behind) fails at **startup**, 
 in someone's browser. 8-BIT NES publishes its own digests at
 [`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
 
-> **On 8bit-nes 0.7.0** (released 2026-07-26): the bump is one line plus
+> **On 8bit-nes 0.7.1** (released 2026-07-27): the bump is one line plus
 > `make vendor`. Everything here is verified against the published tarball rather
 > than the changelog, because a release has already once been tagged without the fix
-> it claimed — all five digests match the package's own `sri.json`.
+> it claimed — all five digests match the package's own `sri.json`, and the README's
+> own documented `<head>` now quotes `@0.7.1` with matching digests (0.7.0 shipped
+> that pair mismatched, which would have blocked the stylesheet as an SRI failure;
+> the release now gates it with `check:pins`).
 >
-> 0.7.0 **keeps** 0.6.1's two touch fixes (send button 44px, chat textarea 16px), so
-> `web/app/styles.css` still owns no `(pointer: coarse)` CSS.
+> 0.7.1 carries **both** accessibility fixes this project reported upstream, so
+> `web/docsbase.html` no longer overrides anything: prose links get ink colour plus an
+> underline, and a `.wt-dot` grows a 40px hit area on a coarse pointer. Verified by
+> measuring three builds — 0.7.1 with the overrides, 0.7.1 without them (identical
+> computed decoration and identical hit-test at 14px in all four directions), and
+> 0.7.0 without them as a control, where links fall back to body colour with no
+> underline and only the 12×12 dot is hittable.
 >
-> It does **not** carry two accessibility fixes this project found and reported
-> upstream, so `web/docsbase.html` still overrides them locally, each marked with why:
-> `.wt-dot` is a 12×12 tap target, and `base.css` has no `a` rule at all so an inline
-> link is visually identical to the text around it. Both confirmed by pinning 0.7.0
-> and removing the overrides: the dots drop to 12×12 and links lose their underline
-> and go back to body colour. They stay until a release carries them.
+> It also keeps 0.6.1's two touch fixes (send button 44px, chat textarea 16px), so
+> `web/app/styles.css` owns no `(pointer: coarse)` CSS either.
 
 > **On the diagram.** The "how it works" picture is a mermaid graph, but mermaid
 > never reaches the browser: 8bit-nes deliberately does not bundle it (~800KB
