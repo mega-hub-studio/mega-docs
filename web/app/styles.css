@@ -161,22 +161,34 @@ main.ba {
 }
 .dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
 
-/* The scope bar: one row above the prompt saying which folder answers come from.
-   Wraps rather than truncating — a path is the one thing here that must stay
-   readable — and shares the prompt's reading column so it reads as part of it.
+/* The scope picker: a closed row above the prompt naming the folder answers come
+   from, opening into the corpus tree.
 
-   It needs its own ground: the dock fades in from transparent, so a row added at
-   the top of it would otherwise sit over whatever the page is scrolled to, and the
-   corpus tree behind it read as part of the bar. */
-.scopebar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+   It needs its own ground: the dock fades in from transparent, so a row added at the
+   top of it would otherwise sit over whatever the page is scrolled to, and the tree
+   behind it read as part of the row.
+
+   The open tree is capped and scrolls inside itself. Uncapped, a corpus of a few
+   hundred documents becomes a dock taller than the phone — and the dock's height is
+   what the conversation is padded by, so it would push the answer off screen. */
+.scopepick {
   max-inline-size: 760px; margin: 0 auto var(--sp-2);
-  padding-block: var(--sp-1);
   background: var(--screen);
 }
-/* The badge already names the folder and the button already offers the way out; on
-   a phone the sentence is the part that costs a second row. */
-.scopebar .scope-note { display: none; }
+.scopepick > summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  padding-block: var(--sp-2); cursor: pointer;
+  min-block-size: 2.75rem; /* 44px: it is the control that changes every answer */
+}
+.scopepick > summary::-webkit-details-marker { display: none; }
+.scopepick > summary::marker { content: ""; }
+.scopepick[open] > summary { border-block-end: 2px solid var(--line); }
+.scopepick nes-tree { display: block; max-block-size: 40vh; overflow: auto; }
+.scopepick > .btn { margin-block: var(--sp-2); }
+/* On a phone the sentence is what costs a second row; the badge already names the
+   folder, and with no scope the count is the whole message. */
+.scopepick .scope-note { display: none; }
+.scopepick:not(:has(.badge)) .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
 /* The status line sits inside the dock, under the prompt, so viewport.js keeps
    measuring one height and the conversation still clears everything fixed. The
    strip, its light and its items are all .statusline — this only undoes the dock's
@@ -194,7 +206,7 @@ main.ba {
   .empty { margin-block-start: 12vh; }
   .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
-  .scopebar .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
+  .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
 }
 

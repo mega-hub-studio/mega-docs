@@ -156,17 +156,6 @@
         </button>
       </div>
 
-      <!-- The corpus, as the folders it actually is. It answers "does it even know
-           about my file?" without spending a question — and picking a row narrows the
-           next answer to that folder, which is the same control doing both jobs.
-           <nes-tree> is the library's element: keyboard nav and ARIA come with it. -->
-      <details class="corpus" v-if="corpus.documents.length" @toggle="showSources = $event.target.open">
-        <summary>
-          <span class="eyebrow">{{ showSources ? 'Hide' : 'Browse' }} documents — tap a folder to ask inside it</span>
-        </summary>
-        <corpus-tree :documents="corpus.documents" :scope="scope" @pick="setScope"></corpus-tree>
-      </details>
-
       <!-- History. Every row here is an answer already paid for: asking it again
            costs nothing, so the hit count is worth showing rather than hiding. -->
       <details class="corpus" v-if="history.length">
@@ -280,15 +269,25 @@
          textarea, Enter-to-send, and the send/stop button (busy → red ■). The app
          only listens for nes:submit / nes:stop, so none of that is reimplemented. -->
     <!-- `busy` reaches it as an attribute via a watcher, not :busy — see app.js. -->
-    <!-- The active scope, where the question is typed rather than where it was
-         chosen: a filter you cannot see from the prompt is a filter you forget, and
-         then read a narrow answer as the whole truth. One tap clears it. -->
-    <div class="scopebar" v-if="scope">
-      <span class="badge warn"><nes-icon name="layers" aria-hidden="true"></nes-icon> {{ scope }}</span>
-      <span class="scope-note">answers come from this folder only</span>
-      <button class="btn ghost xs" @click="setScope('')"
+    <!-- ══ Scope picker ═══════════════════════════════════════════════════════
+         Lives in the dock, not on the empty screen: it is both the answer to "does it
+         know about my file?" and the control that narrows the next question, and both
+         are needed *after* the first answer as often as before it. The closed row is
+         the filter made visible where the question is typed — a filter you cannot see
+         from the prompt is one you forget, and then read a narrow answer as the whole
+         truth. <nes-tree> brings keyboard nav and ARIA with it.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <details class="scopepick" v-if="corpus.documents.length" ref="pick">
+      <summary>
+        <span class="badge warn" v-if="scope">
+          <nes-icon name="layers" aria-hidden="true"></nes-icon> {{ scope }}</span>
+        <span class="scope-note" v-if="scope">answers come from this folder only</span>
+        <span class="scope-note" v-else>{{ corpus.docs }} documents — tap to ask inside one folder</span>
+      </summary>
+      <button class="btn ghost xs" v-if="scope" @click="setScope('')"
         aria-label="Ask the whole corpus again">ALL DOCS</button>
-    </div>
+      <corpus-tree :documents="corpus.documents" :scope="scope" @pick="pickScope"></corpus-tree>
+    </details>
 
     <nes-chat-prompt ref="prompt"
       placeholder="Ask the documents…" aria-label="Question"

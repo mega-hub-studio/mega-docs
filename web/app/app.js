@@ -60,7 +60,6 @@ export function boot(ds) {
         online: true,
         starters: STARTERS,
         corpus: { state: "loading", docs: 0, chunks: 0, approved: 0, documents: [] },
-        showSources: false,
         // Which part of the corpus questions are answered from. "" is all of it, and
         // is what every question was before this control existed.
         scope: localStorage.getItem(SCOPE_KEY) || "",
@@ -204,6 +203,12 @@ export function boot(ds) {
       /** Narrow the next question to one folder or document — or, with "", widen it
        *  back to everything. Stored, because a reader working through one area asks
        *  several questions about it and a reload should not silently widen them. */
+      /** Picked from the tree: close the picker too, or the answer arrives behind it. */
+      pickScope(scope) {
+        this.setScope(scope);
+        if (this.$refs.pick) this.$refs.pick.open = false;
+      },
+
       setScope(scope) {
         this.scope = scope || "";
         this.scope ? localStorage.setItem(SCOPE_KEY, this.scope) : localStorage.removeItem(SCOPE_KEY);
@@ -213,7 +218,6 @@ export function boot(ds) {
         this.stop();
         this.turns = [];
         session.clear();
-        this.showSources = false;
         this.$refs.prompt?.focus();
       },
 
