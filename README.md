@@ -106,9 +106,22 @@ internal/config   env → Config, with defaults
 
 web/              index.html · docs.html · dev.html · deploy.html (Go templates,
                   shared head in docsbase.html) + embed.go + assets.go
-web/app/          the app shell — native ES modules, no build step
-                  app.js · chat.js · answer.js · viewport.js · library.js ·
-                  session.js · qa.js · ba.js · tree.js · upload.js
+web/app/          the front end — Vue 3.5 Composition API, native ES modules,
+                  no build step
+                  app.js      wiring: composables in, components registered, mount
+                  ba.js       the BA screen (in-DOM template, #ba-screen)
+                  tree.js     <nes-tree> as the corpus + scope picker
+                  chat.js · qa.js · upload.js      transport (SSE, tickets, import)
+                  answer.js · diagram.js           rendering (markdown, mermaid)
+                  library.js · session.js · viewport.js   corpus, storage, keyboard
+web/app/use/      one composable per concern, and nothing else in them
+                  conversation.js  turns, ask/regenerate/stop/reset, persistence
+                  corpus.js        what is indexed + the starters derived from it
+                  scope.js         which folder answers
+                  qaloop.js        the ticket queue and the free-to-replay history
+                  runtime.js       online · writes · model and prices
+                  statusline.js    the bottom strip, as one computed object
+                  diagrams.js      the lazy renderer and the zoom viewer
 web/howitworks.mmd  the "how it works" diagram, authored as mermaid
 web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
 web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
@@ -126,7 +139,8 @@ web/vendor/       `make vendor` output (gitignored)
 | how a document is cut into sections | `internal/rag/chunk.go` | small sections merge, oversized ones split by paragraph then by line; **changing it needs a re-ingest** |
 | a new provider | `internal/ai` | one client, one seam; probe it with `make live` |
 | a provider quirk to survive | `internal/aitest` | fault injection lives with the fake, not in each test |
-| a UI action | `web/app/app.js` | it's intent; plumbing lives in its own module |
+| a UI action | `web/app/app.js` | it's wiring and intent; state lives in a composable, plumbing in its own module |
+| a new piece of shell state | a file in `web/app/use/` | one concern per composable — the shell used to be one object where the import bar could collide with the chat thread |
 | a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
 | anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
 | what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
@@ -134,7 +148,7 @@ web/vendor/       `make vendor` output (gitignored)
 | anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + scope, under a signature of corpus + chat model + prompt |
 | retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `web/app/tree.js` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
 | a BA-screen behaviour | `web/app/ba.js` | its own component with its own state; the shell only passes what both screens render |
-| a chat-screen behaviour | `web/app/app.js` | the shell: turns, health, corpus, queue, mode |
+| a chat-screen behaviour | `web/app/use/conversation.js` | the thread owns ask/stream/stop/reset; `app.js` only wires it |
 | document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
 | markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
 | a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |

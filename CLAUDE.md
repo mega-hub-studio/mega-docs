@@ -157,9 +157,25 @@ a runtime error.
 
 ### Front end
 
-Native ES modules, no bundler: `Vue` is a global from `index.html`, the template is
-in-DOM, and the Go binary serves `web/app/` from its embed FS. **`make build` before
-testing the built artifact**, or you are debugging the old bytes.
+**Vue 3.5, Composition API, no bundler.** `Vue` is a global from `index.html` (the build
+that ships the compiler, so in-DOM templates work), the Go binary serves `web/app/` from
+its embed FS, and there is no build step to run. **`make build` before testing the built
+artifact**, or you are debugging the old bytes.
+
+State is one composable per concern in `web/app/use/` — `conversation` (turns, streaming,
+persistence), `corpus`, `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`. `app.js`
+is wiring: it creates them, hands each what it needs, and returns what the template
+binds. Two rules keep that honest:
+
+- **A composable never reaches for another's state.** What it needs arrives as an
+  argument — `useConversation` gets the scope, a scroll function and an `onSettled`
+  callback, not the corpus. The shell is the only place that knows the whole picture.
+- **Everything the template names must be in the returned object.** A missing key is
+  `undefined` at render time with no error — the same trap as a `computed` colliding with
+  a `data` key in the old Options API. When you add a binding, add it to the return.
+
+Composables read `Vue` *inside* the function (`const { ref } = Vue`), never at module
+scope: the global is a classic script and a module body can evaluate before it exists.
 
 The design system (8bit-nes) owns components; `web/app/styles.css` owns layout only.
 Before writing CSS, check the pinned `llms.txt` for a recipe that already exists —

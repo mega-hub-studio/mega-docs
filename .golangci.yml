@@ -4,6 +4,10 @@
 # The rule this file exists to protect: `make lint` says nothing unless something is
 # actually wrong. The stock config reported 591 issues here, 420 of them whitespace and
 # missing t.Parallel(). A gate that always shouts is a gate everybody learns to ignore.
+#
+# Validated on golangci-lint 2.5.0 and 2.12.2 — both report zero. An unknown-linter name
+# is a hard error, not a warning, so a linter that only exists in the newest release
+# would lock out anyone running an older one. That is why `modernize` is off below.
 version: "2"
 
 run:
@@ -59,7 +63,6 @@ linters:
     - sqlclosecheck
     - rowserrcheck
     # modernisation
-    - modernize
     - intrange
     - usestdlibvars
     - exhaustive
@@ -93,6 +96,10 @@ linters:
     - testifylint
     # exptostd: no golang.org/x/exp import.
     - exptostd
+    # modernize is *not listed here either*, deliberately: naming an unknown linter is an
+    # error whether it appears under enable or disable, and this one only exists from
+    # golangci-lint 2.9. It found two real simplifications (strings.Cut, slices.Contains),
+    # both applied; add it back — by name — when the oldest version anyone runs has it.
     # Kept off for the reasons the recommended config already gives.
     - lll
     - prealloc

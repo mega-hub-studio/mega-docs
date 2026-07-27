@@ -39,8 +39,8 @@
           <tr lang="vi"><th>đặc thù provider (header, endpoint)</th><td><code>internal/ai</code></td></tr>
           <tr lang="en"><th>chunking, schema, hybrid search</th><td><code>internal/db</code></td></tr>
           <tr lang="vi"><th>cắt đoạn, schema, hybrid search</th><td><code>internal/db</code></td></tr>
-          <tr lang="en"><th>anything the user clicks</th><td><code>web/app/</code></td></tr>
-          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/app/</code></td></tr>
+          <tr lang="en"><th>anything the user clicks</th><td><code>web/app/</code> — Vue 3.5 Composition API, no build step: <code>app.js</code> wires, <code>use/*.js</code> holds one concern each, <code>ba.js</code>/<code>tree.js</code> are the components</td></tr>
+          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/app/</code> — Vue 3.5 Composition API, không có build step: <code>app.js</code> đấu dây, <code>use/*.js</code> mỗi file một việc, <code>ba.js</code>/<code>tree.js</code> là component</td></tr>
           <tr lang="en"><th>a dependency version</th><td><code>web/vendor.sha384</code> — one line</td></tr>
           <tr lang="vi"><th>version một dependency</th><td><code>web/vendor.sha384</code> — một dòng</td></tr>
         </tbody>
