@@ -271,6 +271,33 @@ so a cached answer can never outlive the sources it cites. There is no TTL to tu
 Misses and cut-off streams are never cached: those are exactly what someone retries,
 and remembering them would make one bad answer permanent. Regenerate always pays.
 
+## Upgrading a running instance
+
+```bash
+cd /opt/knowledge && git pull origin main
+make build                              # the UI is compiled in — pulling alone changes nothing
+sudo systemctl restart knowledge
+curl -s localhost:8080/api/health       # {"ok":true,"writes":true} — writes:true = BA_PASS is set
+```
+
+With `ASSET_BASE=/vendor`, run `make vendor` before `make build`: the vendored assets
+are gitignored.
+
+**One upgrade needs a re-index.** Document paths are now stored relative to
+`CORPUS_DIR`. An index built before that stored them differently, so a re-ingest would
+add a *second* document for every file — each cited twice. Check what yours holds:
+
+```bash
+sqlite3 knowledge.db 'select path from documents limit 3'
+# spec.md · qa/ticket-1.md              → already relative, nothing to do
+# docs/spec.md · /opt/knowledge/docs/…  → predates the change, rebuild:
+rm -f knowledge.db knowledge.db-wal knowledge.db-shm && ./bin/ingest docs
+```
+
+Deleting the index is safe: it is derived. `CORPUS_DIR` is the source of truth,
+confirmed answers included, and the answer cache rebuilds itself on demand. The only
+cost is re-embedding the corpus.
+
 ## Caveats (read before first build)
 
 - **sqlite-vec Go bindings evolve.** If `go mod tidy` or the build complains
