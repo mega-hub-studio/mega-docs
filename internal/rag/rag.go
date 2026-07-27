@@ -227,6 +227,14 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		raw, _ := json.Marshal(cites)
 		_ = e.store.Cache(sig, db.Cached{Question: question, Scope: scope, Answer: full.String(), Citations: raw})
 	}
+	// A miss cites nothing. Retrieval did return chunks — that is why the model was
+	// asked at all — but printing six sources under "this is not in the documents"
+	// is a contradiction on screen: it invites the reader to go and look for an
+	// answer that the engine has just said does not exist. The cost still gets
+	// reported, because it was really spent.
+	if isMiss(full.String()) {
+		return Reply{Usage: usage}, nil
+	}
 	return Reply{Citations: cites, Usage: usage}, nil
 }
 

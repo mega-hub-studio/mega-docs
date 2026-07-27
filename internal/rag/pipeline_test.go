@@ -306,3 +306,31 @@ func TestFailedIngestLeavesNoPhantomDocument(t *testing.T) {
 		t.Errorf("failed ingest left %d documents / %d chunks behind", c.Docs, c.Chunks)
 	}
 }
+
+// Retrieval finding chunks and the model finding no answer in them are different
+// events, and only the second one reaches the reader. Printing the sources anyway is
+// a contradiction on screen — "this is not in the documents", followed by six places
+// to go and look for it.
+func TestAMissCitesNothingEvenWhenRetrievalFoundChunks(t *testing.T) {
+	e, prov := engine(t, &aitest.Provider{Reply: rag.NoAnswer})
+	ctx := context.Background()
+
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+
+	got, reply, err := ask(t, e, "what is the refund policy?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	// The model was asked — this is not the empty-index shortcut.
+	if len(prov.Chats()) != 1 {
+		t.Fatalf("chat calls = %d, want 1 (retrieval must have produced context)", len(prov.Chats()))
+	}
+	if got != rag.NoAnswer {
+		t.Fatalf("answer = %q, want the no-answer sentence", got)
+	}
+	if len(reply.Citations) != 0 {
+		t.Errorf("a miss cited %d source(s): %+v", len(reply.Citations), reply.Citations)
+	}
+}
