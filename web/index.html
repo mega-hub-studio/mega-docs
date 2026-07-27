@@ -302,7 +302,13 @@
           placeholder="BA_PASS">
         <span class="hint">Kept for this tab only. Reading never needs it.</span>
       </label>
-      <button class="btn" type="submit">UNLOCK</button>
+      <!-- The password is checked against the server before this form goes away, so
+           a typo is answered here rather than surviving until the first upload and
+           looking like a broken import. -->
+      <div class="callout crit" v-if="unlockError" role="alert">{{ unlockError }}</div>
+      <button class="btn" type="submit" :disabled="unlocking">
+        {{ unlocking ? 'CHECKING…' : 'UNLOCK' }}
+      </button>
     </form>
 
     <!-- ══ Import ═════════════════════════════════════════════════════════════
@@ -314,6 +320,7 @@
          ═══════════════════════════════════════════════════════════════════ -->
     <section class="card drop" data-accent="blue" v-if="online && writes && unlocked"
       :data-over="String(dragging)"
+      @dragenter.prevent="dragging = true"
       @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false"
       @drop.prevent="importDocs($event.dataTransfer.files)">
       <div class="head">
@@ -347,6 +354,22 @@
           <input type="file" webkitdirectory multiple hidden @change="pickDocs" :disabled="importing">
           CHOOSE A FOLDER
         </label>
+      </div>
+
+      <!-- Progress, and only real progress. One request per file is what makes the
+           number honest — a single POST could only be animated by guessing, and a
+           bar that invents its position says "nearly done" while the last file has
+           not started. .pbar is the design system's determinate bar (--fill drives
+           its <i>); the spinner covers the moment before the first file returns,
+           when the bar would sit at 0 and read as stuck. -->
+      <div class="importing" v-if="importing" role="status" aria-live="polite">
+        <p class="hint">
+          <span class="spinner sm" aria-hidden="true"></span>
+          Indexing {{ progress.done + 1 > progress.total ? progress.total : progress.done + 1 }}
+          of {{ progress.total }} — each file is embedded before it is searchable.
+        </p>
+        <div class="pbar" :style="{ '--fill': (progress.total ? progress.done / progress.total * 100 : 0) + '%' }"
+          role="progressbar" :aria-valuenow="progress.done" aria-valuemin="0" :aria-valuemax="progress.total"><i></i></div>
       </div>
 
       <!-- Per file, both outcomes in one list: a batch where seven landed and one

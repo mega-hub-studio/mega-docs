@@ -44,18 +44,66 @@ export function sort(files) {
 }
 
 /**
- * Import documents. Resolves with the per-file outcome even when the server
- * refused every one of them — the caller renders the same list either way.
+ * Does this password open the gate? Asked before a BA is told they are unlocked,
+ * because the alternative is what used to happen: the password is stored without
+ * being checked, the import card appears, and the first upload turns a wrong
+ * password into a card that silently disappears.
+ *
+ * The probe is a request that changes nothing — no files, so the gate answers
+ * first and the handler then rejects it as empty. 401/403 is a real no; anything
+ * else means the gate opened.
+ * @returns {Promise<boolean>}
+ */
+export async function verify(candidate) {
+  let res;
+  try {
+    res = await fetch("/api/documents", {
+      method: "POST",
+      headers: { "X-BA-Pass": candidate },
+      body: new FormData(),
+    });
+  } catch {
+    throw new Error("Can't reach the server");
+  }
+  return res.status !== 401 && res.status !== 403;
+}
+
+/**
+ * Import documents, one request per file.
+ *
+ * One request each, not one for the batch: it is what makes the progress bar
+ * *true*. A single POST can only be animated by guessing, and a bar that invents
+ * its own position is worse than none — it says "nearly done" while the last file
+ * has not started. It also means a file's outcome appears as soon as it lands,
+ * instead of every file waiting for the slowest.
+ *
+ * @param {File[]} files
+ * @param {string} dir
+ * @param {(done: number, total: number) => void} [onProgress] after each file
  * @throws {WrongPass} when the password is missing, wrong, or writes are off
  * @returns {Promise<{uploaded: {path: string, chunks: number}[], failed: {name: string, error: string}[], chunks: number}>}
  */
-export async function send(files, dir = "") {
+export async function send(files, dir = "", onProgress = () => {}) {
+  const out = { uploaded: [], failed: [], chunks: 0 };
+  let done = 0;
+  onProgress(0, files.length);
+  for (const f of files) {
+    const one = await sendOne(f, dir);
+    out.uploaded.push(...one.uploaded);
+    out.failed.push(...one.failed);
+    out.chunks += one.chunks || 0;
+    onProgress(++done, files.length);
+  }
+  return out;
+}
+
+async function sendOne(file, dir) {
   const body = new FormData();
   if (dir.trim()) body.append("dir", dir.trim());
   // webkitRelativePath is set when a *folder* was picked, and it carries the
   // structure the person already built on their own disk — keep it rather than
   // flattening a tree they organised.
-  for (const f of files) body.append("files", f, f.webkitRelativePath || f.name);
+  body.append("files", file, file.webkitRelativePath || file.name);
 
   let res;
   try {
@@ -67,9 +115,9 @@ export async function send(files, dir = "") {
     setPass("");
     throw new WrongPass((await res.text()).trim() || "Not allowed");
   }
-  // 400 with a JSON body means "nothing usable", and it still names each file.
-  // Throwing that away would leave the user with "Server error 400" for a batch
-  // whose problem is one line long.
+  // 400 with a JSON body means "nothing usable", and it still names the file.
+  // Throwing that away would leave the user with "Server error 400" for a problem
+  // whose description is one line long.
   if (res.headers.get("Content-Type")?.includes("application/json")) {
     return res.json();
   }

@@ -139,6 +139,11 @@ main.ba {
   border-style: dashed;
 }
 .drop[data-over="true"] { border-style: solid; border-color: var(--primary); }
+/* The progress block: .spinner and .pbar are the library's; this only stacks them
+   and puts the spinner on the same line as its sentence. Not the library's .row —
+   that selector is also a tree row, and it carries cursor:pointer. */
+.importing { display: flex; flex-direction: column; gap: var(--sp-2); }
+.importing .hint { display: flex; align-items: center; gap: var(--sp-2); }
 /* A label is not focusable, so keyboard users reach the input; give it the same
    visible ring the library puts on a focused control. */
 .drop .btn:focus-within { outline: var(--bw-2) solid var(--primary); outline-offset: 2px; }

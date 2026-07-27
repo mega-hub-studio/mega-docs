@@ -73,6 +73,30 @@ Decisions worth not relitigating:
 - Re-importing the same path updates that document in place — the same identity rule
   `cmd/ingest.docPath` uses, so the CLI and the browser cannot disagree.
 
+### Three defects found by driving a real browser, and fixed
+
+Reported as "BA mode cannot upload and there is no progress bar". The upload path
+itself was fine — a headless Chrome over CDP indexed a file through the UI on the
+first try. What was broken was everything around it:
+
+1. **A wrong password was a trapdoor.** `unlock()` stored the password without
+   checking it, so the import card appeared, and the first upload turned the 401
+   into `unlocked = false` — the card vanished and the unlock form came back. That
+   is indistinguishable from "upload is broken". `unlock()` now verifies against the
+   gate first (an empty multipart POST to `/api/documents`, which changes nothing)
+   and shows the failure inline in the form.
+2. **`dragenter` never called `preventDefault`.** Only `dragover` did, which Chrome
+   tolerates and the spec does not — the element was not a valid drop target.
+3. **No progress indicator at all.** Fixed with the design system's own `.spinner`
+   and `.pbar`, and by uploading **one file per request** so the bar is determinate.
+   A single POST for the batch could only be animated by guessing, and a bar that
+   invents its position claims "nearly done" while the last file has not started.
+
+Verification is `scratchpad/verify.mjs`-style CDP driving, not a click-through: the
+three checks are `defaultPrevented` on all three drag events, `--fill` moving
+0% → 66.7% with the text going "1 of 3" → "3 of 3", and a wrong password leaving
+`importCardLeaked: false`.
+
 ### Corpus structure
 
 `/opt/knowledge/docs/README.md` is the convention and is itself indexed, so the
@@ -134,6 +158,10 @@ with no human action.
 The requested end state: a folder tree in the app, click a branch, ask a question
 scoped to it.
 
+- **The tree is a component, not a build.** 8bit-nes 0.7.1 already ships
+  `<nes-tree>` — "hierarchical folder/file list, expand/collapse, single or multiple
+  selection, full keyboard nav, data via child JSON". Check its `llms.txt` before
+  writing any of it; there is also `<nes-code-tree>` if a viewer pane is wanted.
 - The data already exists — `GET /api/corpus` returns full paths, so the tree is
   derivable client-side with no API change. `web/app/upload.js` already has
   `folders()` doing exactly this collapse for the import picker.

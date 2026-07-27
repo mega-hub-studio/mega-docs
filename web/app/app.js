@@ -82,8 +82,11 @@ export function boot(ds) {
         accept: upload.ACCEPT,
         importDir: "", // the folder this batch lands in — the scope a reader browses
         importing: false,
+        progress: { done: 0, total: 0 }, // real counts — the bar must not invent a position
         dragging: false, // a drop target that doesn't light up reads as inert
         imported: null, // {uploaded, failed, chunks} from the last import
+        unlocking: false,
+        unlockError: "",
       };
     },
 
@@ -215,10 +218,27 @@ export function boot(ds) {
         }
       },
 
-      unlock() {
-        qa.setPass(this.passInput.trim());
-        this.unlocked = !!qa.pass();
-        this.passInput = "";
+      /** Check the password before saying it worked. Storing it unchecked is how a
+       *  typo used to survive until the first upload, and then look like a broken
+       *  import rather than a wrong password. */
+      async unlock() {
+        const candidate = this.passInput.trim();
+        if (!candidate) return;
+        this.unlockError = "";
+        this.unlocking = true;
+        try {
+          if (!(await upload.verify(candidate))) {
+            this.unlockError = "That password does not open the gate. Reads still work.";
+            return;
+          }
+          qa.setPass(candidate);
+          this.unlocked = !!qa.pass();
+          this.passInput = "";
+        } catch (e) {
+          this.unlockError = e.message;
+        } finally {
+          this.unlocking = false;
+        }
       },
 
       /** draft · confirm · reject — one path, so every outcome is handled once. */
@@ -259,8 +279,11 @@ export function boot(ds) {
         }
         this.importing = true;
         this.imported = null;
+        this.progress = { done: 0, total: ok.length };
         try {
-          const r = await upload.send(ok, this.importDir);
+          const r = await upload.send(ok, this.importDir, (done, total) => {
+            this.progress = { done, total };
+          });
           // A file the browser filtered never reached the server, but to the person
           // who dropped it there is one list, so they arrive in one.
           r.failed = [...r.failed, ...rejected.map((f) => ({ name: f.name, error: `not ${upload.ACCEPT}` }))];
@@ -276,7 +299,10 @@ export function boot(ds) {
           }
         } catch (e) {
           if (e instanceof qa.WrongPass) {
+            // Say why the card just went away. A toast alone is missed exactly
+            // when it matters — the thing being read is the card that vanished.
             this.unlocked = false;
+            this.unlockError = `The server refused the password: ${e.message}`;
             ds.toast(`<b>Locked.</b> ${e.message}`, { accent: "crit" });
           } else {
             ds.toast(`<b>${e.message}</b>`, { accent: "crit" });
