@@ -56,11 +56,13 @@ type Runtime struct {
 // domain, so it is not served here — one surface, one job.
 //
 //	GET  /            index.html          revalidated (it names hashed assets)
-//	GET  /api/health  {"ok":true,"writes":bool} — open, so probes need no secret
+//	GET  /api/health  {"ok","writes","model","window","price_in","price_out"} — open, so
+//	                  probes need no secret. No "site": the app does not link to the guide
 //	POST /api/chat    SSE: cached · token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /api/tickets · POST /api/tickets · POST /api/tickets/{id}/{action}
 //	POST /api/documents  import .md/.txt into the corpus — same gate as a confirm
+//	DELETE /api/documents/{path…}  remove a document and its chunks — same gate
 //	GET  /api/history answers still free to replay
 //	GET  /assets/…    the built bundle      immutable (every name has a content hash)
 func New(d Deps) http.Handler {

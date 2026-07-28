@@ -39,10 +39,10 @@
           <tr lang="vi"><th>đặc thù provider (header, endpoint)</th><td><code>internal/ai</code></td></tr>
           <tr lang="en"><th>chunking, schema, hybrid search</th><td><code>internal/db</code></td></tr>
           <tr lang="vi"><th>cắt đoạn, schema, hybrid search</th><td><code>internal/db</code></td></tr>
-          <tr lang="en"><th>anything the user clicks</th><td><code>web/app/</code> — Vue 3.5 Composition API, no build step: <code>app.js</code> wires, <code>use/*.js</code> holds one concern each, <code>ba.js</code>/<code>tree.js</code> are the components</td></tr>
-          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/app/</code> — Vue 3.5 Composition API, không có build step: <code>app.js</code> đấu dây, <code>use/*.js</code> mỗi file một việc, <code>ba.js</code>/<code>tree.js</code> là component</td></tr>
-          <tr lang="en"><th>a dependency version</th><td><code>web/vendor.sha384</code> — one line</td></tr>
-          <tr lang="vi"><th>version một dependency</th><td><code>web/vendor.sha384</code> — một dòng</td></tr>
+          <tr lang="en"><th>anything the user clicks</th><td><code>web/ui/src/</code> — Vue 3.5 single-file components, built by Vite into <code>web/dist</code> (committed, embedded): <code>App.vue</code> wires, <code>composables/*.js</code> hold one concern each, <code>components/*.vue</code> are the screens, <code>lib/*.js</code> is plumbing with no Vue in it</td></tr>
+          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/ui/src/</code> — Vue 3.5 single-file component, build bằng Vite ra <code>web/dist</code> (đã commit, nhúng vào binary): <code>App.vue</code> đấu dây, <code>composables/*.js</code> mỗi file một việc, <code>components/*.vue</code> là các màn hình, <code>lib/*.js</code> là phần ống dẫn, không có Vue</td></tr>
+          <tr lang="en"><th>a dependency version</th><td>the app's in <code>web/ui/package.json</code>; the docs pages' CDN pins in <code>web/vendor.sha384</code> — two manifests, neither knowing the other's versions</td></tr>
+          <tr lang="vi"><th>version một dependency</th><td>của app thì ở <code>web/ui/package.json</code>; pin CDN của trang tài liệu ở <code>web/vendor.sha384</code> — hai manifest, không bên nào biết version của bên kia</td></tr>
         </tbody>
       </table>
     </div>
@@ -90,30 +90,32 @@ type Importer interface {              // documents in, from the browser
 
     <h3 lang="en">App ↔ transport</h3>
     <h3 lang="vi">App ↔ transport</h3>
-    <p lang="en"><code>app.js</code> never sees an <code>AbortController</code>, a
+    <p lang="en"><code>App.vue</code> never sees an <code>AbortController</code>, a
       <code>TextDecoder</code> or <code>visualViewport</code>. It states intent; the
-      modules hide the mechanism.</p>
-    <p lang="vi"><code>app.js</code> không bao giờ thấy <code>AbortController</code>,
+      modules under <code>lib/</code> hide the mechanism.</p>
+    <p lang="vi"><code>App.vue</code> không bao giờ thấy <code>AbortController</code>,
       <code>TextDecoder</code> hay <code>visualViewport</code>. Nó chỉ nói ý định;
-      các module giấu phần cơ chế.</p>
+      các module trong <code>lib/</code> giấu phần cơ chế.</p>
     <div class="terminal"><span class="out">const run = ask(q, { onToken, onCitations, onDone, fresh });  // chat.js
 run.stop();                                    // resolves, never throws
 await qa.act(id, "confirm", { answer });       // qa.js — throws WrongPass on 401/403
 view.scrollToEnd();                            // viewport.js</span></div>
-    <p lang="en">The two screens are two components. <code>app.js</code> is the shell —
-      turns, health, corpus, the queue both screens list; <code>ba.js</code> owns what
-      only BA mode touches (drafts, the unlock form, import progress). Three kinds of crossing, and no more:
-      four props down, two events up (<code>changed</code>, <code>ask</code>), and
-      <code>toast</code> injected because the pinned CDN URL lives in one file. In-DOM
-      templates, so components still cost no build step — and every branch behind that
-      contract lives in a composable, which is the section below.</p>
-    <p lang="vi">Hai màn hình là hai component. <code>app.js</code> là lớp vỏ — lượt hỏi,
-      health, corpus, hàng đợi mà cả hai màn hình đều hiển thị; <code>ba.js</code> giữ
-      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Ba loại chỗ
+    <p lang="en">The two screens are two components. <code>App.vue</code> is the shell —
+      turns, health, corpus, the queue both screens list; <code>BaScreen.vue</code> owns what
+      only BA mode touches (drafts, the unlock form, import progress). Two kinds of crossing,
+      and no more: four props down, two events up (<code>changed</code>, <code>ask</code>).
+      <code>toast</code> is a plain <code>import</code> from <code>8bit-nes</code> now
+      rather than something injected — there is no CDN URL left to keep in one file — and
+      every branch behind that contract lives in a composable, which is the section
+      below.</p>
+    <p lang="vi">Hai màn hình là hai component. <code>App.vue</code> là lớp vỏ — lượt hỏi,
+      health, corpus, hàng đợi mà cả hai màn hình đều hiển thị; <code>BaScreen.vue</code> giữ
+      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Hai loại chỗ
       giao nhau, không hơn: bốn props xuống, hai event lên (<code>changed</code>,
-      <code>ask</code>), và <code>toast</code> được inject vì URL CDN đã pin chỉ nằm ở
-      một file. Template in-DOM, nên component vẫn không cần bước build — và mọi nhánh
-      logic phía sau contract đó nằm trong composable, đúng mục bên dưới.</p>
+      <code>ask</code>). <code>toast</code> giờ là một <code>import</code> bình thường từ
+      <code>8bit-nes</code> chứ không còn được inject — không còn URL CDN nào phải giữ ở một
+      file — và mọi nhánh logic phía sau contract đó nằm trong composable, đúng mục bên
+      dưới.</p>
 
   </section>
 
@@ -442,14 +444,22 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       <div class="body">
         <b lang="en">The UI</b>
         <b lang="vi">Giao diện</b>
-        <p lang="en">Native ES modules, no build step — edit
-          <code>web/app/*.js</code> and reload. It is embedded in the binary, so
-          <code>make build</code> before you test the built artifact, or you will
-          debug the old bytes.</p>
-        <p lang="vi">ES module thuần, không có bước build — sửa
-          <code>web/app/*.js</code> rồi reload. Nó nằm trong binary, nên phải
-          <code>make build</code> trước khi test bản đã build, không thì bạn đang
-          debug bytes cũ.</p>
+        <p lang="en">Vue single-file components built by Vite. Day to day:
+          <code>make server</code> in one shell and <code>make ui-dev</code> in another —
+          Vite on <code>:5179</code> with hot reload, <code>/api</code> proxied to
+          <code>:8080</code>, so an edit under <code>web/ui/src/</code> shows up without a
+          build and still talks to the real engine. The build output
+          (<code>web/dist</code>) is <b>committed and embedded</b>, which is what keeps
+          <code>go build</code> free of Node — so run <code>make ui</code> before testing
+          the built binary, or you are debugging last week's bundle.</p>
+        <p lang="vi">Vue single-file component, build bằng Vite. Hằng ngày:
+          <code>make server</code> ở một shell và <code>make ui-dev</code> ở shell khác —
+          Vite chạy <code>:5179</code> có hot reload, <code>/api</code> proxy sang
+          <code>:8080</code>, nên sửa file trong <code>web/ui/src/</code> là thấy ngay mà
+          vẫn nói chuyện với engine thật. Kết quả build (<code>web/dist</code>) được
+          <b>commit và nhúng vào binary</b> — đó là thứ giúp <code>go build</code> không cần
+          Node — nên phải chạy <code>make ui</code> trước khi test bản binary đã build,
+          không thì bạn đang debug bundle của tuần trước.</p>
       </div>
     </div>
   </section>
@@ -520,11 +530,11 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       hình trống thì chỉ còn cách xoá cả mạch hội thoại mới tới được. Một chỗ phục vụ cả
       hai, vì dock luôn có mặt ở chế độ ASK.</p>
     <p lang="en">The tree itself is the library's <code>&lt;nes-tree&gt;</code>, built from
-      <code>GET /api/corpus</code> paths in <code>web/app/tree.js</code> — no API was added
+      <code>GET /api/corpus</code> paths in <code>composables/nestree.js</code> — no API was added
       for it. The element renders once from a child JSON payload, which is why the
       component replaces it instead of mutating it.</p>
     <p lang="vi">Cây thư mục là <code>&lt;nes-tree&gt;</code> của thư viện, dựng từ đường
-      dẫn của <code>GET /api/corpus</code> trong <code>web/app/tree.js</code> — không thêm
+      dẫn của <code>GET /api/corpus</code> trong <code>composables/nestree.js</code> — không thêm
       API nào. Element chỉ render một lần từ payload JSON con, nên component thay nó chứ
       không sửa nó.</p>
   </section>
@@ -534,7 +544,7 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     <span lang="en">A model asked for <code>```mermaid</code> writes a bare
       <code>```</code> often enough that labelling was never a usable signal — the
       reported case was a fence whose first line was <code>graph TD;</code>, rendered as
-      source code. <code>web/app/diagram.js</code> matches the diagram kinds on a block's
+      source code. <code>lib/diagram.js</code> matches the diagram kinds on a block's
       first line instead, and one predicate serves both callers (whether to fetch the
       3.4 MB renderer, and which block to replace) so they cannot disagree. The renderer
       is lazy and integrity-checked; if it never arrives the fence stays, which reads.
@@ -545,7 +555,7 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     <b lang="vi">Sơ đồ được nhận theo nội dung, không theo nhãn của fence.</b>
     <span lang="vi">Model được yêu cầu ghi <code>```mermaid</code> nhưng rất hay ghi
       <code>```</code> trơn — case được báo là fence trơn với dòng đầu
-      <code>graph TD;</code>, hiện ra thành code. <code>web/app/diagram.js</code> đối chiếu
+      <code>graph TD;</code>, hiện ra thành code. <code>lib/diagram.js</code> đối chiếu
       các loại sơ đồ ở dòng đầu của block, và một hàm phán đoán duy nhất dùng cho cả hai
       chỗ (có tải renderer 3.4 MB không, và thay block nào) để chúng không lệch nhau.
       Renderer tải lười và có kiểm tra integrity; nếu không tải được thì vẫn là fence,

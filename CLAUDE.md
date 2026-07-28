@@ -229,7 +229,7 @@ than half-work**:
 - `Importer` — document import (nil → no `POST /api/documents`)
 
 So the entire HTTP surface is covered by `go test` with fakes: no API key, no
-database. On the front end the same idea — `app.js` never sees an `AbortController`,
+database. On the front end the same idea — `App.vue` never sees an `AbortController`,
 a `TextDecoder` or `visualViewport`.
 
 ### Five invariants worth not breaking

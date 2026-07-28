@@ -298,25 +298,25 @@ done: 8/8 files, 74 chunks</span></div>
       khi có người hỏi.</p>
 
     <div class="callout memo">
-      <b lang="en">Three kinds of change need that same rebuild.</b>
-      <span lang="en">There is no schema migration and deliberately so — the database is
-        derived, so the upgrade path is to rebuild it. (1) A change to how documents are
+      <b lang="en">Two kinds of change need that same rebuild.</b>
+      <span lang="en">A schema change does <i>not</i>: the server carries a forward-only
+        migration runner, so a new table or column reaches a database that already exists.
+        What a migration cannot do is re-derive rows that were written under an older rule,
+        and that is what the rebuild is for. (1) A change to how documents are
         <i>split</i> into sections: the existing rows were split by the old rule and stay
-        that way until re-ingested. (2) A new database column: <code>schema.sql</code> is
-        <code>CREATE TABLE IF NOT EXISTS</code>, so an existing table never gains one, and
-        queries naming it fail at runtime while passing on a fresh file. (3) A change to
-        how a document path is stored. Everything else — a prompt edit, a new model, a
-        retrieval parameter — invalidates the answer cache on its own and needs
-        nothing.</span>
-      <b lang="vi">Ba loại thay đổi cần dựng lại như trên.</b>
-      <span lang="vi">Không có migration schema, và đó là chủ ý — database là thứ dựng lại
-        được, nên cách nâng cấp là dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành
-        đoạn: các dòng đang có vẫn theo luật cũ tới khi ingest lại. (2) Thêm column mới:
-        <code>schema.sql</code> chỉ có <code>CREATE TABLE IF NOT EXISTS</code>, nên bảng đã
-        tồn tại sẽ không bao giờ có column đó, và query gọi tên nó sẽ lỗi lúc chạy dù test
-        trên file mới vẫn xanh. (3) Thay đổi cách lưu path tài liệu. Còn lại — sửa prompt,
-        đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không cần
-        gì thêm.</span>
+        that way until re-ingested. (2) A change to how a document path is stored — two
+        spellings of one file become two documents, each cited separately. Everything
+        else — a prompt edit, a new model, a retrieval parameter — invalidates the answer
+        cache on its own and needs nothing.</span>
+      <b lang="vi">Hai loại thay đổi cần dựng lại như trên.</b>
+      <span lang="vi">Thay đổi schema thì <i>không</i>: server có sẵn một migration runner
+        chạy một chiều, nên bảng mới hay column mới vẫn tới được database đang tồn tại. Thứ
+        migration không làm được là dựng lại những dòng đã ghi theo luật cũ — và đó mới là
+        việc của bước dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành đoạn: các dòng
+        đang có vẫn theo luật cũ tới khi ingest lại. (2) Thay đổi cách lưu path tài liệu —
+        hai cách viết của cùng một file thành hai document, được dẫn nguồn riêng. Còn lại —
+        sửa prompt, đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không
+        cần gì thêm.</span>
     </div>
   </section>
 

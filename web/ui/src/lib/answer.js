@@ -3,8 +3,9 @@
 
      answerHtml(markdown, { count: 2, srcId: (n) => `s7-${n}` })
 
-   `marked` and `DOMPurify` are globals here on purpose — index.html loads them as
-   classic scripts so they cost no module graph. This is the only file that knows.
+   `marked` and `DOMPurify` are npm dependencies bundled by Vite, imported here and
+   nowhere else in the app. This is still the only file that knows they exist — that part
+   was always the point; they stopped being globals when the bundler arrived.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import DOMPurify from 'dompurify'

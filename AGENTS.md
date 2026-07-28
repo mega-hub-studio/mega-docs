@@ -92,8 +92,9 @@ it, so trust the table.
 
 ## Verifying, not guessing
 
-- `make check` is the gate: tests, `gofmt`, `go vet`, `staticcheck`, `deadcode`, and a
-  scan that refuses credential-shaped strings in tracked files.
+- `make check` is the gate: tests, `gofmt`, `go vet`, `staticcheck`, `deadcode`, **ESLint
+  over `web/ui`** (it is the formatter too — style rules are errors), and a scan that
+  refuses credential-shaped strings in tracked files.
 - `internal/aitest` is a fake OpenAI-compatible provider, so the whole pipeline is
   testable with **no API key and no network**.
 - Never put a real key in a file, a command line, or a commit. Keys come from `.env`,

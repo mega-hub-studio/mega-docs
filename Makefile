@@ -186,8 +186,10 @@ live:
 smoke:
 	sh scripts/smoke.sh
 
-# Download + digest-verify the front-end's CDN assets into web/vendor/, so the
-# binary can serve them itself (ASSET_BASE=/vendor). Pins live in web/vendor.sha384.
+# Download + digest-verify the *docs pages'* CDN assets into web/vendor/, so the guide can
+# be rendered and read with no egress: `rendocs -base /vendor`. Not the app — the app's
+# dependencies are bundled into web/dist by Vite, and there is no ASSET_BASE any more.
+# Pins live in web/vendor.sha384.
 vendor:
 	sh scripts/vendor.sh
 

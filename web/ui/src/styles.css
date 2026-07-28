@@ -211,6 +211,15 @@ main.ba {
    column with it, which is the alignment above coming undone from the inside. Scoped to the
    screen rather than repeated per card: it is one fact about paths in this mode. */
 main.ba .datalist code { overflow-wrap: anywhere; }
+/* …and label and value sit on one baseline. The library asks for it on the `dt` alone
+   (`align-self: baseline`), which cannot work — a lone baseline-aligned item has nobody to
+   share a baseline with and falls back to `start` — so a 9px label and a 13.5px value both
+   started at the row's top edge with their text several pixels apart, worst on the row whose
+   value is an inline <code> (its border and padding grow the line box above the baseline).
+   The library never sets `align-items` here, so this supplies one rather than overriding it,
+   and `.source` is the same shape already doing the same thing. Not `center`: a wrapped
+   answer would float its label to the middle of the paragraph. */
+main.ba .datalist { align-items: baseline; }
 
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
