@@ -337,19 +337,42 @@ done: 8/8 files, 74 chunks</span></div>
   <section>
     <h2 lang="en">Upgrading</h2>
     <h2 lang="vi">Nâng cấp</h2>
-    <p class="lede" lang="en">Four lines. The build step is not optional: the whole UI
-      is compiled into the binary, so pulling without building leaves the old bytes
-      being served.</p>
-    <p class="lede" lang="vi">Bốn dòng. Bước build không phải tuỳ chọn: toàn bộ UI được
-      compile vào binary, nên pull mà không build thì vẫn đang phục vụ bytes cũ.</p>
+    <p class="lede" lang="en">One command. The build step is not optional — the whole UI is
+      compiled into the binary, so pulling without building leaves the old bytes being
+      served — and <code>make deploy</code> is the four lines with the four ways they go
+      wrong already handled.</p>
+    <p class="lede" lang="vi">Một lệnh. Bước build không phải tuỳ chọn: toàn bộ UI được
+      compile vào binary, nên pull mà không build thì vẫn đang phục vụ bytes cũ — và
+      <code>make deploy</code> là bốn dòng đó, kèm sẵn bốn kiểu sai đã từng xảy ra.</p>
 
-    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; git pull origin main</span><span class="cmd">make build</span><span class="cmd">sudo systemctl restart knowledge</span><span class="cmd">curl -s localhost:8080/api/health</span><span class="out ok">{"ok":true,"writes":true}</span></div>
-    <p lang="en">That last line is the check that matters: <code>"writes":true</code> means
-      <code>BA_PASS</code> was picked up, so BA mode can publish. <code>"writes":false</code>
-      means the instance is read-only.</p>
-    <p lang="vi">Dòng cuối là chỗ cần xem: <code>"writes":true</code> nghĩa là
-      <code>BA_PASS</code> đã được nhận, chế độ BA publish được. <code>"writes":false</code>
-      là instance đang chỉ-đọc.</p>
+    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; make deploy</span><span class="out">  before: 228607e</span><span class="out">  deployed: 9c4a34d — {"ok":true,"writes":true,…,"version":"9c4a34d"}</span></div>
+    <p lang="en">What it adds over typing the four by hand, each one a failure that has
+      happened on this host: <code>git pull <b>--ff-only</b></code>, because a deploy
+      checkout is a mirror and a local commit here turns an upgrade into a half-finished
+      rebase, mid-deploy, on the machine serving the team; a check that <code>web/dist</code>
+      is not stale, because this host has no Node and a push that forgot <code>make ui</code>
+      deploys a UI that predates the change; the revision before and after, so the output
+      answers "did that change anything?"; and a health check afterwards, because a restart
+      that fails leaves systemd retrying quietly.</p>
+    <p lang="vi">Nó thêm gì so với gõ tay bốn dòng — mỗi thứ là một lỗi đã xảy ra trên host
+      này: <code>git pull <b>--ff-only</b></code>, vì bản checkout để deploy là một bản sao,
+      và một commit local ở đây biến việc nâng cấp thành một cuộc rebase dở dang, ngay giữa
+      lúc deploy, trên máy đang phục vụ cả nhóm; kiểm tra <code>web/dist</code> có cũ không,
+      vì host không có Node nên một lần push quên <code>make ui</code> sẽ deploy ra UI cũ hơn
+      thay đổi; in revision trước và sau, để output trả lời được "có đổi gì không?"; và
+      health check sau khi restart, vì restart thất bại thì systemd cứ retry trong im lặng.</p>
+    <p lang="en">Two fields in that JSON are the check that matters.
+      <code>"writes":true</code> means <code>BA_PASS</code> was picked up, so BA mode can
+      publish; <code>"writes":false</code> means the instance is read-only.
+      <code>"version"</code> is the commit the running binary was built from — the same
+      string the app shows in its status line, so "which version is deployed?" is answerable
+      without shell access. A trailing <code>+</code> means it was built from a dirty tree.</p>
+    <p lang="vi">Hai field trong JSON đó là chỗ cần xem. <code>"writes":true</code> nghĩa là
+      <code>BA_PASS</code> đã được nhận, chế độ BA publish được; <code>"writes":false</code>
+      là instance đang chỉ-đọc. <code>"version"</code> là commit mà binary đang chạy được
+      build ra — đúng chuỗi mà app hiện ở status line, nên "đang deploy version nào?" trả lời
+      được mà không cần vào shell. Có dấu <code>+</code> ở cuối là build từ cây làm việc còn
+      bẩn.</p>
 
     <p lang="en">The front end needs nothing extra here: it is built by
       <code>make ui</code> into <code>web/dist</code>, which is committed, so
