@@ -35,9 +35,34 @@ export function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}
     configured = true
   }
   let html = DOMPurify.sanitize(marked.parse(markdown || ''))
+  html = dressTables(html)
   if (nums.length && srcId)
     html = linkCites(html, new Set(nums), srcId)
   return diagrams ? asDiagrams(html) : html
+}
+
+/* Markdown emits a bare <table>, and every one of the design system's table styles hangs
+   off a *class* — so an answer that enumerates ("list every convention for X") rendered as
+   an unstyled browser table: no mono headers, no row hover, and on a 390px screen a
+   three-column table of convention text ran off the side of the page, which is the exact
+   failure the docs pages already had to fix.
+   `.table-wrap` is the library's own overflow container, so a wide table scrolls inside
+   itself and the page never moves sideways. Done here rather than with a marked renderer
+   override because it must also run on a table that arrives mid-stream. */
+function dressTables(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  for (const table of tpl.content.querySelectorAll('table')) {
+    table.classList.add('table')
+    // Already wrapped if the model emitted its own container, or if a re-render runs.
+    if (table.parentElement?.classList.contains('table-wrap'))
+      continue
+    const wrap = document.createElement('div')
+    wrap.className = 'table-wrap'
+    table.replaceWith(wrap)
+    wrap.append(table)
+  }
+  return tpl.innerHTML
 }
 
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before
