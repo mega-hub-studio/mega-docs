@@ -270,7 +270,7 @@ can hold it:
 
 One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
 `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
-`importer`, `tickets`, `nestree`.
+`importer`, `tickets`, `nestree`, `finder`.
 
 Three rules keep the layers from leaking:
 

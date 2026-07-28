@@ -33,28 +33,48 @@ export async function loadCorpus() {
 }
 
 /**
- * Three questions worth tapping first, derived from the corpus itself.
+ * The documents worth tapping first, ranked and optionally narrowed by a typed query.
  *
- * They used to be three hardcoded questions about this engine ("How do I ingest a
- * PDF?") — which, over a corpus of booking specifications, is a first screen that
- * advertises the wrong subject and returns "not in the documents" for all three.
+ * Ranked by retrievable sections, because that is what makes a document *able* to
+ * answer — a row with 2 sections and a row with 300 are not equally worth the first tap,
+ * and the count is shown next to each so the order never has to be taken on trust.
  *
- * The biggest documents are the ones most likely to answer something, and "what does
- * it cover?" is the question that proves the whole loop — retrieval, grounding,
- * citation — in one tap.
+ * The query matches title *and* path: a folder name ("booking/") is how anyone with a
+ * structured corpus actually looks, and it is invisible in the title alone.
  *
- * @param {Corpus} corpus
- * @returns {string[]}
+ * @param {Doc[]} documents
+ * @param {string} query
+ * @returns {Doc[]}
  */
-export function starters(corpus) {
-  return [...(corpus.documents || [])]
-    .sort((a, b) => b.chunks - a.chunks)
-    .slice(0, 3)
-    .map((d) => `What does ${title(d)} cover?`);
+export function rankDocs(documents, query) {
+  const q = query.trim().toLowerCase();
+  const ranked = [...(documents || [])].sort((a, b) => b.chunks - a.chunks);
+  if (!q) return ranked;
+  return ranked.filter((d) =>
+    `${docTitle(d)} ${d.path || ""}`.toLowerCase().includes(q));
+}
+
+/**
+ * The question a document row sends.
+ *
+ * It was three hardcoded questions about this engine once ("How do I ingest a PDF?") —
+ * which, over a corpus of booking specifications, advertises the wrong subject and
+ * returns "not in the documents" for all three. "What does it cover?" is instead the
+ * question that proves the whole loop — retrieval, grounding, citation — in one tap.
+ *
+ * Built here, in one place, because the row no longer *shows* this sentence: it shows
+ * the document, and the sentence is what the tap means. Two spellings of it would be
+ * two different cache keys for what a user experiences as one question.
+ *
+ * @param {Doc} doc
+ * @returns {string}
+ */
+export function coverQuestion(doc) {
+  return `What does ${docTitle(doc)} cover?`;
 }
 
 /** A file name is not a sentence: "booking-list_v2.md" → "booking list v2". */
-function title(doc) {
+export function docTitle(doc) {
   const name = doc.title || (doc.path || "").split("/").pop() || "";
   return name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim();
 }

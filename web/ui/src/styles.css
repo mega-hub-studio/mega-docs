@@ -94,16 +94,45 @@ main {
 }
 .prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
 
-/* The corpus disclosure inside .empty. base.css already styles <summary> (focus
-   ring, pointer); this only handles width and the list's left-alignment, since
-   .empty centres its children and a file list reads badly centred. */
-.corpus {
-  inline-size: 100%;
-  margin-block-start: var(--sp-2);
+/* ── inside .empty: one rhythm, and stretch what must not be centred ──
+   .empty is `display: flex; align-items: center; text-align: center; gap: --sp-3`, which
+   is right for the icon, the title and a sentence — and wrong for anything that is a
+   *list*. A flex child at align-items:center shrinks to its content, so a menu of
+   documents would be as wide as its longest row and every row a different width.
+
+   `gap` already spaces every child equally, so nothing here adds a margin: the disclosures
+   used to add --sp-2 on top of the gap, which made two of the panel's seams wider than the
+   other four. Absolute vertical evenness is one property, set once, on the parent. */
+.empty > .palette,
+.empty > .callout,
+.empty > .corpus {
+  align-self: stretch;   /* full width of the panel, so all rows share one geometry */
+  text-align: start;     /* a file list, a path and an error read badly centred */
 }
+/* The metric bar wraps rather than stretches — centred, it stays symmetrical on the
+   phone line-break that .note-stats' flex-wrap produces. */
+.empty > .note-stats { justify-content: center; }
+
+/* The library caps .palette-list at min(50vh, 340px) and scrolls it, which is right for a
+   palette floating in a modal. In the page it made a *nested* scroller: measured on an
+   iPhone 14, three of seven documents were visible and the other four were behind an inner
+   scrollbar — a scroll trap on touch, and the same documents this menu exists to expose.
+   The page is the scroller; the row count is capped in composables/finder.js instead. */
+.empty .palette-list { max-block-size: none; overflow: visible; }
+
+/* .result-hint is a slot the library leaves unstyled (its own example puts a .kbd there).
+   Ours holds a figure, so: mono, dim, and tabular — the counts sit in a column, and
+   proportional digits make a column of numbers ragged at the decimal. */
+.result-hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+
+/* base.css already styles <summary> (focus ring, pointer); the disclosure only needs
+   its own width, which the rule above gives it. */
 .corpus summary { cursor: pointer; }
-.corpus .sources { text-align: start; }
-.corpus .source { margin-block-start: var(--sp-2); }
 
 /* ── BA mode: the queue ──
    Layout only. Every block inside is a library recipe (.steps, .stat, .card,

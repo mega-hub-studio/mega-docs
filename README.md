@@ -148,6 +148,7 @@ web/ui/src/composables/   one composable per concern, and nothing else in them
                   importer.js      files in, progress, per-file results
                   tickets.js       four states, one path, one draft per ticket
                   nestree.js       the <nes-tree> payload and its rebuild rules
+                  finder.js        the first screen's document menu: one query, ranked rows
 
 **Where do I add…?**
 

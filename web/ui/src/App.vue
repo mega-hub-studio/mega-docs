@@ -49,7 +49,7 @@ const zoomBody = useTemplateRef("zoomBody");
 
 /* ── state, one concern per composable ── */
 const { scope, setScope } = useScope();
-const { corpus, starters, refresh: refreshCorpus } = useCorpus();
+const { corpus, refresh: refreshCorpus } = useCorpus();
 const { online, writes, runtime, check, watchNetwork } = useRuntime();
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast });
 const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
@@ -171,7 +171,7 @@ function replay(entry) {
   <main v-if="mode === 'dev'">
     <EmptyScreen
       v-if="!turns.length"
-      :corpus="corpus" :starters="starters" :history="history" :queue="queue"
+      :corpus="corpus" :history="history" :queue="queue"
       @ask="ask" @replay="replay"
     />
 
