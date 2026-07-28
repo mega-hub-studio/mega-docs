@@ -16,6 +16,11 @@ import (
 // surface can be faked — and refused — independently.
 type Importer interface {
 	Upload(ctx context.Context, name, content string) (rag.Uploaded, error)
+	// Remove takes a document out of the index and moves its file to the corpus's
+	// trash. On the same interface as Upload because they are one capability — a BA
+	// who may add what everyone reads may also take it back — and nil-ing the seam
+	// must remove both or the surface half-works.
+	Remove(ctx context.Context, name string) (rag.Removed, error)
 }
 
 const (
@@ -38,6 +43,24 @@ const (
 // should index the seven and name the eighth, rather than failing the batch and
 // leaving the user to guess which one was wrong.
 func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
+	// DELETE /api/documents/{path...}
+	//
+	// The path is in the URL rather than a body, because it is the document's identity
+	// and DELETE has no body worth parsing. `{path...}` is Go 1.22's trailing wildcard,
+	// so "booking/pricing.md" arrives whole — and it is passed to rag.Remove unvalidated
+	// on purpose: SafePath is the one place that decides what a document path may be, and
+	// a second opinion here would be a second thing to keep in agreement with it.
+	mux.HandleFunc("DELETE /api/documents/{path...}", pass.gate(func(w http.ResponseWriter, r *http.Request) {
+		removed, err := imp.Remove(r.Context(), r.PathValue("path"))
+		if err != nil {
+			// The engine's errors here are all "this path is not usable" or "it is not
+			// in the corpus" — a client mistake, not a server fault.
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, removed)
+	}))
+
 	mux.HandleFunc("POST /api/documents", pass.gate(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxImport)
 		if err := r.ParseMultipartForm(maxDoc); err != nil {

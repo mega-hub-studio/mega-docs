@@ -14,8 +14,9 @@ import (
 )
 
 type fakeImporter struct {
-	got []string // "name:content", in the order the handler called
-	err error
+	got     []string // "name:content", in the order the handler called
+	removed []string // the paths DELETE asked for, in order
+	err     error
 }
 
 func (f *fakeImporter) Upload(_ context.Context, name, content string) (rag.Uploaded, error) {
@@ -24,6 +25,14 @@ func (f *fakeImporter) Upload(_ context.Context, name, content string) (rag.Uplo
 		return rag.Uploaded{}, f.err
 	}
 	return rag.Uploaded{Path: name, Chunks: 3}, nil
+}
+
+func (f *fakeImporter) Remove(_ context.Context, name string) (rag.Removed, error) {
+	f.removed = append(f.removed, name)
+	if f.err != nil {
+		return rag.Removed{}, f.err
+	}
+	return rag.Removed{Path: name, Trash: rag.TrashDir + "/" + name}, nil
 }
 
 func importServer(imp Importer, pass BAPass) http.Handler {
@@ -173,4 +182,55 @@ func TestImportRouteAbsentWithoutAnImporter(t *testing.T) {
 	if w := do(t, h, "POST", "/api/documents", "", nil); w.Code != http.StatusNotFound {
 		t.Fatalf("POST /api/documents = %d, want 404", w.Code)
 	}
+}
+
+// The removal route, and the two things about it that are easy to get wrong.
+//
+// It is gated: an unset BA_PASS must mean no delete surface at all, not an open one — the
+// same rule the import and confirm routes follow, and the one that turns "forgot to
+// configure a secret" into a missing feature rather than an open door.
+func TestRemovingADocumentIsGated(t *testing.T) {
+	t.Run("unset BA_PASS refuses", func(t *testing.T) {
+		imp := &fakeImporter{}
+		srv := importServer(imp, "")
+		res := do(t, srv, http.MethodDelete, "/api/documents/booking/pricing.md", "", nil)
+		if res.Code != http.StatusForbidden {
+			t.Errorf("want 403 with no password configured, got %d", res.Code)
+		}
+		if len(imp.removed) != 0 {
+			t.Errorf("the engine was called anyway: %v", imp.removed)
+		}
+	})
+
+	t.Run("wrong password refuses", func(t *testing.T) {
+		imp := &fakeImporter{}
+		srv := importServer(imp, "right")
+		res := do(t, srv, http.MethodDelete, "/api/documents/booking/pricing.md", "",
+			map[string]string{"X-BA-Pass": "wrong"})
+		if res.Code != http.StatusUnauthorized {
+			t.Errorf("want 401 with the wrong password, got %d", res.Code)
+		}
+		if len(imp.removed) != 0 {
+			t.Errorf("the engine was called anyway: %v", imp.removed)
+		}
+	})
+
+	// And the path must arrive whole. `{path...}` is what makes a nested document
+	// deletable at all: without the trailing wildcard, "booking/pricing.md" matches no
+	// route and a folder of documents becomes undeletable through the UI.
+	t.Run("a nested path arrives whole", func(t *testing.T) {
+		imp := &fakeImporter{}
+		srv := importServer(imp, "pw")
+		res := do(t, srv, http.MethodDelete, "/api/documents/business/pricing/2026.md", "",
+			map[string]string{"X-BA-Pass": "pw"})
+		if res.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", res.Code, res.Body.String())
+		}
+		if len(imp.removed) != 1 || imp.removed[0] != "business/pricing/2026.md" {
+			t.Errorf("the engine got %v, want the full nested path", imp.removed)
+		}
+		if !strings.Contains(res.Body.String(), rag.TrashDir) {
+			t.Errorf("the reply does not say where the file went: %s", res.Body.String())
+		}
+	})
 }

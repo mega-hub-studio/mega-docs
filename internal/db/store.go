@@ -6,6 +6,7 @@ package db
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -380,4 +381,44 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 		c.Documents = append(c.Documents, d)
 	}
 	return c, rows.Err()
+}
+
+// DeleteDocument removes one document and everything derived from it: its vectors, its
+// chunks, and its row. Reports whether it was there.
+//
+// The three deletes are one transaction because a half-removed document is worse than
+// either state: chunks with no document row are retrievable text that can never be cited
+// (Search joins documents for the path), and vectors with no chunk are a KNN candidate that
+// resolves to nothing. UpsertDocument already does the first two on re-ingest — this is the
+// same removal without the insert that follows it.
+//
+// It does not touch the file. The corpus directory is the source of truth (invariant 1), so
+// the caller decides what happens on disk and this only keeps the derived copy in step.
+func (s *Store) DeleteDocument(path string) (bool, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var id sql.NullInt64
+	if err := tx.QueryRow(`SELECT id FROM documents WHERE path=?`, path).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if !id.Valid {
+		return false, nil
+	}
+	for _, q := range []string{
+		`DELETE FROM vec_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id=?)`,
+		`DELETE FROM chunks WHERE document_id=?`,
+		`DELETE FROM documents WHERE id=?`,
+	} {
+		if _, err := tx.Exec(q, id.Int64); err != nil {
+			return false, fmt.Errorf("deleting %s: %w", path, err)
+		}
+	}
+	return true, tx.Commit()
 }
