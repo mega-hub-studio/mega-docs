@@ -53,11 +53,11 @@ export default antfu({
     // A component that reads a prop it never declared is the same class of bug seen from
     // the other side.
     'vue/require-explicit-emits': 'error',
-    // Two families of tag this rule cannot see a definition for, and both are real:
-    // `nes-*` are the design system's custom elements, and `i18n-t` is vue-i18n's own
-    // component, registered globally by `app.use(i18n)` in main.js. Everything else that
-    // is undefined is the bug this rule exists to catch.
-    'vue/no-undef-components': ['error', { ignorePatterns: ['nes-.*', 'i18n-t'] }],
+    // Three families of tag this rule cannot see a definition for, and all three are
+    // real: `nes-*` are the design system's custom elements, and `i18n-t` and `router-*`
+    // are vue-i18n's and vue-router's own components, registered globally by `app.use()`
+    // in main.js. Everything else that is undefined is the bug this rule exists to catch.
+    'vue/no-undef-components': ['error', { ignorePatterns: ['nes-.*', 'i18n-t', 'router-.*'] }],
   },
 }, {
   files: ['**/*.vue'],

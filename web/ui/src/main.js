@@ -12,6 +12,7 @@ import { createApp } from 'vue'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import { messages, preferredLang } from './lib/i18n.js'
+import { router } from './router.js'
 
 import '8bit-nes/all.css'
 import './styles.css'
@@ -42,6 +43,12 @@ const i18n = createI18n({
   fallbackWarn: false,
 })
 app.use(i18n)
+
+// Which screen is showing, and the two components that read it: `app.use` is what
+// registers <router-view> and <router-link> globally, which is also why eslint's
+// `vue/no-undef-components` has to be told they exist. The routes and the three decisions
+// behind them are in router.js.
+app.use(router)
 
 // Before first paint, so the document never announces the wrong language.
 document.documentElement.lang = i18n.global.locale.value

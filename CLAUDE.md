@@ -254,8 +254,9 @@ a `TextDecoder` or `visualViewport`.
 
 1. **`CORPUS_DIR` is the source of truth; `knowledge.db` is derived.** `ingest docs`
    rebuilds the database. A BA-confirmed answer is *written as a file* into
-   `CORPUS_DIR/qa/ticket-N.md` and then indexed, precisely so this stays true — which
-   is why the answer to "how do we back up?" is "put the documents folder in git".
+   `CORPUS_DIR/qa/ticket-N.md` and then indexed, precisely so this stays true. There is
+   deliberately **no backup story** — see *Now vs vNext* in `README.md`: the WebUI import
+   is the one controlled way in, and `Remove` is a soft delete into `.trash/`.
 2. **Reads are open; writes are gated.** `BA_PASS` guards confirming an answer,
    dismissing a ticket, and importing a document (`X-BA-Pass` header, constant-time
    compare). An unset `BA_PASS` means **no write surface at all**, not open writes —
@@ -308,9 +309,10 @@ rm -f state/knowledge.db state/knowledge.db-wal state/knowledge.db-shm
 sudo systemctl start knowledge
 ```
 
-**The remaining blocker for the inversion is backup, not schema.** "Put the documents
-folder in git" stops being the backup story the moment the DB is the only copy, and today
-nothing backs it up. See *Now vs vNext* in `README.md`.
+**Nothing blocks the inversion any more.** Migrations were one of its two preconditions; the
+other was an off-box backup, and that requirement was dropped — the WebUI import is the
+controlled entry point the brief asks for, and a second copy of the corpus is not what makes
+that true. What is left is the work itself. See *Now vs vNext* in `README.md`.
 
 ### Traps that have already cost time
 
@@ -369,7 +371,7 @@ can hold it:
 | **plumbing** | `src/lib/` — `chat.js` `qa.js` `upload.js` `answer.js` `diagram.js` `library.js` `session.js` `viewport.js` | fetch, SSE, storage, markdown, DOM maths | any Vue import — these run in a bare console |
 | **logic** | `src/composables/*.js` | reactive state and every branch | another composable's state, or markup |
 | **components** | `src/components/*.vue` | props, emits, compose, template | branches in `<script setup>` — a component with an `if` is a composable nobody wrote yet |
-| **wiring** | `src/App.vue`, `src/main.js` | who gets what, and what the template binds | logic of its own, or a reach into `src/lib/` (except `viewport.js`: it binds the dock element the shell owns) |
+| **wiring** | `src/App.vue`, `src/main.js`, `src/router.js` | who gets what, which screen, and what the template binds | logic of its own, or a reach into `src/lib/` (except `viewport.js`: it binds the dock element the shell owns) |
 
 One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
 `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
@@ -382,11 +384,22 @@ Three rules keep the layers from leaking:
   callback, not the corpus. Reactive inputs it does not own arrive as *getters*
   (`documents: () => props.documents`), so it never holds a stale array.
 - **A component is a contract, not a place to work.** `BaScreen.vue` declares four props
-  and two emits, composes the gate and the tickets, and delegates the importer to
+  and one emit, composes the gate and the tickets, and delegates the importer to
   `ImportPanel.vue` — because a composable belongs to whoever renders its state.
 - **The shell destructures.** `const { turns, ask } = useConversation(…)`, so the template
   names plain values and Vue unwraps them. `chat.turns.value` in a template is the smell
   that the wiring has started keeping state of its own.
+
+**Which screen is showing lives in the address, not in a ref.** `src/router.js` is
+vue-router over the two screens — `/#/ask` (`AskScreen.vue`) and `/#/ba` (`BaScreen.vue`,
+a dynamic import, so a DEV never downloads the queue) — and it replaced a `mode` ref
+mirrored into `localStorage`, which could not be linked or backed out of. Read that file's
+header before changing routing: the hash is load-bearing (the binary serves one HTML file
+and `TestGuideRoutesAreNotServed` asserts every other path 404s, which is a clean-URL
+fallback inverted), and `/` resolving to the last screen is the one thing still stored.
+The state stays in the shell rather than moving into the route components, because an
+answer has to keep streaming while a BA reads the queue — so the router picks *which*
+screen and `App.vue`'s template picks what each is handed.
 
 Things that were true before the bundler and are not now: `Vue` is an import, not a
 global; `toast` and `setMute` are imported from `8bit-nes` rather than injected; mermaid

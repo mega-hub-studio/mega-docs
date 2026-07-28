@@ -8,7 +8,9 @@
              they belong to the shell rather than here
      emit    changed(ticket|null)  something moved: the shell refreshes queue, corpus and
              history, and updates the turn badge when a ticket came with it
-     emit    ask                   take me back to the chat
+
+   Going back to the chat is a <router-link>, not an emit: it is a change of address, and
+   the shell stopped being the thing that knows which screen is showing.
 
    Everything visible is a design-system recipe — .segment, .stat, .card, .field,
    .textarea, .badge, .callout, .pbar, .datalist — so this screen owns no component
@@ -27,7 +29,7 @@ const props = defineProps({
   documents: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['changed', 'ask'])
+const emit = defineEmits(['changed'])
 
 const gate = useGate({ toast })
 const { unlocked, passInput, unlocking, unlockError, unlock } = gate
@@ -119,7 +121,11 @@ const importRefused = e => gate.fail(e, 'The server refused the password: ')
       <span class="icon">◈</span>
       <span class="title">Nothing waiting</span>
       <p>When the documents can't answer a question, the DEV who hit it files it here.</p>
-      <button class="btn ghost sm" @click="$emit('ask')">ASK A QUESTION</button>
+      <!-- .btn is written for a <button>, and an <a> would arrive underlined, so the link
+           renders none of its own element: only the navigation. -->
+      <router-link v-slot="{ navigate }" to="/ask" custom>
+        <button class="btn ghost sm" @click="navigate">ASK A QUESTION</button>
+      </router-link>
     </div>
 
     <TicketCard

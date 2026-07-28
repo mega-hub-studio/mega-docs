@@ -35,8 +35,9 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 1. **`knowledge.db` is derived, `CORPUS_DIR` is the source of truth.** `ingest docs`
    rebuilds the database, and a BA-confirmed answer is written to
-   `CORPUS_DIR/qa/ticket-N.md` precisely so that stays true. When asked about backups,
-   the answer is "put the documents directory in git", not "copy the database".
+   `CORPUS_DIR/qa/ticket-N.md` precisely so that stays true. When asked about backups: there
+   is **no backup story, by decision** — documents enter through one controlled path (the BA
+   WebUI import) and removal is a soft delete into `.trash/`. Do not invent one.
 2. **Reads are open; the three writes are gated.** `BA_PASS` guards confirming an
    answer, dismissing a ticket, and importing a document (`POST /api/documents`). An
    unset `BA_PASS` means the instance has *no* write surface — not open writes. Asking,

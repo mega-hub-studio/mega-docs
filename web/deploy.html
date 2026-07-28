@@ -200,9 +200,9 @@ done: 8/8 files, 74 chunks</span></div>
       </div>
       <div class="card">
         <div class="head"><span class="title" lang="en">Cloud VM</span><span class="title" lang="vi">VM cloud</span></div>
-        <p lang="en">Always up and easy to back up, but the key and the index live
+        <p lang="en">Always up and easy to snapshot, but the key and the index live
           off-site. 2 vCPU is plenty — the heavy work is the provider's.</p>
-        <p lang="vi">Luôn online và dễ backup, nhưng key và index nằm ngoài công
+        <p lang="vi">Luôn online và dễ snapshot, nhưng key và index nằm ngoài công
           ty. 2 vCPU là thừa đủ — phần nặng là việc của provider.</p>
       </div>
     </div>
@@ -219,8 +219,6 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>Back up</th><td>Put the documents directory in <b>git</b>, <b>by hand</b> — nothing automates it. That is the backup: <code>knowledge.db</code> is derived from it, and <code>./bin/ingest docs</code> rebuilds the whole thing — including the answers BAs confirmed, which are files in <code>docs/qa/</code>. A snapshot of the database is only a shortcut back to a running state (<code>sqlite3 knowledge.db ".backup out.db"</code> while it runs — a plain copy of a live database can tear).</td></tr>
-          <tr lang="vi"><th>Backup</th><td>Đưa thư mục tài liệu vào <b>git</b>, <b>làm tay</b> — không có gì tự động làm việc này. Đó mới là backup: <code>knowledge.db</code> được dựng ra từ nó, và <code>./bin/ingest docs</code> dựng lại toàn bộ — kể cả câu trả lời BA đã confirm, vì chúng là file trong <code>docs/qa/</code>. Snapshot database chỉ là đường tắt để quay lại trạng thái đang chạy (<code>sqlite3 knowledge.db ".backup out.db"</code> khi đang chạy — copy trực tiếp một database đang mở có thể bị lỗi dở dang).</td></tr>
           <tr lang="en"><th>Review what BAs published</th><td><code>git diff docs/qa/</code>. Every confirm is one file, so the knowledge base has a review trail without anyone opening the database.</td></tr>
           <tr lang="vi"><th>Xem BA đã publish gì</th><td><code>git diff docs/qa/</code>. Mỗi lần confirm là một file, nên knowledge base có vết để review mà không cần mở database.</td></tr>
           <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>

@@ -35,9 +35,9 @@
     </a>
     <a class="card" data-accent="purple" href="<%.DeployURL%>">
       <div class="head"><span class="title" lang="en">I host it</span><span class="title" lang="vi">Tôi host</span></div>
-      <p lang="en">Let the team in from anywhere, safely. Backups, systemd.
+      <p lang="en">Let the team in from anywhere, safely. Cross-OS, systemd, launchd.
         <b>→ Deploy</b></p>
-      <p lang="vi">Cho cả team truy cập từ mọi nơi, an toàn. Backup, systemd.
+      <p lang="vi">Cho cả team truy cập từ mọi nơi, an toàn. Đa hệ điều hành, systemd, launchd.
         <b>→ Triển khai</b></p>
     </a>
   </div>
@@ -160,10 +160,11 @@
       <div data-title="2 · SQLite" data-title-vi="2 · SQLite" data-focus="sqlite">
         <p lang="en">Each file is split into sections, each section becomes a vector,
           and both land in <b>one SQLite file</b>. That file is the whole database — and it is
-          rebuilt from the folder above, so the folder is what you back up.</p>
+          rebuilt from the folder above, which is why deleting it costs an index, not a
+          document.</p>
         <p lang="vi">Mỗi file được cắt thành đoạn, mỗi đoạn thành một vector, và cả
           hai nằm trong <b>một file SQLite</b>. File đó là toàn bộ database — và nó dựng lại
-          được từ thư mục ở trên, nên thứ cần backup là thư mục đó.</p>
+          được từ thư mục ở trên, nên xoá nó chỉ mất index, không mất tài liệu.</p>
       </div>
       <div data-title="3 · hybrid search" data-title-vi="3 · tìm kiểu hybrid" data-focus="your question|hybrid search">
         <p lang="en">Your question runs as <i>both</i> a meaning search and a keyword
@@ -664,9 +665,9 @@ EMBED_DIM=1536</span></div>
 
   <p class="separator"></p>
   <p class="lede" lang="en">Running it for the team — Tailscale, Cloudflare Tunnel,
-    LAN, systemd, backups — is the next page.</p>
+    LAN, systemd, WSL and macOS — is the next page.</p>
   <p class="lede" lang="vi">Phần chạy cho cả team — Tailscale, Cloudflare Tunnel,
-    LAN, systemd, backup — là trang tiếp theo.</p>
+    LAN, systemd, WSL và macOS — là trang tiếp theo.</p>
   <p class="next"><a class="btn sm" href="<%.DeployURL%>"><span lang="en">Deploy
     &rsaquo;</span><span lang="vi">Triển khai &rsaquo;</span></a></p>
 

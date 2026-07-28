@@ -107,12 +107,25 @@ func TestComponentsHoldNoLogic(t *testing.T) {
 		t.Fatalf("only %d components — has the layer moved?", len(files))
 	}
 	// Both patterns assert an absence, so the same trap as reImportsVue applies: one that
-	// matches nothing passes for the wrong reason. App.vue is the positive control for the
-	// ternary — it is the shell, which this rule does not govern, and it reads a stored mode
-	// with one. If the pattern cannot find that, it is broken rather than satisfied.
-	if !reTernary.MatchString(stripComments(scriptOf(t, filepath.Join(uiSrc, "App.vue")))) {
-		t.Fatal("reTernary matched nothing in App.vue, which branches on the stored mode — " +
-			"the pattern no longer matches this source, so this rule is not being enforced")
+	// matches nothing passes for the wrong reason. The composables layer is the positive
+	// control: this rule does not govern it, and it is where every branch in the front end
+	// is supposed to live, so several of them carry a ternary. If the pattern finds none
+	// there it is broken rather than satisfied.
+	//
+	// App.vue was that control until vue-router took the screen: the shell read a stored
+	// `mode` with a ternary, and the router left it with none — which is the rule working,
+	// not a hole in it.
+	control := filesIn(t, filepath.Join(uiSrc, "composables"), ".js")
+	ternaries := 0
+	for _, path := range control {
+		if reTernary.MatchString(stripComments(readFile(t, path))) {
+			ternaries++
+		}
+	}
+	if ternaries == 0 {
+		t.Fatalf("reTernary matched none of the %d composables, which are where the front "+
+			"end's branches live — the pattern no longer matches this source, so this rule "+
+			"is not being enforced", len(control))
 	}
 	for _, path := range files {
 		script := stripComments(scriptOf(t, path))

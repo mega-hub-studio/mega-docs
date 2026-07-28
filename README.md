@@ -62,8 +62,13 @@ make build && ./bin/knowledge
 [`README-MEGA-DOCS.md`](README-MEGA-DOCS.md) is the **brief for the product this is
 becoming** — a Knowledge Engine Platform with three roles and the WebUI as the only way
 in. It is not a description of this tree, and this table is the only place the two are
-joined. Read it before implementing anything from the brief: two of its lines are **settled
-decisions against it**, and re-deriving them lands on the wrong answer.
+joined. Read it before implementing anything from the brief: most of what is not shipped is
+**decided rather than queued**, and several lines are settled decisions *against* the brief.
+Re-deriving any of them lands on the wrong answer.
+
+A ✅ **decided** row is closed: either it shipped, or it will not be built until its stated
+trigger exists. Only 🟡 rows are work, and each says what the remaining part is. Nothing here
+is a backlog item to find and start.
 
 | the brief asks for | today | |
 |---|---|---|
@@ -74,26 +79,26 @@ decisions against it**, and re-deriving them lands on the wrong answer.
 | PDF / DOCX upload | **out of scope** — `.md · .markdown · .txt`, and the refusal names the converter | ✅ **decided** |
 | One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
 | WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
-| Three roles (Admin · BA · DEV) | two shared passwords, no accounts. Next: `gate(role)` + `ADMIN_PASS`, ~15 lines, no schema | 🟡 **next** |
+| Three roles (Admin · BA · DEV) | the two that exist are expressed once each — DEV reads (open), BA writes (`BA_PASS`). **`ADMIN_PASS` deliberately not added**: there is no admin-only *action* to gate, so it would be a knob with no job (rule 20). Trigger: the first admin-only action | ✅ **decided** |
 | BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | create, update and delete ship — import, re-import the same path to replace, and remove behind the library's `.perm` confirmation in `ImportPanel.vue` (the file goes to `docs/.trash/`). Preview · Version · Publish · Archive · Reindex: not built | 🟡 **partial** |
-| Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two have no field in `Reply` at all | 🟡 **next** |
-| Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist; `schema.sql` has none of the other five. They are new *tables*, so `CREATE TABLE IF NOT EXISTS` reaches an existing database and they cost no re-ingest | 🟡 **next** |
-| Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **Nothing backs the corpus up automatically now**; that is the accepted cost | ✅ **decided** |
+| Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two are **not being built on a name**: "Suggested Actions" could be model follow-ups, presets or ticket shortcuts. Trigger: one sentence saying what they contain | ✅ **decided** |
+| Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist. The other five are new *tables*, so they cost no re-ingest whenever they land — which is why there is no hurry and no schema for them yet. Trigger: a BA screen that filters by one | ✅ **decided** |
+| Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **There is no backup story at all**, by decision, not by omission | ✅ **decided** |
 | Cross-OS self-host (WSL2 · macOS) | one binary, no runtime; the tooling was already portable (`openssl dgst`, not `sha384sum`). Both supervisors documented on the Deploy page | ✅ **shipped** |
-| Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). Migration runner shipped; **off-box DB backup** has not | ⛔ **blocked** |
+| Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). **Nothing blocks the switch any more** — the migration runner shipped and the backup precondition was dropped | 🟡 **next** |
 
-The four rows that are a decision rather than a queue position:
+The rows worth reading the reasoning for:
 
-- **Inverting the source of truth** needed two unglamorous things first. The **migration
-  runner** is done — `internal/db/migrate.go`, forward only, one transaction per
-  migration, `schema_version` as a table — and it landed *before* the corpus directory
-  stops being written to, deliberately: the other order removes the way back. What is
-  still missing is an **off-box DB backup**. "Put the documents folder in git" stops being
-  the backup story the moment the database is the only copy of every uploaded document and
-  every confirmed answer, and today nothing backs it up. A `sqlite3 .backup` on a timer,
-  off-box, is the minimum before the first real document is uploaded — that, not the
-  schema, is what now blocks the switch.
-  → [`changelog/2026-07-28-sot-decision.md`](changelog/2026-07-28-sot-decision.md)
+- **Inverting the source of truth** is unblocked, and both preconditions are settled rather
+  than pending. The **migration runner** shipped (`internal/db/migrate.go` — forward only,
+  one transaction per migration, `schema_version` as a table), landing *before* the corpus
+  directory stops being written to because the other order removes the way back. The
+  **backup precondition was dropped**: the WebUI import is the one controlled way a document
+  enters, so it is the control point the brief asked for, and a second copy of the corpus is
+  not what makes that true. What is left is the work itself — stop writing files, let
+  `Upload` write to the DB — and nothing gates it.
+  → [`changelog/2026-07-28-no-backup.md`](changelog/2026-07-28-no-backup.md)
+  · [`sot-decision`](changelog/2026-07-28-sot-decision.md)
 - **PDF/DOCX is out of scope**, not pending. A Go parser puts a binary-format parser's CVE
   surface inside a service with a write gate and no accounts; an external converter run at
   upload is a per-file failure a BA cannot fix. Converting stays a one-time step *outside*
@@ -107,9 +112,9 @@ The four rows that are a decision rather than a queue position:
 - **Git sync and folder watch are gone**, and with them the only thing that backed the
   corpus up. That was raised as a risk and accepted deliberately: the brief removes both,
   and carrying automation the brief deletes in order to protect a backup the brief does not
-  ask for is the redundancy this cleanup exists to remove. Backing up is now an operator
-  action — `git -C docs commit` — stated as such on the Deploy page. Whatever replaces it
-  arrives with the off-box DB backup above, not before.
+  ask for is the redundancy this cleanup exists to remove. **Nothing replaces it**: the
+  backup story is gone rather than pending, because every document enters through one
+  controlled path (the BA WebUI import) and `Remove` is a soft delete into `docs/.trash/`.
   → [`changelog/2026-07-28-drop-corpus-sync.md`](changelog/2026-07-28-drop-corpus-sync.md)
   · [`scope-decisions`](changelog/2026-07-28-scope-decisions.md)
   · [`vnext-collisions`](changelog/2026-07-28-vnext-collisions.md)
@@ -176,8 +181,10 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                   index.html · vite.config.js · package.json · eslint.config.js
                   src/main.js       createApp + mount, and the one design-system import
                   src/App.vue       wiring: composables in, components placed
-                  src/components/   ChatTurn · EmptyScreen · ScopePicker · StatusLine
-                                    BaScreen · ImportPanel · TicketCard · CorpusTree
+                  src/router.js     the two screens, as addresses: /#/ask and /#/ba
+                  src/components/   AskScreen · BaScreen   the two screens the router picks
+                                    ChatTurn · EmptyScreen · ScopePicker · StatusLine
+                                    ImportPanel · TicketCard · CorpusTree
                   src/lib/          plumbing — no Vue import anywhere in here
                                     chat.js · qa.js · upload.js   transport (SSE, tickets, import)
                                     answer.js · diagram.js        rendering (markdown, mermaid)
@@ -211,6 +218,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
 | a new provider | `internal/ai` | one client, one seam; probe it with `make live` |
 | a provider quirk to survive | `internal/aitest` | fault injection lives with the fake, not in each test |
 | a UI action | `web/ui/src/App.vue` | it's wiring and intent; state lives in a composable, plumbing in its own module |
+| a screen, or where one lives | `web/ui/src/router.js` | the address is the only truth for which screen is showing; the shell still owns the state both read |
 | a new piece of shell state | a file in `web/ui/src/composables/` | one concern per composable — the shell used to be one object where the import bar could collide with the chat thread |
 | a fetch/stream concern | `web/ui/src/lib/chat.js` | the app must not learn about SSE |
 | anything about the corpus | `web/ui/src/lib/library.js` | one place decides ready / empty / unavailable |

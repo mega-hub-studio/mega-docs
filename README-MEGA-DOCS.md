@@ -3,11 +3,11 @@
 > **This is the brief, not the spec.** Every line below describes the product this is
 > becoming; none of it describes the tree you are reading. Before implementing anything
 > from here, read **Now vs vNext** in [`README.md`](README.md) — it marks each line
-> shipped, next, or blocked-and-on-what. Three do not simply await work: hybrid retrieval
-> **stays** (a settled decision against this brief), the source-of-truth inversion is
-> blocked on an **off-box DB backup** (the migration runner it also needed has shipped),
-> and PDF/DOCX is an **open parser choice**. The reasoning is in
-> [`changelog/`](changelog/); re-deriving it costs a day and lands on the wrong answer.
+> shipped, next, or blocked-and-on-what. Two do not simply await work: hybrid retrieval
+> **stays** and PDF/DOCX is **out of scope** — both settled decisions against this brief. The
+> source-of-truth inversion is no longer blocked: the migration runner shipped and the backup
+> precondition was dropped. The reasoning is in [`changelog/`](changelog/); re-deriving it
+> costs a day and lands on the wrong answer.
 >
 > Keep this file a statement of intent. A claim about what the code does today goes in
 > `README.md` — that is critical rule 19, and `TestRootDocsAreTheFourWeKnowAbout` fails

@@ -23,8 +23,9 @@ type Cached struct {
 	At        string          `json:"at"`
 }
 
-// keep caps the cache. 200 answers is more than a team asks between re-indexes,
-// and it keeps the one-file backup story honest.
+// keep caps the cache. 200 answers is more than a team asks between re-indexes, and it keeps
+// the one-file story honest: a database small enough to copy in a second is a database nobody
+// has to plan around.
 const keep = 200
 
 // Sig identifies the current state of the corpus. Any ingest changes the document

@@ -39,8 +39,8 @@
           <tr lang="vi"><th>đặc thù provider (header, endpoint)</th><td><code>internal/ai</code></td></tr>
           <tr lang="en"><th>chunking, schema, hybrid search</th><td><code>internal/db</code></td></tr>
           <tr lang="vi"><th>cắt đoạn, schema, hybrid search</th><td><code>internal/db</code></td></tr>
-          <tr lang="en"><th>anything the user clicks</th><td><code>web/ui/src/</code> — Vue 3.5 single-file components, built by Vite into <code>web/dist</code> (committed, embedded): <code>App.vue</code> wires, <code>composables/*.js</code> hold one concern each, <code>components/*.vue</code> are the screens, <code>lib/*.js</code> is plumbing with no Vue in it</td></tr>
-          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/ui/src/</code> — Vue 3.5 single-file component, build bằng Vite ra <code>web/dist</code> (đã commit, nhúng vào binary): <code>App.vue</code> đấu dây, <code>composables/*.js</code> mỗi file một việc, <code>components/*.vue</code> là các màn hình, <code>lib/*.js</code> là phần ống dẫn, không có Vue</td></tr>
+          <tr lang="en"><th>anything the user clicks</th><td><code>web/ui/src/</code> — Vue 3.5 single-file components, built by Vite into <code>web/dist</code> (committed, embedded): <code>App.vue</code> wires, <code>router.js</code> says which screen, <code>composables/*.js</code> hold one concern each, <code>components/*.vue</code> are the screens, <code>lib/*.js</code> is plumbing with no Vue in it</td></tr>
+          <tr lang="vi"><th>bất cứ thứ gì người dùng bấm</th><td><code>web/ui/src/</code> — Vue 3.5 single-file component, build bằng Vite ra <code>web/dist</code> (đã commit, nhúng vào binary): <code>App.vue</code> đấu dây, <code>router.js</code> nói màn nào đang hiện, <code>composables/*.js</code> mỗi file một việc, <code>components/*.vue</code> là các màn hình, <code>lib/*.js</code> là phần ống dẫn, không có Vue</td></tr>
           <tr lang="en"><th>a dependency version</th><td>the app's in <code>web/ui/package.json</code>; the docs pages' CDN pins in <code>web/vendor.sha384</code> — two manifests, neither knowing the other's versions</td></tr>
           <tr lang="vi"><th>version một dependency</th><td>của app thì ở <code>web/ui/package.json</code>; pin CDN của trang tài liệu ở <code>web/vendor.sha384</code> — hai manifest, không bên nào biết version của bên kia</td></tr>
         </tbody>
@@ -100,22 +100,31 @@ type Importer interface {              // documents in, from the browser
 run.stop();                                    // resolves, never throws
 await qa.act(id, "confirm", { answer });       // qa.js — throws WrongPass on 401/403
 view.scrollToEnd();                            // viewport.js</span></div>
-    <p lang="en">The two screens are two components. <code>App.vue</code> is the shell —
-      turns, health, corpus, the queue both screens list; <code>BaScreen.vue</code> owns what
-      only BA mode touches (drafts, the unlock form, import progress). Two kinds of crossing,
-      and no more: four props down, two events up (<code>changed</code>, <code>ask</code>).
+    <p lang="en">The two screens are two components, and which one shows is an address:
+      <code>/#/ask</code> is <code>AskScreen.vue</code>, <code>/#/ba</code> is
+      <code>BaScreen.vue</code> — routed by <code>src/router.js</code>, which also loads the
+      BA screen as its own chunk, so a DEV never downloads the queue.
+      <code>App.vue</code> stays the shell — turns, health, corpus, the queue both screens
+      list, the header and the dock — because an answer has to keep streaming while a BA
+      reads the queue, and the router unmounts the screen you left. So the router picks
+      <em>which</em> screen and the shell picks what it is handed: five props down and seven
+      events up for ASK, four props and one event (<code>changed</code>) for BA.
       <code>toast</code> is a plain <code>import</code> from <code>8bit-nes</code> now
       rather than something injected — there is no CDN URL left to keep in one file — and
       every branch behind that contract lives in a composable, which is the section
       below.</p>
-    <p lang="vi">Hai màn hình là hai component. <code>App.vue</code> là lớp vỏ — lượt hỏi,
-      health, corpus, hàng đợi mà cả hai màn hình đều hiển thị; <code>BaScreen.vue</code> giữ
-      những gì chỉ chế độ BA dùng (bản nháp, form mở khoá, tiến trình import). Hai loại chỗ
-      giao nhau, không hơn: bốn props xuống, hai event lên (<code>changed</code>,
-      <code>ask</code>). <code>toast</code> giờ là một <code>import</code> bình thường từ
-      <code>8bit-nes</code> chứ không còn được inject — không còn URL CDN nào phải giữ ở một
-      file — và mọi nhánh logic phía sau contract đó nằm trong composable, đúng mục bên
-      dưới.</p>
+    <p lang="vi">Hai màn hình là hai component, và màn nào đang hiện là một địa chỉ:
+      <code>/#/ask</code> là <code>AskScreen.vue</code>, <code>/#/ba</code> là
+      <code>BaScreen.vue</code> — do <code>src/router.js</code> định tuyến, và nó nạp màn BA
+      thành chunk riêng, nên một DEV không bao giờ phải tải hàng đợi về.
+      <code>App.vue</code> vẫn là lớp vỏ — lượt hỏi, health, corpus, hàng đợi mà cả hai màn
+      hình đều hiển thị, header và dock — vì một câu trả lời phải chảy tiếp trong lúc BA đọc
+      hàng đợi, còn router thì unmount màn bạn vừa rời. Nên router chọn <em>màn nào</em> và
+      lớp vỏ chọn nó nhận gì: năm props xuống và bảy event lên cho ASK, bốn props và một
+      event (<code>changed</code>) cho BA. <code>toast</code> giờ là một <code>import</code>
+      bình thường từ <code>8bit-nes</code> chứ không còn được inject — không còn URL CDN nào
+      phải giữ ở một file — và mọi nhánh logic phía sau contract đó nằm trong composable,
+      đúng mục bên dưới.</p>
 
   </section>
 
@@ -675,10 +684,10 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>plumbing</th><td><code>src/lib/</code> — chat · qa · upload · answer · diagram · library · session · viewport</td><td>fetch, SSE, storage, markdown, toán DOM</td><td>bất kỳ import Vue nào — chúng chạy được trong console trần</td></tr>
           <tr lang="en"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · finder</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
           <tr lang="vi"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · finder</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
-          <tr lang="en"><th>components</th><td><code>src/components/*.vue</code> — ChatTurn · EmptyScreen · ScopePicker · StatusLine · BaScreen · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>branches in <code>&lt;script setup&gt;</code> — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
-          <tr lang="vi"><th>component</th><td><code>src/components/*.vue</code> — ChatTurn · EmptyScreen · ScopePicker · StatusLine · BaScreen · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>nhánh trong <code>&lt;script setup&gt;</code> — component có <code>if</code> là composable chưa ai viết</td></tr>
-          <tr lang="en"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code></td><td>who gets what, and what the template binds</td><td>logic of its own, or a reach into <code>src/lib/</code> (one exception: <code>viewport.js</code>, which binds the dock element the shell owns)</td></tr>
-          <tr lang="vi"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code></td><td>ai nhận gì, và template bind gì</td><td>logic của riêng nó, hoặc chạm vào <code>src/lib/</code> (một ngoại lệ: <code>viewport.js</code>, nó bind vào phần tử dock mà shell sở hữu)</td></tr>
+          <tr lang="en"><th>components</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>branches in <code>&lt;script setup&gt;</code> — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
+          <tr lang="vi"><th>component</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>nhánh trong <code>&lt;script setup&gt;</code> — component có <code>if</code> là composable chưa ai viết</td></tr>
+          <tr lang="en"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code> · <code>src/router.js</code></td><td>who gets what, which screen, and what the template binds</td><td>logic of its own, or a reach into <code>src/lib/</code> (one exception: <code>viewport.js</code>, which binds the dock element the shell owns)</td></tr>
+          <tr lang="vi"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code> · <code>src/router.js</code></td><td>ai nhận gì, màn nào, và template bind gì</td><td>logic của riêng nó, hoặc chạm vào <code>src/lib/</code> (một ngoại lệ: <code>viewport.js</code>, nó bind vào phần tử dock mà shell sở hữu)</td></tr>
         </tbody>
       </table>
     </div>
@@ -1145,9 +1154,9 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
 
   <p class="separator"></p>
   <p class="lede" lang="en">Running it for the team — Tailscale, Cloudflare Tunnel,
-    LAN, systemd, backups — is the Deploy page.</p>
+    LAN, systemd, WSL and macOS — is the Deploy page.</p>
   <p class="lede" lang="vi">Phần chạy cho cả team — Tailscale, Cloudflare Tunnel,
-    LAN, systemd, backup — nằm ở trang Triển khai.</p>
+    LAN, systemd, WSL và macOS — nằm ở trang Triển khai.</p>
   <p class="next"><a class="btn sm" href="<%.DeployURL%>"><span lang="en">Deploy
     &rsaquo;</span><span lang="vi">Triển khai &rsaquo;</span></a></p>
 
