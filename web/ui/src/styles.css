@@ -15,10 +15,30 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Local stacking scale. --z-overlay (100) stays reserved for the library's own
-   overlays, so a toast() is never trapped under the app chrome. */
+   overlays, so a toast() is never trapped under the app chrome.
+
+   --col and --measure are the two widths this app has, and they are here because
+   several rules each have to agree on them:
+
+     --col      the shell. The conversation, the prompt, the scope picker and the
+                diagram viewer all share this edge — the prompt has to look attached
+                to the answers above it, so 760px used to be written out three times
+                and the viewer kept a fourth number of its own. One home instead.
+     --measure  how wide *text* is allowed to get inside that shell. They are separate
+                numbers because they answer different questions: --col is how much room
+                a table, a diagram or a code block may use, --measure is how far the eye
+                travels back to find the next line. 72ch is the library's own value for
+                `.prose`, kept rather than re-invented.
+
+   No breakpoint sets --col. `max-inline-size` with `margin-inline: auto` is already
+   fluid — it fills anything narrower and centres in anything wider — so the responsive
+   behaviour here is one declaration, not a ladder of queries. The one media query in
+   this file changes *padding*, which is the thing that genuinely differs on a phone. */
 #app {
   --z-bar: 10;
   --z-dock: 20;
+  --col: 80rem;
+  --measure: 72ch;
   min-block-size: 100dvh;
 }
 
@@ -56,14 +76,21 @@ html {
 
 /* ── conversation column ── */
 main {
-  max-inline-size: 760px; margin-inline: auto;
+  max-inline-size: var(--col); margin-inline: auto;
   padding: var(--sp-4) var(--sp-3);
   /* clears the fixed prompt, which grows as the textarea grows — measured at
      runtime into --dock-h rather than guessed */
   padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
 }
 
-.empty { margin-block-start: var(--sp-6); }
+/* The ask panel does not scale with the shell. --col is sized for an *answer* — a table,
+   a diagram — and this screen is a prompt with a file list under it: stretched to 1280px
+   its rows become a few words at one end of a very long line, and the eye has nothing to
+   land on. It keeps roughly the width the whole app had before, centred in the new one. */
+.empty {
+  max-inline-size: 48rem; margin-inline: auto;
+  margin-block-start: var(--sp-6);
+}
 .turn + .turn { margin-block-start: var(--sp-6); }
 
 /* The question. No message-bubble recipe exists, so this is the one piece of
@@ -99,20 +126,27 @@ main {
 
 .a .head { justify-content: space-between; }
 
-/* The answer fills the card. `.prose` caps itself at `max-inline-size: 72ch` — about
-   545px at --fs-body — which is the right reflex for the recipe's own use case, a prose
-   block dropped straight into a page of unbounded width. Here the width is already
-   bounded: `main` is 760px, so the card's content box is ~700px and the cap is a *second*
-   measure inside the first. It cost ~168px of every answer, and it did not cost them
-   evenly — a paragraph only rewraps, but a table cannot, so the columns of a UI-spec table
-   were crushed to one word per line ("Panel" breaking into "Pane"/"l") with 168px of empty
-   card beside them. A diagram lost the same 168 and drew its labels smaller to fit.
+/* ── one shell, two widths ──
+   `.prose` caps itself at 72ch, which is the right reflex for the recipe's own case — a
+   prose block dropped into a page of unbounded width — and the wrong one here, because it
+   caps the *container*: a paragraph only rewraps when it runs out of room, but a table
+   cannot, so the columns of a UI-spec table were crushed to one word per line ("Panel"
+   breaking into "Pane"/"l") with a third of the card empty beside them, and a diagram drew
+   its labels smaller to fit a width it did not need to fit.
 
-   So the reading measure stays where it can only be one thing — the column — and the
-   answer uses the room it has. This does mean a paragraph can now run to ~92ch instead of
-   72; that is the trade, and it is the right way round, because 92ch of body text is
-   readable and a table folded into three words per column is not. */
+   So the cap moves off the container and onto the things that actually want it. Everything
+   in an answer is measured by default, which is the safe way round — a construct nobody
+   has thought about yet reads correctly rather than sprawling — and the four that are not
+   text opt out, because for them width *is* the content.
+
+   That split is what makes --col: 80rem safe. Widening the shell without it would have
+   bought a wide table at the price of 160-character lines of prose. */
 .prose { max-inline-size: none; }
+.q,
+.prose > *,
+.sources,
+main.ba :is(p, dd) { max-inline-size: var(--measure); }
+.prose > :is(.table-wrap, nes-mermaid, pre, hr) { max-inline-size: none; }
 
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
    styles inline code only) — the one recipe the app has to supply. */
@@ -194,7 +228,10 @@ main.ba {
 }
 .ticket { display: flex; flex-direction: column; gap: var(--sp-3); }
 .ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
-.ticket .textarea { inline-size: 100%; }
+/* Fills the card on a phone, measured on a desktop: what gets typed here becomes a
+   document, and drafting a paragraph across the full 80rem is the same long-line problem
+   as reading one. `inline-size` and `max-inline-size` together are what make it both. */
+.ticket .textarea { inline-size: 100%; max-inline-size: var(--measure); }
 /* The three actions wrap instead of shrinking: a 44px target that has been
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
@@ -264,7 +301,7 @@ main.ba .datalist { align-items: baseline; }
      overlap measured from visualViewport (0 whenever no keyboard is up). */
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
-.dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+.dock nes-chat-prompt { display: block; max-inline-size: var(--col); margin-inline: auto; }
 
 /* The scope picker: a closed row above the prompt naming the folder answers come
    from, opening into the corpus tree.
@@ -277,7 +314,7 @@ main.ba .datalist { align-items: baseline; }
    hundred documents becomes a dock taller than the phone — and the dock's height is
    what the conversation is padded by, so it would push the answer off screen. */
 .scopepick {
-  max-inline-size: 760px; margin: 0 auto var(--sp-2);
+  max-inline-size: var(--col); margin: 0 auto var(--sp-2);
   background: var(--screen);
 }
 .scopepick > summary {
@@ -378,7 +415,7 @@ main.ba .datalist { align-items: baseline; }
      backdrop turns back into a way to close it. Still wider than the library's 32rem —
      the whole point is the drawing at its own size. */
   .diagram-zoom {
-    inline-size: min(96vw, 1200px); max-inline-size: min(96vw, 1200px);
+    inline-size: min(96vw, var(--col)); max-inline-size: min(96vw, var(--col));
     block-size: auto; max-block-size: 90dvh;
     margin: auto;
     padding: var(--sp-5);

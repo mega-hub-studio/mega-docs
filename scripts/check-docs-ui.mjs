@@ -11,8 +11,11 @@
 // `go test`, so what a screenshot shows is now measured: characters per box, the gap
 // between every pair of blocks, and the chrome of the header.
 //
-// Playwright is not a dependency of this product — it is a tool, like mermaid, and
-// `make check-ui` skips when it is not installed.
+// The browser is driven by PinchTab (scripts/pinchtab.mjs), which replaced Playwright. Not a
+// dependency of this product either — a tool, like mermaid — and `make check-ui` skips when
+// it is not installed. What changed with it: the old skip condition was a hardcoded
+// `/opt/node22/...` path that existed on one machine, so on every other machine this check
+// skipped silently, and a skipped check reads exactly like a passing one.
 //
 // Verifies the restructured four-page docs set: one page per role, each split into
 // feature-sized sections. Read on a phone (390) and on a laptop (1440), in both
@@ -25,28 +28,25 @@
 //   • inline links inside prose are exempt from WCAG 2.5.5 (the "inline" exception:
 //     their height is constrained by the line-height of the text around them). Only
 //     chrome controls — nav, toc, tabs, walkthrough — are held to 44px.
-import { chromium, devices } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { open } from "./pinchtab.mjs";
 
 const BASE = process.argv[2] || "http://127.0.0.1:8123";
 const PAGES = ["index.html", "ba.html", "dev.html", "deploy.html"];
 
-const b = await chromium.launch();
 const errs = [];
-const watch = (p) => {
-  p.on("console", m => { if (m.type() === "error") errs.push(m.text()); });
-  p.on("pageerror", e => errs.push("pageerror: " + e.message));
-  p.on("requestfailed", r => errs.push("failed: " + r.url()));
-};
+const pt = open("docs-ui", `${BASE}/${PAGES[0]}`);
 
-const setLang = async (p, want) => {
-  if (await p.evaluate(() => document.documentElement.dataset.lang) !== want) {
-    await p.locator("#lang").click();
-    await p.waitForTimeout(250);
+const lang = () => document.documentElement.dataset.lang;
+
+const setLang = (want) => {
+  if (pt.evalJson(lang) !== want) {
+    pt.click("#lang");
+    pt.sleep(250);
   }
-  return p.evaluate(() => document.documentElement.dataset.lang);
+  return pt.evalJson(lang);
 };
 
-const measure = (p) => p.evaluate(() => {
+const measure = () => {
   const doc = document.documentElement;
   const seen = (e) => e.offsetParent !== null;
   const lang = doc.dataset.lang;
@@ -162,22 +162,25 @@ const measure = (p) => p.evaluate(() => {
                          Number.parseInt(getComputedStyle(document.querySelector("nes-toc")).zIndex, 10) };
     })(),
   };
-});
+};
 
 const out = {};
-for (const width of [390, 1440]) {
-  const ctx = width === 390
-    ? await b.newContext(devices["iPhone 14"])
-    : await b.newContext({ viewport: { width: 1440, height: 900 } });
-  const p = await ctx.newPage();
-  watch(p);
+// 390×664 at dpr 3 with mobile emulation is Playwright's "iPhone 14" preset, spelled out.
+// The viewport is set *before* each navigation, never after: <nes-toc> picks rail-or-bar when
+// it upgrades and does not re-pick on resize, so a resized page reports the wrong shape.
+for (const [width, height, mobile] of [[390, 664, true], [1440, 900, false]]) {
   for (const page of PAGES) {
-    await p.goto(`${BASE}/${page}`, { waitUntil: "networkidle" });
+    pt.viewport(width, height, { dpr: mobile ? 3 : 1, mobile });
+    pt.nav(`${BASE}/${page}`);
     const r = {};
-    for (const lang of ["en", "vi"]) r[lang] = { got: await setLang(p, lang), ...await measure(p) };
+    for (const want of ["en", "vi"]) r[want] = { got: setLang(want), ...measureNow() };
     out[`${page}@${width}`] = r;
+    errs.push(...pt.drain(`${page}@${width}`));
   }
-  await ctx.close();
+}
+
+function measureNow() {
+  return pt.evalJson(measure);
 }
 
 // Link resolution over the union of what every page declares. Anchors are read from
@@ -259,5 +262,6 @@ console.log(JSON.stringify(Object.fromEntries(Object.entries(out).map(([k, v]) =
         diagrams: v.en.diagrams, hScroll: v.en.hScroll }])), null, 1));
 if (fails.length) console.log("\n" + fails.join("\n"));
 console.log(fails.length ? "\nDOCS: FAIL" : "\nDOCS: PASS");
-await b.close();
+// No teardown here: the browser instance belongs to the wrapper that started it, and it stops
+// it on the way out — including when this exits non-zero.
 process.exit(fails.length ? 1 : 0);
