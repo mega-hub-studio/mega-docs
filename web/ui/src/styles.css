@@ -4,11 +4,11 @@
    the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
    value comes from a token in tokens.css.
 
-   Two rules do overrule how a component sizes *itself*, which is the library's
-   job and so has to be named: `.palette-list` (a bug 0.7.3 has not fixed, delete
-   on the release that does) and `.prose` (permanent — the recipe measures for a
-   page of unbounded width, and this app's column is already bounded). Both carry
-   the reasoning where they are written; AGENTS.md keeps the count.
+   One rule overrules how a component sizes *itself*, which is the library's job and so
+   has to be named: `.palette-list`, which 8bit-nes 0.8.0 still does not fix — delete it
+   on the release that does. A second one un-capped `.prose` until 0.8.0 moved that
+   measure onto the children, which is what this app had been patching around; reporting
+   it and then deleting the local rule is the shape to aim for. AGENTS.md keeps the count.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.
@@ -17,18 +17,17 @@
 /* Local stacking scale. --z-overlay (100) stays reserved for the library's own
    overlays, so a toast() is never trapped under the app chrome.
 
-   --col and --measure are the two widths this app has, and they are here because
-   several rules each have to agree on them:
+   --col is the one width this app owns, and it is here because several rules have to
+   agree on it:
 
      --col      the shell. The conversation, the prompt, the scope picker and the
                 diagram viewer all share this edge — the prompt has to look attached
                 to the answers above it, so 760px used to be written out three times
                 and the viewer kept a fourth number of its own. One home instead.
-     --measure  how wide *text* is allowed to get inside that shell. They are separate
-                numbers because they answer different questions: --col is how much room
-                a table, a diagram or a code block may use, --measure is how far the eye
-                travels back to find the next line. 72ch is the library's own value for
-                `.prose`, kept rather than re-invented.
+
+   Text measure is not here: 8bit-nes 0.8.0 owns it as `--prose-measure` on :root, and
+   the rules below borrow that rather than keeping a second copy of 72ch. Nor is
+   --mmd-fs — see :root below for why it cannot live on #app.
 
    No breakpoint sets --col. `max-inline-size` with `margin-inline: auto` is already
    fluid — it fills anything narrower and centres in anything wider — so the responsive
@@ -38,9 +37,20 @@
   --z-bar: 10;
   --z-dock: 20;
   --col: 80rem;
-  --measure: 72ch;
   min-block-size: 100dvh;
 }
+
+/* Diagram label size, and it has to be on :root rather than with the tokens above.
+   mermaidTheme() resolves it with getComputedStyle(document.documentElement), so a value
+   set on #app — a *descendant* — is never seen: custom properties inherit down, and the
+   library silently falls back to --fs-body. Measured, which is the only way that shows:
+   12px on #app rendered a 13.5px label.
+
+   Smaller than body copy because a node label is a landmark, not prose — and because with
+   htmlLabels off every label is measured at render time to size its box, so this shrinks
+   the *drawing* rather than the text inside boxes of the same size. Measured on a six-node
+   graph TD: 16px → 12px took the viewBox height from 723.84 to 617.63. */
+:root { --mmd-fs: 12px; }
 
 /* Kills the 300ms tap delay and double-tap-to-zoom; pinch-zoom is untouched,
    so the WCAG zoom affordance stays. (The library's own docs do the same.) */
@@ -126,27 +136,14 @@ main {
 
 .a .head { justify-content: space-between; }
 
-/* ── one shell, two widths ──
-   `.prose` caps itself at 72ch, which is the right reflex for the recipe's own case — a
-   prose block dropped into a page of unbounded width — and the wrong one here, because it
-   caps the *container*: a paragraph only rewraps when it runs out of room, but a table
-   cannot, so the columns of a UI-spec table were crushed to one word per line ("Panel"
-   breaking into "Pane"/"l") with a third of the card empty beside them, and a diagram drew
-   its labels smaller to fit a width it did not need to fit.
-
-   So the cap moves off the container and onto the things that actually want it. Everything
-   in an answer is measured by default, which is the safe way round — a construct nobody
-   has thought about yet reads correctly rather than sprawling — and the four that are not
-   text opt out, because for them width *is* the content.
-
-   That split is what makes --col: 80rem safe. Widening the shell without it would have
-   bought a wide table at the price of 160-character lines of prose. */
-.prose { max-inline-size: none; }
+/* Text keeps a reading measure while the shell does not, which is what makes --col: 80rem
+   safe — widening it without this buys a wide table at the price of 160-character prose.
+   Inside `.prose` that split is the library's since 0.8.0 (`--prose-measure` on the
+   children, and the constructs whose content *is* width opting out). These three are the
+   text this app renders *outside* `.prose`, so they borrow the same token. */
 .q,
-.prose > *,
 .sources,
-main.ba :is(p, dd) { max-inline-size: var(--measure); }
-.prose > :is(.table-wrap, nes-mermaid, pre, hr) { max-inline-size: none; }
+main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
    styles inline code only) — the one recipe the app has to supply. */
@@ -180,8 +177,8 @@ main.ba :is(p, dd) { max-inline-size: var(--measure); }
    phone line-break that .note-stats' flex-wrap produces. */
 .empty > .note-stats { justify-content: center; }
 
-/* OVERRIDE 1 OF 2, AND THE ONLY ONE THAT IS A BUG — 8bit-nes 0.7.3 lacks the fix (AGENTS.md
-   names it too; override 2 is `.prose`, above, which is permanent). 0.7.3 caps .palette-list at min(50vh, 340px) and scrolls it, which is right
+/* THE ONE LOCAL OVERRIDE OF THE DESIGN SYSTEM — 8bit-nes 0.8.0 still lacks the fix
+   (AGENTS.md names it too). It caps .palette-list at min(50vh, 340px) and scrolls it, which is right
    for the modal its docs describe ("drop it in a modal"). In the page it made a *nested*
    scroller: measured on an iPhone 14, three of seven documents were visible and the other
    four were behind an inner scrollbar — a scroll trap on touch, and the same documents this
@@ -231,7 +228,7 @@ main.ba {
 /* Fills the card on a phone, measured on a desktop: what gets typed here becomes a
    document, and drafting a paragraph across the full 80rem is the same long-line problem
    as reading one. `inline-size` and `max-inline-size` together are what make it both. */
-.ticket .textarea { inline-size: 100%; max-inline-size: var(--measure); }
+.ticket .textarea { inline-size: 100%; max-inline-size: var(--prose-measure); }
 /* The three actions wrap instead of shrinking: a 44px target that has been
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
@@ -281,15 +278,6 @@ main.ba {
    column with it, which is the alignment above coming undone from the inside. Scoped to the
    screen rather than repeated per card: it is one fact about paths in this mode. */
 main.ba .datalist code { overflow-wrap: anywhere; }
-/* …and label and value sit on one baseline. The library asks for it on the `dt` alone
-   (`align-self: baseline`), which cannot work — a lone baseline-aligned item has nobody to
-   share a baseline with and falls back to `start` — so a 9px label and a 13.5px value both
-   started at the row's top edge with their text several pixels apart, worst on the row whose
-   value is an inline <code> (its border and padding grow the line box above the baseline).
-   The library never sets `align-items` here, so this supplies one rather than overriding it,
-   and `.source` is the same shape already doing the same thing. Not `center`: a wrapped
-   answer would float its label to the middle of the paragraph. */
-main.ba .datalist { align-items: baseline; }
 
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {

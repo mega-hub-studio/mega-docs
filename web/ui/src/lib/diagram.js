@@ -153,33 +153,13 @@ export function ready() {
   return loading
 }
 
-/* The one theme value the design system does not map to a token. `mermaidTheme()` takes
-   fontFamily from --font-body and leaves fontSize at mermaid's own default of 16, and that
-   is the number deciding how much of a flow can be read at once: with htmlLabels off, every
-   label is measured at render time to size its box, so a smaller font is a *smaller
-   drawing*, not smaller text in boxes of the same size. Since the card fits the drawing to
-   its width, a bigger drawing is then scaled down harder — 16px labels on a 1083px flowchart
-   in a 545px column drew at about 4px. 12 against a 13.5px body, because a node label is a
-   landmark rather than prose. */
-const LABEL_PX = 12
-
 async function load() {
   const m = await import('mermaid')
-  const lib = m.default ?? m
-  // <nes-mermaid> looks at globalThis.mermaid first and only falls back to fetching a URL,
-  // so handing it the module here is what keeps the renderer a bundled chunk instead of a
-  // second network request. It then themes the instance itself — once, behind a private
-  // static — so there is no order in which an `initialize()` of ours survives: before, and
-  // the element resets over it; after, and there is no hook saying when after is. Wrapping
-  // the method is the seam that works whenever the element gets round to calling it.
-  // Delete when the library maps a token for the size: item 1 of
-  // changelog/2026-07-28-8bit-nes-requests.md.
-  const initialize = lib.initialize.bind(lib)
-  lib.initialize = cfg => initialize({
-    ...cfg,
-    fontSize: LABEL_PX,
-    themeVariables: { ...cfg?.themeVariables, fontSize: `${LABEL_PX}px` },
-  })
-  globalThis.mermaid = lib
+  // <nes-mermaid> looks at globalThis.mermaid first and only falls back to fetching a
+  // URL, so handing it the module here is what keeps the renderer a bundled chunk
+  // instead of a second network request. The element still applies its own theme to an
+  // instance it did not create — including the label size, which it reads from --mmd-fs
+  // (styles.css says why this app sets it).
+  globalThis.mermaid = m.default ?? m
   return true
 }

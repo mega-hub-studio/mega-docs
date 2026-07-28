@@ -234,6 +234,101 @@ done: 8/8 files, 74 chunks</span></div>
     </div>
   </section>
 
+  <!-- ══ admin ═════════════════════════════════════════════════════════════════
+       Read-mostly on purpose. The thing an operator could not do before this screen was
+       *see* a setting: the effective value of a knob lived in .env, in internal/config's
+       defaults, and in whatever the environment already had — and which one won was a
+       guess. Editing is deliberately not here; every knob is read at startup, so a write
+       path would need persistence and a reload for a value nobody changes twice a year. -->
+  <section id="admin" data-feature="admin"
+           data-api="GET /api/settings" data-env="ADMIN_PASS"
+           data-test="TestSettingsNeedTheAdminPassword,TestSettingsRedactEverySecret">
+    <h2 lang="en">Admin: what this instance actually is</h2>
+    <h2 lang="vi">Admin: instance này thực sự là gì</h2>
+    <p class="lede" lang="en">One screen at <code>/#/admin</code>, three tabs, and nothing
+      on it changes anything. It answers the question every other page can only describe:
+      <i>what is this running instance configured to do, right now?</i></p>
+    <p class="lede" lang="vi">Một màn hình ở <code>/#/admin</code>, ba tab, và không thứ gì
+      trên đó thay đổi được cái gì. Nó trả lời câu hỏi mà mọi trang khác chỉ mô tả được:
+      <i>instance đang chạy này được cấu hình để làm gì, ngay lúc này?</i></p>
+
+    <div class="callout gotcha">
+      <b lang="en">No <code>ADMIN_PASS</code>, no screen.</b>
+      <span lang="en">The route is not registered and the tab does not render — the same
+        shape as <code>BA_PASS</code>, for the same reason: forgetting to configure a secret
+        must never be how you end up without one. A settings list carries the *provenance*
+        of every password on the box, so it cannot be open the way
+        <code>/api/health</code> is.</span>
+      <b lang="vi">Không có <code>ADMIN_PASS</code> thì không có màn hình.</b>
+      <span lang="vi">Route không được đăng ký và tab không render — cùng hình dạng với
+        <code>BA_PASS</code>, cùng lý do: quên cấu hình một secret không bao giờ được là
+        cách bạn kết thúc mà không có nó. Danh sách setting mang theo *nguồn gốc* của mọi
+        mật khẩu trên máy, nên nó không thể mở như <code>/api/health</code>.</span>
+    </div>
+
+    <nes-tabs>
+      <section data-label="Settings" selected>
+        <p lang="en">Every variable <code>internal/config</code> reads, grouped the way
+          <code>.env.example</code> groups them, and each row carries the part that used to
+          be a guess: <b>where the value came from</b> — <code>.env</code>, the process
+          environment, or the built-in default. A password shows <code>set</code> or
+          <code>unset</code> and never its value.</p>
+        <p lang="vi">Mọi biến <code>internal/config</code> đọc, nhóm y như
+          <code>.env.example</code>, và mỗi dòng mang đúng phần trước đây phải đoán:
+          <b>giá trị đến từ đâu</b> — <code>.env</code>, môi trường tiến trình, hay giá trị
+          mặc định. Mật khẩu hiện <code>set</code> hoặc <code>unset</code>, không bao giờ
+          hiện giá trị.</p>
+        <div class="callout memo">
+          <b lang="en">Everything here is read at startup.</b>
+          <span lang="en">Changing one means editing <code>.env</code> and restarting — the
+            screen says so once, at the top, rather than badging all nineteen rows.
+            <code>EMBED_DIM</code> is the one that costs more than a restart: a different
+            width means re-embedding the whole corpus.</span>
+          <b lang="vi">Mọi giá trị ở đây đọc lúc khởi động.</b>
+          <span lang="vi">Đổi một cái là sửa <code>.env</code> rồi restart — màn hình nói
+            điều đó một lần ở trên đầu, thay vì dán badge lên cả mười chín dòng.
+            <code>EMBED_DIM</code> là cái đắt hơn một lần restart: đổi độ rộng nghĩa là
+            embed lại toàn bộ corpus.</span>
+        </div>
+      </section>
+
+      <section data-label="Runtime">
+        <p lang="en">What the binary is, not what it was configured with: the front end
+          build it is serving (Vue, 8bit-nes and the bundle's own hash — otherwise
+          unanswerable without unzipping the binary), how long it has been up, the size of
+          the derived index, and the corpus counts <code>/api/corpus</code> already
+          reports.</p>
+        <p lang="vi">Binary <i>là</i> gì, không phải nó được cấu hình bằng gì: bản build
+          front end đang phục vụ (Vue, 8bit-nes và hash của chính bundle — nếu không thì
+          phải giải nén binary mới trả lời được), nó đã chạy bao lâu, index dẫn xuất lớn cỡ
+          nào, và số liệu corpus mà <code>/api/corpus</code> vốn đã trả về.</p>
+      </section>
+
+      <section data-label="Usage">
+        <p lang="en">What has been asked, from <code>/api/history</code>: the question, how
+          many times it was answered from cache, and the folder it was scoped to. That is
+          the honest version of "analytics" for an instance with no accounts — usage of the
+          corpus, not of people.</p>
+        <p lang="vi">Đã có những gì được hỏi, từ <code>/api/history</code>: câu hỏi, số lần
+          nó được trả lời từ cache, và thư mục nó bị thu hẹp vào. Đó là bản trung thực của
+          "analytics" cho một instance không có tài khoản — thống kê corpus, không phải
+          thống kê con người.</p>
+      </section>
+    </nes-tabs>
+
+    <div class="callout memo">
+      <b lang="en">Documents are never touched from here.</b>
+      <span lang="en">Import, remove, confirm and dismiss stay in
+        <a href="<%.BAURL%>#import">BA mode</a>, where the person doing that work already
+        is. Two screens with the same button is one button and one lie about which
+        matters.</span>
+      <b lang="vi">Không bao giờ thao tác tài liệu từ đây.</b>
+      <span lang="vi">Import, xoá, confirm và dismiss ở lại
+        <a href="<%.BAURL%>#import">chế độ BA</a>, nơi người làm việc đó vốn đã ở. Hai màn
+        hình cùng một cái nút là một cái nút và một lời nói dối về cái nào mới đúng.</span>
+    </div>
+  </section>
+
   <!-- ══ upgrading ═════════════════════════════════════════════════════════════
        The UI is compiled in, so "replace the binary" is not optional — and the one
        upgrade that needs a re-index is stated with a *checkable condition* rather
@@ -322,7 +417,7 @@ done: 8/8 files, 74 chunks</span></div>
   <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
        the build if one is missing: a knob nobody documented is a knob nobody finds. -->
   <section id="settings" data-feature="settings"
-           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS,ADMIN_PASS"
            data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
@@ -344,6 +439,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>AUTH_PASS</code></th><td>trống (tắt)</td><td>bắt buộc nếu truy cập được từ ngoài tailnet/VPN</td></tr>
           <tr lang="en"><th><code>BA_PASS</code></th><td>empty (read-only)</td><td>set it to let BAs confirm answers into the documents. Empty means no write surface at all — reads and the queue still work. Keep it different from <code>AUTH_PASS</code>: everyone who reads shares that one.</td></tr>
           <tr lang="vi"><th><code>BA_PASS</code></th><td>trống (chỉ đọc)</td><td>đặt để BA confirm được câu trả lời vào tài liệu. Trống nghĩa là không có chỗ ghi nào — đọc và hàng đợi vẫn hoạt động. Nên khác <code>AUTH_PASS</code>: mật khẩu đó ai đọc cũng dùng chung.</td></tr>
+          <tr lang="en"><th><code>ADMIN_PASS</code></th><td>empty (no admin screen)</td><td>set it to open <b>Admin</b> — the read-only window onto this instance: every setting with the value it resolved to and where that came from, what the binary is running, and what has been asked. Empty means the screen and its route do not exist, the same way an unset <code>BA_PASS</code> removes the write surface rather than opening it</td></tr>
+          <tr lang="vi"><th><code>ADMIN_PASS</code></th><td>trống (không có màn Admin)</td><td>đặt để mở <b>Admin</b> — cửa sổ chỉ-đọc nhìn vào instance này: mọi setting kèm giá trị thực tế và nguồn của nó, binary đang chạy gì, và đã có những gì được hỏi. Trống nghĩa là màn hình và route đó không tồn tại, giống như <code>BA_PASS</code> trống thì không có mặt ghi chứ không phải mở toang</td></tr>
           <tr lang="en"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>the folder <code>ingest</code> reads and where a confirmed answer is written. The service needs write access to it (<code>ReadWritePaths</code> below).</td></tr>
           <tr lang="vi"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>thư mục <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm. Service cần quyền ghi vào đó (xem <code>ReadWritePaths</code> bên dưới).</td></tr>
           <tr lang="en"><th><code>EMBED_BASE_URL</code></th><td>same as chat</td><td>when the chat provider has no <code>/embeddings</code></td></tr>

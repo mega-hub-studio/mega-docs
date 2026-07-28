@@ -56,7 +56,7 @@ const route = useRoute() // which screen: the header, the dock and the props bel
 const { t, lang, langs, setLang } = useT()
 const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
-const { online, writes, runtime, check, watchNetwork } = useRuntime()
+const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
@@ -163,6 +163,14 @@ function replay(entry) {
           {{ t('app.ba') }}<template v-if="queue.open"> · {{ queue.open }}</template>
         </button>
       </router-link>
+      <!-- Only where there is an admin surface to reach. A third button that answers 404 is
+           worse than no button: it teaches a reader the app is broken rather than that this
+           instance has no ADMIN_PASS. /api/health is what says so. -->
+      <router-link v-if="admin" v-slot="{ isActive, navigate }" to="/admin" custom>
+        <button type="button" :aria-pressed="String(isActive)" @click="navigate">
+          {{ t('app.admin') }}
+        </button>
+      </router-link>
     </div>
 
     <!-- EN / VI. With two languages the honest control is a button showing the one you are
@@ -211,6 +219,13 @@ function replay(entry) {
       :is="Component" v-else-if="route.name === 'ba'"
       :writes="writes" :online="online" :queue="queue" :documents="corpus.documents"
       @changed="baChanged"
+    />
+    <!-- Read-only, so it emits nothing. Runtime and Usage are props rather than a second
+         fetch: the shell already has both for the status line and the replay list. -->
+    <component
+      :is="Component" v-else-if="route.name === 'admin'"
+      :online="online" :writes="writes" :runtime="runtime" :corpus="corpus"
+      :history="history"
     />
   </router-view>
 

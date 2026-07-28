@@ -1,5 +1,15 @@
 # Requests to 8bit-nes — the spec to take upstream
 
+> **All six landed in 8bit-nes 0.8.0**, as specified. This repo is on that pin, and the
+> local workarounds are deleted: the `initialize` wrapper in `diagram.js` (now `--mmd-fs`),
+> `main.ba .datalist { align-items: baseline }`, and the `.prose` override — which takes
+> `AGENTS.md`'s override count from two back to one. `.palette-list` is the only override
+> left, and 0.8.0 does not fix it; that request predates this file and is still open.
+>
+> Nothing below is outstanding. It is kept as the reasoning behind the release, and as the
+> shape to reuse: read the pinned package, name the construct, measure the symptom, say what
+> the consumer deletes when it lands.
+
 Pinned version measured against: **8bit-nes@0.7.3** (`web/vendor.sha384`).
 Upstream: <https://github.com/TuTranMVP/8bit-components> — the same owner, so these are
 changes to make, not tickets to hope for.

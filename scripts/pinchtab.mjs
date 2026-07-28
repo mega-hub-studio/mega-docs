@@ -37,32 +37,41 @@ const SERVER = process.env.PINCHTAB_SERVER || ''
  * on stderr while the run carries on measuring at the default width — a phone assertion
  * passing at 1440px, which is the exact shape of the bugs this check exists to catch.
  */
-export function open(agentId, bootUrl) {
-  // No agent session. PINCHTAB_SERVER points at an instance started for this run and nobody
-  // else, so the anonymous current tab *is* ours — a session would isolate the same tab a
-  // second time. It also needs `sessions.agent.enabled` on the server to exist at all, and
-  // returns an empty id when that is off: one more thing to configure for a property the
-  // dedicated instance already guarantees.
+export function open(bootUrl) {
+  // No session and no agent id. PINCHTAB_SERVER points at an instance started for this run
+  // and nobody else, so the anonymous current tab *is* ours — anything that scopes the tab
+  // a second time only adds a way to look at the wrong one. Both were tried: a session needs
+  // `sessions.agent.enabled` on the server and returns an empty id when it is off, and an
+  // agent id makes "current tab" per-agent, which answers `409 no current tab` for every
+  // command after a boot nav that created the anonymous one.
   //
-  // process.env is passed through rather than a stripped object, because the npm launcher
-  // resolves its managed Go binary relative to HOME — an empty environment fails with an
+  // process.env is passed through rather than a stripped object: the npm launcher resolves
+  // its managed Go binary relative to HOME, and an empty environment fails with an
   // "npm rebuild pinchtab" that has nothing to do with the install.
-  const env = { ...process.env, PINCHTAB_AGENT_ID: agentId }
-  const run = args => sh(args, env)
-  // Gives the instance a tab, so `set viewport` has something to size. Retried because the
-  // first navigation of a run is also what starts the browser, and a cold start loses the
-  // race often enough to matter: it answers `500 navigate: context canceled` once and works
-  // immediately after.
+  // The boot navigation creates the tab and, with --print-tab-id, names it — after which
+  // every command carries `--tab`. That explicitness is the fix for the failure that took
+  // two runs to place: the CLI remembers a *current tab* in its own state directory, so a
+  // run that starts a fresh instance on the same port inherits the last run's tab id and
+  // every command answers `404 tab … not found` (or `409 no current tab`) against something
+  // that no longer exists. Ambient state is fine for a human at a prompt and wrong for a
+  // check that has to be repeatable.
+  //
+  // Retried because this navigation is also what starts the browser, and a cold start loses
+  // the race often enough to matter: `500 navigate: context canceled` once, then fine.
+  let tab = ''
   for (let i = 0; ; i++) {
     try {
-      run(['nav', bootUrl])
-      break
+      tab = sh(['nav', bootUrl, '--print-tab-id'], process.env).trim().split(/\s+/).pop()
+      if (tab)
+        break
+      throw new Error('pinchtab nav --print-tab-id printed no id')
     }
     catch (e) {
       if (i === 4)
         throw e
     }
   }
+  const run = args => sh([...args, '--tab', tab], process.env)
 
   /**
    * Viewport, plus the mobile flags Playwright's device presets used to carry — and then

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"knowledge-engine/internal/config"
 	"knowledge-engine/internal/rag"
 )
 
@@ -252,4 +253,98 @@ func TestRemovingADocumentIsGated(t *testing.T) {
 			t.Errorf("the engine got %q, want the decoded name", imp.removed)
 		}
 	})
+}
+
+// ── the Admin screen's one endpoint ───────────────────────────────────────────
+// It lives with the document tests because it shares their shape — a gated read on a
+// nil-able seam — and rule 21 says extend the file that already owns that, not add another.
+
+func adminServer(inv func() any, pass AdminPass) http.Handler {
+	return New(Deps{
+		Answers:   &fakeAnswers{},
+		Index:     []byte("<html>index</html>"),
+		Assets:    fstest.MapFS{"assets/index-A1b2C3d4.js": {Data: []byte("export const x = 1\n")}},
+		Settings:  inv,
+		AdminPass: pass,
+	})
+}
+
+// Rule — an unset ADMIN_PASS removes the surface rather than opening it, and the route is
+// not even registered: the front end reads /api/health to decide whether the Admin tab
+// exists, so a 404 here and an absent tab are the same fact.
+func TestSettingsNeedTheAdminPassword(t *testing.T) {
+	inv := func() any { return []map[string]string{{"name": "TOP_K", "value": "6"}} }
+
+	t.Run("unset ADMIN_PASS leaves the route unregistered", func(t *testing.T) {
+		// 404, not 403: `settings` returns before HandleFunc, so there is no handler to
+		// refuse. That is the difference between "you may not" and "there is nothing here",
+		// and it is what keeps an admin-less instance from advertising an admin surface.
+		res := do(t, adminServer(inv, ""), http.MethodGet, "/api/settings", "", nil)
+		if res.Code != http.StatusNotFound {
+			t.Errorf("GET /api/settings = %d, want 404 when ADMIN_PASS is unset", res.Code)
+		}
+	})
+
+	t.Run("no header refuses", func(t *testing.T) {
+		res := do(t, adminServer(inv, "pw"), http.MethodGet, "/api/settings", "", nil)
+		if res.Code != http.StatusUnauthorized {
+			t.Errorf("got %d, want 401 without the header", res.Code)
+		}
+	})
+
+	t.Run("the BA password does not open it", func(t *testing.T) {
+		// Separate secrets on purpose: publishing an answer and reading which passwords
+		// exist on the box are different permissions. Sending the right value in the wrong
+		// header must not pass either.
+		res := do(t, adminServer(inv, "pw"), http.MethodGet, "/api/settings", "",
+			map[string]string{"X-BA-Pass": "pw"})
+		if res.Code != http.StatusUnauthorized {
+			t.Errorf("got %d, want 401 for a BA password in the BA header", res.Code)
+		}
+	})
+
+	t.Run("the admin password opens it", func(t *testing.T) {
+		res := do(t, adminServer(inv, "pw"), http.MethodGet, "/api/settings", "",
+			map[string]string{"X-Admin-Pass": "pw"})
+		if res.Code != http.StatusOK {
+			t.Fatalf("got %d, want 200: %s", res.Code, res.Body.String())
+		}
+		if !strings.Contains(res.Body.String(), "TOP_K") {
+			t.Errorf("the reply does not carry the inventory: %s", res.Body.String())
+		}
+	})
+}
+
+// Rule — a secret's value never leaves the process. This screen is what an operator
+// screenshots when asking for help, so a key on it is a key in a chat thread. The inventory
+// is built in internal/config, and this asserts the property end to end over the real one.
+func TestSettingsRedactEverySecret(t *testing.T) {
+	const leak = "sk-do-not-print-me"
+	t.Setenv("AI_API_KEY", leak)
+	t.Setenv("BA_PASS", leak)
+	t.Setenv("ADMIN_PASS", leak)
+	t.Setenv("AUTH_PASS", leak)
+	t.Setenv("EMBED_API_KEY", leak)
+
+	cfg := config.Load()
+	srv := adminServer(func() any { return cfg.Inventory() }, AdminPass(cfg.AdminPass))
+	res := do(t, srv, http.MethodGet, "/api/settings", "",
+		map[string]string{"X-Admin-Pass": leak})
+	if res.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200: %s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if strings.Contains(body, leak) {
+		t.Errorf("a secret's value reached the response: %s", body)
+	}
+	// Not vacuous: the five secrets must be *present* as rows, reporting that they are set.
+	// A response that simply omitted them would pass the check above for the wrong reason.
+	for _, name := range []string{"AI_API_KEY", "BA_PASS", "ADMIN_PASS", "AUTH_PASS", "EMBED_API_KEY"} {
+		if !strings.Contains(body, name) {
+			t.Errorf("%s is not in the inventory at all", name)
+		}
+	}
+	if n := strings.Count(body, `"value":"set"`); n != 5 {
+		t.Errorf("got %d secrets reported as set, want 5: %s", n, body)
+	}
 }

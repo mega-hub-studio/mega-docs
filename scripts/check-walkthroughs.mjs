@@ -22,7 +22,7 @@ const PAGES = [["index.html", ["hiw"]], ["ba.html", ["gaploop"]],
                ["dev.html", ["pipe", "specloop", "loops"]]];
 const out = {}, errs = [], fails = [];
 const need = (c, why) => { if (!c) fails.push(why); };
-const pt = open("walkthroughs", `${BASE}/${PAGES[0][0]}`);
+const pt = open(`${BASE}/${PAGES[0][0]}`);
 
 /**
  * One step of one walkthrough: do `what`, then report everything about where it landed.

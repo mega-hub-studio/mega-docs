@@ -35,6 +35,11 @@ export const router = createRouter({
     { path: '/', redirect: () => (localStorage.getItem(KEY) === 'ba' ? '/ba' : '/ask') },
     { path: '/ask', name: 'ask', component: AskScreen },
     { path: '/ba', name: 'ba', component: () => import('./components/BaScreen.vue') },
+    // Lazy for the same reason /ba is: nobody asking questions needs the settings screen,
+    // and a dynamic import gives Rollup its own chunk. Registered unconditionally — the
+    // screen itself discovers whether this instance has an admin surface, because the route
+    // table is static and /api/health is not.
+    { path: '/admin', name: 'admin', component: () => import('./components/AdminScreen.vue') },
     // An old link, or a typo in the hash, lands on the prompt — rather than a shell with
     // an empty <main> and nothing in the console to explain it.
     { path: '/:unknown(.*)', redirect: '/ask' },

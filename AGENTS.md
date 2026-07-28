@@ -47,15 +47,15 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.7.3
+    8bit-nes@0.8.0
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.3/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.3/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.7.3/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -72,22 +72,19 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
-2. **There are exactly two local overrides of the design system, and they are different
-   kinds.** Both live in `web/ui/src/styles.css`, and each says next to itself which kind
-   it is:
+2. **There is exactly one local override of the design system, and it names its
+   version.** `web/ui/src/styles.css` un-caps `.palette-list` (`max-block-size: none`)
+   because **8bit-nes 0.8.0** still sizes it for the modal its own docs describe —
+   `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested*
+   scroller which hid four of seven documents on a phone. Delete the rule when a release
+   ships an in-page variant of `.palette`; the request is in the changelog.
 
-   - **A bug, so it is dated.** `.palette-list` is un-capped (`max-block-size: none`)
-     because **8bit-nes 0.7.3** sizes it for the modal its own docs describe —
-     `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested*
-     scroller which hid four of seven documents on a phone. Delete the rule when a release
-     ships an in-page variant of `.palette`; the request is in the changelog.
-   - **A context difference, so it is permanent.** `.prose` is un-capped
-     (`max-inline-size: none`) because the recipe's `72ch` is a reading measure for a prose
-     block dropped into a page of unbounded width. This app's column is already bounded at
-     760px, so the cap was a second measure inside the first: it left ~168px of every
-     answer card empty while crushing the tables and diagrams *in* that answer, which
-     cannot rewrap the way a paragraph can. No release will "fix" this — the recipe is
-     right for its own case.
+   There were two until 0.8.0. The other un-capped `.prose`, whose `72ch` sat on the
+   container and so capped the tables and diagrams inside an answer as well as its text.
+   0.8.0 moved that measure onto the children (`--prose-measure`) with the width-is-content
+   constructs opting out, which is what this app had been patching around, so the override
+   was deleted rather than re-pinned. That is the shape to aim for: report it, and delete
+   the local rule when it lands.
 
    `docsbase.html` overrides nothing — it used to patch two accessibility gaps, and 0.7.1
    ships both, so they were removed after measuring rather than assumed.

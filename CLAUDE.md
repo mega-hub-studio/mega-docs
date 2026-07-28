@@ -85,8 +85,9 @@ Rule 22 is where those meet the syntax. Complexity is not deleted, it is **place
 seam holds it and the caller reads as intent — `const { turns, ask } = useConversation(…)`,
 with the SSE parse and the `AbortController` nowhere near the shell. So the question is
 *which layer can hold the mess* (see *Front end*), never whether to add a wrapper. Then the
-plainest modern syntax, and neither half is taste — both are lint findings: Go 1.22 idiom
-(`for i := range n`, `slices`/`maps`, `strings.Cut`, `errors.Is` and `%w`), ESM JavaScript
+plainest modern syntax, and neither half is taste — both are lint findings: Go 1.26 idiom
+(`for i := range n`, `slices`/`maps`, `strings.Cut`, the `SplitSeq`/`FieldsSeq` iterators
+over their slice-allocating twins, `errors.Is` and `%w`), ESM JavaScript
 with `const`, `?.`/`??` and no `var`, early return over `else`, and a named function — never
 a comment apologising — when `gocyclo`, `nestif` or `funlen` push back.
 

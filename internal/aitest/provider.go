@@ -202,7 +202,7 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 // to be meaningful rather than arbitrary.
 func Vector(text string, dim int) []float32 {
 	v := make([]float32, dim)
-	for _, word := range strings.Fields(strings.ToLower(text)) {
+	for word := range strings.FieldsSeq(strings.ToLower(text)) {
 		h := fnv.New32a()
 		_, _ = h.Write([]byte(word)) // hash writes never fail
 		v[int(h.Sum32())%dim]++

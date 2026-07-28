@@ -121,16 +121,16 @@ would have fired the day a dependency shipped unformatted Go, blaming this repo 
   either finds code unreachable from a main or it does not — there is no rule set to shift
   under us. Left on `@latest`, knowingly.
 
-## Not done, and it is a real gap
+## The gap this opened, and where it went
 
-`go.mod` says **`go 1.22.5`** — July 2024, past end of support. `run.go` derives its target
-from go.mod, so it **caps** what `usestdlibvars`, `intrange` and `modernize` will suggest;
-the local toolchain is already 1.26.5. Bumping it would surface real findings.
+`go.mod` said **`go 1.22.5`** — July 2024, past end of support — and `run.go` derives its
+lint target from it, so it **capped** what `usestdlibvars`, `intrange` and `modernize` were
+allowed to suggest. That was named here as a gap rather than fixed, on the grounds that it
+changes what the *deployed* binary compiles against and deserves its own verification.
 
-Deliberately not bundled into a lint change: it changes what the *deployed* binary is
-compiled against, so it belongs to its own change with its own verification, not to a
-formatting-adjacent commit. Named here so it is a recorded decision rather than an
-oversight.
+It was then done, in the same session but as its own change:
+[`2026-07-28-go-1.26.md`](2026-07-28-go-1.26.md). It has a **deploy prerequisite** — read
+that entry before the next deploy.
 
 ## Verified
 

@@ -59,6 +59,10 @@ func run() error {
 	handler := server.New(server.Deps{
 		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
 		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
+		// The Admin screen reads the config it is describing, so the inventory is a closure
+		// over cfg rather than a snapshot: one source for what the knobs are, in the package
+		// that defines them.
+		Settings: func() any { return cfg.Inventory() }, AdminPass: server.AdminPass(cfg.AdminPass),
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
@@ -76,8 +80,8 @@ func run() error {
 
 	// The UI's build is in the startup line because the bundle is committed: "which
 	// front end is this binary serving" is otherwise unanswerable without unzipping it.
-	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s)",
-		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg))
+	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s, admin: %s)",
+		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg), admin(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
 	warnIfKeyless(cfg)
 	return srv.ListenAndServe()
@@ -114,6 +118,16 @@ func writes(cfg config.Config) string {
 		return "read-only (BA_PASS unset)"
 	}
 	return "BA into " + cfg.CorpusDir
+}
+
+// admin says whether the read-only settings screen exists. One word in the startup line for
+// the same reason `writes` earns one: an operator who set ADMIN_PASS wants to see that it was
+// picked up, and one who did not should not go looking for a screen that is not there.
+func admin(cfg config.Config) string {
+	if cfg.AdminPass == "" {
+		return "off (ADMIN_PASS unset)"
+	}
+	return "on"
 }
 
 // warnIfExposed says the quiet part out loud: this app has no access control of

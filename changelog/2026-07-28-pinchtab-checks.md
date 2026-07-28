@@ -31,9 +31,10 @@ The first working version was flaky, and every cause was silent-and-wrong rather
 | `rail: true` on a 390px phone | `<nes-toc>` picks rail-or-bar when it upgrades and does not re-pick on resize | set the viewport **before** navigating, never after — documented at the top of the driver |
 | every font reported as a failed request | `drain` matched `\b4\d\d\b` against text, and `nes-mono-400.woff2` contains "400" | parse `pinchtab network --json` and read `entries[].status` |
 | `500 resolve current tab url: context canceled`, 2 runs in 3 | commands landed on the shared default instance, which an editor or an MCP integration navigates out from under a measurement (16 `pinchtab mcp` processes were running) | each wrapper starts its own instance on its own port and stops it on exit — `chromium.launch()`/`close()`, spelled differently |
+| `404 tab … not found`, then `409 no current tab` | the CLI keeps a *current tab* in its own state directory, so a run starting a fresh instance on the same port inherited the previous run's tab id — and an agent id, tried as a fix, only moved the same staleness behind a per-agent tab | the boot nav takes `--print-tab-id` and every command afterwards carries `--tab <id>`. Ambient state is fine for a human at a prompt and wrong for a check that has to be repeatable |
 
-Measured after: 3 runs of 4 pages × 2 viewports, byte-identical results, `DOCS: PASS` and
-`WALKTHROUGHS: PASS`.
+Measured after: 3 runs of 4 pages × 2 viewports, byte-identical results, then two more
+consecutive `DOCS: PASS` plus `WALKTHROUGHS: PASS` once the tab was pinned.
 
 ## The one assertion that did not survive
 

@@ -1,2 +1,0 @@
-# `make vendor` fills this directory (see the Makefile). Contents are gitignored;
-# only this file is tracked, so the //go:embed in embed.go always has a match.

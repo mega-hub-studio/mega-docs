@@ -26,7 +26,9 @@ decisions in [`changelog/`](changelog/), and what an agent gets wrong in
 
 ## Prerequisites
 
-- Go 1.22.5+
+- Go 1.26+ — the floor in `go.mod`, and a hard one: `GOTOOLCHAIN` cannot fetch a newer
+  toolchain on a network where `proxy.golang.org` is unreachable, which is the case on the
+  deploy host. Install it from <https://go.dev/dl/>, not from apt (Ubuntu 24.04 ships 1.22).
 - A C compiler (gcc/clang) + `sqlite3.h` (Debian/Ubuntu: `apt install libsqlite3-dev`;
   macOS: preinstalled with Xcode CLT) — required by the cgo SQLite bindings.
 - An OpenAI API key. Any OpenAI-compatible base URL works (Azure, Groq, OpenRouter),
@@ -75,11 +77,11 @@ is a backlog item to find and start.
 | OpenAI only; no local LLMs or embeddings | one OpenAI-compatible client, no other SDK | ✅ **shipped** |
 | Never render raw HTML | `marked → DOMPurify`, then components built from *parsed values* | ✅ **shipped** |
 | Markdown Components → NES Renderer | `dressTables · dressTaskLists · linkCites · asDiagrams` | ✅ **shipped** |
-| Reuse NES before creating components | app CSS owns exactly two overrides, both named in `AGENTS.md` | ✅ **shipped** |
+| Reuse NES before creating components | app CSS owns exactly one override, named in `AGENTS.md` | ✅ **shipped** |
 | PDF / DOCX upload | **out of scope** — `.md · .markdown · .txt`, and the refusal names the converter | ✅ **decided** |
 | One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
 | WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
-| Three roles (Admin · BA · DEV) | the two that exist are expressed once each — DEV reads (open), BA writes (`BA_PASS`). **`ADMIN_PASS` deliberately not added**: there is no admin-only *action* to gate, so it would be a knob with no job (rule 20). Trigger: the first admin-only action | ✅ **decided** |
+| Three roles (Admin · BA · DEV) | all three exist as capabilities: DEV reads (open), BA writes (`BA_PASS`), Admin inspects (`ADMIN_PASS` → `/#/admin`, `GET /api/settings`). Not accounts — a password is a permission boundary, not an identity, and per-user anything is the SaaS phase | 🟡 **partial** |
 | BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | create, update and delete ship — import, re-import the same path to replace, and remove behind the library's `.perm` confirmation in `ImportPanel.vue` (the file goes to `docs/.trash/`). Preview · Version · Publish · Archive · Reindex: not built | 🟡 **partial** |
 | Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two are **not being built on a name**: "Suggested Actions" could be model follow-ups, presets or ticket shortcuts. Trigger: one sentence saying what they contain | ✅ **decided** |
 | Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist. The other five are new *tables*, so they cost no re-ingest whenever they land — which is why there is no hurry and no schema for them yet. Trigger: a BA screen that filters by one | ✅ **decided** |
@@ -188,6 +190,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                   src/lib/          plumbing — no Vue import anywhere in here
                                     chat.js · qa.js · upload.js   transport (SSE, tickets, import)
                                     answer.js · diagram.js        rendering (markdown, mermaid)
+                                    admin.js    the settings request, and its own password
                                     library.js · session.js · viewport.js  corpus, storage, keyboard
                                     i18n.js        the EN/VI catalogues + the stored choice
                   src/styles.css    layout only; 8bit-nes owns the components
@@ -200,6 +203,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                                     statusline.js    the bottom strip, as one computed object
                                     diagrams.js      the lazy renderer and the zoom viewer
                                     gate.js          the BA password, and what a refused write means
+                  admin.js         the admin password, and the settings list it opens
                                     importer.js      files in, progress, per-file results
                                     tickets.js       four states, one path, one draft per ticket
                                     nestree.js       the <nes-tree> payload and its rebuild rules
@@ -228,6 +232,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
 | a new **column** | a migration in `internal/db/migrate.go` | `IF NOT EXISTS` finds the table and does nothing, so the column never arrives — never renumber an id, never edit shipped SQL |
 | anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + scope, under a signature of corpus + chat model + prompt |
 | retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `components/CorpusTree.vue` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
+| a capability behind a password | `internal/server/gate.go` | one constant-time compare, two secrets — `BA_PASS` for writes, `ADMIN_PASS` for inspection. A third would be a third `gate{}` value, not a third implementation |
 | a BA-screen behaviour | `web/ui/src/composables/gate.js`, `importer.js` or `tickets.js` | the screen is headless — props, emits and composition; the behaviour is in one of these three |
 | a chat-screen behaviour | `web/ui/src/composables/conversation.js` | the thread owns ask/stream/stop/reset; `App.vue` only wires it |
 | document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/ui/src/lib/upload.js` | path validation next to the writer, transport next to the form |
@@ -249,7 +254,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
 |---|---|
 | `GET /` | the app (revalidated with an ETag — it pins the asset versions) |
 | `GET /assets/…` | the bundle, `immutable`: every name carries a content hash |
-| `GET /api/health` | `{ok,writes,model,window,price_in,price_out}` — the light in the top bar, whether BA mode can publish, and what the status line reports. No `site`: the binary does not link out to the guide (see `CLAUDE.md`) |
+| `GET /api/health` | `{ok,writes,admin,model,window,price_in,price_out}` — the light in the top bar, whether BA mode can publish, whether an Admin screen exists here, and what the status line reports. No `site`: the binary does not link out to the guide (see `CLAUDE.md`) |
 | `POST /api/chat` | `{question, scope?, fresh?}` → SSE: `token` · `citations` · `done{cached,in,out}`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed, with full paths |
 | `GET · POST /api/tickets` | read the queue · file a gap |
@@ -257,6 +262,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
 | `POST /api/documents` | multipart import: `files` (repeatable) + optional `dir` — needs `X-BA-Pass` |
 | `DELETE /api/documents/{path…}` | remove a document and its chunks — needs `X-BA-Pass` |
 | `GET /api/history` | answers still free to replay, with hit counts and the scope each was answered in |
+| `GET /api/settings` | every knob with the value it resolved to and **where that came from** (`.env` · `env` · `default`); secrets report `set`/`unset` and never a value — needs `X-Admin-Pass`, and is unregistered entirely when `ADMIN_PASS` is unset |
 
 `internal/server` reaches the engine through three narrow interfaces — `Answerer` (read,
 required), `Knowledge` and `Importer` (writes, nil-able: their routes **disappear rather
@@ -392,7 +398,7 @@ spends — see **Now vs vNext**.
 
 ## Frontend assets: two manifests, one design system
 
-Both front ends use [8-BIT NES](https://github.com/TuTranMVP/8bit-components) (**0.7.3**),
+Both front ends use [8-BIT NES](https://github.com/TuTranMVP/8bit-components) (**0.8.0**),
 and each gets it a different way — which is the whole reason there are two manifests and
 neither knows the other's versions:
 

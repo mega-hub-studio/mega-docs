@@ -96,7 +96,7 @@ func SafePath(name string) (string, error) {
 	}
 
 	var segs []string
-	for _, s := range strings.Split(clean, "/") {
+	for s := range strings.SplitSeq(clean, "/") {
 		s = strings.TrimSpace(s)
 		if s == "" {
 			continue // leading "/", "//", trailing "/"

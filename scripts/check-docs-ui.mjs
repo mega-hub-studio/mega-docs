@@ -51,7 +51,7 @@ const BASE = process.argv[2] || "http://127.0.0.1:8123";
 const PAGES = ["index.html", "ba.html", "dev.html", "deploy.html"];
 
 const errs = [];
-const pt = open("docs-ui", `${BASE}/${PAGES[0]}`);
+const pt = open(`${BASE}/${PAGES[0]}`);
 
 const lang = () => document.documentElement.dataset.lang;
 
