@@ -57,7 +57,7 @@ make build && ./bin/knowledge
 [`README-MEGA-DOCS.md`](README-MEGA-DOCS.md) is the **brief for the product this is
 becoming** — a Knowledge Engine Platform with three roles and the WebUI as the only way
 in. It is not a description of this tree, and this table is the only place the two are
-joined. Read it before implementing anything from the brief: three lines are **settled
+joined. Read it before implementing anything from the brief: two of its lines are **settled
 decisions against it**, and re-deriving them lands on the wrong answer.
 
 | the brief asks for | today | |
@@ -66,13 +66,14 @@ decisions against it**, and re-deriving them lands on the wrong answer.
 | Never render raw HTML | `marked → DOMPurify`, then components built from *parsed values* | ✅ **shipped** |
 | Markdown Components → NES Renderer | `dressTables · dressTaskLists · linkCites · asDiagrams` | ✅ **shipped** |
 | Reuse NES before creating components | app CSS owns exactly one override, named in `AGENTS.md` | ✅ **shipped** |
+| PDF / DOCX upload | **out of scope** — `.md · .markdown · .txt`, and the refusal names the converter | ✅ **decided** |
+| One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
 | WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
 | Three roles (Admin · BA · DEV) | two shared passwords, no accounts. Next: `gate(role)` + `ADMIN_PASS`, ~15 lines, no schema | 🟡 **next** |
+| Removed: Git sync | `scripts/corpus-sync.sh` is still the **only backup that exists**, on a `.path` unit. It goes when the off-box DB backup lands — not before | 🟡 **pending** |
 | Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). Migration runner shipped; **off-box DB backup** has not | ⛔ **blocked** |
-| PDF / DOCX upload | `.md · .markdown · .txt`; convert first (below) | ⛔ **open** |
-| One pipeline, no hybrid retrieval | vector KNN + BM25, fused with RRF | ⛔ **rejected** |
 
-The three that are not simply "not built yet":
+The four rows that are a decision rather than a queue position:
 
 - **Inverting the source of truth** needed two unglamorous things first. The **migration
   runner** is done — `internal/db/migrate.go`, forward only, one transaction per
@@ -84,13 +85,21 @@ The three that are not simply "not built yet":
   off-box, is the minimum before the first real document is uploaded — that, not the
   schema, is what now blocks the switch.
   → [`changelog/2026-07-28-sot-decision.md`](changelog/2026-07-28-sot-decision.md)
-- **PDF/DOCX** means either a Go dependency and its CVE surface, or an external tool run
-  at upload. Both defensible, neither free — the choice is open, not overlooked.
-- **Dropping BM25** is **rejected**: it is the half that matches an error code, a config
-  key or a rule id verbatim over a Vietnamese corpus, and the BA guide's own advice is
-  that an error code beats a paraphrase. "One pipeline" is already true in the sense that
-  matters — there is exactly one `Answer`.
-  → [`changelog/2026-07-28-vnext-collisions.md`](changelog/2026-07-28-vnext-collisions.md)
+- **PDF/DOCX is out of scope**, not pending. A Go parser puts a binary-format parser's CVE
+  surface inside a service with a write gate and no accounts; an external converter run at
+  upload is a per-file failure a BA cannot fix. Converting stays a one-time step *outside*
+  the product, and the DX that makes that acceptable already exists: `upload.go` names the
+  command in its refusal instead of reporting an unsupported type.
+- **Dropping BM25 is rejected.** It is the half that matches an error code, a config key or
+  a rule id verbatim over a Vietnamese corpus (`unicode61 remove_diacritics 2`), and the BA
+  guide's own advice is that an error code beats a paraphrase. "One pipeline" is already
+  true in the sense that matters — one path a question travels, one `Answer`. Invariant 4
+  and `TestScopedSearchRanksWithinTheScope` stay with it.
+- **Git sync**: the brief removes it and the corpus will indeed stop living in git — but
+  `corpus-sync.sh` is what backs the corpus up *today*, and its replacement is the off-box
+  DB backup above. Deleting it first would leave a live deployment with no backup at all.
+  → [`changelog/2026-07-28-scope-decisions.md`](changelog/2026-07-28-scope-decisions.md)
+  · [`vnext-collisions`](changelog/2026-07-28-vnext-collisions.md)
 
 ## The published guide
 
@@ -247,10 +256,10 @@ so the key never lands on a command line. Point them at a new provider *before* 
 anything real: `make live` says in seconds whether `/embeddings` is missing, which is the
 one gap that stops ingest dead.
 
-## Ingesting PDF / DOCX
+## PDF / DOCX: convert first, on purpose
 
-Go is weak at parsing binary docs — don't fight it. Convert to clean markdown first,
-then ingest the markdown:
+`.md` · `.markdown` · `.txt` is the whole list, and that is a **decision**, not a gap —
+see *Now vs vNext*. Convert outside the product, then ingest the markdown:
 
 ```bash
 pip install markitdown
@@ -258,10 +267,11 @@ markitdown spec.pdf > docs/spec.md
 make ingest DOCS=./docs
 ```
 
-`MarkItDown` (Microsoft) or `Docling` (IBM) both work well. This keeps the binary clean
-and makes "docs are messy/noisy" a one-time cleaning step rather than a runtime failure
-mode — which is also why native PDF/DOCX upload is an open decision above rather than a
-missing feature.
+`MarkItDown` (Microsoft) or `Docling` (IBM) both work well. What makes this acceptable DX
+rather than an obstacle is that nothing has to be looked up: the upload refusal names the
+command. A rejection that tells you the fix is not a missing feature — and it keeps "the
+documents are messy" a one-time cleaning step instead of a runtime failure mode inside a
+service that has a write gate.
 
 ## How answers stay grounded
 

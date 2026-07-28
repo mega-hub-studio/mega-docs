@@ -263,10 +263,12 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 }
 
 /* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
-   wide, was squeezed into 289, and its 16px labels rendered at about 4px. The natural
-   width is read from the viewBox in JS (diagram.onRender — CSS cannot reach it) and the
-   scrolling is the library's own .mermaid-view, so the page itself never scrolls
-   sideways.
+   wide, was squeezed into 289, and its 16px labels rendered at about 4px. Here it stays
+   fitted anyway — the card is the shape of the thing, not the reading of it — and the
+   scrolling is the library's own .mermaid-view, so the page never scrolls sideways. The
+   natural size is the viewer's job, and it takes JS: diagram.zoomInto reads the width
+   out of the viewBox, which is the only place an SVG keeps it and somewhere CSS cannot
+   reach.
 
    Height is capped for the same reason in the other direction: a tall flowchart would
    push the answer's citations off screen, and the sources are the point. */
@@ -279,11 +281,51 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   font-family: var(--font-mono); font-size: var(--fs-label);
   letter-spacing: var(--ls-chrome); color: var(--muted); text-align: end;
 }
-/* The viewer: wider than the library's 32rem default, because the whole point is the
-   drawing at its own size, and scrolling in both axes rather than shrinking again. */
-.diagram-zoom { inline-size: min(96vw, 1200px); }
-.diagram-zoom .zoom-view { overflow: auto; max-block-size: 76vh; }
+/* ── the viewer ──
+   Where a diagram is actually *read*. The card can only ever show it fitted — the
+   answer column is a reading measure and the drawing is not text — so every pixel this
+   dialog does not use is a pixel of diagram nobody can see. On a phone that is the whole
+   screen, and it was not: `.modal` is `min(92vw, 32rem)` with `--sp-5` of padding and a
+   border, and .mermaid-view adds `--sp-4` and a border of its own, which on a 390px
+   screen adds up to about 265px of drawing — two thirds of a phone, in the one place
+   built for reading the thing at full size.
+
+   So the base — the phone — is edge to edge, and the drawing takes whatever the head
+   leaves. The frame stays the library's (border, accent bar, panel) rather than being
+   re-declared here; only the geometry is ours.
+
+   `dvh`, not `vh`: the browser's own chrome slides away as you scroll and `vh` is frozen
+   at the tallest state, so the bottom of a `100vh` dialog sits under the URL bar exactly
+   when the diagram is at its widest and you are panning it. */
+.diagram-zoom {
+  inline-size: 100dvw; max-inline-size: 100dvw;
+  block-size: 100dvh; max-block-size: 100dvh;
+  margin: 0;
+  display: flex; flex-direction: column;
+  padding: var(--sp-3);
+  /* Landscape is how a wide diagram gets read on a phone, which is also where the notch
+     is on the inline edge rather than the top. */
+  padding-block-start: max(var(--sp-3), env(safe-area-inset-top));
+  padding-block-end: max(var(--sp-3), env(safe-area-inset-bottom));
+  padding-inline-start: max(var(--sp-3), env(safe-area-inset-left));
+  padding-inline-end: max(var(--sp-3), env(safe-area-inset-right));
+}
+/* The head is a fixed cost; the drawing gets the rest. `min-block-size: 0` is what lets
+   it shrink below its content and scroll — without it a flex child floors at its content
+   height and the dialog grows past the screen instead. */
+.diagram-zoom > .head { flex: none; }
+/* The frame goes: the dialog is already a bordered panel of the same colour, so
+   .mermaid-view's own border is a second one drawn a few pixels inside the first — and
+   on a 390px screen its padding and border spend 36px of the width the drawing came
+   here to get. The library drops it in the same situation (`nes-tabs.lens`); the
+   scrolling, which is the part that matters, stays the library's. */
+.diagram-zoom .zoom-view { flex: 1; min-block-size: 0; border: 0; padding: 0; }
 .diagram-zoom .zoom-view svg { display: block; }
+/* Full screen there is no backdrop left to tap and no Escape key to press, so this
+   button is the only way out — it gets a real 44px target rather than the `sm` the
+   markup asks for, which is sized for a mouse. */
+.diagram-zoom > .head .btn { min-inline-size: 2.75rem; min-block-size: 2.75rem; }
+
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
@@ -294,38 +336,17 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
-}
-
-/* ── wide screens: the diagram leaves the reading column ──
-   Squeezing a flowchart is the viewport's fault on a phone and the *column's* fault
-   here. 760px is the right measure for prose and the wrong one for a drawing: measured
-   at 1755px the diagram had 545px and the window had a thousand pixels doing nothing on
-   either side of it. So the box — which is already a framed panel of its own, border and
-   background from the library — bleeds symmetrically out of the column, by whichever is
-   smaller:
-
-     --want  what the drawing asks for. --dgm-w is its viewBox width, published on the
-             element by diagram.onRender; the padding and border added to it are
-             .mermaid-view's own, and every box here is border-box.
-     --room  what the window has left, minus a gutter. 100vw counts the scrollbar and
-             --sp-6 absorbs it with margin to spare.
-
-   Both terms floor at 0px, so nothing overhangs: a diagram narrower than the column asks
-   for nothing rather than sitting in an empty panel, and one with no viewBox keeps
-   exactly today's width. Only the width changes — a drawing too big for even this is
-   still scrolled inside .mermaid-view, and still opens full size in the viewer.
-
-   The breakpoint is where the bleed is first worth having. Below it the column already
-   *is* the window and the arithmetic yields a few pixels, which is not a wider diagram,
-   it is a box that looks misaligned with the card it sits in. */
-@media (min-width: 1080px) {
-  .prose nes-mermaid {
-    --want: calc((var(--dgm-w, 0px) + 2 * (var(--sp-4) + var(--bw-2)) - 100%) / 2);
-    --room: calc((100vw - 100%) / 2 - var(--sp-6));
-    --bleed: max(0px, min(var(--want), var(--room)));
-    inline-size: calc(100% + 2 * var(--bleed));
-    margin-inline: calc(-1 * var(--bleed));
+  /* The viewer stops being the screen and becomes a dialog again: a pointer has a window
+     manager behind it, the page around the modal is context worth keeping, and the
+     backdrop turns back into a way to close it. Still wider than the library's 32rem —
+     the whole point is the drawing at its own size. */
+  .diagram-zoom {
+    inline-size: min(96vw, 1200px); max-inline-size: min(96vw, 1200px);
+    block-size: auto; max-block-size: 90dvh;
+    margin: auto;
+    padding: var(--sp-5);
   }
+  .diagram-zoom > .head .btn { min-inline-size: 0; min-block-size: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

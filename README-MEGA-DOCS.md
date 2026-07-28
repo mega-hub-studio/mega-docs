@@ -37,11 +37,14 @@ Build a **Knowledge Engine Platform** for enterprises with:
 - LM Studio
 - Local LLMs
 - Local Embeddings
-- CLI import
+- CLI import *(as a way **in**. `ingest` stays as an operator recovery tool)*
 - Folder watch
-- Git sync
+- Git sync *(pending: `scripts/corpus-sync.sh` is still the only backup that exists)*
 - Background sync
-- Hybrid pipelines
+- Hybrid **provider and import** pipelines — *not* hybrid retrieval: vector + BM25 fused
+  with RRF **stays**, because BM25 is the half that matches an error code or a config key
+  verbatim over a Vietnamese corpus. "One pipeline" means one path a question travels, and
+  there is already exactly one `Answer`. Decided 2026-07-28.
 
 ## Single Knowledge Pipeline
 ```text
@@ -64,10 +67,14 @@ NES Components Preview
 Only BA uploads via WebUI.
 
 ## Supported Files
-- PDF
-- DOCX
 - Markdown
 - TXT
+
+**PDF and DOCX are out of scope.** Decided 2026-07-28, for KISS: a binary-format parser
+inside the binary is a CVE surface in a service with a write gate, and an external converter
+invoked at upload is a per-file failure a BA cannot fix. Converting stays a one-time step
+outside the product — `markitdown spec.pdf > spec.md` — and the upload refusal names that
+command rather than reporting an unsupported type.
 
 Automatic:
 Chunk → Embed → Save → Index
