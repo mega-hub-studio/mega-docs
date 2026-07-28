@@ -41,11 +41,15 @@ for _ in $(seq 1 40); do
   sleep 0.25
 done
 
+# See check-docs-ui.sh: free the port first, and treat a failure to start as a failure rather
+# than a skip. A missing browser is a skip; a busy port is a broken run.
+"$PT" --server "http://127.0.0.1:$ptport" instance stop >/dev/null 2>&1 || true
 inst=$("$PT" instance start --port "$ptport" --mode headless 2>/dev/null \
   | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -1)
 if [ -z "$inst" ]; then
-  echo "  skipped check-walkthroughs (pinchtab could not start an instance on :$ptport)"
-  exit 0
+  echo "  FAILED check-walkthroughs: pinchtab could not start an instance on :$ptport." >&2
+  echo "  Set PINCHTAB_PORT_WT to a free port, or stop what is on that one." >&2
+  exit 1
 fi
 
 PINCHTAB_BIN="$PT" PINCHTAB_SERVER="http://127.0.0.1:$ptport" \

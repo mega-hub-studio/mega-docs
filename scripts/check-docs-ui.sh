@@ -51,11 +51,16 @@ for _ in $(seq 1 40); do
   sleep 0.25
 done
 
+# Free the port first. An instance left behind by an interrupted run still holds it, and
+# `instance start` then fails — which used to mean this check *skipped*, with a reason nobody
+# reads, which is the exact failure mode the whole rewrite was about.
+"$PT" --server "http://127.0.0.1:$ptport" instance stop >/dev/null 2>&1 || true
 inst=$("$PT" instance start --port "$ptport" --mode headless 2>/dev/null \
   | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -1)
 if [ -z "$inst" ]; then
-  echo "  skipped check-ui (pinchtab could not start an instance on :$ptport)"
-  exit 0
+  echo "  FAILED check-ui: pinchtab could not start an instance on :$ptport." >&2
+  echo "  Set PINCHTAB_PORT to a free port, or stop what is on that one." >&2
+  exit 1
 fi
 
 PINCHTAB_BIN="$PT" PINCHTAB_SERVER="http://127.0.0.1:$ptport" \
