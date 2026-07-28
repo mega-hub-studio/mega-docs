@@ -161,11 +161,29 @@ main.ba {
 }
 .ticket { display: flex; flex-direction: column; gap: var(--sp-3); }
 .ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
-.ticket .q { margin-block-end: 0; }
 .ticket .textarea { inline-size: 100%; }
 /* The three actions wrap instead of shrinking: a 44px target that has been
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
+
+/* ── one rhythm, one left edge ──
+   .ticket and .drop are the two flex-column cards, so `gap` is the only thing allowed to
+   space their blocks — the same "absolute vertical evenness is one property, set once, on
+   the parent" the .empty panel above already learned. The library's `.card > .head` carries
+   margin-block-end: --sp-3 because a plain .card is *not* a flex container; in these two it
+   lands on top of the gap, so the seam under the head measured --sp-6 and every other seam
+   in the same card measured --sp-3. Not the unlock form (`.card` with no flex) — it needs
+   the library's margin, which is why this names the two cards instead of `main.ba .card`. */
+.ticket > .head,
+.drop > .head { margin-block-end: 0; }
+
+/* .q is a chat bubble on the ASK screen: its gold bar says "this turn is the user's" in a
+   thread, and it brings its own margin. Inside a ticket neither is true — there is one
+   question, the head already titles it, and the bar only drew a second accent rule 6px
+   inside the card's own (a *different* colour once the status accent moves off gold) while
+   pushing the text --accent-bar + --sp-3 = 18px in. The head, the datalist and the buttons
+   stayed flush, so a 160px card had two left edges. One edge, and the gap does the spacing. */
+.ticket .q { margin-block-end: 0; border-inline-start: 0; padding-inline-start: 0; }
 
 /* ── BA mode: the import card ──
    The card, the badge and the datalist are library recipes. Two things are not,
@@ -188,7 +206,11 @@ main.ba {
 /* A label is not focusable, so keyboard users reach the input; give it the same
    visible ring the library puts on a focused control. */
 .drop .btn:focus-within { outline: var(--bw-2) solid var(--primary); outline-offset: 2px; }
-.drop .datalist code { overflow-wrap: anywhere; }
+/* Both BA cards put a document path in a .datalist value, and the grid's second track is
+   `1fr` — an unbreakable path there widens the card past the viewport and drags the value
+   column with it, which is the alignment above coming undone from the inside. Scoped to the
+   screen rather than repeated per card: it is one fact about paths in this mode. */
+main.ba .datalist code { overflow-wrap: anywhere; }
 
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
