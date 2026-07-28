@@ -217,10 +217,20 @@ function replay(entry) {
         <nes-icon name="close" />
       </button>
     </div>
-    <!-- .mermaid-view is the library's own diagram frame: panel background, square
-         corners on the nodes, and scrolling. The copy is styled exactly like the
-         original because it is in the same kind of box. -->
-    <div ref="zoomBody" class="mermaid-view zoom-view" />
+    <!-- <nes-zoom> is the library's panner: wheel, drag, +/−/reset buttons and the
+         keyboard, over a CSS transform. It owns `.zoom-view` and `.zoom-stage` — this
+         used to borrow the *class* without the element, which is why the viewer had
+         `cursor: grab` and `overflow: hidden` (both that class's) and neither a drag
+         that worked nor a scroller. It moves whatever children it finds into its stage
+         at upgrade time, so the frame below has to be here in the markup, not appended
+         later. `.mermaid-view` is the library's diagram frame — panel, and the square
+         node corners the inline copy already has.
+         One thing it does not do: pinch. `.zoom-view` sets `touch-action: none` to own the
+         drag, and the element listens for `wheel` and pointers only — so on a phone you
+         pan with a finger and scale with its own +/− buttons. -->
+    <nes-zoom aria-label="Diagram — drag to pan, scroll to zoom">
+      <div ref="zoomBody" class="mermaid-view" />
+    </nes-zoom>
   </dialog>
 
   <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes away

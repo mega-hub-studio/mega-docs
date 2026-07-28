@@ -64,8 +64,12 @@ export function hasDiagram(markdown) {
    diagram, and the *labels*. Mermaid scales to fit, which gives the first and loses
    the second — measured at 1083px squeezed into 289, so 16px text drew at about 4.
 
-   So: fitted in the answer, natural size on demand. The card keeps the overview, and
-   one tap opens the same drawing full-screen where it can be panned and pinched. */
+   So: fitted in the answer, explorable on demand. The card keeps the overview, and one
+   tap opens the same drawing in <nes-zoom>, which pans and scales it — so nothing here
+   sizes the copy. That is deliberate and it is why this file is short: wheel, drag,
+   +/−/reset and the keyboard are the component's, and a viewer that starts whole and
+   zooms in beats one that opens pinned to the top-left corner of a drawing three times
+   the width of the screen. */
 
 /**
  * Mark a freshly drawn diagram as openable, and say so.
@@ -89,14 +93,13 @@ export function onRender(host) {
 }
 
 /**
- * Put a copy of a diagram into the viewer at its natural size.
+ * Put a copy of a diagram into the viewer, and hand the panner back to 1:1.
  *
  * A copy, not the original: moving the node out of the answer would leave a hole in it
- * and lose the drawing when the dialog closes. The width comes from the viewBox because
- * that is the only place it exists — an SVG with a viewBox has no intrinsic width, so
- * CSS `width: auto` just resolves against the container again.
+ * and lose the drawing when the dialog closes. Nothing sizes it — `.zoom-stage` fits the
+ * SVG to the frame and the reader scales it from there.
  *
- * @param {Element} into an empty container inside the dialog
+ * @param {Element} into the frame inside <nes-zoom>'s stage
  * @param {Element} host the <nes-mermaid> that was tapped
  * @returns {boolean} false when there was no drawing to show
  */
@@ -105,14 +108,11 @@ export function zoomInto(into, host) {
   if (!into || !svg)
     return false
   const copy = svg.cloneNode(true)
-  const box = svg.getAttribute('viewBox')?.trim().split(/[\s,]+/)
-  const width = box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0
-  if (width) {
-    copy.style.inlineSize = `${width}px`
-    copy.style.maxInlineSize = 'none'
-  }
   reid(copy, svg.id)
   into.replaceChildren(copy)
+  // The pan/scale lives on the component, not on what it holds, so a second diagram would
+  // otherwise open wherever the first one was dragged to.
+  into.closest('nes-zoom')?.reset?.()
   return true
 }
 

@@ -295,10 +295,8 @@ main.ba .datalist { align-items: baseline; }
 /* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
    wide, was squeezed into 289, and its 16px labels rendered at about 4px. Here it stays
    fitted anyway — the card is the shape of the thing, not the reading of it — and the
-   scrolling is the library's own .mermaid-view, so the page never scrolls sideways. The
-   natural size is the viewer's job, and it takes JS: diagram.zoomInto reads the width
-   out of the viewBox, which is the only place an SVG keeps it and somewhere CSS cannot
-   reach.
+   scrolling is the library's own .mermaid-view, so the page never scrolls sideways.
+   Reading it properly is the viewer's job, and <nes-zoom> is what does it.
 
    Height is capped for the same reason in the other direction: a tall flowchart would
    push the answer's citations off screen, and the sources are the point. */
@@ -312,17 +310,13 @@ main.ba .datalist { align-items: baseline; }
   letter-spacing: var(--ls-chrome); color: var(--muted); text-align: end;
 }
 /* ── the viewer ──
-   Where a diagram is actually *read*. The card can only ever show it fitted — the
-   answer column is a reading measure and the drawing is not text — so every pixel this
-   dialog does not use is a pixel of diagram nobody can see. On a phone that is the whole
-   screen, and it was not: `.modal` is `min(92vw, 32rem)` with `--sp-5` of padding and a
-   border, and .mermaid-view adds `--sp-4` and a border of its own, which on a 390px
-   screen adds up to about 265px of drawing — two thirds of a phone, in the one place
-   built for reading the thing at full size.
+   Where a diagram is actually *read*, so every pixel this dialog does not use is a pixel
+   of diagram nobody can see. On a phone that is the whole screen, and it was not: the
+   library's `.modal` is `min(92vw, 32rem)` with `--sp-5` of padding, which spends about a
+   third of a 390px screen on chrome around the one thing the reader came for.
 
-   So the base — the phone — is edge to edge, and the drawing takes whatever the head
-   leaves. The frame stays the library's (border, accent bar, panel) rather than being
-   re-declared here; only the geometry is ours.
+   So the base — the phone — is edge to edge, and <nes-zoom> takes whatever the head
+   leaves. Panning and scaling are the component's; this file only says how big its box is.
 
    `dvh`, not `vh`: the browser's own chrome slides away as you scroll and `vh` is frozen
    at the tallest state, so the bottom of a `100vh` dialog sits under the URL bar exactly
@@ -350,11 +344,13 @@ main.ba .datalist { align-items: baseline; }
   padding-inline-start: max(var(--sp-3), env(safe-area-inset-left));
   padding-inline-end: max(var(--sp-3), env(safe-area-inset-right));
 }
-/* The head is a fixed cost; the drawing gets the rest. `min-block-size: 0` is what lets
-   it shrink below its content and scroll — without it a flex child floors at its content
-   height and the dialog grows past the screen instead. */
+/* The head is a fixed cost; the panner gets the rest. `min-block-size: 0` is what lets it
+   shrink below its content — without it a flex child floors at its content height and the
+   dialog grows past the screen instead. Targeted at `nes-zoom` and not at its `.zoom-view`:
+   the class belongs to the component, and reaching past the element into its internals is
+   exactly the mistake this replaced. */
 .diagram-zoom > .head { flex: none; }
-.diagram-zoom .zoom-view { flex: 1; min-block-size: 0; }
+.diagram-zoom > nes-zoom { flex: 1; min-block-size: 0; }
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
