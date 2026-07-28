@@ -41,10 +41,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
   },
   server: {
+    host: true,
     // `npm run dev` serves the UI with HMR and forwards the API to the Go server, so
     // the two run side by side: edit a .vue file, see it without a rebuild, and still
     // talk to the real engine. Start the backend with `make server` first.
-    port: 5173,
+    port: 5179,
     strictPort: true,
     proxy: {
       '/api': {
