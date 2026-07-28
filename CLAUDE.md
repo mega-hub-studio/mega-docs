@@ -456,10 +456,11 @@ address held by a running server is a second home for a fact that already has on
   `warn-unused`: an exclusion rule in `.golangci.yml` that no longer matches anything, so
   dead config cannot sit in the gate reading like a decision.
 - `make check` runs in CI on every push and pull request
-  ([`.github/workflows/check.yml`](.github/workflows/check.yml)), with `deadcode`
-  installed so nothing is skipped — it is the one tool `make check` needs that
-  golangci-lint has no equivalent for. It runs `make vendor` first, because
-  `web/vendor/` is gitignored and one test asserts the tree matches every pin.
+  ([`.github/workflows/check.yml`](.github/workflows/check.yml)), and installs **no tool of
+  its own**: `make lint` and `make dead` each install what they run, so CI and a laptop
+  cannot disagree about a version — or, in `deadcode`'s case, about whether the check ran
+  at all. It runs `make vendor` first, because `web/vendor/` is gitignored and one test
+  asserts the tree matches every pin.
 - Comments explain *why*, and name the failure that motivated the code. This repo's
   existing comments are the style guide; match their density and voice. Deleted on sight:
   a line restating the line below it, a banner, a commented-out branch, a `TODO` with no

@@ -258,15 +258,24 @@
      component assumes short ones). */
   .table td { vertical-align: top; }
   .table td code { white-space: nowrap; }
-  /* No column narrower than 14 characters. A three-column row inside an 820px reading
+  /* No column narrower than the gate allows. A three-column row inside an 820px reading
      column gave its last column 17 characters — "never, so probes need no secret" over
      three lines — because the route cell is `nowrap` and the middle one is a paragraph.
      A floor makes the table wider than its wrapper instead, and .table-wrap already
      scrolls inside its own frame, which is the honest trade: the border says there is
      more, and the page never widens. Below 40rem the rows are blocks, so it does not
-     apply there. */
+     apply there.
+
+     17ch, not a round number picked by eye: scripts/check-docs-ui.mjs fails a box under
+     18 characters and counts a character as 0.55em, while CSS `ch` is the `0` advance —
+     0.621em in this face. So its 18 are 9.9em are 15.9ch, and a floor of 14ch sat *below*
+     the gate it was written to satisfy. Nothing said so while every column happened to be
+     wider than both; the day a middle cell grew, the last one settled on the floor and the
+     gate reported the number the CSS had promised to prevent. 17 rather than 16 is the
+     rounding margin — 16ch measures 18.07 of the gate's characters. Move it if that
+     threshold moves; they are one rule. */
   @media (min-width: 40rem) {
-    .table th, .table td { min-inline-size: 14ch; }
+    .table th, .table td { min-inline-size: 17ch; }
   }
 
   /* ── a key/value list on a phone is one column ──

@@ -58,23 +58,13 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web/ui
 
-      # golangci-lint is NOT installed here — `make lint` installs the version pinned in
-      # the Makefile itself (GOLANGCI_VERSION), so there is one version and one installer
-      # for this repo instead of a copy here that can drift from the one a laptop has.
-      # That drift is not hypothetical: this step used to run `@latest` while developers
-      # had whatever they installed once, and the gate went green locally and red here on
-      # `goconst` and a new `gosec` rule.
-      #
-      # deadcode is still installed the `go install` way: it has no release binaries, and
-      # unlike a linter suite it either finds code unreachable from a main or it does not
-      # — there is no rule set to change under us. GOTOOLCHAIN defaults to auto, so `go
-      # install` fetches whatever toolchain the tool needs while this module keeps
-      # compiling against its own version.
-      - name: Install deadcode
-        run: |
-          go install golang.org/x/tools/cmd/deadcode@latest
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
+      # No linter and no deadcode step here: `make lint` installs the version pinned in the
+      # Makefile itself (GOLANGCI_VERSION) and `make dead` installs deadcode, so each tool
+      # has one installer for this repo instead of a copy here that can drift from the one a
+      # laptop has. That drift is not hypothetical: this workflow used to run `@latest` for
+      # the linter while developers had whatever they installed once, and the gate went
+      # green locally and red here on `goconst` and a new `gosec` rule. deadcode drifted the
+      # other way — installed here, skipped on a laptop, which reads exactly like a pass.
       - name: make check
         run: make check
 

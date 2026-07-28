@@ -14,7 +14,7 @@
 // MCP integration holding the same instance navigates the tab out from under a measurement —
 // which reads as `500 resolve current tab url: context canceled` at a random point in the
 // run. Measured: shared instance failed 2 of 3 runs, dedicated instance 0 of 3.
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 
 const BIN = process.env.PINCHTAB_BIN || 'pinchtab'
 // A dedicated instance, set by the wrapper. Without it every command lands on whatever
@@ -213,14 +213,32 @@ export function open(bootUrl) {
   }
 }
 
+// The one line PinchTab writes on every single command: a suggestion to create a session,
+// which this driver does not use on purpose (see open() — the instance is ours alone, and a
+// session scopes "current tab" a second way). Twenty identical copies at the end of a green
+// run is a gate that shouts, so it is dropped by name rather than by swallowing stderr —
+// everything else it says is a diagnostic and still prints.
+const NOISE = /^HINT: no session set/
+
+/**
+ * Run the CLI and return its stdout.
+ *
+ * spawnSync rather than execFileSync because stderr has to be *read* on the way past, and
+ * execFileSync only hands it over when the command fails. It fails rarely: PinchTab reports
+ * `Error 500: …` on stderr and still exits 0, so an inherited stderr was the only place a
+ * real failure ever showed — which is why it is filtered and re-emitted here rather than
+ * captured into an error nobody sees. The exit-code path keeps the text too: `e.stderr` was
+ * always null under the old default, so a genuine non-zero said `Command failed` and nothing
+ * about why.
+ */
 function sh(args, env) {
   // --server is a global flag, so it goes before the subcommand.
   const argv = SERVER ? ['--server', SERVER, ...args] : args
-  try {
-    return execFileSync(BIN, argv, { env, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
-  }
-  catch (e) {
-    const said = `${e.stdout || ''}${e.stderr || ''}`.trim()
-    throw new Error(`pinchtab ${args[0]} failed: ${said || e.message}`)
-  }
+  const r = spawnSync(BIN, argv, { env, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+  const said = (r.stderr || '').split('\n').filter(l => l.trim() && !NOISE.test(l)).join('\n')
+  if (said)
+    process.stderr.write(`${said}\n`)
+  if (r.error || r.status !== 0)
+    throw new Error(`pinchtab ${args[0]} failed: ${said || r.error?.message || `exit ${r.status}`}`)
+  return r.stdout
 }

@@ -23,9 +23,11 @@ fi
 port=${PORT_WT:-8125}
 ptport=${PINCHTAB_PORT_WT:-9875}
 dir=$(mktemp -d)
+# The kill is reaped rather than left for bash to notice — see check-docs-ui.sh for the
+# stray `Terminated: 15` line that costs.
 cleanup() {
   rm -rf "$dir"
-  [ -n "${srv:-}" ] && kill "$srv" 2>/dev/null || true
+  [ -n "${srv:-}" ] && { kill "$srv"; wait "$srv"; } 2>/dev/null || true
   [ -n "${inst:-}" ] && "$PT" instance stop "$inst" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT

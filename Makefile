@@ -18,7 +18,11 @@ UNIT ?= knowledge
 PORT ?= $(shell sed -n 's/^PORT=//p' .env 2>/dev/null | tail -1)
 HEALTH := http://127.0.0.1:$(or $(PORT),8080)/api/health
 
-.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy
+# Where `go install` puts a tool, which is where the targets that install one look for it.
+# GOBIN wins when it is set, or `dead-deps` installs on every run and finds nothing.
+GOBIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
+
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy
 
 deps:
 	go mod tidy
@@ -55,8 +59,13 @@ check: test secrets
 #
 # 4 and 5 need node + pinchtab + a browser, and *skip* (0) without them, so this target
 # stays runnable on a box that has none — read the "skipped" lines rather than assuming a
-# green run covered them. Same for deadcode inside `check`. That warning is not theoretical:
-# both skipped on every machine for as long as they gated on a hardcoded Playwright path.
+# green run covered them. That warning is not theoretical: both skipped on every machine
+# for as long as they gated on a hardcoded Playwright path.
+#
+# Two stages that used to skip no longer can, because their tool needs nothing this gate
+# does not already have: `dead` installs deadcode (Go), `lint-js` is the one left, and it
+# skips only when web/ui/node_modules is absent — which `make ui`, stage 1, has just made
+# sure it is not.
 check-full:
 	@$(MAKE) --no-print-directory ui
 	@$(MAKE) --no-print-directory check
@@ -87,7 +96,7 @@ check-full:
 # directives do not apply transitively, and tool dependencies can collide with the
 # project's own.
 GOLANGCI_VERSION := v2.12.2
-GOLANGCI_BIN := $(shell go env GOPATH)/bin/golangci-lint
+GOLANGCI_BIN := $(GOBIN_DIR)/golangci-lint
 
 lint-deps:
 	@$(GOLANGCI_BIN) version 2>/dev/null | grep -qF " $(patsubst v%,%,$(GOLANGCI_VERSION)) " || { \
@@ -182,14 +191,29 @@ lint-fix: lint-deps
 
 # What no linter finds: a function no binary can reach. staticcheck's unused only sees
 # within a package, and it now runs inside `lint` anyway; deadcode does whole-program
-# reachability from the two mains. A missing tool is reported as skipped — but a
-# *finding* must fail the build, which is why this is not written as `tool || echo`
-# (that turns a non-zero exit into a cheerful message).
-dead:
-	@if command -v deadcode >/dev/null 2>&1; then \
-		out=$$(deadcode -tags "$(TAGS)" ./cmd/...); \
-		if [ -n "$$out" ]; then echo "$$out"; echo "^ unreachable from any binary"; exit 1; fi; \
-	else echo "  skipped deadcode (go install golang.org/x/tools/cmd/deadcode@latest)"; fi
+# reachability from the two mains. A *finding* must fail the build, which is why this is
+# not written as `tool || echo` (that turns a non-zero exit into a cheerful message).
+#
+# Installed rather than skipped, which is the move `lint-deps` and `ui-deps` already make —
+# and the case for it is stronger here: the only thing this install needs is the Go
+# toolchain, which every box running `make check` has by definition. So the old skip
+# protected nobody and cost rule 17 its enforcer, printing "skipped deadcode (go install
+# …)" on every run of a developer machine's gate. A skipped check reads exactly like a
+# passing one; that is the same trap the hardcoded Playwright path set, and it was open
+# here the whole time. CI installs nothing of its own now either — one installer for this
+# tool, the way there is one for the linter.
+#
+# @latest, unlike GOLANGCI_VERSION, because there is no rule set to move under us: it
+# either finds code unreachable from a main or it does not.
+DEADCODE_BIN := $(GOBIN_DIR)/deadcode
+
+dead-deps:
+	@[ -x "$(DEADCODE_BIN)" ] || { echo "  installing deadcode"; \
+		go install golang.org/x/tools/cmd/deadcode@latest; }
+
+dead: dead-deps
+	@out=$$($(DEADCODE_BIN) -tags "$(TAGS)" ./cmd/...); \
+	if [ -n "$$out" ]; then echo "$$out"; echo "^ unreachable from any binary"; exit 1; fi
 
 # Nothing key-shaped may be committed. .env is gitignored; this catches the case
 # where a key gets pasted into a tracked file by accident.

@@ -33,9 +33,14 @@ fi
 port=${PORT_UI:-8123}
 ptport=${PINCHTAB_PORT:-9871}
 dir=$(mktemp -d)
+# `wait` after the kill, both silenced together: bash notices a SIGTERMed background job on
+# its own and prints `line 36: 12018 Terminated: 15 python3 -m http.server …` — after
+# `DOCS: PASS`, on stderr, as the last line of a green run. Reaping it here is what stops the
+# notice, and it only shows up when something follows the kill (stopping the browser does),
+# which is why it reads as a failure on this machine and not on the one it was written on.
 cleanup() {
   rm -rf "$dir"
-  [ -n "${srv:-}" ] && kill "$srv" 2>/dev/null || true
+  [ -n "${srv:-}" ] && { kill "$srv"; wait "$srv"; } 2>/dev/null || true
   [ -n "${inst:-}" ] && "$PT" instance stop "$inst" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
