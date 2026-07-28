@@ -39,9 +39,10 @@ check: test secrets
 #   4. check-ui  the guide rendered, served and measured in Chromium, both languages
 #   5. check-wt  every diagram walkthrough driven prev/next at two viewports
 #
-# 4 and 5 need node + playwright and *skip* (0) without them, so this target stays
-# runnable on a box that has neither — read the "skipped" lines rather than assuming a
-# green run covered them. Same for deadcode inside `check`.
+# 4 and 5 need node + pinchtab + a browser, and *skip* (0) without them, so this target
+# stays runnable on a box that has none — read the "skipped" lines rather than assuming a
+# green run covered them. Same for deadcode inside `check`. That warning is not theoretical:
+# both skipped on every machine for as long as they gated on a hardcoded Playwright path.
 check-full:
 	@$(MAKE) --no-print-directory ui
 	@$(MAKE) --no-print-directory check
@@ -104,6 +105,12 @@ check-wt:
 # The browser check: what a screenshot shows, measured. Not in `check` — it needs a
 # browser, and this product needs no Node at all (see CLAUDE.md rule 14). Run it after
 # touching a docs page, a recipe or docsbase.html.
+#
+# Both browser checks are driven by PinchTab (`npm i -g pinchtab`, then `pinchtab doctor`),
+# which replaced Playwright. The old gate was a hardcoded /opt/node22/... path, so on any
+# machine without it these skipped — and a skipped check reads exactly like a passing one.
+# One assertion did not survive the move: touch-target size, which needs a coarse-pointer
+# emulation PinchTab does not have. It is named at the top of scripts/check-docs-ui.mjs.
 check-ui:
 	@./scripts/check-docs-ui.sh
 

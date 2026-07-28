@@ -220,6 +220,22 @@
   @media (min-width: 90rem) {
     :root { --col: 960px; }
   }
+  /* The same step again, once, because 960px is where the page stopped growing and a
+     1920px screen is not rare. Measured (scripts/check-docs-ui.mjs, the 1920 rung): the
+     column, the rail and their gap came to 1296px at every width from 1440 up, so a
+     1920px screen carried 312px of empty gutter on each side and the widest table on the
+     Deploy page was still drawn 928px wide — the exact content the step above exists to
+     feed. 1280px puts the three tracks at 1616 and leaves 152px a side, the same
+     proportion the 90rem rung chose at 1440.
+
+     The measure does not move with it, and that is the point: `main p, main li` stays at
+     62ch, near the top of the 45–75 a reader tracks. What widens is what cannot rewrap.
+     One rung, not two — a 2560px screen keeps its gutters, because past this the page is
+     a 62ch paragraph beside an increasingly empty half, and no table on these four pages
+     asks for more. */
+  @media (min-width: 120rem) {
+    :root { --col: 1280px; }
+  }
   .lede { color: var(--muted); font-size: var(--fs-body); }
   /* the link to the other page is a control, not a word in a sentence: at the end
      of a page on a phone it is the thing you reach for, so it gets a thumb-sized

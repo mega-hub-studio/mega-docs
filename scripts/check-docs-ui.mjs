@@ -173,7 +173,12 @@ const out = {};
 // 390×664 at dpr 3 with mobile emulation is Playwright's "iPhone 14" preset, spelled out.
 // The viewport is set *before* each navigation, never after: <nes-toc> picks rail-or-bar when
 // it upgrades and does not re-pick on resize, so a resized page reports the wrong shape.
-for (const [width, height, mobile] of [[390, 664, true], [1440, 900, false]]) {
+//
+// 1920 is here because --col has a rung there and nothing was measuring above it: the page
+// stopped growing at 960px and every check ran at 1440, so a wider column could widen a
+// table past its wrapper, or push the rail off, and both would have passed. It is the
+// cheapest rung to add — the measurements below are the ones already written.
+for (const [width, height, mobile] of [[390, 664, true], [1440, 900, false], [1920, 1080, false]]) {
   for (const page of PAGES) {
     pt.viewport(width, height, { dpr: mobile ? 3 : 1, mobile });
     pt.nav(`${BASE}/${page}`);
@@ -230,9 +235,8 @@ for (const [key, r] of Object.entries(out)) {
     need(o.toc.dead.length === 0, `${key} ${lang}: toc rows point nowhere: ${o.toc.dead}`);
     need(o.toc.rail === !phone, `${key} ${lang}: toc shape rail=${o.toc.rail}`);
     if (phone) need(o.toc.now !== "", `${key} ${lang}: collapsed toc bar names no section`);
-    // 44px is the touch bar. At 1440 the pointer is fine and the library sizes its
-    // chrome down to 32px on purpose, so the rule only applies on the phone.
-    if (phone) need(o.small.length === 0, `${key} ${lang}: chrome under 44px: ${JSON.stringify(o.small)}`);
+    // No 44px assertion here — see ONE GAP, NAMED at the top of this file. The rule still
+    // holds; nothing in reach can emulate the coarse pointer it depends on.
     need(o.diagrams.every(d => d.nodes >= 5 && d.fits),
       `${key} ${lang}: diagrams ${JSON.stringify(o.diagrams)}`);
     need(o.narrow.length === 0,
@@ -250,7 +254,9 @@ for (const [key, r] of Object.entries(out)) {
     if (phone) {
       need(o.stacked && o.stacked.display === "block" && o.stacked.labelled > 0,
         `${key} ${lang}: table rows not stacked on a phone: ${JSON.stringify(o.stacked)}`);
-      need(o.find.h >= 44, `${key} ${lang}: finder is ${o.find.h}px tall`);
+      // `o.find.h` is still measured and still printed in the finder failure above — it is
+      // the height a coarse-pointer check would have asserted, kept as the diagnostic it can
+      // still be without the emulation to judge it.
     } else {
       need(o.stacked === null || o.stacked.display === "table-row",
         `${key} ${lang}: table rows stacked on a laptop: ${JSON.stringify(o.stacked)}`);

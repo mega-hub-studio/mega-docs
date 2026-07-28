@@ -169,9 +169,12 @@ make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
 make check-wt              # optional: drives every diagram walkthrough (prev/next + highlight)
-#   both need Playwright, and both default to /opt/node22/lib/node_modules/playwright/
-#   index.mjs — set PLAYWRIGHT_PATH if yours is elsewhere (npm i -g playwright), or they
-#   skip with a reason rather than failing the gate.
+#   both are driven by PinchTab: `npm i -g pinchtab`, then `pinchtab doctor` — which is also
+#   what they gate on, so "no browser" skips with the reason instead of failing. Each run
+#   starts its own instance on its own port and stops it after: PinchTab commands act on an
+#   instance's current tab, so sharing one with an editor or an MCP integration makes the
+#   measurements flaky (2 of 3 runs, measured). scripts/pinchtab.mjs is the only file that
+#   knows a CLI is involved.
 make ui                    # build the app's front end (Vite) into web/dist — commit the output
 make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
