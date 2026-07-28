@@ -1,10 +1,13 @@
 // Package ai is a minimal OpenAI-compatible client (embeddings + streaming chat).
-// Works with OpenAI, Azure, Groq, Together, OpenRouter, local Ollama/LM Studio,
+// One OpenAI-compatible client. The MVP targets OpenAI only — a single vendor is the
+// whole of the AI stack, and provider choice is a SaaS-phase plugin, not an MVP knob.
+// The wire format is still the OpenAI one, so Azure/Groq/OpenRouter work by base URL alone;
+// that is a property of the protocol, not a feature this repo maintains.
 // and any gateway that speaks the same two endpoints.
 //
 // Embeddings and chat carry separate base URLs on purpose: plenty of gateways
 // serve /chat/completions but not /embeddings, and a RAG index needs both. Point
-// EmbedBaseURL somewhere that has them (a local Ollama is enough) and keep chat
+// EmbedBaseURL somewhere that has them and keep chat
 // wherever you want it.
 package ai
 
@@ -249,7 +252,7 @@ func apiErr(where, base string, resp *http.Response) error {
 	}
 	if resp.StatusCode == http.StatusNotFound && where == "embeddings" {
 		return fmt.Errorf("embeddings: %s%s returned 404 — this provider has no embeddings endpoint. "+
-			"Point EMBED_BASE_URL at one that does (a local Ollama works) and keep chat where it is. Body: %s",
+			"Point EMBED_BASE_URL at one that does and keep chat where it is. Body: %s",
 			base, "/embeddings", msg)
 	}
 	return fmt.Errorf("%s API %d at %s: %s", where, resp.StatusCode, base, msg)

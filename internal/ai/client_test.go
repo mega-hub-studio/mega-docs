@@ -197,7 +197,9 @@ func TestTrailingSlashesInBaseURLsDoNotDoubleUp(t *testing.T) {
 }
 
 func TestMissingAPIKeySendsNoAuthorizationHeader(t *testing.T) {
-	// A local Ollama needs no key; sending "Bearer " would be worse than nothing.
+	// A keyless endpoint needs no Authorization header, and sending "Bearer " with nothing
+	// after it is worse than sending none: some gateways reject the malformed header rather
+	// than treating the request as anonymous.
 	// The fake rejects a malformed Bearer header, so a 401 here proves it was absent.
 	c := newClient(t, &aitest.Provider{Dim: 4})
 	keyless := ai.New(ai.Config{

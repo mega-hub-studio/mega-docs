@@ -49,7 +49,7 @@ func TestLiveEmbeddings(t *testing.T) {
 			t.Fatalf("%s has no /embeddings.\n"+
 				"Ingest cannot work without it. Set EMBED_BASE_URL to a provider that does —\n"+
 				"e.g. EMBED_BASE_URL=http://localhost:11434/v1 with EMBED_MODEL=nomic-embed-text\n"+
-				"and EMBED_DIM=768 (Ollama, local, free) — and leave AI_BASE_URL for chat.\n\n%v",
+				"and EMBED_DIM to match that provider — and leave AI_BASE_URL for chat.\n\n%v",
 				cfg.BaseURL, err)
 		}
 		t.Fatalf("embeddings failed: %v", err)
