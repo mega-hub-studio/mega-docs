@@ -1,7 +1,8 @@
 package web
 
 import (
-	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -11,9 +12,16 @@ func TestPinsParseRealManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("web/vendor.sha384 does not parse: %v", err)
 	}
-	for _, pkg := range []string{"8bit-nes", "vue", "marked", "dompurify"} {
-		if _, ok := p.spec[pkg]; !ok {
-			t.Errorf("%s is not pinned", pkg)
+	// Only the design system: the manifest is the *docs pages'* CDN pins now. Vue, marked,
+	// DOMPurify and mermaid are npm dependencies of web/ui, bundled into web/dist — pinning
+	// them here as well would be two sources of truth for one version.
+	if _, ok := p.spec["8bit-nes"]; !ok {
+		t.Error("8bit-nes is not pinned")
+	}
+	for _, pkg := range []string{"vue", "marked", "dompurify", "mermaid"} {
+		if _, ok := p.spec[pkg]; ok {
+			t.Errorf("%s is pinned here as well as in web/ui/package.json — the app's "+
+				"dependencies are bundled, so this manifest is not where their version lives", pkg)
 		}
 	}
 	for _, d := range p.digest {
@@ -23,11 +31,14 @@ func TestPinsParseRealManifest(t *testing.T) {
 	}
 }
 
-// Every file index.html asks for must be pinned, and every pinned file must be
-// something `make vendor` can place — the two lists cannot drift apart.
-func TestEveryAssetThePageUsesIsPinned(t *testing.T) {
-	if _, err := Index("/vendor", "https://example.test/docs"); err != nil {
-		t.Fatalf("rendering failed, so some asset is unpinned: %v", err)
+// Every file a docs page asks for must be pinned: url/sri return an error for anything
+// the manifest does not list, and Execute turns that into a render failure. So rendering
+// all four pages *is* the check. (The app has no pins — it is bundled.)
+func TestEveryAssetThePagesUseIsPinned(t *testing.T) {
+	for _, page := range Pages() {
+		if _, err := page.Build("/vendor", StaticNav); err != nil {
+			t.Errorf("%s: rendering failed, so some asset is unpinned: %v", page.File, err)
+		}
 	}
 }
 
@@ -61,10 +72,14 @@ func TestPinsRejectMalformedManifests(t *testing.T) {
 	}
 }
 
-// A populated web/vendor/ must hold exactly what the manifest pins, or
-// ASSET_BASE=/vendor serves 404s for assets the page believes are local.
+// A populated web/vendor/ must hold exactly what the manifest pins, or a docs page
+// rendered with `-base /vendor` (which is how `make check-ui` measures them, and how a
+// no-egress preview works) links files that are not there.
+//
+// Read from disk, not from an embed: the vendor tree is gitignored, it is only ever used
+// by tooling, and embedding it would put a second copy of every asset in the binary.
 func TestVendorTreeMatchesTheManifest(t *testing.T) {
-	if !HasVendor() {
+	if entries, err := os.ReadDir("vendor"); err != nil || len(entries) < 2 {
 		t.Skip("vendor/ is empty — run `make vendor`")
 	}
 	p, err := parsePins(manifestSrc)
@@ -74,7 +89,7 @@ func TestVendorTreeMatchesTheManifest(t *testing.T) {
 	// keys are "<pkg>@<version>/<path>", which is exactly the layout
 	// `make vendor` writes under web/vendor/
 	for f := range p.digest {
-		if _, err := fs.Stat(FS, "vendor/"+f); err != nil {
+		if _, err := os.Stat(filepath.Join("vendor", filepath.FromSlash(f))); err != nil {
 			t.Errorf("pinned but not vendored: %s", f)
 		}
 	}

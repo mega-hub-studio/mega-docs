@@ -23,3 +23,8 @@ web/vendor/*
 # keeps its corpus in a private repo of its own (see changelog/).
 docs/*
 !docs/.gitkeep
+
+# web/ui is a Vite project: its dependencies are fetched, its *output* is committed.
+# web/dist is deliberately NOT ignored — the binary embeds it, which is what keeps
+# `go build` and a deploy free of Node (CLAUDE.md rule 14).
+web/ui/node_modules/

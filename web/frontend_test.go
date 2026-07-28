@@ -4,218 +4,125 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"testing"
 )
 
-/* ══ The front end's critical rules, as tests ══════════════════════════════════
-   The architecture is four layers (see CLAUDE.md). Three of its rules can be broken
-   without anything failing at build time and without a browser looking wrong until the
-   exact moment someone uses the feature. Those three are checked here, in Go, because
-   this repo already tests its own HTML from Go and because a rule that only a human
-   remembers is not a rule.
+/* ══ The front end's layer rules, as tests ══════════════════════════════════════
+   The app is built by Vite from web/ui (Vue 3.5 SFCs, JavaScript — no TypeScript, by
+   choice). Its architecture is four layers:
 
-   What is deliberately *not* here: a JavaScript linter. Measured on this tree,
-   @antfu/eslint-config pulls 255 packages and 113 MB to report three findings, all of
-   them small (two unused capturing groups and a `parseFloat`), and its best rules —
-   eslint-plugin-vue's reactivity-loss checks — do not fire at all without SFCs. The day
-   TypeScript or .vue files land here, that config is the right call and this comment is
-   the trigger. Until then these three tests carry the load for free.
+     lib/          plumbing: fetch, SSE, storage, markdown, DOM maths. No Vue.
+     composables/  every branch and every piece of reactive state, one concern each
+     components/   *.vue — props, emits, compose, template. No branches in the script.
+     App.vue       wiring: who gets what
+
+   Four rules can be broken without the build failing and without a browser looking wrong
+   until the moment somebody uses the feature, so they are checked here.
+
+   A fifth used to be — "everything a template binds exists behind it" — and it moved to
+   ESLint when the SFCs landed: `vue/no-undef-properties` reads a real Vue parse of a real
+   component, which is strictly better than the regex over module text that approximated
+   it. That is `make lint-js`, and it runs inside `make check` now that there are .vue
+   files for it to be good at. The trigger written in the old comment was exactly this.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// The layers, by file. Everything under web/app is in exactly one of them.
-var (
-	// Plumbing: fetch, SSE, storage, markdown, DOM maths. No Vue, so each of these runs
-	// in a bare console and is testable without mounting anything.
-	plumbing = []string{
-		"chat.js", "qa.js", "upload.js", "answer.js", "diagram.js",
-		"library.js", "session.js", "viewport.js",
-	}
-	// Components: props, emits, compose, return. No branches.
-	components = []string{"ba.js", "tree.js"}
-)
+const uiSrc = "ui/src" // relative to web/, which is this package's directory
 
-// Rule 1 — the plumbing layer may not touch Vue.
+// Rule — the plumbing layer may not touch Vue.
 //
 // It is what makes those files testable in isolation and reusable from anywhere: the
 // moment one of them reaches for a `ref`, it can only run inside a mounted app, and the
-// seam that keeps `app.js` free of AbortControllers and TextDecoders is gone.
+// seam that keeps App.vue free of AbortControllers and TextDecoders is gone.
 func TestPlumbingDoesNotImportVue(t *testing.T) {
-	for _, name := range plumbing {
-		src := readApp(t, name)
-		for _, bad := range []string{"Vue.", "from \"vue\"", "= Vue"} {
-			if strings.Contains(src, bad) {
-				t.Errorf("web/app/%s reaches for Vue (%q). Plumbing must stay framework-free — "+
-					"put the reactive part in a composable under web/app/use/ instead.", name, bad)
-			}
+	files := filesIn(t, filepath.Join(uiSrc, "lib"), ".js")
+	if len(files) < 6 {
+		t.Fatalf("only %d files under %s/lib — has the layer moved?", len(files), uiSrc)
+	}
+	for _, path := range files {
+		if reImportsVue.MatchString(readFile(t, path)) {
+			t.Errorf("%s imports vue. That file is plumbing: it must run in a bare console, "+
+				"which is what makes it testable without mounting the app. Move the reactive "+
+				"part into a composable and leave the mechanism here.", path)
 		}
 	}
 }
 
-// Rule 2 — a composable may not reach for another composable's state.
+// Rule — a composable may not import another composable.
 //
-// What it needs arrives as an argument, so each file can be read alone and the shell
-// stays the only place that knows the whole picture. An import between two of them is how
-// that becomes a graph nobody can hold in their head.
+// Eleven independent files, each readable alone, is the whole point; a graph of them is
+// the thing this replaced. What a composable needs arrives as an argument, and reactive
+// inputs it does not own arrive as getters, so it cannot hold a stale array.
 func TestComposablesDoNotImportEachOther(t *testing.T) {
-	imports := regexp.MustCompile(`(?m)^import .*?from "([^"]+)"`)
-	for _, path := range appFiles(t, "use") {
-		src := readFile(t, path)
-		for _, m := range imports.FindAllStringSubmatch(src, -1) {
-			if strings.Contains(m[1], "use/") || (!strings.HasPrefix(m[1], "../") && strings.HasPrefix(m[1], "./")) {
-				t.Errorf("%s imports %q — a composable takes what it needs as an argument, "+
-					"never another composable's state.", filepath.Base(path), m[1])
+	files := filesIn(t, filepath.Join(uiSrc, "composables"), ".js")
+	if len(files) < 8 {
+		t.Fatalf("only %d composables — has the layer moved?", len(files))
+	}
+	for _, path := range files {
+		for _, m := range reImport.FindAllStringSubmatch(readFile(t, path), -1) {
+			if strings.HasPrefix(m[1], "./") && strings.HasSuffix(m[1], ".js") {
+				t.Errorf("%s imports %s — a composable may not reach for another composable's "+
+					"state. Pass what it needs in (a getter for anything reactive it does not "+
+					"own), or the flat set of files becomes a graph.", path, m[1])
 			}
 		}
 	}
 }
 
-// Rule 3 — a component holds no branches.
+// Rule — a component holds no branches.
 //
-// A component declares what it needs (props, emits), composes the behaviour, and returns
-// it. The first `if` is the signal that a composable is missing: that is exactly how
-// ba.js grew to 179 lines holding the password gate, the import pipeline and the ticket
-// transitions at once.
+// A component is a contract: props in, events out, composables behind it, template. The
+// moment its script grows an `if`, some piece of logic has no name and no home, and the
+// split that made the BA screen 54 lines instead of 179 has started to undo itself.
+// Branching in the *template* is fine and expected — a `v-if` asks a question some
+// composable already answered.
 func TestComponentsHoldNoLogic(t *testing.T) {
-	// Ternaries and optional chaining are not branches in this sense — they read as one
-	// expression. A statement-level branch is.
-	branches := regexp.MustCompile(`\b(if|for|while|switch)\s*\(`)
-	for _, name := range components {
-		src := readApp(t, name)
-		if found := branches.FindAllString(stripComments(src), -1); len(found) > 0 {
-			t.Errorf("web/app/%s contains %v — a component with a branch is a composable "+
-				"nobody wrote yet. Move it to web/app/use/.", name, found)
+	files := filesIn(t, filepath.Join(uiSrc, "components"), ".vue")
+	if len(files) < 4 {
+		t.Fatalf("only %d components — has the layer moved?", len(files))
+	}
+	for _, path := range files {
+		if m := reBranch.FindString(stripComments(scriptOf(t, path))); m != "" {
+			t.Errorf("%s: `%s` in <script setup>. A component with a branch is a composable "+
+				"nobody wrote yet — move it into one and let the template ask the question.",
+				path, strings.TrimSpace(m))
 		}
 	}
 }
 
-// Rule 4 — everything the templates bind must exist somewhere in the code behind them.
+// Rule — the shell is wiring, so it may not reach for transport.
 //
-// This is the one the new architecture made possible: `setup()` returns an object, and a
-// key that is missing from it is `undefined` at render with no error, no warning and no
-// failed build — just a blank where a badge should be. The check is deliberately coarse
-// (does the identifier appear at all in the module graph behind that template?) because a
-// coarse check that runs is worth more than an exact one that needs a JS parser.
-func TestTemplatesBindNothingUndefined(t *testing.T) {
-	html := readFile(t, "index.html")
-	appHTML, baHTML := splitTemplates(t, html)
-
-	for _, c := range []struct {
-		name  string
-		html  string
-		files []string
-	}{
-		// The shell's template is backed by app.js and everything it wires.
-		{"#app", appHTML, append([]string{"app.js"}, base(appFiles(t, "use"))...)},
-		// The BA screen's template is backed by its component and the three behind it.
-		{"#ba-screen", baHTML, []string{"ba.js", "use/gate.js", "use/importer.js", "use/tickets.js", "qa.js"}},
-	} {
-		var behind strings.Builder
-		for _, f := range c.files {
-			behind.WriteString(readApp(t, f))
-		}
-		code := behind.String()
-
-		for _, id := range bound(c.html) {
-			if !strings.Contains(code, id) {
-				t.Errorf("%s binds %q and nothing behind it defines that name — a missing key in a "+
-					"setup() return is undefined at render, with no error anywhere. Files checked: %v",
-					c.name, id, c.files)
-			}
+// App.vue composes composables and mounts components. A `fetch` reached from the shell is
+// the first step back to the 492-line app.js this replaced: state ends up next to
+// transport and neither can be read without the other. viewport.js is the one exception —
+// it binds to the dock element the shell owns — and it is named here rather than left as
+// a surprise.
+func TestTheShellDoesNotReachForTransport(t *testing.T) {
+	const allowed = "./lib/viewport.js"
+	for _, m := range reImport.FindAllStringSubmatch(scriptOf(t, filepath.Join(uiSrc, "App.vue")), -1) {
+		if strings.HasPrefix(m[1], "./lib/") && m[1] != allowed {
+			t.Errorf("App.vue imports %s. The shell wires; transport and rendering belong "+
+				"behind a composable or a component. (%s is the one exception: it binds to "+
+				"the dock element the shell owns.)", m[1], allowed)
 		}
 	}
 }
 
-/* ── helpers ─────────────────────────────────────────────────────────────────── */
+/* ── reading the tree ────────────────────────────────────────────────────────── */
 
-// splitTemplates cuts index.html at the BA screen's <template>, so an identifier is
-// checked against the code that actually backs the markup binding it.
-func splitTemplates(t *testing.T, html string) (appHTML, baHTML string) {
+func filesIn(t *testing.T, dir, ext string) []string {
 	t.Helper()
-	const marker = `<template id="ba-screen">`
-	i := strings.Index(html, marker)
-	if i < 0 {
-		t.Fatalf("index.html no longer contains %s — this test's assumption about where the "+
-			"BA markup lives is stale, not the code", marker)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading %s: %v", dir, err)
 	}
-	start := strings.Index(html, `<div id="app"`)
-	if start < 0 {
-		t.Fatal(`index.html no longer contains <div id="app"`)
-	}
-	return html[start:i], html[i:]
-}
-
-var (
-	// Vue bindings: a mustache, or an attribute that carries an expression.
-	mustache = regexp.MustCompile(`\{\{([^}]+)\}\}`)
-	bindAttr = regexp.MustCompile(`(?:@[\w:.-]+|:[\w-]+|v-(?:if|else-if|for|show|html|model)(?::[\w-]+)?)="([^"]*)"`)
-	word     = regexp.MustCompile(`[A-Za-z_$][\w$]*`)
-	// v-for="x in xs" and v-for="(x, i) in xs" declare their own names.
-	vFor = regexp.MustCompile(`v-for="\(?([^)]*?)\)? in `)
-	// String literals in an expression. Single quotes inside an attribute value, and
-	// double quotes inside a mustache — where they are legal, because a mustache sits in
-	// text rather than in an attribute.
-	quoted = regexp.MustCompile(`'[^']*'|"[^"]*"`)
-)
-
-// bound lists the identifiers a template expects the code behind it to provide: the head
-// of every expression, minus the names the template declares itself and the ones the
-// language provides.
-func bound(html string) []string {
-	locals := map[string]bool{}
-	for _, m := range vFor.FindAllStringSubmatch(html, -1) {
-		for _, name := range word.FindAllString(m[1], -1) {
-			locals[name] = true
-		}
-	}
-
-	seen := map[string]bool{}
 	var out []string
-	add := func(expr string) {
-		// A string literal is not a binding. `:class="t.ok ? 'tip' : 'memo'"` names two
-		// CSS classes, not two things setup() must return.
-		expr = quoted.ReplaceAllString(expr, " ")
-		// Position matters: only the *head* of a member expression is the app's to define.
-		// In `statusLine.tokens` and `$event.dataTransfer.files`, everything after a dot
-		// belongs to the object, not to setup().
-		for _, at := range word.FindAllStringIndex(expr, -1) {
-			if at[0] > 0 && expr[at[0]-1] == '.' {
-				continue
-			}
-			name := expr[at[0]:at[1]]
-			if locals[name] || jsGlobals[name] || seen[name] {
-				continue
-			}
-			seen[name] = true
-			out = append(out, name)
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ext) {
+			out = append(out, filepath.Join(dir, e.Name()))
 		}
 	}
-	for _, m := range mustache.FindAllStringSubmatch(html, -1) {
-		add(m[1])
-	}
-	for _, m := range bindAttr.FindAllStringSubmatch(html, -1) {
-		add(m[1])
-	}
-	sort.Strings(out)
 	return out
-}
-
-// jsGlobals is what the language and the DOM provide, plus the handler argument Vue
-// passes. Nothing here has to come from setup().
-var jsGlobals = map[string]bool{
-	"true": true, "false": true, "null": true, "undefined": true, "NaN": true,
-	"String": true, "Number": true, "Boolean": true, "Object": true, "Array": true,
-	"JSON": true, "Math": true, "Date": true, "event": true,
-	"length": true, "trim": true, "toLocaleString": true, "target": true, "detail": true,
-	"value": true, "open": true, "files": true, "key": true, "in": true, "of": true,
-	// Vue's own instance properties, available to every template without being returned.
-	"$emit": true, "$event": true, "$refs": true, "emit": true,
-}
-
-func readApp(t *testing.T, name string) string {
-	t.Helper()
-	return readFile(t, filepath.Join("app", name))
 }
 
 func readFile(t *testing.T, path string) string {
@@ -227,48 +134,31 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
-// appFiles lists the .js files in web/app/<dir>, so a new composable is covered by these
-// rules the moment it exists rather than when someone remembers to add it here.
-func appFiles(t *testing.T, dir string) []string {
+// scriptOf returns an SFC's <script setup> body, or the whole file for a plain module.
+func scriptOf(t *testing.T, path string) string {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join("app", dir, "*.js"))
-	if err != nil || len(paths) == 0 {
-		t.Fatalf("no .js files under app/%s (%v)", dir, err)
+	src := readFile(t, path)
+	if !strings.HasSuffix(path, ".vue") {
+		return src
 	}
-	sort.Strings(paths)
-	return paths
+	m := reScript.FindStringSubmatch(src)
+	if m == nil {
+		t.Fatalf("%s has no <script setup> block", path)
+	}
+	return m[1]
 }
 
-func base(paths []string) []string {
-	out := make([]string, 0, len(paths))
-	for _, p := range paths {
-		out = append(out, filepath.Join("use", filepath.Base(p)))
-	}
-	return out
-}
-
-// stripComments removes // and /* */ so a rule is not tripped by the word "if" in a
-// sentence explaining why there is no if.
+// stripComments removes /* … */ and // … , so the word "if" inside a comment — and these
+// files carry a lot of prose — cannot read as a branch.
 func stripComments(src string) string {
-	var b strings.Builder
-	for _, line := range strings.Split(src, "\n") {
-		if i := strings.Index(line, "//"); i >= 0 {
-			line = line[:i]
-		}
-		b.WriteString(line)
-		b.WriteString("\n")
-	}
-	out := b.String()
-	for {
-		i := strings.Index(out, "/*")
-		if i < 0 {
-			break
-		}
-		j := strings.Index(out[i:], "*/")
-		if j < 0 {
-			break
-		}
-		out = out[:i] + out[i+j+2:]
-	}
-	return out
+	return reLineComment.ReplaceAllString(reBlockComment.ReplaceAllString(src, ""), "")
 }
+
+var (
+	reImportsVue   = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+"vue"`)
+	reImport       = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?"([^"]+)"`)
+	reScript       = regexp.MustCompile(`(?s)<script setup>(.*?)</script>`)
+	reBranch       = regexp.MustCompile(`(?m)^\s*(?:if|for|while|switch)\s*\(`)
+	reBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	reLineComment  = regexp.MustCompile(`(?m)//.*$`)
+)

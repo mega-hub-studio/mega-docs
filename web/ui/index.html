@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- viewport-fit=cover makes env(safe-area-inset-*) non-zero, so the fixed prompt can
+     clear the iOS home indicator; interactive-widget=resizes-content lets the on-screen
+     keyboard shrink the layout instead of covering it (Android/Chrome — iOS is handled
+     from visualViewport in src/lib/viewport.js). Pinch-zoom stays enabled: no
+     maximum-scale / user-scalable=no, per WCAG 1.4.4. -->
+<meta name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="theme-color" content="#07071c" />
+<meta name="color-scheme" content="dark" />
+<title>mega-docs</title>
+<!-- the name the home-screen shortcut shows; the guide tells people to add one -->
+<meta name="apple-mobile-web-app-title" content="mega-docs">
+<!-- Inline, so there is no second request and no 404 in every console. It is the *same*
+     mark as the header's — 8bit-nes's `layers` glyph, copied verbatim from the icon set
+     rather than redrawn, so the tab and the bar cannot drift apart. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2307071c'/><g fill='%23c2c6f3'><path d='M8 1.5 14.5 5 8 8.5 1.5 5z'/><path fill='none' stroke='%23c2c6f3' stroke-width='1.3' d='M1.5 8 8 11.5 14.5 8 M1.5 11 8 14.5 14.5 11'/></g></svg>">
+<!-- Nothing else here loads anything. Vue, the design system, marked, DOMPurify and the
+     app itself are one module graph, bundled and content-hashed by Vite and served from
+     this binary — no CDN, no version in this file, and no `integrity` attribute, because
+     same-origin bytes cannot be pinned to themselves. (The published *docs* pages still
+     use the CDN with SRI: they are static files with no build step. web/vendor.sha384 is
+     theirs now.)
+     Fonts are discovered from the design system's own stylesheet one hop after it loads.
+     A preload here would have to name a hashed filename this file cannot know. -->
+</head>
+<body>
+<!-- No .scanlines wrapper: its ::after is a fixed, full-viewport striped layer over
+     everything, and DESIGN.md is explicit that reading text sits on a *solid* ground,
+     never a scanline layer. The CRT read comes from the chrome instead. -->
+<div id="app"></div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

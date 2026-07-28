@@ -1,0 +1,27 @@
+{
+  "name": "mega-docs-ui",
+  "private": true,
+  "type": "module",
+  "description": "The chat app's front end. JavaScript only — no TypeScript, by choice: one maintainer, and the type surface here is three API shapes already described in web/spec.json.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "8bit-nes": "0.7.2",
+    "dompurify": "3.4.12",
+    "marked": "18.0.7",
+    "mermaid": "11.16.0",
+    "vue": "3.5.40"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^6.2.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-format": "^1.0.2",
+    "vite": "^8.0.0"
+  }
+}

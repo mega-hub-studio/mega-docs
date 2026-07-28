@@ -120,36 +120,34 @@ internal/db       SQLite: sqlite-vec + FTS5, hybrid search with RRF,
                   tickets (the QA state machine) and the answer cache
 internal/config   env → Config, with defaults
 
-web/              index.html · docs.html · ba.html · dev.html · deploy.html
+web/              docs.html · ba.html · dev.html · deploy.html — the guide
                   (Go templates, shared head in docsbase.html) + embed.go + assets.go
                   *.mmd + *.svg  diagram sources and their committed renders
-web/app/          the front end — Vue 3.5 Composition API, native ES modules,
-                  no build step
-                  app.js      wiring: composables in, components registered, mount
-                  ba.js       the BA screen (in-DOM template, #ba-screen)
-                  tree.js     <nes-tree> as the corpus + scope picker
-                  chat.js · qa.js · upload.js      transport (SSE, tickets, import)
-                  answer.js · diagram.js           rendering (markdown, mermaid)
-                  library.js · session.js · viewport.js   corpus, storage, keyboard
-web/app/use/      one composable per concern, and nothing else in them
+                  spec.go        the pages' annotations → the published spec.json
+web/dist/         the built app: committed, embedded, served. `make ui` regenerates it
+web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vite
+                  index.html · vite.config.js · package.json · eslint.config.js
+                  src/main.js       createApp + mount, and the one design-system import
+                  src/App.vue       wiring: composables in, components placed
+                  src/components/   ChatTurn · EmptyScreen · ScopePicker · StatusLine
+                                    BaScreen · ImportPanel · TicketCard · CorpusTree
+                  src/lib/          plumbing — no Vue import anywhere in here
+                                    chat.js · qa.js · upload.js   transport (SSE, tickets, import)
+                                    answer.js · diagram.js        rendering (markdown, mermaid)
+                                    library.js · session.js · viewport.js  corpus, storage, keyboard
+                  src/styles.css    layout only; 8bit-nes owns the components
+web/ui/src/composables/   one composable per concern, and nothing else in them
                   conversation.js  turns, ask/regenerate/stop/reset, persistence
                   corpus.js        what is indexed + the starters derived from it
                   scope.js         which folder answers
                   qaloop.js        the ticket queue and the free-to-replay history
-                  runtime.js       online · writes · model and prices
+                  runtime.js       online · writes · model, prices and the guide's address
                   statusline.js    the bottom strip, as one computed object
                   diagrams.js      the lazy renderer and the zoom viewer
                   gate.js          the BA password, and what a refused write means
-                  importer.js      files, real progress, partial success
-                  tickets.js       draft · confirm · reject, and the drafts being typed
-                  nestree.js       corpus paths → nodes, and driving <nes-tree>
-                  toast.js         the injected design-system helper, with a no-op default
-web/howitworks.mmd  the "how it works" diagram, authored as mermaid
-web/howitworks.svg  …rendered once by `make diagram`; mermaid never ships
-web/llms.go       generates /llms.txt from the rendered pages (llmstxt.org)
-web/vendor.sha384 the one pin list: versions + digests, for the page and `make vendor`
-web/vendor/       `make vendor` output (gitignored)
-```
+                  importer.js      files in, progress, per-file results
+                  tickets.js       four states, one path, one draft per ticket
+                  nestree.js       the <nes-tree> payload and its rebuild rules
 
 **Where do I add…?**
 
@@ -161,20 +159,20 @@ web/vendor/       `make vendor` output (gitignored)
 | how a document is cut into sections | `internal/rag/chunk.go` | small sections merge, oversized ones split by paragraph then by line; **changing it needs a re-ingest** |
 | a new provider | `internal/ai` | one client, one seam; probe it with `make live` |
 | a provider quirk to survive | `internal/aitest` | fault injection lives with the fake, not in each test |
-| a UI action | `web/app/app.js` | it's wiring and intent; state lives in a composable, plumbing in its own module |
-| a new piece of shell state | a file in `web/app/use/` | one concern per composable — the shell used to be one object where the import bar could collide with the chat thread |
-| a fetch/stream concern | `web/app/chat.js` | the app must not learn about SSE |
-| anything about the corpus | `web/app/library.js` | one place decides ready / empty / unavailable |
-| what survives a reload | `web/app/session.js` | storage, quota and schema drift, hidden |
+| a UI action | `web/ui/src/App.vue` | it's wiring and intent; state lives in a composable, plumbing in its own module |
+| a new piece of shell state | a file in `web/ui/src/composables/` | one concern per composable — the shell used to be one object where the import bar could collide with the chat thread |
+| a fetch/stream concern | `web/ui/src/lib/chat.js` | the app must not learn about SSE |
+| anything about the corpus | `web/ui/src/lib/library.js` | one place decides ready / empty / unavailable |
+| what survives a reload | `web/ui/src/lib/session.js` | storage, quota and schema drift, hidden |
 | a ticket state or transition | `internal/db/tickets.go` | one table, one state machine, all four states reachable |
 | anything about answer cost | `internal/db/cache.go` + `rag.Answer` | one cache, keyed on question + scope, under a signature of corpus + chat model + prompt |
-| retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `web/app/tree.js` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
-| a BA-screen behaviour | `web/app/use/gate.js`, `use/importer.js` or `use/tickets.js` | the screen is headless — 54 lines of props, emits and composition; the behaviour is in one of these three |
-| a chat-screen behaviour | `web/app/use/conversation.js` | the thread owns ask/stream/stop/reset; `app.js` only wires it |
-| document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/app/upload.js` | path validation next to the writer, transport next to the form |
-| markdown / citation rendering | `web/app/answer.js` | sanitising is one file's job |
-| a mobile viewport quirk | `web/app/viewport.js` | keyboard/dock/scroll maths, hidden |
-| a layout rule | `web/app/styles.css` | 8bit-nes owns components; this owns layout |
+| retrieval scope (ask inside a folder) | `db.Search`'s scope filter + `rag.Scope` + `components/CorpusTree.vue` | filtered before both retrievers rank, canonicalised in one place because it is half the cache key |
+| a BA-screen behaviour | `web/ui/src/composables/gate.js`, `importer.js` or `tickets.js` | the screen is headless — 54 lines of props, emits and composition; the behaviour is in one of these three |
+| a chat-screen behaviour | `web/ui/src/composables/conversation.js` | the thread owns ask/stream/stop/reset; `App.vue` only wires it |
+| document import | `internal/rag/upload.go` + `internal/server/documents.go` + `web/ui/src/lib/upload.js` | path validation next to the writer, transport next to the form |
+| markdown / citation rendering | `web/ui/src/lib/answer.js` | sanitising is one file's job |
+| a mobile viewport quirk | `web/ui/src/lib/viewport.js` | keyboard/dock/scroll maths, hidden |
+| a layout rule | `web/ui/src/styles.css` | 8bit-nes owns components; this owns layout |
 | a layout rule on the **docs** pages | `web/docsbase.html` | one `--flow` gap for every block; run `make check-ui` after |
 | a diagram | `web/*.mmd` + `make diagram` | mermaid is the source; the committed SVG is what ships |
 | a feature | its page `<section>` **first**, with `data-feature`/`data-api`/`data-env`/`data-test` | `make check` is red until those names exist — the docs are the input, not the write-up |
@@ -338,8 +336,8 @@ sudo systemctl restart knowledge
 curl -s localhost:8080/api/health       # {"ok":true,"writes":true} — writes:true = BA_PASS is set
 ```
 
-With `ASSET_BASE=/vendor`, run `make vendor` before `make build`: the vendored assets
-are gitignored.
+No Node on the host and none needed: the front end is built by `make ui` into
+`web/dist`, which is committed, and `make build` embeds whatever is there.
 
 **One upgrade needs a re-index.** Document paths are now stored relative to
 `CORPUS_DIR`. An index built before that stored them differently, so a re-ingest would
@@ -418,7 +416,7 @@ in someone's browser. 8-BIT NES publishes its own digests at
 > underline and only the 12×12 dot is hittable.
 >
 > It also keeps 0.6.1's two touch fixes (send button 44px, chat textarea 16px), so
-> `web/app/styles.css` owns no `(pointer: coarse)` CSS either.
+> `web/ui/src/styles.css` owns no `(pointer: coarse)` CSS either.
 
 > **On the diagram.** The "how it works" picture is a mermaid graph, but mermaid
 > never reaches the browser: 8bit-nes deliberately does not bundle it (~800KB
@@ -436,18 +434,17 @@ in someone's browser. 8-BIT NES publishes its own digests at
 
 ### Air-gapped / no egress
 
-Serve every asset from the binary instead:
+Nothing to do: the app fetches nothing at runtime. Vue, the design system, marked,
+DOMPurify and mermaid are npm dependencies of `web/ui`, bundled by Vite into `web/dist`
+and served from the binary — content-hashed, so `/assets/` goes out `Cache-Control:
+immutable`. Even the diagram renderer is a lazy *chunk* rather than a CDN fetch: it loads
+the first time an answer actually contains a diagram, from the same origin.
+
+`make vendor` still exists, and it is the **guide's**: four static pages on GitHub Pages
+with no build step, loading the design system from jsDelivr with an `integrity` attribute.
+Vendoring lets you render and read them with no egress at all:
 
 ```bash
-make vendor      # fetch + sha384-verify into web/vendor/ (npm registry, not the CDN)
-make build       # whatever is in web/vendor/ gets embedded
-ASSET_BASE=/vendor ./bin/knowledge
-```
-
-`ASSET_BASE` is the only switch — the asset paths in `web/index.html` mirror the
-npm layout, so the same URLs work against a CDN or against `/vendor` (served with
-`Cache-Control: immutable`, since every path carries its version). Vendored files
-are gitignored; run `make vendor` on a machine that *does* have egress, then ship
-the binary. To upgrade a dependency, bump the version and digest in
-`web/vendor.sha384` and `web/index.html`, then re-run `make vendor`.
+make vendor                                       # fetch + sha384-verify into web/vendor/
+go run ./cmd/rendocs -d /tmp/site -base /vendor   # the guide, pointing at local copies
 ```

@@ -2,7 +2,16 @@
 TAGS := sqlite_fts5
 export CGO_ENABLED := 1
 
-.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui
+# The Go packages, spelled out rather than `./...`.
+#
+# web/ui is a Vite project, and npm installs whatever its dependencies ship — one of them
+# (flatted) ships a Go package. `./...` walks into web/ui/node_modules and hands the
+# linter somebody else's code: seven findings that are not this repository's, in a gate
+# whose whole value is that a finding means something. The Go tool has no ignore for
+# directories, so the pattern is the fix.
+PKGS := ./cmd/... ./internal/... ./web
+
+.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui ui ui-dev
 
 deps:
 	go mod tidy
@@ -10,8 +19,9 @@ deps:
 # Everything CI should gate on: formatting, vet, tests, linters.
 check: test secrets
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed in:"; gofmt -l .; exit 1; }
-	go vet -tags "$(TAGS)" ./...
+	go vet -tags "$(TAGS)" $(PKGS)
 	@$(MAKE) --no-print-directory lint
+	@$(MAKE) --no-print-directory lint-js
 	@$(MAKE) --no-print-directory dead
 
 # golangci-lint, configured by .golangci.yml — which explains every linter it turns off,
@@ -24,40 +34,47 @@ check: test secrets
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint version | head -1; \
-		golangci-lint run ./...; \
+		golangci-lint run $(PKGS); \
 	else echo "  skipped golangci-lint (go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
 
-# The JavaScript net, on demand and with nothing committed for it.
-#
-# eslint + @antfu/eslint-config are installed into .cache/ — the same throwaway tool cache
-# `make diagram` uses for mermaid — because they are 255 packages the product does not
-# need, and this repo has no package.json for exactly that reason. The config itself is
-# tracked (eslint.config.mjs) and explains what it turns off.
-#
-# Not part of `make check`: the architecture rules that catch this codebase's real mistakes
-# are in web/frontend_test.go and cost nothing. See the note at the top of eslint.config.mjs.
-JS_CACHE := .cache/eslint
+# ── the app's front end ───────────────────────────────────────────────────────
+# web/ui is a Vite project (Vue 3.5 SFCs, JavaScript). Its output, web/dist, is committed
+# and embedded by the binary — so `go build`, `go install` and `git pull && make build` on
+# the host all keep working without Node. That is the whole reason a build artefact is in
+# git, and TestBuiltUIMatchesItsSources is what stops it going stale.
+ui:
+	@cd web/ui && \
+		{ [ -d node_modules ] || npm ci --no-audit --no-fund; } && \
+		npm run build
+
+# HMR against the real engine: serves the UI on :5173 and proxies /api to :8080, so run
+# `make server` in another shell first.
+ui-dev:
+	@cd web/ui && npm run dev
+
 # The browser check: what a screenshot shows, measured. Not in `check` — it needs a
 # browser, and this product needs no Node at all (see CLAUDE.md rule 14). Run it after
 # touching a docs page, a recipe or docsbase.html.
 check-ui:
 	@./scripts/check-docs-ui.sh
 
+# ESLint over web/ui — and it is in `check`, unlike before. What changed is that there are
+# .vue files now: eslint-plugin-vue's `vue/no-undef-properties` reads a real parse of a
+# real component and catches a template binding with nothing behind it, which is the rule a
+# Go regex used to approximate. It runs from the project's own devDependencies (installed
+# by `make ui`), so there is no second eslint cache to keep in step.
+#
+# Skipped, loudly, when node_modules is absent: a machine that only builds Go still has a
+# committed bundle and does not need a linter for it.
 lint-js:
-	@command -v npm >/dev/null 2>&1 || { echo "  skipped lint-js (needs npm; the product does not)"; exit 0; }
-	@mkdir -p $(JS_CACHE)
-	@cp eslint.config.mjs $(JS_CACHE)/
-	@[ -d $(JS_CACHE)/node_modules ] || { \
-		printf '{ "name":"eslint-cache","private":true,"type":"module" }\n' > $(JS_CACHE)/package.json; \
-		echo "  installing eslint into $(JS_CACHE) (once)"; \
-		(cd $(JS_CACHE) && npm i -D --silent eslint@9 @antfu/eslint-config@latest); }
-	$(JS_CACHE)/node_modules/.bin/eslint --config $(JS_CACHE)/eslint.config.mjs web/app
+	@[ -d web/ui/node_modules ] || { echo "  skipped lint-js (run \`make ui\` to install web/ui)"; exit 0; }
+	@cd web/ui && npm run --silent lint
 
 # Same linters, applying the fixes they know how to make. Read the diff: the formatters
 # are opinionated and one of them (gofumpt) is turned off here for a reason .golangci.yml
 # spells out.
 lint-fix:
-	golangci-lint run --fix ./...
+	golangci-lint run --fix $(PKGS)
 
 # What no linter finds: a function no binary can reach. staticcheck's unused only sees
 # within a package, and it now runs inside `lint` anyway; deadcode does whole-program
@@ -77,7 +94,7 @@ secrets:
 		|| { echo "^ that looks like a credential in a tracked file"; exit 1; }
 
 test:
-	go test -tags "$(TAGS)" ./...
+	go test -tags "$(TAGS)" $(PKGS)
 
 # Run the chat server (http://localhost:8080)
 server:

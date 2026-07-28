@@ -2,37 +2,127 @@ package web
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 )
 
-// Versions are read from the manifest, not written here: this asserts the wiring,
-// so bumping a dependency stays a one-line change in web/vendor.sha384.
-func TestIndexSubstitutesRemoteAssetBase(t *testing.T) {
-	out, err := Index("https://cdn.jsdelivr.net/npm", "https://example.test/docs")
+// ── the built app ─────────────────────────────────────────────────────────────
+// web/dist is produced by Vite (`make ui`) and committed, so the binary embeds a build
+// artefact. That buys `go build` with no Node, and it costs the one failure mode of any
+// committed generated file: going stale. These four tests are that trade, paid.
+
+// TestBuiltAppIsEmbedded: a missing embed would otherwise show up as a blank page at
+// runtime, on the deployed instance, with nothing in the log.
+func TestBuiltAppIsEmbedded(t *testing.T) {
+	index, err := Index()
+	if err != nil {
+		t.Fatalf("no built app embedded: %v", err)
+	}
+	page := string(index)
+	if !strings.Contains(page, `<div id="app">`) {
+		t.Error("index.html has no mount point")
+	}
+	// Vite writes the entry as a module script with a hashed name. Both halves matter:
+	// module because the app is ESM, hashed because /assets/ is served immutable.
+	m := regexp.MustCompile(`<script type="module"[^>]*src="(/assets/[^"]+\.js)"`).FindStringSubmatch(page)
+	if m == nil {
+		t.Fatal("index.html does not load a hashed module from /assets/")
+	}
+	for _, want := range []string{m[1], "build.json"} {
+		if _, err := fs.Stat(FS, strings.TrimPrefix(want, "/")); err != nil {
+			t.Errorf("index.html names %s but it is not in the embedded build: %v", want, err)
+		}
+	}
+	// Nothing may load from a CDN any more: the bundle is same-origin, and an
+	// integrity attribute on a same-origin file pins bytes to themselves.
+	if strings.Contains(page, "cdn.jsdelivr.net") || strings.Contains(page, "integrity=") {
+		t.Error("the built page reaches for a CDN — the app is bundled and self-hosted")
+	}
+}
+
+// TestBuiltUIMatchesItsSources is the freshness check. Vite stamps dist/build.json with a
+// hash of everything it built from; this recomputes it from the tree. It fails when
+// somebody edits an SFC and forgets `make ui` — which is exactly how a committed bundle
+// rots, silently, while the binary keeps serving last week's app.
+func TestBuiltUIMatchesItsSources(t *testing.T) {
+	build, err := BuildInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := uiSourceHash(t)
+	if got != build.Sources {
+		t.Errorf("web/dist was built from %s but web/ui is now %s — run `make ui`",
+			build.Sources[:8], got[:8])
+	}
+}
+
+// uiSourceHash mirrors web/ui/scripts/stamp.js exactly: the same files, the same order,
+// path then bytes, each NUL-terminated. Two implementations of one hash is the cost of
+// checking a JS build from Go without running Node — and the reason the algorithm is
+// three lines rather than clever.
+func uiSourceHash(t *testing.T) string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(filepath.Join("ui", "src"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking web/ui/src: %v", err)
+	}
+	for _, extra := range []string{"index.html", "vite.config.js", "package-lock.json"} {
+		files = append(files, filepath.Join("ui", extra))
+	}
+	sort.Strings(files)
+
+	h := sha256.New()
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		rel, err := filepath.Rel("ui", f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.Write([]byte(filepath.ToSlash(rel)))
+		h.Write([]byte{0})
+		h.Write(b)
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))[:32]
+}
+
+// The pins are the *docs pages* now — the app has no CDN. Versions are read from the
+// manifest rather than written here, so bumping one stays a one-line change.
+func TestDocsPagesLoadPinnedAssetsFromTheCDN(t *testing.T) {
+	out, err := Docs("https://cdn.jsdelivr.net/npm", StaticNav)
 	if err != nil {
 		t.Fatal(err)
 	}
 	page := string(out)
 	pin := pinnedSpecs(t)
-
 	for _, want := range []string{
 		`href="https://cdn.jsdelivr.net/npm/` + pin["8bit-nes"] + `/all.min.css"`,
-		`src="https://cdn.jsdelivr.net/npm/` + pin["vue"] + `/dist/vue.global.prod.js"`,
 		// a remote base is worth one warmed connection
 		`<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>`,
+		`integrity="` + pinnedDigest(t, "8bit-nes", "all.min.css") + `"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("missing %q", want)
 		}
-	}
-	// and the digest must travel with it
-	if !strings.Contains(page, `integrity="`+pinnedDigest(t, "8bit-nes", "all.min.css")+`"`) {
-		t.Error("the stylesheet went out without its manifest digest")
 	}
 }
 
@@ -56,88 +146,6 @@ func pinnedDigest(t *testing.T, pkg, file string) string {
 		t.Fatal(err)
 	}
 	return d
-}
-
-func TestIndexSubstitutesVendorBaseAndDropsPreconnect(t *testing.T) {
-	out, err := Index("/vendor/", "https://example.test/docs") // trailing slash must not double up
-	if err != nil {
-		t.Fatal(err)
-	}
-	page := string(out)
-
-	if !strings.Contains(page, `href="/vendor/`+pinnedSpecs(t)["8bit-nes"]+`/all.min.css"`) {
-		t.Error("vendor path not substituted (or slash doubled)")
-	}
-	if strings.Contains(page, "preconnect") {
-		t.Error("preconnect emitted for a same-origin base")
-	}
-	if strings.Contains(page, "cdn.jsdelivr.net") {
-		t.Error("a CDN URL survived into the vendored page")
-	}
-}
-
-// The page is a Vue template. Go's delimiters are <% %> precisely so that Vue's
-// {{ }} passes through untouched — if this ever regresses, the UI renders literal
-// mustaches or the template fails to parse.
-func TestIndexLeavesVueInterpolationAlone(t *testing.T) {
-	out, err := Index("/vendor", "https://example.test/docs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	page := string(out)
-
-	for _, want := range []string{"{{ t.q }}", "{{ c.n }}"} {
-		if !strings.Contains(page, want) {
-			t.Errorf("Vue interpolation %q did not survive rendering", want)
-		}
-	}
-	if strings.Contains(page, "<%") || strings.Contains(page, "%>") {
-		t.Error("an unrendered Go action was left in the output")
-	}
-}
-
-func TestIndexRejectsEmptyBase(t *testing.T) {
-	if _, err := Index("", "https://example.test/docs"); err == nil {
-		t.Error("want an error for an empty asset base")
-	}
-}
-
-// The app shell must actually be in the binary — a missing embed would only show
-// up as a blank page at runtime.
-func TestAppShellIsEmbedded(t *testing.T) {
-	for _, name := range []string{
-		"app/styles.css", "app/app.js", "app/chat.js", "app/answer.js", "app/viewport.js",
-	} {
-		b, err := fs.ReadFile(FS, name)
-		if err != nil {
-			t.Errorf("%s not embedded: %v", name, err)
-			continue
-		}
-		if len(b) == 0 {
-			t.Errorf("%s is empty", name)
-		}
-	}
-}
-
-// index.html references the shell by path; keep the two in step.
-func TestIndexReferencesTheEmbeddedShell(t *testing.T) {
-	out, err := Index("/vendor", "https://example.test/docs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{`href="/app/styles.css"`, `"/app/app.js"`} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("index.html does not reference %s", want)
-		}
-	}
-}
-
-func TestHasVendorReportsEmptyTree(t *testing.T) {
-	// A clean checkout has only web/vendor/.gitkeep, so this must be false —
-	// that's what makes the startup warning meaningful.
-	if HasVendor() {
-		t.Skip("vendor/ is populated in this working tree (make vendor has run)")
-	}
 }
 
 func TestDocsRendersForBothAssetBases(t *testing.T) {
@@ -273,7 +281,7 @@ func TestBothGuidePagesRenderAndCrossLink(t *testing.T) {
 func TestThemeColorMatchesTheBarToken(t *testing.T) {
 	// The path is built from the manifest, not written here, so bumping the design
 	// system stays a one-line change in web/vendor.sha384.
-	css, err := fs.ReadFile(FS, "vendor/"+pinnedSpecs(t)["8bit-nes"]+"/all.min.css")
+	css, err := os.ReadFile(filepath.Join("vendor", pinnedSpecs(t)["8bit-nes"], "all.min.css"))
 	if err != nil {
 		t.Skip("8bit-nes stylesheet not vendored — run `make vendor` to enable this check")
 	}
@@ -283,9 +291,14 @@ func TestThemeColorMatchesTheBarToken(t *testing.T) {
 	}
 	token := strings.ToLower(string(m[1]))
 
-	// .bar is painted with --bg in docsbase.html; index.html carries its own copy of
-	// the same bar, so both templates are checked.
-	for name, src := range map[string]string{"docsbase.html": docsBaseTmpl, "index.html": indexTmpl} {
+	// .bar is painted with --bg in docsbase.html (the docs pages) and in the app's own
+	// index.html, which Vite copies through verbatim — so both are checked, one from a
+	// template and one from the built output.
+	app, err := Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, src := range map[string]string{"docsbase.html": docsBaseTmpl, "dist/index.html": string(app)} {
 		got := regexp.MustCompile(`name="theme-color" content="(#[0-9a-fA-F]{3,8})"`).FindStringSubmatch(src)
 		if got == nil {
 			t.Errorf("%s has no theme-color meta", name)

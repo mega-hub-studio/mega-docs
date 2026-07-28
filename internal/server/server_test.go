@@ -40,9 +40,11 @@ func newTestServer(a Answerer) http.Handler {
 	return New(Deps{
 		Answers: a,
 		Index:   []byte("<html>index</html>"),
+		// The shape Vite emits: every name carries a content hash, which is what makes
+		// the immutable cache below safe.
 		Assets: fstest.MapFS{
-			"app/app.js":                    {Data: []byte("export const x = 1\n")},
-			"vendor/vue@3.5.40/dist/vue.js": {Data: []byte("/* vue */\n")},
+			"assets/index-A1b2C3d4.js":  {Data: []byte("export const x = 1\n")},
+			"assets/index-E5f6G7h8.css": {Data: []byte(":root{}\n")},
 		},
 	})
 }
@@ -87,31 +89,30 @@ func TestIndexIsRevalidatedAndCachesWithETag(t *testing.T) {
 	}
 }
 
-func TestAppTreeRevalidatesAndVendorIsImmutable(t *testing.T) {
+func TestTheBuiltBundleIsImmutable(t *testing.T) {
 	h := newTestServer(&fakeAnswers{})
 
-	app := do(t, h, "GET", "/app/app.js", "", nil)
-	if app.Code != 200 {
-		t.Fatalf("app.js = %d", app.Code)
+	js := do(t, h, "GET", "/assets/index-A1b2C3d4.js", "", nil)
+	if js.Code != 200 {
+		t.Fatalf("bundle = %d", js.Code)
 	}
-	if got := app.Header().Get("Cache-Control"); got != "no-cache" {
-		t.Errorf("app Cache-Control = %q, want no-cache", got)
-	}
-	if app.Header().Get("ETag") == "" {
-		t.Error("app tree served without an ETag — every load would re-download it")
+	// Every asset name carries a content hash, so a changed file is a changed URL and a
+	// year of caching is safe. index.html is revalidated (the test above), which is what
+	// makes the new names reachable.
+	if got := js.Header().Get("Cache-Control"); !strings.Contains(got, "immutable") {
+		t.Errorf("bundle Cache-Control = %q, want immutable", got)
 	}
 	// Module scripts are rejected unless the MIME type is JavaScript.
-	if ct := app.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
-		t.Errorf("app.js Content-Type = %q, want a JavaScript type", ct)
+	if ct := js.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
+		t.Errorf("bundle Content-Type = %q, want a JavaScript type", ct)
 	}
-
-	// Vendored paths carry their version, so they can be cached forever.
-	v := do(t, h, "GET", "/vendor/vue@3.5.40/dist/vue.js", "", nil)
-	if v.Code != 200 {
-		t.Fatalf("vendor = %d", v.Code)
+	if css := do(t, h, "GET", "/assets/index-E5f6G7h8.css", "", nil); css.Code != 200 {
+		t.Errorf("stylesheet = %d", css.Code)
 	}
-	if got := v.Header().Get("Cache-Control"); !strings.Contains(got, "immutable") {
-		t.Errorf("vendor Cache-Control = %q, want immutable", got)
+	// The old app tree is gone: a stale bookmark or a cached page must 404 rather than
+	// silently serve something.
+	if old := do(t, h, "GET", "/app/app.js", "", nil); old.Code != 404 {
+		t.Errorf("/app/app.js = %d, want 404 — that tree no longer exists", old.Code)
 	}
 }
 
@@ -233,14 +234,14 @@ func authServer(t *testing.T, a Auth) http.Handler {
 	return New(Deps{
 		Answers: &fakeAnswers{corpus: db.Corpus{Documents: []db.Document{}}},
 		Index:   []byte("<html>index</html>"),
-		Assets:  fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
+		Assets:  fstest.MapFS{"assets/index-A1b2C3d4.js": {Data: []byte("export const x = 1\n")}},
 		Auth:    a,
 	})
 }
 
 func TestNoAuthConfiguredLeavesEverythingOpen(t *testing.T) {
 	h := authServer(t, Auth{})
-	for _, path := range []string{"/", "/api/health", "/api/corpus", "/app/app.js"} {
+	for _, path := range []string{"/", "/api/health", "/api/corpus", "/assets/index-A1b2C3d4.js"} {
 		if code := do(t, h, "GET", path, "", nil).Code; code != 200 {
 			t.Errorf("%s = %d with auth off, want 200", path, code)
 		}

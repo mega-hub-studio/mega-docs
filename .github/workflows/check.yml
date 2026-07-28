@@ -44,6 +44,20 @@ jobs:
       - name: Vendor the pinned front-end assets
         run: make vendor
 
+      # The app's front end is a Vite project whose build output is committed. Node is
+      # here for two reasons: `make check` runs ESLint over web/ui (that is where the
+      # "a template binds nothing undefined" rule lives now), and the step after it
+      # rebuilds the bundle to prove the committed one is what the sources produce.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/ui/package-lock.json
+
+      - name: Install the front end
+        run: npm ci --no-audit --no-fund
+        working-directory: web/ui
+
       # golangci-lint and deadcode are optional in the Makefile — it skips them with a
       # note when they are absent. On CI they are cheap, and the whole point is to not
       # skip anything, so install them first. (staticcheck runs inside golangci-lint.)
@@ -61,6 +75,18 @@ jobs:
 
       - name: make check
         run: make check
+
+      # TestBuiltUIMatchesItsSources already fails when web/dist is stale — it compares a
+      # hash of web/ui recorded at build time. This is the other direction: rebuild from
+      # the same lockfile and prove the committed output is byte-identical, so a bundle
+      # cannot carry anything its sources do not produce.
+      - name: The committed bundle is what the sources build
+        run: |
+          make ui
+          git diff --exit-code --stat web/dist || {
+            echo "::error::web/dist differs from a fresh build of web/ui — commit the rebuild";
+            exit 1;
+          }
 
       # The gate proves the code is correct; this proves it still builds into the two
       # binaries a deploy actually installs.

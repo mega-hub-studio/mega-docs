@@ -31,7 +31,7 @@ func importServer(imp Importer, pass BAPass) http.Handler {
 		Answers: &fakeAnswers{},
 		Docs:    imp,
 		Index:   []byte("<html>index</html>"),
-		Assets:  fstest.MapFS{"app/app.js": {Data: []byte("export const x = 1\n")}},
+		Assets:  fstest.MapFS{"assets/index-A1b2C3d4.js": {Data: []byte("export const x = 1\n")}},
 		BAPass:  pass,
 	})
 }

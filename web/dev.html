@@ -581,15 +581,19 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
   <!-- ══ front-end architecture ═══════════════════════════════════════════════
        New because it is now real and enforced: four layers, four tests. -->
   <section id="frontend" data-feature="frontend-layers"
-           data-test="TestPlumbingDoesNotImportVue,TestComposablesDoNotImportEachOther,TestComponentsHoldNoLogic,TestTemplatesBindNothingUndefined">
+           data-test="TestPlumbingDoesNotImportVue,TestComposablesDoNotImportEachOther,TestComponentsHoldNoLogic,TestTheShellDoesNotReachForTransport,TestBuiltUIMatchesItsSources">
     <h2 lang="en">The front end, in four layers</h2>
     <h2 lang="vi">Frontend, bốn tầng</h2>
-    <p class="lede" lang="en">Vue 3.5 Composition API, no bundler, no
-      <code>node_modules</code>, no build step — the binary serves <code>web/app/</code>
-      straight from its embed FS. Put a change in the lowest layer that can hold it.</p>
-    <p class="lede" lang="vi">Vue 3.5 Composition API, không bundler, không
-      <code>node_modules</code>, không build step — binary serve <code>web/app/</code> trực
-      tiếp từ embed FS. Đặt thay đổi vào tầng thấp nhất còn giữ được nó.</p>
+    <p class="lede" lang="en">Vue 3.5 single-file components, built by Vite from
+      <code>web/ui</code> into <code>web/dist</code> — which is committed and embedded, so
+      <code>make build</code> still needs no Node. JavaScript, not TypeScript: one
+      maintainer, and the type surface here is three API shapes <code>spec.json</code>
+      already describes. Put a change in the lowest layer that can hold it.</p>
+    <p class="lede" lang="vi">Vue 3.5 single-file component, build bằng Vite từ
+      <code>web/ui</code> ra <code>web/dist</code> — thư mục đó được commit và embed, nên
+      <code>make build</code> vẫn không cần Node. JavaScript, không TypeScript: một người
+      maintain, và bề mặt kiểu ở đây chỉ là ba shape API mà <code>spec.json</code> đã mô tả.
+      Đặt thay đổi vào tầng thấp nhất còn giữ được nó.</p>
 
     <div class="table-wrap">
       <table class="table">
@@ -598,28 +602,61 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>Tầng</th><th>File</th><th>Được chứa</th><th>Không được</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>plumbing</th><td><code>chat.js</code> <code>qa.js</code> <code>upload.js</code> <code>answer.js</code> <code>diagram.js</code> <code>library.js</code> <code>session.js</code> <code>viewport.js</code></td><td>fetch, SSE, storage, markdown, DOM maths</td><td>any Vue import — these run in a bare console</td></tr>
-          <tr lang="vi"><th>plumbing</th><td><code>chat.js</code> <code>qa.js</code> <code>upload.js</code> <code>answer.js</code> <code>diagram.js</code> <code>library.js</code> <code>session.js</code> <code>viewport.js</code></td><td>fetch, SSE, storage, markdown, toán DOM</td><td>bất kỳ import Vue nào — chúng chạy được trong console trần</td></tr>
-          <tr lang="en"><th>logic</th><td><code>use/*.js</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · toast</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
-          <tr lang="vi"><th>logic</th><td><code>use/*.js</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · toast</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
-          <tr lang="en"><th>components</th><td><code>ba.js</code> <code>tree.js</code></td><td>props, emits, compose, return</td><td>branches — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
-          <tr lang="vi"><th>component</th><td><code>ba.js</code> <code>tree.js</code></td><td>props, emits, compose, return</td><td>nhánh — component có <code>if</code> là composable chưa ai viết</td></tr>
-          <tr lang="en"><th>wiring</th><td><code>app.js</code></td><td>who gets what, and what the template binds</td><td>logic of its own</td></tr>
-          <tr lang="vi"><th>wiring</th><td><code>app.js</code></td><td>ai nhận gì, và template bind gì</td><td>logic của riêng nó</td></tr>
+          <tr lang="en"><th>plumbing</th><td><code>src/lib/</code> — chat · qa · upload · answer · diagram · library · session · viewport</td><td>fetch, SSE, storage, markdown, DOM maths</td><td>any Vue import — these run in a bare console</td></tr>
+          <tr lang="vi"><th>plumbing</th><td><code>src/lib/</code> — chat · qa · upload · answer · diagram · library · session · viewport</td><td>fetch, SSE, storage, markdown, toán DOM</td><td>bất kỳ import Vue nào — chúng chạy được trong console trần</td></tr>
+          <tr lang="en"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
+          <tr lang="vi"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
+          <tr lang="en"><th>components</th><td><code>src/components/*.vue</code> — ChatTurn · EmptyScreen · ScopePicker · StatusLine · BaScreen · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>branches in <code>&lt;script setup&gt;</code> — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
+          <tr lang="vi"><th>component</th><td><code>src/components/*.vue</code> — ChatTurn · EmptyScreen · ScopePicker · StatusLine · BaScreen · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>nhánh trong <code>&lt;script setup&gt;</code> — component có <code>if</code> là composable chưa ai viết</td></tr>
+          <tr lang="en"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code></td><td>who gets what, and what the template binds</td><td>logic of its own, or a reach into <code>src/lib/</code> (one exception: <code>viewport.js</code>, which binds the dock element the shell owns)</td></tr>
+          <tr lang="vi"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code></td><td>ai nhận gì, và template bind gì</td><td>logic của riêng nó, hoặc chạm vào <code>src/lib/</code> (một ngoại lệ: <code>viewport.js</code>, nó bind vào phần tử dock mà shell sở hữu)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3 lang="en">Four rules, four tests</h3>
-    <h3 lang="vi">Bốn quy tắc, bốn test</h3>
-    <p lang="en">All four break silently — nothing fails to build, and the browser looks fine
-      until the exact moment someone uses the feature. So they are checked in Go, in
-      <code>web/frontend_test.go</code>, and each was mutation-tested against an injected
+    <h3 lang="en">Working on it</h3>
+    <h3 lang="vi">Làm việc với nó</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Command</th><th>What it does</th></tr>
+          <tr lang="vi"><th>Lệnh</th><th>Làm gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th><code>make server</code> + <code>make ui-dev</code></th><td>the engine on :8080 and Vite with HMR on :5173, which proxies <code>/api</code> to it. Edit an SFC, see it without a rebuild, talk to the real engine</td></tr>
+          <tr lang="vi"><th><code>make server</code> + <code>make ui-dev</code></th><td>engine ở :8080 và Vite HMR ở :5173, proxy <code>/api</code> sang nó. Sửa một SFC là thấy ngay, không cần build lại, và vẫn nói chuyện với engine thật</td></tr>
+          <tr lang="en"><th><code>make ui</code></th><td>the production build into <code>web/dist</code>. Commit the output — the binary embeds it, which is what keeps <code>go build</code> and <code>git pull &amp;&amp; make build</code> free of Node</td></tr>
+          <tr lang="vi"><th><code>make ui</code></th><td>build production ra <code>web/dist</code>. Commit output — binary embed nó, và đó là cái giữ cho <code>go build</code> và <code>git pull &amp;&amp; make build</code> không cần Node</td></tr>
+          <tr lang="en"><th><code>make build</code></th><td>the binaries, from whatever is committed in <code>web/dist</code>. It does <b>not</b> run Vite: a deploy host has no Node and does not need one</td></tr>
+          <tr lang="vi"><th><code>make build</code></th><td>build binary, từ đúng những gì đã commit trong <code>web/dist</code>. Nó <b>không</b> chạy Vite: host deploy không có Node và cũng không cần</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">Edited an SFC and forgot <code>make ui</code>?</b>
+      <span lang="en">The build stamps <code>web/dist/build.json</code> with a hash of
+        everything it was built from, and <code>TestBuiltUIMatchesItsSources</code>
+        recomputes it — so <code>make check</code> goes red rather than the binary quietly
+        serving last week's app. CI goes further and rebuilds from the lockfile, failing if
+        the committed bytes differ.</span>
+      <b lang="vi">Sửa SFC mà quên <code>make ui</code>?</b>
+      <span lang="vi">Bản build ghi <code>web/dist/build.json</code> kèm hash của mọi thứ nó
+        được build từ đó, và <code>TestBuiltUIMatchesItsSources</code> tính lại — nên
+        <code>make check</code> sẽ đỏ, thay vì binary âm thầm serve app của tuần trước. CI
+        còn đi xa hơn: build lại từ lockfile và fail nếu byte đã commit khác đi.</span>
+    </div>
+
+    <h3 lang="en">Five rules, and their checks</h3>
+    <h3 lang="vi">Năm quy tắc, và cái gì kiểm</h3>
+    <p lang="en">All of them break silently: nothing fails to build, and the browser looks
+      fine until the exact moment someone uses the feature. Four are checked in Go, in
+      <code>web/frontend_test.go</code>, each mutation-tested against an injected
       violation.</p>
-    <p lang="vi">Cả bốn đều sai một cách im lặng — không có gì build lỗi, và browser trông
-      vẫn ổn tới đúng lúc có người dùng tính năng đó. Nên chúng được kiểm bằng Go, trong
-      <code>web/frontend_test.go</code>, và mỗi cái đều đã được mutation-test bằng một lỗi
-      tiêm vào.</p>
+    <p lang="vi">Cả bốn đều sai một cách im lặng: không có gì build lỗi, và browser trông vẫn
+      ổn tới đúng lúc có người dùng tính năng đó. Bốn cái được kiểm bằng Go, trong
+      <code>web/frontend_test.go</code>, mỗi cái đều mutation-test bằng một lỗi tiêm
+      vào.</p>
     <dl class="datalist">
       <dt><code>TestPlumbingDoesNotImportVue</code></dt>
       <dd lang="en">A <code>ref</code> in <code>session.js</code> and that file can only run
@@ -632,36 +669,47 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       <dd lang="vi">Thứ một composable cần thì được truyền vào — input reactive nó không sở
         hữu thì truyền dạng <i>getter</i>, không thì nó đóng băng vào array lúc setup.</dd>
       <dt><code>TestComponentsHoldNoLogic</code></dt>
-      <dd lang="en">This is the drift that grew <code>ba.js</code> to 179 lines holding the
-        password gate, the import pipeline and the ticket transitions at once.</dd>
-      <dd lang="vi">Đây đúng là kiểu trôi đã làm <code>ba.js</code> phình lên 179 dòng chứa
-        cả gate mật khẩu, đường import và các chuyển trạng thái ticket.</dd>
-      <dt><code>TestTemplatesBindNothingUndefined</code></dt>
-      <dd lang="en">A missing key in a <code>setup()</code> return is <code>undefined</code>
-        at render, with no error and no warning — just a blank where a badge should be.</dd>
-      <dd lang="vi">Thiếu một key trong <code>setup()</code> return là
-        <code>undefined</code> lúc render, không error không warning — chỉ là chỗ trống nơi
-        đáng ra có badge.</dd>
+      <dd lang="en">A branch in <code>&lt;script setup&gt;</code>. This is the drift that
+        grew the BA screen to 179 lines holding the password gate, the import pipeline and
+        the ticket transitions at once.</dd>
+      <dd lang="vi">Một nhánh trong <code>&lt;script setup&gt;</code>. Đây đúng là kiểu trôi
+        đã làm màn hình BA phình lên 179 dòng chứa cả gate mật khẩu, đường import và các
+        chuyển trạng thái ticket.</dd>
+      <dt><code>TestTheShellDoesNotReachForTransport</code></dt>
+      <dd lang="en"><code>App.vue</code> wires; a <code>fetch</code> reached from the shell
+        is the first step back to the 492-line <code>app.js</code> this replaced.</dd>
+      <dd lang="vi"><code>App.vue</code> chỉ đấu dây; một <code>fetch</code> gọi từ shell là
+        bước đầu quay lại <code>app.js</code> 492 dòng mà cái này đã thay thế.</dd>
+      <dt><code>vue/no-undef-properties</code> (ESLint)</dt>
+      <dd lang="en">A template that binds a name nothing behind it defines renders blank,
+        with no error and no warning. A Go regex over module text used to approximate this;
+        eslint-plugin-vue reads a real parse of a real component, so
+        <code>make lint-js</code> is in <code>make check</code> now that there are
+        <code>.vue</code> files for it to be good at.</dd>
+      <dd lang="vi">Template bind một cái tên mà phía sau không định nghĩa thì render ra
+        trống, không error không warning. Trước đây một regex Go trên text module chỉ xấp xỉ
+        được việc này; eslint-plugin-vue đọc bản parse thật của component thật, nên
+        <code>make lint-js</code> đã nằm trong <code>make check</code> kể từ khi có file
+        <code>.vue</code> cho nó phát huy.</dd>
     </dl>
 
     <div class="callout memo">
-      <b lang="en">No JavaScript linter in the gate, on purpose.</b>
-      <span lang="en">Measured: <code>@antfu/eslint-config</code> pulls 255 packages and
-        113 MB to report three small findings here, and its best rules — eslint-plugin-vue's
-        reactivity-loss checks — do not fire without SFCs. It is wired as
-        <code>make lint-js</code>, installed into <code>.cache/</code>, with nothing
-        committed for it. Promote it the day TypeScript or <code>.vue</code> files
-        land.</span>
-      <b lang="vi">Không có linter JavaScript trong gate, và đó là chủ ý.</b>
-      <span lang="vi">Đã đo: <code>@antfu/eslint-config</code> kéo về 255 package và 113 MB
-        để báo ba finding nhỏ ở đây, còn các rule mạnh nhất của nó — reactivity-loss của
-        eslint-plugin-vue — không chạy khi không có SFC. Nó được wire thành
-        <code>make lint-js</code>, cài vào <code>.cache/</code>, không commit gì cho nó. Đẩy
-        nó vào gate vào ngày TypeScript hoặc file <code>.vue</code> xuất hiện.</span>
+      <b lang="en">Two dependency manifests, on purpose.</b>
+      <span lang="en">The app's dependencies are npm packages, bundled: their versions live
+        in <code>web/ui/package.json</code> and their bytes in the lockfile.
+        <code>web/vendor.sha384</code> is now only the <i>docs pages'</i> CDN pins — four
+        static files on GitHub Pages with no build step, so their design system has to
+        arrive at runtime, pinned by digest. Neither file knows about the other's
+        versions.</span>
+      <b lang="vi">Hai manifest dependency, và đó là chủ ý.</b>
+      <span lang="vi">Dependency của app là package npm, được bundle: version nằm trong
+        <code>web/ui/package.json</code>, byte nằm trong lockfile.
+        <code>web/vendor.sha384</code> giờ chỉ còn là pin CDN của <i>các trang docs</i> — bốn
+        file tĩnh trên GitHub Pages không có build step, nên design system của chúng phải
+        tới lúc runtime, pin bằng digest. Hai file không biết version của nhau.</span>
     </div>
   </section>
 
-  <!-- ══ extend ════════════════════════════════════════════════════════════ -->
   <!-- ══ spec-driven ═══════════════════════════════════════════════════════
        Last, because it is the section that tells you where everything above came
        from: these pages are the spec, and the build enforces the join. The diagram

@@ -30,14 +30,15 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 4 | A scope filters **both** retrievers before they rank, never after fusion | `TestScopedSearchRanksWithinTheScope` |
 | 5 | A miss is never cached; a partial answer always is | `TestOnlyAWholeMissSkipsTheCache` |
 | 6 | `cmd/ingest.docPath` and `rag.SafePath` agree: one document, one identity | `cmd/ingest` + `rag` path tests |
-| 7 | The version and digest of every front-end asset live only in `web/vendor.sha384` | `TestVendorTreeMatchesTheManifest`, `TestAgentNotesPinMatchesTheManifest` |
+| 7 | Two dependency manifests, neither knowing the other's versions: the **app's** in `web/ui/package.json` (bundled), the **docs pages'** CDN pins in `web/vendor.sha384` | `TestPinsParseRealManifest`, `TestVendorTreeMatchesTheManifest`, `TestAgentNotesPinMatchesTheManifest` |
 | 8 | No credential in a tracked file | `make secrets` |
-| 9 | Plumbing (`web/app/*.js`) never touches Vue | `TestPlumbingDoesNotImportVue` |
+| 9 | Plumbing (`web/ui/src/lib/*.js`) never touches Vue | `TestPlumbingDoesNotImportVue` |
 | 10 | A composable never imports another composable | `TestComposablesDoNotImportEachOther` |
-| 11 | A component holds no branches — props, emits, compose, return | `TestComponentsHoldNoLogic` |
-| 12 | Everything a template binds exists in the code behind it | `TestTemplatesBindNothingUndefined` |
+| 11 | A component holds no branches in `<script setup>` — props, emits, compose, template | `TestComponentsHoldNoLogic` |
+| 12 | Everything a template binds exists in the code behind it | `vue/no-undef-properties` — `make lint-js`, in `make check` |
+| 12b | The shell wires; it does not reach for transport | `TestTheShellDoesNotReachForTransport` |
 | 13 | Go lint stays at **zero** findings | `make lint` (in `make check`, and in CI) |
-| 14 | The product needs no Node and no build step | *prose only* — the day it stops being true, `make build` will tell you |
+| 14 | `go build`, `go install` and `git pull && make build` need **no Node**: `web/dist` is built by `make ui` and committed | `TestBuiltUIMatchesItsSources` (stale bundle), plus CI rebuilds from the lockfile and diffs |
 | 15 | Every feature a section documents names its routes, knobs and tests — and every `/api/` route and every variable `internal/config` reads is named by some section | `TestEverySpecNameExistsInTheCode`, `TestEveryRouteAndKnobIsSpecified` |
 | 16 | `spec.json` and `llms.txt` are generated from the pages, never written by hand | `TestSpecJSONIsGeneratedFromThePages`, `TestLLMsIndexListsEveryPage` |
 
@@ -56,11 +57,17 @@ check` until a section documents it — so the order of work is: write the secti
 the join, watch it go red, then implement. The full five steps are on the Dev page
 (`dev.html#spec`), which is also where an agent is pointed.
 
-Rules 9–12 exist because the Vue 3.5 refactor made three new mistakes possible that nothing
-else would catch: a template binding with no definition renders blank with no error, a
-component quietly reabsorbing logic undoes the split, and one composable importing another
-turns a flat set of files into a graph. All four were mutation-tested — each fails, with an
-actionable message, when its rule is broken.
+Rules 9–12 exist because the front end can break silently: a template binding with no
+definition renders blank with no error, a component quietly reabsorbing logic undoes the
+split, and one composable importing another turns a flat set of files into a graph. Rule 12
+was a Go regex over module text until the SFCs landed; it is `vue/no-undef-properties` now,
+which reads a real parse of a real component — the trigger that had been written down for
+promoting ESLint into the gate.
+
+Rule 14 changed shape rather than going away. The app is a Vite build now, and **the build
+output is committed** precisely so the rule still holds where it matters: nobody needs Node
+to build the binary, run it, or deploy it. Node is a *contributor's* tool — `make ui`,
+`make ui-dev`, `make lint-js` — and every one of them says so when it is missing.
 
 ## Commands
 
@@ -73,9 +80,11 @@ make deps                  # go mod tidy
 make check                 # THE GATE: tests, gofmt, go vet, golangci-lint, deadcode, credential scan
 make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
 make lint-fix              # …applying what it can fix; read the diff
-make lint-js               # optional: eslint + @antfu/eslint-config, installed into .cache/
+make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
-make build                 # bin/knowledge + bin/ingest
+make ui                    # build the app's front end (Vite) into web/dist — commit the output
+make ui-dev                # Vite dev server on :5173 with HMR, /api proxied to :8080
+make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
 
@@ -120,7 +129,9 @@ internal/ai      one OpenAI-compatible client (embeddings + chat streaming + usa
 internal/aitest  a fake provider over httptest — the whole pipeline, no key needed
 internal/db      SQLite: sqlite-vec + FTS5, hybrid search with RRF, tickets, answer cache
 internal/config  env → Config, with defaults
-web/             Go templates + embedded ES modules; no build step
+web/ui           the app's front end: Vue 3.5 SFCs, JavaScript, built by Vite
+web/dist         that build — committed, embedded, served. `make ui` regenerates it
+web/*.html       the guide: Go templates, both languages inline, no build step at all
                  spec.go → spec.json: the pages' own annotations, machine-readable
 ```
 
@@ -207,6 +218,9 @@ a runtime error.
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the
   header's stacking context.
+- **`go ./...` walks into `web/ui/node_modules`.** One npm dependency (flatted) ships a Go
+  package, and the linter reported seven findings from somebody else's code. The Go tool has
+  no directory ignore, so the Makefile spells the packages out: `PKGS := ./cmd/... ./internal/... ./web`.
 - **A stale `golangci-lint` on PATH makes the gate lie.** CI installs `@latest`; an
   older binary installed locally reports zero while CI fails (it happened on `goconst`
   and a new `gosec` rule). `make lint` prints the version it used — compare it with the
@@ -218,24 +232,30 @@ a runtime error.
 
 ### Front end
 
-**Vue 3.5, Composition API, no bundler.** `Vue` is a global from `index.html` (the build
-that ships the compiler, so in-DOM templates work), the Go binary serves `web/app/` from
-its embed FS, and there is no build step to run. **`make build` before testing the built
-artifact**, or you are debugging the old bytes.
+**Vue 3.5 single-file components, built by Vite from `web/ui`.** JavaScript, not
+TypeScript — one maintainer, and the type surface is three API shapes `spec.json` already
+describes. The output lands in `web/dist`, which is **committed and embedded**: that is
+what keeps `go build` and a deploy free of Node, and `TestBuiltUIMatchesItsSources` is
+what keeps it honest. **`make ui` before testing the built binary**, or you are debugging
+last week's bundle.
+
+Day to day: `make server` in one shell, `make ui-dev` in another — Vite on :5173 with HMR,
+`/api` proxied to :8080, so an SFC edit shows up without a build and still talks to the
+real engine.
 
 Four layers, and the rule for each is one sentence. Put a change in the lowest layer that
 can hold it:
 
 | layer | files | may contain | may not |
 |---|---|---|---|
-| **plumbing** | `chat.js` `qa.js` `upload.js` `answer.js` `diagram.js` `library.js` `session.js` `viewport.js` | fetch, SSE, storage, markdown, DOM maths | any Vue import — these run in a bare console |
-| **logic** | `use/*.js` | reactive state and every branch | another composable's state, or markup |
-| **components** | `ba.js` `tree.js` | props, emits, compose, return | branches — a component with an `if` is a composable nobody wrote yet |
-| **wiring** | `app.js` | who gets what, and what the template binds | logic of its own |
+| **plumbing** | `src/lib/` — `chat.js` `qa.js` `upload.js` `answer.js` `diagram.js` `library.js` `session.js` `viewport.js` | fetch, SSE, storage, markdown, DOM maths | any Vue import — these run in a bare console |
+| **logic** | `src/composables/*.js` | reactive state and every branch | another composable's state, or markup |
+| **components** | `src/components/*.vue` | props, emits, compose, template | branches in `<script setup>` — a component with an `if` is a composable nobody wrote yet |
+| **wiring** | `src/App.vue`, `src/main.js` | who gets what, and what the template binds | logic of its own, or a reach into `src/lib/` (except `viewport.js`: it binds the dock element the shell owns) |
 
 One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
 `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
-`importer`, `tickets`, `nestree`, `toast`.
+`importer`, `tickets`, `nestree`.
 
 Three rules keep the layers from leaking:
 
@@ -243,15 +263,19 @@ Three rules keep the layers from leaking:
   argument — `useConversation` gets the scope, a scroll function and an `onSettled`
   callback, not the corpus. Reactive inputs it does not own arrive as *getters*
   (`documents: () => props.documents`), so it never holds a stale array.
-- **A component is a contract, not a place to work.** `ba.js` is 54 lines: four props, two
-  emits, three composables, one return. Its logic moved to `use/gate.js`,
-  `use/importer.js` and `use/tickets.js`, where each piece is readable alone.
-- **Everything the template names must be in the returned object.** A missing key is
-  `undefined` at render with no error — the same trap as a `computed` colliding with a
-  `data` key in the old Options API. When you add a binding, add it to the return.
+- **A component is a contract, not a place to work.** `BaScreen.vue` declares four props
+  and two emits, composes the gate and the tickets, and delegates the importer to
+  `ImportPanel.vue` — because a composable belongs to whoever renders its state.
+- **The shell destructures.** `const { turns, ask } = useConversation(…)`, so the template
+  names plain values and Vue unwraps them. `chat.turns.value` in a template is the smell
+  that the wiring has started keeping state of its own.
 
-Composables read `Vue` *inside* the function (`const { ref } = Vue`), never at module
-scope: the global is a classic script and a module body can evaluate before it exists.
+Things that were true before the bundler and are not now: `Vue` is an import, not a
+global; `toast` and `setMute` are imported from `8bit-nes` rather than injected; mermaid
+arrives as a dynamic `import("mermaid")` that Rollup gives its own chunk (never import it
+statically — that moves 3.4 MB into first paint and only the chunk sizes would say so);
+and `<nes-*>` is declared a custom element in `vite.config.js`, at *compile* time, because
+the runtime flag is too late for a pre-compiled template.
 
 On the **docs pages** (`web/docsbase.html`) spacing is one rule, not per-recipe margins:
 `--flow` for every block that follows another, `--sp-5` above an `h3`, `--sp-7` between
@@ -260,10 +284,11 @@ sections. Before that there were four different gaps and 31 pairs of blocks touc
 copied onto the cells by the foot script — because at 390px a three-column grid gives each
 value about four characters. `make check-ui` measures all of it.
 
-The design system (8bit-nes) owns components; `web/app/styles.css` owns layout only.
+The design system (8bit-nes) owns components; `web/ui/src/styles.css` owns layout only.
 Before writing CSS, check the pinned `llms.txt` for a recipe that already exists —
 `.statusline`, `.pbar`, `.spinner`, `.datalist` and `<nes-tree>` are all there — the
-tree is now in use (`web/app/tree.js`), and it renders once from a child JSON payload,
+tree is in use (`components/CorpusTree.vue` + `composables/nestree.js`), and it renders once
+from a child JSON payload,
 so the component replaces the element rather than mutating it. Two
 selectors are defined twice in the library (`.row` is also a tree row, with
 `cursor: pointer`); scope app rules rather than reusing an ambiguous class.

@@ -231,8 +231,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Cập nhật app</th><td>Pull, build, restart — bốn dòng ở mục <b>Nâng cấp</b> bên dưới. Browser revalidate bằng ETag nên không cần xoá cache.</td></tr>
           <tr lang="en"><th>Change embedding model</th><td><code>EMBED_DIM</code> must match it. Delete <code>knowledge.db</code> and re-index, or every insert fails.</td></tr>
           <tr lang="vi"><th>Đổi embedding model</th><td><code>EMBED_DIM</code> phải khớp. Xoá <code>knowledge.db</code> rồi index lại, không thì mọi insert đều lỗi.</td></tr>
-          <tr lang="en"><th>No third-party requests</th><td><code>make vendor &amp;&amp; make build</code>, then <code>ASSET_BASE=/vendor</code></td></tr>
-          <tr lang="vi"><th>Không gọi ra third-party</th><td><code>make vendor &amp;&amp; make build</code>, rồi <code>ASSET_BASE=/vendor</code></td></tr>
+          <tr lang="en"><th>No third-party requests</th><td>already true: the UI is bundled into the binary by <code>make ui</code> — no CDN, no egress</td></tr>
+          <tr lang="vi"><th>Không gọi ra third-party</th><td>đã đúng sẵn: UI được bundle vào binary bởi <code>make ui</code> — không CDN, không cần egress</td></tr>
         </tbody>
       </table>
     </div>
@@ -260,14 +260,15 @@ done: 8/8 files, 74 chunks</span></div>
       <code>BA_PASS</code> đã được nhận, chế độ BA publish được. <code>"writes":false</code>
       là instance đang chỉ-đọc.</p>
 
-    <p lang="en">Add <code>ASSET_BASE=/vendor</code>? Then <code>make vendor</code> before
-      <code>make build</code>, since the vendored assets are not in git. New settings
-      arrive in <code>.env</code>; the table below says which ones exist and what each
-      one costs to get wrong.</p>
-    <p lang="vi">Đang dùng <code>ASSET_BASE=/vendor</code>? Chạy <code>make vendor</code>
-      trước <code>make build</code>, vì asset vendored không nằm trong git. Setting mới
-      thì thêm vào <code>.env</code>; bảng bên dưới liệt kê có những gì và đặt sai thì
-      mất gì.</p>
+    <p lang="en">The front end needs nothing extra here: it is built by
+      <code>make ui</code> into <code>web/dist</code>, which is committed, so
+      <code>make build</code> on this host has no Node step and no network step. New
+      settings arrive in <code>.env</code>; the table below says which ones exist and what
+      each one costs to get wrong.</p>
+    <p lang="vi">Frontend không cần thêm gì ở đây: nó được build bởi <code>make ui</code>
+      ra <code>web/dist</code>, và thư mục đó được commit — nên <code>make build</code>
+      trên host không cần Node, không cần mạng. Setting mới thì thêm vào
+      <code>.env</code>; bảng bên dưới liệt kê có những gì và đặt sai thì mất gì.</p>
 
     <div class="callout gotcha">
       <b lang="en">One upgrade needs a re-index: check your stored paths first.</b>
@@ -325,7 +326,7 @@ done: 8/8 files, 74 chunks</span></div>
   <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
        the build if one is missing: a knob nobody documented is a knob nobody finds. -->
   <section id="settings" data-feature="settings"
-           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,ASSET_BASE,SITE_URL,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,SITE_URL,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
            data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
@@ -377,8 +378,6 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>model đi index. Đổi thì phải index lại toàn bộ và <code>EMBED_DIM</code> phải khớp — dùng <code>make switch-embed</code>, nó kiểm key trước khi xoá gì cả</td></tr>
           <tr lang="en"><th><code>SITE_URL</code></th><td>the published guide</td><td>only if you fork the docs: it is the address the app links out to</td></tr>
           <tr lang="vi"><th><code>SITE_URL</code></th><td>trang guide đã publish</td><td>chỉ khi bạn fork tài liệu: đây là địa chỉ app trỏ ra ngoài</td></tr>
-          <tr lang="en"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> to serve the UI's assets from the binary</td></tr>
-          <tr lang="vi"><th><code>ASSET_BASE</code></th><td>jsDelivr</td><td><code>/vendor</code> để binary tự phục vụ asset của UI</td></tr>
         </tbody>
       </table>
     </div>

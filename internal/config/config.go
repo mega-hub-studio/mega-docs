@@ -18,7 +18,6 @@ type Config struct {
 	Port       string
 	DBPath     string
 	CorpusDir  string
-	AssetBase  string
 	SiteURL    string
 	BaseURL    string
 	EmbedURL   string
@@ -36,18 +35,16 @@ type Config struct {
 	BAPass     string
 }
 
-// DefaultAssetBase is the CDN the frontend loads Vue / marked / DOMPurify /
-// 8bit-nes from. Set ASSET_BASE=/vendor to serve them out of the binary instead
-// (run `make vendor` first) — required on a network without egress.
-const (
-	DefaultAssetBase = "https://cdn.jsdelivr.net/npm"
-	VendorAssetBase  = "/vendor"
-
-	// DefaultSiteURL is where the guide is published. It appears in the absolute
-	// URLs of /llms.txt, which indexes the documentation rather than this host, so a
-	// fork should point it at its own Pages site.
-	DefaultSiteURL = "https://mega-hub-studio.github.io/mega-docs"
-)
+// DefaultSiteURL is where the guide is published. The app links out to it (the address
+// reaches the front end through /api/health, because the bundle is a static file), and it
+// is the base of the absolute URLs in /llms.txt — which indexes the documentation rather
+// than this host, so a fork should point it at its own Pages site.
+//
+// There is no ASSET_BASE any more: the app's assets are bundled into web/dist by Vite and
+// served from this binary, so there is no CDN to switch away from and nothing to vendor.
+// The *docs* pages still load the design system from jsDelivr with SRI — they are static
+// files with no build step, and cmd/rendocs takes their base as a flag.
+const DefaultSiteURL = "https://mega-hub-studio.github.io/mega-docs"
 
 // Load reads .env (if present) into the environment, then the environment into a Config.
 // Existing environment variables win over .env, so a systemd unit or a one-off
@@ -65,7 +62,6 @@ func Load() Config {
 		// a markdown file. Keeping both on one path is what makes the database
 		// derived: this directory is the source of truth, so put it in git.
 		CorpusDir: env("CORPUS_DIR", "docs"),
-		AssetBase: env("ASSET_BASE", DefaultAssetBase),
 		SiteURL:   env("SITE_URL", DefaultSiteURL),
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
 		// Empty means "same as chat". Split it when a gateway serves

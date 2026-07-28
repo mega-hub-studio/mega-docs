@@ -38,14 +38,16 @@ func run() error {
 	}
 	defer store.Close()
 
-	// The page is rendered once, for whichever asset base is configured.
-	index, err := web.Index(cfg.AssetBase, cfg.SiteURL)
+	// The built app, read out of the binary once. A missing build is a startup error,
+	// not a blank page: the bundle is committed, so the only way to get here without one
+	// is a hand-edited tree.
+	index, err := web.Index()
 	if err != nil {
 		return fmt.Errorf("frontend: %w", err)
 	}
-	if cfg.AssetBase == config.VendorAssetBase && !web.HasVendor() {
-		log.Printf("warning: ASSET_BASE=%s but no assets are embedded — run `make vendor`, then rebuild",
-			config.VendorAssetBase)
+	build, err := web.BuildInfo()
+	if err != nil {
+		return fmt.Errorf("frontend: %w", err)
 	}
 
 	engine := rag.New(store, ai.New(ai.Config{
@@ -60,6 +62,7 @@ func run() error {
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
+			Site: cfg.SiteURL,
 		},
 	})
 
@@ -72,8 +75,10 @@ func run() error {
 		// here would cut it off mid-generation.
 	}
 
-	log.Printf("mega-docs on http://%s (assets: %s, auth: %s, writes: %s)",
-		addr, cfg.AssetBase, describe(auth), writes(cfg))
+	// The UI's build is in the startup line because the bundle is committed: "which
+	// front end is this binary serving" is otherwise unanswerable without unzipping it.
+	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s)",
+		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
 	return srv.ListenAndServe()
 }

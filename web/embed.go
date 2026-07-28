@@ -1,21 +1,23 @@
-// Package web holds the embedded front-end: one HTML file plus, optionally, a
-// vendored copy of its CDN assets.
+// Package web holds the two front ends this repository ships, which are deliberately
+// built in different ways:
+//
+//	the app    web/ui (Vue 3.5 SFCs) → built by Vite into web/dist, committed, and
+//	           embedded here. One module graph, self-hosted, content-hashed.
+//	the guide  web/*.html — Go templates with both languages inline, rendered by
+//	           cmd/rendocs to static files for GitHub Pages. No build step, no
+//	           JavaScript framework, and the CDN pins in web/vendor.sha384 are theirs.
 package web
 
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
 	"text/template"
 )
-
-// Both pages are templates, not static files — see Index and Docs.
-//
-//go:embed index.html
-var indexTmpl string
 
 //go:embed docs.html
 var docsTmpl string
@@ -54,16 +56,60 @@ func diagram(name string) (string, error) {
 	return string(b), nil
 }
 
-// FS is the static tree served straight to the browser:
+// distFS is the built app: web/dist, produced by `make ui` and committed, so `go build`
+// and `go install` still work on a machine with no Node — and so deploying stays
+// `git pull && make build`, which is what the runbook says.
 //
-//	app/     the app shell — styles.css + the ES modules (no build step)
-//	vendor/  third-party assets, laid out exactly like the CDN paths
-//	         (vendor/<pkg>@<version>/<path>). Empty unless `make vendor` has run;
-//	         the `all:` prefix keeps the embed valid when it holds only .gitkeep.
+// The `all:` prefix is not needed (no dotfiles are emitted) but the embed would break the
+// moment Vite emitted one, and a build that fails at compile time beats a page that is
+// missing a chunk at runtime.
 //
-//go:embed app
-//go:embed all:vendor
-var FS embed.FS
+//go:embed all:dist
+var distFS embed.FS
+
+// FS is the static tree served straight to the browser: dist/assets/… every file
+// content-hashed, so the server can send it with a one-year immutable cache.
+var FS = must(fs.Sub(distFS, "dist"))
+
+// Index is the built index.html, read once at startup. It is a static file: the app takes
+// everything it needs to know about this instance from /api/health, so nothing is
+// templated into it and there is no asset base to substitute.
+func Index() ([]byte, error) {
+	b, err := distFS.ReadFile("dist/index.html")
+	if err != nil {
+		return nil, fmt.Errorf("web: no built app in web/dist (%w) — run `make ui`", err)
+	}
+	return b, nil
+}
+
+// Build is what web/dist/build.json records: the hash of the sources it was built from,
+// and the two versions worth reading at a glance. TestBuiltUIMatchesItsSources compares
+// the hash with the tree, which is how a committed bundle cannot go stale.
+type Build struct {
+	Sources string `json:"sources"`
+	Vue     string `json:"vue"`
+	Nes     string `json:"nes"`
+}
+
+// BuildInfo reads that stamp.
+func BuildInfo() (Build, error) {
+	var b Build
+	raw, err := distFS.ReadFile("dist/build.json")
+	if err != nil {
+		return b, fmt.Errorf("web: web/dist/build.json is missing (%w) — run `make ui`", err)
+	}
+	if err := json.Unmarshal(raw, &b); err != nil {
+		return b, fmt.Errorf("web: web/dist/build.json is not valid JSON: %w", err)
+	}
+	return b, nil
+}
+
+func must(f fs.FS, err error) fs.FS {
+	if err != nil {
+		panic(err) // a broken embed is a compile-time mistake, not a runtime condition
+	}
+	return f
+}
 
 // Nav is where the guide's pages live, relative to each other.
 //
@@ -107,16 +153,6 @@ func Pages() []Page {
 // an instance lives behind a tailnet or a tunnel, and a public page must not
 // hardcode somebody's private address.
 var StaticNav = Nav{Guide: "./index.html", BA: "./ba.html", Dev: "./dev.html", Deploy: "./deploy.html"}
-
-// Index renders the app shell. docsURL is the published guide, which the app links
-// out to rather than hosting: the docs have their own domain, and serving a second
-// copy from the app is noise plus a copy to drift.
-// The asset base is "https://cdn.jsdelivr.net/npm" (the default) or "/vendor" when
-// the assets ship inside this binary. Rendering happens once at startup, so serving a
-// request is just bytes.
-func Index(assetBase, docsURL string) ([]byte, error) {
-	return render(page{name: "index", tmpl: indexTmpl, base: assetBase, docsURL: docsURL})
-}
 
 // The three guide pages, by the name that identifies each one in a template, a URL and
 // a nav entry — one spelling, so a new page cannot half-exist.
@@ -238,19 +274,4 @@ func render(pg page) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// HasVendor reports whether `make vendor` actually populated vendor/ — so the
-// server can warn when ASSET_BASE points at /vendor but nothing is there.
-func HasVendor() bool {
-	entries, err := fs.ReadDir(FS, "vendor")
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			return true
-		}
-	}
-	return false
 }

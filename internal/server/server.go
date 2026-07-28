@@ -32,8 +32,8 @@ type Deps struct {
 	Answers Answerer  // the RAG engine, read side
 	Know    Knowledge // the QA loop; nil leaves those routes unregistered
 	Docs    Importer  // document import; nil leaves that route unregistered
-	Index   []byte    // index.html, already rendered for the configured asset base
-	Assets  fs.FS     // embedded static tree: app/… and vendor/…
+	Index   []byte    // the built app's index.html, straight from web/dist
+	Assets  fs.FS     // the rest of that build: assets/… every name content-hashed
 	Auth    Auth      // optional Basic credentials; zero value = open
 	BAPass  BAPass    // gates the write actions; empty = no write surface
 	Runtime Runtime   // what the status line reports; zero values simply hide fields
@@ -48,6 +48,10 @@ type Runtime struct {
 	Window   int
 	PriceIn  float64
 	PriceOut float64
+	// Site is where the guide is published. The app's header links it, and the bundle
+	// is a static file that cannot be told at build time — so it arrives here, with
+	// everything else this instance knows about itself.
+	Site string
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -55,15 +59,14 @@ type Runtime struct {
 // This is the app and nothing else. The guide is documentation with its own public
 // domain, so it is not served here — one surface, one job.
 //
-//	GET  /            index.html          revalidated (it pins asset versions)
+//	GET  /            index.html          revalidated (it names hashed assets)
 //	GET  /api/health  {"ok":true,"writes":bool} — open, so probes need no secret
 //	POST /api/chat    SSE: cached · token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /api/tickets · POST /api/tickets · POST /api/tickets/{id}/{action}
 //	POST /api/documents  import .md/.txt into the corpus — same gate as a confirm
 //	GET  /api/history answers still free to replay
-//	GET  /app/…       app modules + CSS   revalidated, ETag'd from the binary
-//	GET  /vendor/…    vendored CDN assets immutable (version is in the path)
+//	GET  /assets/…    the built bundle      immutable (every name has a content hash)
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 
@@ -75,8 +78,10 @@ func New(d Deps) http.Handler {
 	// The model name and prices are deliberate disclosure, not a leak: an operator
 	// asked for them on screen. The engine itself still refuses to discuss them —
 	// that rule is about what a *document* answer may contain.
-	health := fmt.Sprintf(`{"ok":true,"writes":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
-		d.BAPass.enabled(), d.Runtime.Model, d.Runtime.Window, d.Runtime.PriceIn, d.Runtime.PriceOut)
+	health := fmt.Sprintf(
+		`{"ok":true,"writes":%t,"site":%q,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
+		d.BAPass.enabled(), d.Runtime.Site, d.Runtime.Model, d.Runtime.Window,
+		d.Runtime.PriceIn, d.Runtime.PriceOut)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its
@@ -95,11 +100,10 @@ func New(d Deps) http.Handler {
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))
-	// The app tree changes only when the binary does, so one ETag over the whole
-	// tree is enough to invalidate it — and costs one 304 instead of a re-download.
-	files := http.FileServerFS(d.Assets)
-	mux.Handle("GET /app/", revalidate(etagFS(d.Assets, "app"), files))
-	mux.Handle("GET /vendor/", immutable(files))
+	// Every file under assets/ carries a content hash in its name, which is the only
+	// thing that makes a year-long immutable cache safe: a changed file is a changed
+	// URL, and index.html above is revalidated so the new names are always found.
+	mux.Handle("GET /assets/", immutable(http.FileServerFS(d.Assets)))
 
 	return guard(d.Auth, mux)
 }
@@ -138,25 +142,6 @@ func immutable(h http.Handler) http.Handler {
 func etag(b []byte) string {
 	sum := sha256.Sum256(b)
 	return fmt.Sprintf(`"%x"`, sum[:16])
-}
-
-// etagFS hashes every file under root, so any edit anywhere changes the tag.
-func etagFS(fsys fs.FS, root string) string {
-	h := sha256.New()
-	// The tree is an embed.FS: a read cannot fail at runtime, and if it somehow did the
-	// tag would simply change, which is the safe direction for a cache key.
-	_ = fs.WalkDir(fsys, root, func(path string, e fs.DirEntry, err error) error {
-		if err != nil || e.IsDir() {
-			return err
-		}
-		b, err := fs.ReadFile(fsys, path)
-		if err != nil {
-			return err
-		}
-		_, _ = fmt.Fprintf(h, "%s:%x\n", path, sha256.Sum256(b)) // writing to a hash cannot fail
-		return nil
-	})
-	return fmt.Sprintf(`"%x"`, h.Sum(nil)[:16])
 }
 
 // match handles the one If-None-Match form browsers actually send back, plus "*".

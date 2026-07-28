@@ -69,7 +69,7 @@ it, so trust the table.
 ## Two things to know before changing the UI
 
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
-   first. `web/app/styles.css` and the `<style>` block in `web/docsbase.html` own
+   first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
 2. **There are currently no local overrides of the design system.** `docsbase.html`
    used to patch two accessibility gaps; 8bit-nes 0.7.1 ships both, so they were
