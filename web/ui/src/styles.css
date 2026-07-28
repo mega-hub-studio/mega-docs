@@ -371,14 +371,11 @@ main.ba .datalist { align-items: baseline; }
    at the tallest state, so the bottom of a `100vh` dialog sits under the URL bar exactly
    when the diagram is at its widest and you are panning it.
 
-   `display` is the one property that must stay on its own rule, qualified by [open]. A
-   closed <dialog> is hidden by `dialog:not([open]) { display: none }` in the *user-agent*
-   stylesheet, and the cascade compares origin before specificity — so a plain
-   `.diagram-zoom { display: flex }` beats it however specific the UA selector is, and the
-   viewer sits in the page for ever: visible, empty, and unclosable, because close() does
-   remove the attribute and nothing is left watching it. Keeping the geometry unqualified
-   is deliberate too — [open] would outweigh the desktop rule below and freeze the phone
-   layout on a laptop. */
+   `display` gets its own rule, qualified by [open], because the cascade compares origin
+   before specificity: an unqualified `.diagram-zoom { display: flex }` beats the UA's
+   `dialog:not([open]) { display: none }` and the viewer never hides — visible, empty and
+   unclosable, however correctly close() runs. The geometry stays unqualified for the
+   mirror reason: [open] would outweigh the desktop rule below. */
 .diagram-zoom[open] { display: flex; }
 .diagram-zoom {
   inline-size: 100dvw; max-inline-size: 100dvw;

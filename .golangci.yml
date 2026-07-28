@@ -5,9 +5,11 @@
 # actually wrong. The stock config reported 591 issues here, 420 of them whitespace and
 # missing t.Parallel(). A gate that always shouts is a gate everybody learns to ignore.
 #
-# Validated on golangci-lint 2.5.0 and 2.12.2 — both report zero. An unknown-linter name
-# is a hard error, not a warning, so a linter that only exists in the newest release
-# would lock out anyone running an older one. That is why `modernize` is off below.
+# The version is pinned — GOLANGCI_VERSION in the Makefile, which CI reads too — so this
+# file has exactly one binary to be correct against. That is what lets `modernize` be
+# enabled below and the whole "considered and rejected" list be *comments* rather than
+# `disable:` keys: an unknown linter name is a hard error, so a name written down is a
+# tripwire on every upgrade, and a name that disables nothing is a tripwire for free.
 version: "2"
 
 run:
@@ -18,10 +20,18 @@ run:
   tests: true
 
 issues:
+  # Both unlimited. The tree is at zero, so the only reason to see a truncated report is
+  # if truncation is hiding the second half of a regression.
   max-issues-per-linter: 0
-  max-same-issues: 50
+  max-same-issues: 0
 
 linters:
+  # `none`, not the default `standard`. The list below is then the *complete* set — no
+  # union with a five-name default you have to look up, and no linter arriving behind your
+  # back on an upgrade to shout at a tree that was green. The five `standard` ones
+  # (errcheck, govet, ineffassign, staticcheck, unused) are all named here explicitly.
+  default: none
+
   enable:
     # correctness
     - govet
@@ -61,8 +71,6 @@ linters:
     - gosec
     - bidichk
     - bodyclose
-    # noctx is deliberately NOT here — it is in the disable list below, with the reason.
-    # Listing it in both is how a reader concludes it runs when it does not.
     - containedctx
     - fatcontext
     - sqlclosecheck
@@ -72,70 +80,37 @@ linters:
     - usestdlibvars
     - exhaustive
     - nolintlint
+    # modernize needs golangci-lint >= 2.9, which the pin guarantees. It found two real
+    # simplifications when first run (strings.Cut, slices.Contains), both applied.
+    - modernize
     # tests
     - thelper
     - usetesting
 
-  disable:
-    # ── dropped from the recommended set, each for a reason ──────────────────────
-    # wsl_v5: 304 findings, all of them "put a blank line here". This repo's comments
-    # carry the structure instead, and its style is set by the surrounding code.
-    - wsl_v5
-    # paralleltest: 116 findings. Every test here owns a real SQLite file or an
-    # httptest provider; the suite runs in under a second, so parallelism would buy
-    # nothing and make a failure harder to read.
-    - paralleltest
-    # dupl: test setup repeats on purpose — a test that shares a fixture with another
-    # test fails for reasons that are not in it.
-    - dupl
-    # noctx: 33 findings, all of them database/sql calls in internal/db that could take
-    # a Context. Deliberately not threaded through: every query here is a local SQLite
-    # read measured in microseconds, the cancellable work is the provider call (which
-    # does take ctx), and the change would touch every method of the store for no
-    # measurable gain. Turn this back on the day a query gets slow enough to want
-    # cancelling, or the store stops being a local file.
-    - noctx
-    # sloglint / loggercheck / testifylint: no slog, no testify. Nothing to check.
-    - sloglint
-    - loggercheck
-    - testifylint
-    # exptostd: no golang.org/x/exp import.
-    - exptostd
-    # modernize is *not listed here either*, deliberately: naming an unknown linter is an
-    # error whether it appears under enable or disable, and this one only exists from
-    # golangci-lint 2.9. It found two real simplifications (strings.Cut, slices.Contains),
-    # both applied; add it back — by name — when the oldest version anyone runs has it.
-    # Kept off for the reasons the recommended config already gives.
-    - lll
-    - prealloc
-    - wrapcheck
-    - err113
-    - mnd
-    - iface
-    - nakedret
-    - noinlineerr
-    - gocognit
-    - cyclop
-    - depguard
-    - goheader
-    - importas
-    - funcorder
-    - godoclint
-    - varnamelen
-    - exhaustruct
-    - gochecknoglobals
-    - gochecknoinits
-    - unparam
-    - makezero
-    - testpackage
-    - embeddedstructfieldcheck
-    - iotamixing
-    - unqueryvet
-    - recvcheck
-    - mirror
-    - protogetter
-    - spancheck
-    - zerologlint
+  # ── Considered and rejected ───────────────────────────────────────────────────
+  # Comments, not `disable:` keys: with `default: none` nothing here is enabled, so
+  # disabling it would be a no-op that still breaks the config the day the name is
+  # retired upstream. The reason is the part worth keeping.
+  #
+  #   wsl_v5        304 findings, all "put a blank line here". This repo's comments carry
+  #                 the structure instead, and its style is set by the surrounding code.
+  #   paralleltest  116 findings. Every test owns a real SQLite file or an httptest
+  #                 provider; the suite runs in under a second, so parallelism would buy
+  #                 nothing and make a failure harder to read.
+  #   dupl          test setup repeats on purpose — a test that shares a fixture with
+  #                 another test fails for reasons that are not in it.
+  #   noctx         33 findings, all database/sql calls in internal/db that could take a
+  #                 Context. Deliberately not threaded through: every query here is a
+  #                 local SQLite read measured in microseconds, the cancellable work is
+  #                 the provider call (which does take ctx), and the change would touch
+  #                 every method of the store for no measurable gain. Turn this on the day
+  #                 a query gets slow enough to want cancelling, or the store stops being
+  #                 a local file.
+  #   sloglint · loggercheck · testifylint · exptostd
+  #                 no slog, no testify, no golang.org/x/exp. Nothing to check.
+  #
+  # Everything else the recommended config ships is off for the reasons that config
+  # already gives; re-read it there rather than copying the list to a second home.
 
   settings:
     errcheck:
@@ -171,6 +146,11 @@ linters:
       require-specific: true
 
   exclusions:
+    # An exclusion that stops matching is dead config that still reads as a decision —
+    # the same lie rule 24 calls a suppressed finding. This prints the rule, by name,
+    # the run after the path it names goes away. It *warns* rather than failing, so read
+    # the output: `make lint` turns a warning into a non-zero exit (see the Makefile).
+    warn-unused: true
     rules:
       # A test's branches are its assertions, and its literals read better in place than
       # behind a name declared thirty lines up.
@@ -188,13 +168,15 @@ linters:
         text: "G304|G104"
 
 formatters:
+  # This is what makes `gofmt -l` a second copy of a check rather than a check: a
+  # formatter listed here is reported by `golangci-lint run`, so `make check` runs it
+  # once, over the spelled-out packages, and not over web/ui/node_modules.
   enable:
     - gofmt
-  disable:
-    # gofumpt classifies an import path whose first segment has no dot as stdlib, and
-    # this module is named `knowledge-engine` — so it merged every internal import into
-    # the std group, which is exactly backwards from how this repo reads. gofmt alone
-    # keeps the two groups apart. (Renaming the module to its repository URL would fix
-    # the heuristic *and* the stale product name; it rewrites the import line of every
-    # file, so it is a decision of its own, not a formatting side effect.)
-    - gofumpt
+  # gofumpt is *not* here and needs no `disable:` — formatters are opt-in, so listing it
+  # would disable nothing. The reason it stays out: it classifies an import path whose
+  # first segment has no dot as stdlib, and this module is named `knowledge-engine`, so it
+  # merged every internal import into the std group — exactly backwards from how this repo
+  # reads. gofmt alone keeps the two groups apart. (Renaming the module to its repository
+  # URL would fix the heuristic *and* the stale product name; it rewrites the import line
+  # of every file, so it is a decision of its own, not a formatting side effect.)

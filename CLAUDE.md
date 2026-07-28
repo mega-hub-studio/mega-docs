@@ -162,9 +162,11 @@ Every Go command needs the build tags — `sqlite-vec` and FTS5 are cgo, and a p
 make deps                  # go mod tidy
 make check-full            # THE FINAL GATE — run before saying anything is done: ui → check
 #                            → build → check-ui → check-wt, cheapest stage first
-make check                 # what CI gates on, and what you run while working: tests, gofmt,
-#                            go vet, golangci-lint, eslint, deadcode, credential scan
-make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
+make check                 # what CI gates on, and what you run while working: tests, go vet,
+#                            golangci-lint (gofmt included), eslint, deadcode, credential scan
+make lint                  # golangci-lint alone, at the pinned GOLANGCI_VERSION — installing
+#                            it first if PATH has another one (see .golangci.yml for why each
+#                            linter is on, and which are off with the reason)
 make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
@@ -341,10 +343,6 @@ that true. What is left is the work itself. See *Now vs vNext* in `README.md`.
 - **`go ./...` walks into `web/ui/node_modules`.** One npm dependency (flatted) ships a Go
   package, and the linter reported seven findings from somebody else's code. The Go tool has
   no directory ignore, so the Makefile spells the packages out: `PKGS := ./cmd/... ./internal/... ./web`.
-- **A stale `golangci-lint` on PATH makes the gate lie.** CI installs `@latest`; an
-  older binary installed locally reports zero while CI fails (it happened on `goconst`
-  and a new `gosec` rule). `make lint` prints the version it used — compare it with the
-  one in [`check.yml`](.github/workflows/check.yml) before trusting a green run.
 - **Numbers the UI shows must be measured, not estimated.** Token counts come from
   the provider's own usage frame; `CONTEXT_WINDOW` and `PRICE_IN`/`PRICE_OUT` are
   zero by default and the status line prints *nothing* rather than a zero — an
@@ -437,15 +435,29 @@ address held by a running server is a second home for a fact that already has on
   attributes and `make vendor`. A half-finished bump fails at **startup**, not in a
   browser.
 - **Linting is configured, not inherited.** [`.golangci.yml`](.golangci.yml) starts from
-  the vendored `golang-lint` skill's config and turns off five linters *with the reason
-  written next to each*: whitespace rules that fight this repo's comment style, missing
-  `t.Parallel()` on tests that own real files, `noctx` on a store whose queries are
-  microseconds of local SQLite. The tree is at **zero findings**, so a new one is a new
-  fact rather than background noise — keep it that way, and if a rule has to go, say why
-  in the file.
+  the vendored `golang-lint` skill's config, and its `linters.default` is **`none`** — the
+  `enable:` list is therefore the complete set, with nothing arriving from a default you
+  have to look up or from an upgrade. Everything the recommended config ships and this
+  repo does not run is a **comment** naming the reason (whitespace rules that fight this
+  repo's comment style, missing `t.Parallel()` on tests that own real files, `noctx` on a
+  store whose queries are microseconds of local SQLite) rather than a `disable:` key,
+  because with `default: none` a `disable:` entry suppresses nothing while still breaking
+  the config the day the name is retired upstream. The tree is at **zero findings**, so a
+  new one is a new fact rather than background noise — keep it that way, and if a rule has
+  to go, say why in the file.
+- **One pinned linter, installed by the thing that runs it.** `GOLANGCI_VERSION` in the
+  [`Makefile`](Makefile) is the only place the version is written; `make lint` depends on
+  `lint-deps`, which installs that exact version (upstream's `install.sh`, which is what
+  it recommends over `go install`) when the binary is missing or is a different one. So
+  local and CI agree by construction — CI installs no linter of its own, it just runs
+  `make check`. Bumping the linter is editing one line and reading what goes red. A
+  golangci-lint *warning* also fails `make lint`, because the one it emits is
+  `warn-unused`: an exclusion rule in `.golangci.yml` that no longer matches anything, so
+  dead config cannot sit in the gate reading like a decision.
 - `make check` runs in CI on every push and pull request
-  ([`.github/workflows/check.yml`](.github/workflows/check.yml)), with staticcheck and
-  deadcode installed so nothing is skipped. It runs `make vendor` first, because
+  ([`.github/workflows/check.yml`](.github/workflows/check.yml)), with `deadcode`
+  installed so nothing is skipped — it is the one tool `make check` needs that
+  golangci-lint has no equivalent for. It runs `make vendor` first, because
   `web/vendor/` is gitignored and one test asserts the tree matches every pin.
 - Comments explain *why*, and name the failure that motivated the code. This repo's
   existing comments are the style guide; match their density and voice. Deleted on sight:

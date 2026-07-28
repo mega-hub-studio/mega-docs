@@ -34,13 +34,8 @@ type Config struct {
 	BAPass     string
 }
 
-// There is no SITE_URL here, and no ASSET_BASE. The guide is published from this
-// repository to its own Pages domain on its own cadence, and the app no longer links out
-// to it — one product, one surface, and nothing in the binary that has to be told where
-// the documentation moved. The address the *pages* use to reference themselves is
-// cmd/rendocs' `-site` flag, which is where it belongs: it is a property of a render, not
-// of a running server. Assets are bundled into web/dist by Vite and served from here, so
-// there is no CDN to switch away from either.
+// No SITE_URL, and no ASSET_BASE: both were deleted, and
+// changelog/2026-07-28-drop-guide-link.md is why.
 
 // Load reads .env (if present) into the environment, then the environment into a Config.
 // Existing environment variables win over .env, so a systemd unit or a one-off

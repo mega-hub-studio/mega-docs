@@ -11,14 +11,20 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check check-full ui-deps test lint lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
 
 deps:
 	go mod tidy
 
-# Everything CI should gate on: formatting, vet, tests, linters.
+# Everything CI should gate on: vet, tests, linters.
+#
+# gofmt is deliberately *not* a step of its own. It is a formatter in .golangci.yml, so
+# `lint` already reports it — and reports it over $(PKGS) instead of over `.`, which is
+# the difference that matters: `gofmt -l .` walked web/ui/node_modules, where one npm
+# dependency ships a Go package. That is the same trap $(PKGS) exists to close, reopened
+# by a shorter command. It had not fired yet only because that file happens to be
+# formatted.
 check: test secrets
-	@test -z "$$(gofmt -l .)" || { echo "gofmt needed in:"; gofmt -l .; exit 1; }
 	go vet -tags "$(TAGS)" $(PKGS)
 	@$(MAKE) --no-print-directory lint
 	@$(MAKE) --no-print-directory lint-js
@@ -32,7 +38,8 @@ check: test secrets
 #   1. ui        rebuild the bundle FIRST — TestBuiltUIMatchesItsSources (inside `check`)
 #                compares web/dist against a hash of its sources, so running `check`
 #                before this reports a stale bundle rather than the bug you introduced.
-#   2. check     gofmt · vet · every Go test · golangci-lint · deadcode · credential scan
+#   2. check     vet · every Go test · golangci-lint (gofmt included) · deadcode
+#                · credential scan
 #                · eslint (which is also the formatter now: style rules are errors, so a
 #                missing reformat fails here rather than in review)
 #   3. build     both binaries, because `go build` catches what `go vet` does not
@@ -52,18 +59,52 @@ check-full:
 	@echo ""
 	@echo "  check-full: PASS — bundle fresh, Go + JS clean, guide and walkthroughs measured"
 
-# golangci-lint, configured by .golangci.yml — which explains every linter it turns off,
-# because the stock config reports 591 issues on this tree and a gate that always shouts
-# is a gate nobody reads. It currently reports zero; a new finding means a new fact.
-# staticcheck runs inside it, which is why `dead` no longer runs it separately.
-# Prints the version it used. CI installs @latest, so an older binary left on PATH
-# locally passes what CI then fails — that happened, on goconst and a new gosec rule,
-# after the gate had already gone green here.
-lint:
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint version | head -1; \
-		golangci-lint run $(PKGS); \
-	else echo "  skipped golangci-lint (go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest)"; fi
+# ── golangci-lint, pinned ─────────────────────────────────────────────────────
+# One version for this repo, and CI reads this same variable — so there is no second
+# place for it to be true.
+#
+# Pinned rather than @latest because @latest is a gate that moves on somebody else's
+# schedule: a new linter or a new rule in an upstream release turns a green tree red
+# without a commit. Not theoretical — it happened here on `goconst` and a new `gosec`
+# rule, and the older binary left on PATH locally reported zero while CI failed. The old
+# fix was to *print* the version and ask a human to compare it with check.yml by eye,
+# which is a symptom fix: the versions could still differ, you just got to read about it.
+#
+# `lint-deps` installs the pinned one when the binary is missing *or* is a different
+# version, which is the same move `ui-deps` makes for node_modules and for the same
+# reason — nobody wants "go install the other version" from a target whose whole job is
+# to lint. Local and CI now agree by construction rather than by inspection.
+#
+# It is the binary install because that is what upstream recommends over `go install`,
+# which "isn't guaranteed to work": the result depends on the local Go version, `replace`
+# directives do not apply transitively, and tool dependencies can collide with the
+# project's own.
+GOLANGCI_VERSION := v2.12.2
+GOLANGCI_BIN := $(shell go env GOPATH)/bin/golangci-lint
+
+lint-deps:
+	@$(GOLANGCI_BIN) version 2>/dev/null | grep -qF " $(patsubst v%,%,$(GOLANGCI_VERSION)) " || { \
+		echo "  installing golangci-lint $(GOLANGCI_VERSION)"; \
+		curl -sSfL https://golangci-lint.run/install.sh \
+			| sh -s -- -b "$(dir $(GOLANGCI_BIN))" $(GOLANGCI_VERSION); }
+
+# Configured by .golangci.yml — which explains every linter it leaves off, because the
+# stock config reports 591 issues on this tree and a gate that always shouts is a gate
+# nobody reads. It currently reports zero; a new finding means a new fact. staticcheck
+# runs inside it, which is why `dead` no longer runs it separately.
+#
+# A *warning* fails too. golangci-lint exits zero on `warn-unused` — the message that an
+# exclusion rule in .golangci.yml no longer matches anything — and an exclusion nobody
+# needs is exactly the dead config rule 24 calls a lie in the gate. Left as a warning it
+# would scroll past on every green run, which is how it stays forever.
+lint: lint-deps
+	@out=$$($(GOLANGCI_BIN) run $(PKGS) 2>&1); code=$$?; \
+	printf '%s\n' "$$out"; \
+	[ $$code -eq 0 ] || exit $$code; \
+	case "$$out" in *level=warning*) \
+		echo "^ an exclusion rule in .golangci.yml matched nothing — delete it or fix its path"; \
+		exit 1 ;; \
+	esac
 
 # ── the app's front end ───────────────────────────────────────────────────────
 # web/ui is a Vite project (Vue 3.5 SFCs, JavaScript). Its output, web/dist, is committed
@@ -127,10 +168,10 @@ lint-js:
 	@cd web/ui && npm run --silent lint
 
 # Same linters, applying the fixes they know how to make. Read the diff: the formatters
-# are opinionated and one of them (gofumpt) is turned off here for a reason .golangci.yml
+# are opinionated and one of them (gofumpt) is left off here for a reason .golangci.yml
 # spells out.
-lint-fix:
-	golangci-lint run --fix $(PKGS)
+lint-fix: lint-deps
+	$(GOLANGCI_BIN) run --fix $(PKGS)
 
 # What no linter finds: a function no binary can reach. staticcheck's unused only sees
 # within a package, and it now runs inside `lint` anyway; deadcode does whole-program

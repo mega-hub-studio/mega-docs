@@ -58,18 +58,20 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web/ui
 
-      # golangci-lint and deadcode are optional in the Makefile — it skips them with a
-      # note when they are absent. On CI they are cheap, and the whole point is to not
-      # skip anything, so install them first. (staticcheck runs inside golangci-lint.)
+      # golangci-lint is NOT installed here — `make lint` installs the version pinned in
+      # the Makefile itself (GOLANGCI_VERSION), so there is one version and one installer
+      # for this repo instead of a copy here that can drift from the one a laptop has.
+      # That drift is not hypothetical: this step used to run `@latest` while developers
+      # had whatever they installed once, and the gate went green locally and red here on
+      # `goconst` and a new `gosec` rule.
       #
-      # Both @latest currently need Go >= 1.25 to *build*, which is newer than the 1.22
-      # this module targets. That is fine and deliberate: GOTOOLCHAIN defaults to auto,
-      # so `go install` fetches the toolchain it needs for the tool only, and the module
-      # keeps compiling against its own version. Verified locally on Go 1.24.7 with
-      # golangci-lint 2.12.2 — the tree is at zero findings.
-      - name: Install the linters
+      # deadcode is still installed the `go install` way: it has no release binaries, and
+      # unlike a linter suite it either finds code unreachable from a main or it does not
+      # — there is no rule set to change under us. GOTOOLCHAIN defaults to auto, so `go
+      # install` fetches whatever toolchain the tool needs while this module keeps
+      # compiling against its own version.
+      - name: Install deadcode
         run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
           go install golang.org/x/tools/cmd/deadcode@latest
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 

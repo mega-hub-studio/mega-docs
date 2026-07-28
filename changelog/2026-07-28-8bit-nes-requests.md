@@ -62,7 +62,17 @@ smaller than the reading size without dragging prose down with it — falling ba
 `--fs-body` so a consumer who sets nothing still gets something coherent with the page.
 
 **Acceptance** With `--mmd-fs: 12px` on `:root`, the rendered SVG carries `font-size:12px`
-and the same source produces a narrower `viewBox` than at the default.
+and the same source produces a smaller `viewBox` than at the default.
+
+**Downstream today** Worked around in `web/ui/src/lib/diagram.js`: before handing the
+instance over, `lib.initialize` is wrapped so whatever config the element passes gets
+`fontSize` and `themeVariables.fontSize` merged on top. Measured in a browser against a
+six-node `graph TD` — emitted `font-size` 16px → 12px, `viewBox` height 723.84 → 617.63, so
+the boxes shrink rather than the text shrinking inside boxes of the same size. Note that
+only `themeVariables.fontSize` moves the layout; the top-level `fontSize` alone changed
+nothing, which is worth knowing when mapping the token.
+
+**Deletes here** that wrapper.
 
 ---
 
@@ -79,15 +89,18 @@ if (globalThis.mermaid && !NesMermaid._themed) {
 }
 ```
 
-`_themed` is a private static on a class the package does not export. A consumer that
-brings its own mermaid — the documented path, and the one that keeps the 3.4 MB renderer out
-of the entry bundle — therefore cannot adjust the config at all: initialise before the
-element and `initialize()` resets to defaults over it; initialise after and there is no hook
-that says when "after" is.
+`_themed` is a private static on a class the package does not export. A consumer that brings
+its own mermaid — the documented path, and the one that keeps the 3.4 MB renderer out of the
+entry bundle — has no supported way to amend that config: initialise before the element and
+`initialize()` resets over it; initialise after and there is no hook saying when "after" is.
 
-**Why it matters** This is what makes item 1 un-workaroundable downstream, and it will make
-the next config question un-workaroundable too. The element is right to theme an instance it
-did not create; it is the *once, and no seam* part that traps the integrator.
+**Why it matters** There *is* a way through, and it is the wrong shape: wrap
+`lib.initialize` on the instance before assigning `globalThis.mermaid`, so the element's own
+call carries the extra config. That is what this app does for item 1 and it is measured
+working — but it is monkey-patching a method the element is about to call, it depends on the
+element calling `initialize` exactly once with the whole config, and nothing in the package
+promises either. The element is right to theme an instance it did not create; what traps the
+integrator is that the only seam is one nobody designed.
 
 **Want** One of, cheapest first:
 
@@ -228,5 +241,6 @@ overrides of the design system.
 
 `8bit-nes` publishes a version where items 3, 4 and 6 are fixed; this repo bumps
 `web/vendor.sha384`, re-runs `make check-ui`, and deletes two local rules and one of the two
-entries in `AGENTS.md`'s override list. Items 1, 2 and 5 unblock the mermaid work that is
-currently written up as "cannot be done downstream".
+entries in `AGENTS.md`'s override list. Items 1 and 2 together delete the `initialize`
+wrapper in `diagram.js` — the workaround works, but it is a private seam this app should not
+be standing on. Item 5 is the only one with no downstream answer at all.
