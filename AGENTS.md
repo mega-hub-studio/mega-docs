@@ -71,12 +71,24 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
-2. **There are currently no local overrides of the design system.** `docsbase.html`
-   used to patch two accessibility gaps; 8bit-nes 0.7.1 ships both, so they were
-   removed after measuring, not assumed. If you add one back, say in a comment which
-   upstream version lacks the fix — and if you bump the pin, re-measure rather than
-   trusting the changelog. A release has already been tagged twice without a fix it
-   was expected to contain.
+2. **There is exactly one local override of the design system, and it names its
+   version.** `web/ui/src/styles.css` un-caps `.palette-list` (`max-block-size: none`)
+   because **8bit-nes 0.7.3** sizes it for the modal its own docs describe —
+   `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested*
+   scroller which hid four of seven documents on a phone. Delete the rule when a release
+   ships an in-page variant of `.palette`; the request is in the changelog. `docsbase.html`
+   overrides nothing — it used to patch two accessibility gaps, and 0.7.1 ships both, so
+   they were removed after measuring rather than assumed.
+
+   The other app rules on library classes are *placement*, not overrides, and the
+   difference is worth keeping straight: `align-self`/`text-align` on `.empty`'s children
+   decide where a child sits inside its parent (the app's job); `max-block-size` on
+   `.palette-list` overrules how the component sizes itself (the library's job).
+
+   Adding an override is allowed; leaving it anonymous is not. Say in a comment which
+   upstream version lacks the fix, and if you bump the pin, re-measure rather than trusting
+   the changelog. A release has already been tagged twice without a fix it was expected to
+   contain.
 
 ## Verifying, not guessing
 

@@ -26,7 +26,7 @@ const props = defineProps({
 defineEmits(["ask", "replay"]);
 
 // A getter, not `props.corpus.documents`: the corpus object is replaced on every refresh.
-const { query, matches, shown } = useFinder({ documents: () => props.corpus.documents });
+const { query, shown, extra } = useFinder({ documents: () => props.corpus.documents });
 </script>
 
 <template>
@@ -54,7 +54,11 @@ const { query, matches, shown } = useFinder({ documents: () => props.corpus.docu
       <nes-icon name="warn" />
       <p>Nothing is indexed yet — run <code>make ingest DOCS=./docs</code>, then ask.</p>
     </div>
-    <div v-else-if="corpus.state === 'unavailable'" class="callout crit">
+    <!-- `gotcha` is the library's --crit-accented callout. There is no `.callout.crit`:
+         crit is a *badge* fill, so spelling it here fell through to the default gold and
+         rendered this in almost the tone of the milder `warn` above — inverting the two
+         states this pair exists to tell apart. -->
+    <div v-else-if="corpus.state === 'unavailable'" class="callout gotcha">
       <nes-icon name="alertCircle" />
       <p>Can't read the index. Check the server, then reload.</p>
     </div>
@@ -89,7 +93,7 @@ const { query, matches, shown } = useFinder({ documents: () => props.corpus.docu
       <div class="palette-list">
         <button
           v-for="d in shown" :key="d.path" class="result"
-          :title="`Ask what ${docTitle(d)} covers`" @click="$emit('ask', coverQuestion(d))"
+          :title="coverQuestion(d)" @click="$emit('ask', coverQuestion(d))"
         >
           <nes-icon class="result-icon" name="file" />
           <span class="result-body">
@@ -102,11 +106,9 @@ const { query, matches, shown } = useFinder({ documents: () => props.corpus.docu
 
       <!-- Never truncate in silence: when the corpus is bigger than the menu, say so and
            name the way to reach the rest. -->
-      <p v-if="matches.length > shown.length" class="palette-empty">
-        {{ matches.length - shown.length }} more match — type to narrow.
-      </p>
+      <p v-if="extra" class="palette-empty">{{ extra }} more match — type to narrow.</p>
 
-      <p v-if="!matches.length" class="palette-empty">
+      <p v-if="!shown.length" class="palette-empty">
         No indexed document matches “{{ query }}”.
       </p>
     </div>
@@ -120,15 +122,24 @@ const { query, matches, shown } = useFinder({ documents: () => props.corpus.docu
       <summary>
         <span class="eyebrow">Asked before ({{ history.length }}) — free to repeat</span>
       </summary>
-      <!-- The same .result row as the menu above, so the two lists align to one grid.
+      <!-- The same .result row as the menu above, so the two lists read as one grid.
            A question is body copy, so it must not arrive as uppercase mono chrome the
-           way a .btn label would. -->
-      <div class="palette-list">
+           way a .btn label would.
+
+           NOT .palette-list: the library nests that class inside `.palette`, so out here it
+           matches nothing and the rows would lose the 2px rhythm they are supposed to share
+           with the menu. `.results` is this app's own stack — `.result` itself is top-level
+           in the library, so the rows are the library's.
+
+           No leading icon either: it was the same glyph on every row, so it carried no
+           information while costing one innerHTML parse per row (<nes-icon> builds itself in
+           connectedCallback) — 20 upgrades and 6.3 kB of SVG inside a *collapsed*
+           disclosure, at the server's history ceiling. -->
+      <div class="results">
         <button
           v-for="h in history" :key="h.scope + h.question" class="result"
           @click="$emit('replay', h)"
         >
-          <nes-icon class="result-icon" name="refresh" />
           <span class="result-body">
             <span class="result-title">{{ h.question }}</span>
             <!-- A scoped row is only free in its own scope, so replaying it restores that

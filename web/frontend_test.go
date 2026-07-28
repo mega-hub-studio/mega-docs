@@ -50,7 +50,7 @@ func TestPlumbingDoesNotImportVue(t *testing.T) {
 
 // Rule — a composable may not import another composable.
 //
-// Eleven independent files, each readable alone, is the whole point; a graph of them is
+// Twelve independent files, each readable alone, is the whole point; a graph of them is
 // the thing this replaced. What a composable needs arrives as an argument, and reactive
 // inputs it does not own arrive as getters, so it cannot hold a stale array.
 func TestComposablesDoNotImportEachOther(t *testing.T) {

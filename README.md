@@ -138,7 +138,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                   src/styles.css    layout only; 8bit-nes owns the components
 web/ui/src/composables/   one composable per concern, and nothing else in them
                   conversation.js  turns, ask/regenerate/stop/reset, persistence
-                  corpus.js        what is indexed + the starters derived from it
+                  corpus.js        what is indexed
                   scope.js         which folder answers
                   qaloop.js        the ticket queue and the free-to-replay history
                   runtime.js       online · writes · model, prices and the guide's address

@@ -23,11 +23,19 @@ const MAX_ROWS = 8;
  * @param {{ documents: () => object[] }} deps `documents` is a getter, not an array:
  *   the corpus is refreshed after every ingest and import, and a held array would keep
  *   listing what was indexed a minute ago.
- * @returns {{ query: import("vue").Ref<string>, matches: import("vue").ComputedRef<object[]>,
- *   shown: import("vue").ComputedRef<object[]> }}
+ * @returns {{ query: import("vue").Ref<string>, shown: import("vue").ComputedRef<object[]>,
+ *   extra: import("vue").ComputedRef<number> }}
  */
 export function useFinder({ documents }) {
   const query = ref("");
   const matches = computed(() => rankDocs(documents(), query.value));
-  return { query, matches, shown: computed(() => matches.value.slice(0, MAX_ROWS)) };
+  return {
+    query,
+    shown: computed(() => matches.value.slice(0, MAX_ROWS)),
+    // The count, not the second array. The full match list is never rendered, so publishing
+    // it only moved arithmetic into the markup — and a template that subtracts two lengths
+    // is a composable nobody wrote. `shown` is empty exactly when `matches` is, so the
+    // no-match branch needs nothing else.
+    extra: computed(() => Math.max(0, matches.value.length - MAX_ROWS)),
+  };
 }
