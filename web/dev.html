@@ -682,8 +682,8 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>Lệnh</th><th>Làm gì</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th><code>make server</code> + <code>make ui-dev</code></th><td>the engine on :8080 and Vite with HMR on :5173, which proxies <code>/api</code> to it. Edit an SFC, see it without a rebuild, talk to the real engine</td></tr>
-          <tr lang="vi"><th><code>make server</code> + <code>make ui-dev</code></th><td>engine ở :8080 và Vite HMR ở :5173, proxy <code>/api</code> sang nó. Sửa một SFC là thấy ngay, không cần build lại, và vẫn nói chuyện với engine thật</td></tr>
+          <tr lang="en"><th><code>make server</code> + <code>make ui-dev</code></th><td>the engine on :8080 and Vite with HMR on :5179, which proxies <code>/api</code> to it. Edit an SFC, see it without a rebuild, talk to the real engine</td></tr>
+          <tr lang="vi"><th><code>make server</code> + <code>make ui-dev</code></th><td>engine ở :8080 và Vite HMR ở :5179, proxy <code>/api</code> sang nó. Sửa một SFC là thấy ngay, không cần build lại, và vẫn nói chuyện với engine thật</td></tr>
           <tr lang="en"><th><code>make ui</code></th><td>the production build into <code>web/dist</code>. Commit the output — the binary embeds it, which is what keeps <code>go build</code> and <code>git pull &amp;&amp; make build</code> free of Node</td></tr>
           <tr lang="vi"><th><code>make ui</code></th><td>build production ra <code>web/dist</code>. Commit output — binary embed nó, và đó là cái giữ cho <code>go build</code> và <code>git pull &amp;&amp; make build</code> không cần Node</td></tr>
           <tr lang="en"><th><code>make build</code></th><td>the binaries, from whatever is committed in <code>web/dist</code>. It does <b>not</b> run Vite: a deploy host has no Node and does not need one</td></tr>
@@ -790,7 +790,7 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     </nes-focus-svg>
 
     <div class="steps" id="loops-steps">
-      <div data-title="1 · the fast loop" data-title-vi="1 · vòng nhanh" data-focus="you edit a .vue|vite :5173|browser :5173">
+      <div data-title="1 · the fast loop" data-title-vi="1 · vòng nhanh" data-focus="you edit a .vue|vite :5179|browser :5179">
         <p lang="en">Vite serves the component you are editing and swaps it into the running
           page — measured at zero full reloads, with the conversation already on screen
           surviving. This is the loop you work in.</p>
@@ -846,14 +846,14 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     <div class="step">
       <span class="num">2</span>
       <div class="body">
-        <b lang="en">Vite, on :5173</b>
-        <b lang="vi">Vite, ở :5173</b>
+        <b lang="en">Vite, on :5179</b>
+        <b lang="vi">Vite, ở :5179</b>
         <div class="terminal"><span class="cmd">make ui-dev</span><span class="out">VITE ready in 343 ms
-  ➜  Local:   http://localhost:5173/</span></div>
-        <p lang="en">Open <b>:5173</b>, not :8080. Vite serves the front end you are editing
+  ➜  Local:   http://localhost:5179/</span></div>
+        <p lang="en">Open <b>:5179</b>, not :8080. Vite serves the front end you are editing
           and forwards <code>/api</code> to the engine, so the UI is your working copy while
           everything behind it is real.</p>
-        <p lang="vi">Mở <b>:5173</b>, không phải :8080. Vite serve frontend bạn đang sửa và
+        <p lang="vi">Mở <b>:5179</b>, không phải :8080. Vite serve frontend bạn đang sửa và
           chuyển <code>/api</code> sang engine, nên UI là bản đang sửa còn mọi thứ phía sau
           đều là thật.</p>
       </div>
@@ -893,10 +893,10 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="vi"><th>Bạn thấy</th><th>Thực chất là gì</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>:5173 opens, health dot is red, asking fails</th><td>no engine — <code>make server</code> is not running. Vite proxies <code>/api</code>; it does not answer it</td></tr>
-          <tr lang="vi"><th>:5173 mở được, đèn health đỏ, hỏi thì lỗi</th><td>chưa có engine — <code>make server</code> chưa chạy. Vite chỉ proxy <code>/api</code>, nó không tự trả lời</td></tr>
-          <tr lang="en"><th>an SFC edit changes nothing on :8080</th><td>working as intended: :8080 serves the bundle compiled into the binary. Use :5173, or <code>make ui &amp;&amp; make build</code></td></tr>
-          <tr lang="vi"><th>sửa SFC mà :8080 không đổi gì</th><td>đúng như thiết kế: :8080 serve bundle đã compile vào binary. Dùng :5173, hoặc <code>make ui &amp;&amp; make build</code></td></tr>
+          <tr lang="en"><th>:5179 opens, health dot is red, asking fails</th><td>no engine — <code>make server</code> is not running. Vite proxies <code>/api</code>; it does not answer it</td></tr>
+          <tr lang="vi"><th>:5179 mở được, đèn health đỏ, hỏi thì lỗi</th><td>chưa có engine — <code>make server</code> chưa chạy. Vite chỉ proxy <code>/api</code>, nó không tự trả lời</td></tr>
+          <tr lang="en"><th>an SFC edit changes nothing on :8080</th><td>working as intended: :8080 serves the bundle compiled into the binary. Use :5179, or <code>make ui &amp;&amp; make build</code></td></tr>
+          <tr lang="vi"><th>sửa SFC mà :8080 không đổi gì</th><td>đúng như thiết kế: :8080 serve bundle đã compile vào binary. Dùng :5179, hoặc <code>make ui &amp;&amp; make build</code></td></tr>
           <tr lang="en"><th><code>make check</code> says "run <code>make ui</code>"</th><td>web/dist is older than web/ui. That is <code>TestBuiltUIMatchesItsSources</code> doing its job — rebuild and commit the output</td></tr>
           <tr lang="vi"><th><code>make check</code> báo "run <code>make ui</code>"</th><td>web/dist cũ hơn web/ui. Đó là <code>TestBuiltUIMatchesItsSources</code> đang làm việc của nó — build lại rồi commit output</td></tr>
           <tr lang="en"><th>the answer never streams and the log is quiet</th><td>the provider, not the UI. Check <code>AI_BASE_URL</code> and the key in <code>.env</code>; <code>make live</code> asks the provider directly</td></tr>

@@ -89,7 +89,7 @@ ui-deps:
 ui: ui-deps
 	@cd web/ui && npm run build
 
-# HMR against the real engine: serves the UI on :5173 and proxies /api to :8080, so run
+# HMR against the real engine: serves the UI on :5179 and proxies /api to :8080, so run
 # `make server` in another shell first.
 ui-dev: ui-deps
 	@cd web/ui && npm run dev

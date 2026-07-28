@@ -6,8 +6,8 @@
 %% bundle. Shallow and short-labelled like the other four: it is read on a phone.
 %%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 28, "padding": 6, "useMaxWidth": true}}}%%
 graph TD
-  Edit["you edit a .vue"] --> Vite["vite :5173"]
-  Vite -->|"hot swap, no reload"| Browser["browser :5173"]
+  Edit["you edit a .vue"] --> Vite["vite :5179"]
+  Vite -->|"hot swap, no reload"| Browser["browser :5179"]
   Vite -->|"/api proxied"| Engine["make server :8080"]
   Engine --> Store["sqlite + provider"]
   Edit --> Ui["make ui"]

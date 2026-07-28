@@ -84,7 +84,7 @@ make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipp
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
 make check-wt              # optional: drives every diagram walkthrough (prev/next + highlight)
 make ui                    # build the app's front end (Vite) into web/dist — commit the output
-make ui-dev                # Vite dev server on :5173 with HMR, /api proxied to :8080
+make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
@@ -254,7 +254,7 @@ what keeps `go build` and a deploy free of Node, and `TestBuiltUIMatchesItsSourc
 what keeps it honest. **`make ui` before testing the built binary**, or you are debugging
 last week's bundle.
 
-Day to day: `make server` in one shell, `make ui-dev` in another — Vite on :5173 with HMR,
+Day to day: `make server` in one shell, `make ui-dev` in another — Vite on :5179 with HMR,
 `/api` proxied to :8080, so an SFC edit shows up without a build and still talks to the
 real engine.
 
