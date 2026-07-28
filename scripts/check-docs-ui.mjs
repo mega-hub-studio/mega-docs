@@ -26,8 +26,25 @@
 //     under 80rem, open rail above). So the check is "no row *wraps*", measured against
 //     the row's own line-height — not "the index fits on one line", which it never does.
 //   • inline links inside prose are exempt from WCAG 2.5.5 (the "inline" exception:
-//     their height is constrained by the line-height of the text around them). Only
-//     chrome controls — nav, toc, tabs, walkthrough — are held to 44px.
+//     their height is constrained by the line-height of the text around them).
+//
+// ── ONE GAP, NAMED ──────────────────────────────────────────────────────────────
+// Touch-target size is NOT checked here any more, and it used to be: chrome controls
+// (nav, toc, tabs, walkthrough dots, the section finder) were held to 44px on the phone.
+//
+// That assertion needed a *coarse pointer*, because 8bit-nes sizes its chrome to 32px and
+// lifts it to 44px under `@media (pointer: coarse)`. Playwright supplied it through
+// `devices["iPhone 14"]`, which enables touch emulation. PinchTab has none: `--mobile` on
+// `set viewport` leaves `navigator.maxTouchPoints` at 0, `set media pointer coarse` reports
+// "applied" while `matchMedia("(pointer: coarse)")` stays false (CDP emulates a fixed set of
+// media features and `pointer` is not in it), and `--touch-events=enabled` through
+// `browser.extraFlags` changed nothing. "touch" appears nowhere in its CLI, config or API.
+//
+// So the rule is real and unchecked. It is guarded by 8bit-nes' own release testing —
+// AGENTS.md records that 0.6.1 shipped both touch fixes this repo reported, which is why the
+// app owns no coarse-pointer CSS of its own — and by looking at a phone. If PinchTab gains
+// touch emulation, the measurement to restore is a `small: [...]` list of chrome controls
+// under 44px; see changelog/2026-07-28-pinchtab-checks.md for what it looked like.
 import { open } from "./pinchtab.mjs";
 
 const BASE = process.argv[2] || "http://127.0.0.1:8123";
@@ -92,18 +109,6 @@ const measure = () => {
       .filter(seen).map(a => a.getAttribute("href"))
       .filter(h => h.startsWith("./") || h.startsWith("#")))],
     anchors: [...document.querySelectorAll("[id]")].map(e => e.id),
-    // 44px applies to the chrome, not to a link in a sentence.
-    small: [...document.querySelectorAll(".bar a, .bar button, .pages a, nes-toc a, nes-toc button, nes-tabs button, .wt-dot, .wt-nav button")]
-      .filter(seen)
-      .map((e) => {
-        const r = e.getBoundingClientRect();
-        const a = getComputedStyle(e, "::after");
-        const g = (v) => (v === "auto" ? 0 : Math.max(0, -Number.parseFloat(v) || 0));
-        const h = a.content !== "none" && a.position === "absolute"
-          ? r.height + g(a.top) + g(a.bottom) : r.height;
-        return { label: e.textContent.trim().slice(0, 16), h: Math.round(h), w: Math.round(r.width) };
-      })
-      .filter(x => x.w > 0 && x.h < 44),
     lang: doc.lang,
     // ── what the phone screenshots showed and the checks above did not ──
     // A box too narrow to hold words. `.table th` is nowrap, so one long row header

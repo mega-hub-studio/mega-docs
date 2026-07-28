@@ -9,7 +9,7 @@
    diagram arrives inside v-html, so Vue never sees it as a component, and `nes:render`
    is the library's own event and bubbles to here.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { fileName, turnHtml } from '../lib/answer.js'
+import { fileName, section, turnHtml } from '../lib/answer.js'
 import { STATUS } from '../lib/qa.js'
 
 const props = defineProps({
@@ -62,12 +62,15 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
       />
 
       <!-- official grounded-answer recipe: .sources rows that the inline .cite markers
-           in the prose above link down to -->
+           in the prose above link down to. Both halves show a leaf and keep the whole
+           value in `title`: .source-host is the recipe's short secondary label — dim, mono,
+           --fs-label — so a full breadcrumb in it wrapped to a second line and lost the
+           indent under the filename. See lib/answer.js. -->
       <ol v-if="turn.citations.length" class="sources">
         <li v-for="c in turn.citations" :id="srcId(c.n)" :key="c.n" class="source">
           <span class="source-n">{{ c.n }}</span>
           <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
-          <span v-if="c.heading" class="source-host">{{ c.heading }}</span>
+          <span v-if="c.heading" class="source-host" :title="c.heading">{{ section(c.heading) }}</span>
         </li>
       </ol>
 

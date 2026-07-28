@@ -198,3 +198,17 @@ function cite(n, href) {
 export function fileName(path) {
   return (path || '').split('/').pop()
 }
+
+/**
+ * "Booking List Module > 12. Flows > 12.14 Print Preview" → "12.14 Print Preview"
+ *
+ * The same trade as `fileName` above, for the other half of a citation: show the leaf,
+ * keep the whole path in the `title`. The head of a breadcrumb is the document, which the
+ * filename beside it already names — so it is the part that repeats on every row, and the
+ * tail is the part that says *where in the file*. Six citations from two documents spent
+ * their width on "Developer Handoff — …" six times and pushed the section that
+ * distinguishes them onto a second line.
+ */
+export function section(heading) {
+  return (heading || '').split('>').pop().trim()
+}
