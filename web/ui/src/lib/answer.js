@@ -36,6 +36,7 @@ export function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}
   }
   let html = DOMPurify.sanitize(marked.parse(markdown || ''))
   html = dressTables(html)
+  html = dressTaskLists(html)
   if (nums.length && srcId)
     html = linkCites(html, new Set(nums), srcId)
   return diagrams ? asDiagrams(html) : html
@@ -61,6 +62,36 @@ function dressTables(html) {
     wrap.className = 'table-wrap'
     table.replaceWith(wrap)
     wrap.append(table)
+  }
+  return tpl.innerHTML
+}
+
+/* A checked/unchecked list becomes the design system's `.tasklist`.
+   This deliberately teaches the model *no* new syntax: `- [x]` / `- [ ]` is GFM, which every
+   model already writes correctly, and marked already parses it into exactly the shape
+   `.tasklist` styles — a <ul> of <li>, with `.done` marking the finished ones. A directive
+   would have cost prompt tokens on every question to describe a structure that already
+   exists, and this repo's own prompt comment is firm that a rule the model never needed
+   dilutes the ones that matter.
+   The raw <input type=checkbox> is removed because `.tasklist li::before` draws the box
+   itself; leaving both renders two. Text nodes are untouched, so `[n]` inside a row is still
+   there for linkCites to turn into a citation. */
+function dressTaskLists(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  for (const ul of tpl.content.querySelectorAll('ul')) {
+    const items = [...ul.children].filter(li => li.tagName === 'LI')
+    const boxes = items.filter(li => li.querySelector('input[type="checkbox"]'))
+    // Every item, or it is an ordinary list that happens to mention a checkbox.
+    if (!items.length || boxes.length !== items.length)
+      continue
+    ul.classList.add('tasklist')
+    for (const li of items) {
+      const box = li.querySelector('input[type="checkbox"]')
+      if (box.checked || box.hasAttribute('checked'))
+        li.classList.add('done')
+      box.remove()
+    }
   }
   return tpl.innerHTML
 }
