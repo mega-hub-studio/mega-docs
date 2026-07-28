@@ -37,6 +37,7 @@ const (
 	thanks
 	identity
 	capability
+	runtimeMeta
 )
 
 // Matched against the whole question, lowercased and trimmed of punctuation. Anchored on
@@ -53,6 +54,11 @@ var smallTalkPatterns = []struct {
 	{thanks, regexp.MustCompile(`^(c(a|á)m ơn|c(a|ả)m ơn( b(a|ạ)n)?|thanks|thank you|thx|ok|okay|được rồi)$`)},
 	{identity, regexp.MustCompile(`^(b(a|ạ)n l(a|à) ai|ai đ(a|ấ)y|who are you|what are you|introduce yourself)$`)},
 	{capability, regexp.MustCompile(`^(b(a|ạ)n l(a|à)m đư(o|ợ)c g(i|ì)|gi(u|ú)p g(i|ì)|help|what can you do|how do i use (this|you))$`)},
+	// The model is the one piece of runtime the app *already publishes*: /api/health reports
+	// it and the status line prints it under every answer. Refusing to name it while it is
+	// on screen reads as broken, and it cost a completion each time — measured at 1414ms on
+	// the deployed instance for "model gì", with the answer visible two centimetres below.
+	{runtimeMeta, regexp.MustCompile(`^((d(u|ù)ng |b(a|ạ)n d(u|ù)ng )?model (g(i|ì)|n(a|à)o)|what model( (are you|do you use))?|which model)$`)},
 }
 
 // Vietnamese if the question carries a Vietnamese-only letter, English otherwise. Crude on
@@ -135,6 +141,25 @@ func smallTalkReply(kind smallTalkKind, vi bool) string {
 			"3. **A route to a BA** when the documents are missing something — the BA's answer is " +
 			"written back as a document and indexed, so the next person just gets it.\n\n" +
 			"Asking the exact same question again is free: answers are cached against the corpus."
+	case runtimeMeta:
+		// Pointing at the status line rather than repeating the name: the model is
+		// config (CHAT_MODEL), it reaches the UI through /api/health, and a second
+		// spelling of it here is a second thing to keep in step with the first.
+		if vi {
+			return "Model đang dùng được ghi ở **status line** dưới đáy màn hình, cạnh số token " +
+				"và chi phí của câu trả lời vừa rồi — nó đọc từ `/api/health`, nên luôn là model " +
+				"instance này thực sự gọi, không phải một cái tên viết cứng ở đâu đó.\n\n" +
+				"Đổi model là đổi `CHAT_MODEL` trong `.env` rồi restart. Lưu ý: model nằm trong " +
+				"cache signature, nên đổi model làm mất hiệu lực toàn bộ câu trả lời đã cache — " +
+				"đúng như vậy, vì một câu trả lời do model khác sinh ra là một câu trả lời khác."
+		}
+		return "The model in use is on the **status line** at the bottom of the screen, next to " +
+			"the token count and cost of the last answer — it comes from `/api/health`, so it is " +
+			"always the model this instance actually calls rather than a name written down " +
+			"somewhere.\n\n" +
+			"To change it, set `CHAT_MODEL` in `.env` and restart. Note that the model is part of " +
+			"the cache signature, so changing it invalidates every cached answer — which is " +
+			"correct: an answer produced by a different model is a different answer."
 	case notSmallTalk:
 		return ""
 	}

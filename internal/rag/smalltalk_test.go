@@ -42,6 +42,27 @@ func TestARealQuestionIsNeverAnsweredAsConversation(t *testing.T) {
 	}
 }
 
+// The model is already on the status line under every answer, so refusing to name it is
+// incoherent — and it cost a completion: 1414ms measured on the deployed instance.
+func TestTheModelQuestionIsAnsweredNotRefused(t *testing.T) {
+	for _, q := range []string{"model gì", "model nào", "dùng model gì", "bạn dùng model nào", "what model", "which model", "what model are you"} {
+		got, ok := smallTalk(q)
+		if !ok {
+			t.Errorf("%q was not recognised — it returns NoAnswer while the status line shows the answer", q)
+			continue
+		}
+		if !strings.Contains(got, "CHAT_MODEL") {
+			t.Errorf("%q did not point at the setting that changes it: %.60q", q, got)
+		}
+	}
+	// But a question about a model *in the documents* is a real question.
+	for _, q := range []string{"model dữ liệu booking gồm gì", "what model does the pricing service use"} {
+		if _, ok := smallTalk(q); ok {
+			t.Errorf("%q was swallowed as conversation instead of being retrieved", q)
+		}
+	}
+}
+
 // Answering in the language it was asked in, because the app is bilingual and a Vietnamese
 // greeting answered in English reads as the wrong product.
 func TestConversationAnswersInTheLanguageAsked(t *testing.T) {
