@@ -264,9 +264,9 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 
 /* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
    wide, was squeezed into 289, and its 16px labels rendered at about 4px. The natural
-   width is pinned in JS (diagram.fit — it lives in the viewBox, where CSS cannot reach
-   it) and the scrolling is the library's own .mermaid-view, so the page itself never
-   scrolls sideways.
+   width is read from the viewBox in JS (diagram.onRender — CSS cannot reach it) and the
+   scrolling is the library's own .mermaid-view, so the page itself never scrolls
+   sideways.
 
    Height is capped for the same reason in the other direction: a tall flowchart would
    push the answer's citations off screen, and the sources are the point. */
@@ -294,6 +294,38 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
+}
+
+/* ── wide screens: the diagram leaves the reading column ──
+   Squeezing a flowchart is the viewport's fault on a phone and the *column's* fault
+   here. 760px is the right measure for prose and the wrong one for a drawing: measured
+   at 1755px the diagram had 545px and the window had a thousand pixels doing nothing on
+   either side of it. So the box — which is already a framed panel of its own, border and
+   background from the library — bleeds symmetrically out of the column, by whichever is
+   smaller:
+
+     --want  what the drawing asks for. --dgm-w is its viewBox width, published on the
+             element by diagram.onRender; the padding and border added to it are
+             .mermaid-view's own, and every box here is border-box.
+     --room  what the window has left, minus a gutter. 100vw counts the scrollbar and
+             --sp-6 absorbs it with margin to spare.
+
+   Both terms floor at 0px, so nothing overhangs: a diagram narrower than the column asks
+   for nothing rather than sitting in an empty panel, and one with no viewBox keeps
+   exactly today's width. Only the width changes — a drawing too big for even this is
+   still scrolled inside .mermaid-view, and still opens full size in the viewer.
+
+   The breakpoint is where the bleed is first worth having. Below it the column already
+   *is* the window and the arithmetic yields a few pixels, which is not a wider diagram,
+   it is a box that looks misaligned with the card it sits in. */
+@media (min-width: 1080px) {
+  .prose nes-mermaid {
+    --want: calc((var(--dgm-w, 0px) + 2 * (var(--sp-4) + var(--bw-2)) - 100%) / 2);
+    --room: calc((100vw - 100%) / 2 - var(--sp-6));
+    --bleed: max(0px, min(var(--want), var(--room)));
+    inline-size: calc(100% + 2 * var(--bleed));
+    margin-inline: calc(-1 * var(--bleed));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

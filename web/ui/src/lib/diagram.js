@@ -68,6 +68,21 @@ export function hasDiagram(markdown) {
    one tap opens the same drawing full-screen where it can be panned and pinched. */
 
 /**
+ * The width the drawing was made for, in px — 0 when it does not say.
+ *
+ * It lives in the viewBox and nowhere else: an SVG with a viewBox has no intrinsic
+ * width, so CSS `width: auto` resolves against the container again and the diagram is
+ * whatever the column happens to be. Both callers that need the real number are in this
+ * file — the viewer sizes its copy by it, and the answer sizes its box by it.
+ *
+ * @param {Element} svg
+ */
+function naturalWidth(svg) {
+  const box = svg?.getAttribute?.('viewBox')?.trim().split(/[\s,]+/)
+  return box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0
+}
+
+/**
  * Mark a freshly drawn diagram as openable, and say so.
  *
  * Called from the library's own `nes:render` event. Nothing happens for a diagram that
@@ -76,9 +91,17 @@ export function hasDiagram(markdown) {
  * @param {Element} host the <nes-mermaid> that just drew
  */
 export function onRender(host) {
-  if (!host?.querySelector?.('svg') || host.dataset.zoomable)
+  const svg = host?.querySelector?.('svg')
+  if (!svg || host.dataset.zoomable)
     return
   host.dataset.zoomable = '1'
+  // Hand the drawing's own width to CSS. styles.css widens the box out of the reading
+  // column up to this and no further: past it the panel is empty, short of it the text
+  // is the shrunk 4px labels the viewer exists to rescue. A diagram with no viewBox
+  // publishes nothing and keeps the column's width, which is today's behaviour.
+  const width = naturalWidth(svg)
+  if (width)
+    host.style.setProperty('--dgm-w', `${width}px`)
   host.setAttribute('role', 'button')
   host.setAttribute('tabindex', '0')
   host.setAttribute('aria-label', 'Open this diagram full screen')
@@ -92,9 +115,8 @@ export function onRender(host) {
  * Put a copy of a diagram into the viewer at its natural size.
  *
  * A copy, not the original: moving the node out of the answer would leave a hole in it
- * and lose the drawing when the dialog closes. The width comes from the viewBox because
- * that is the only place it exists — an SVG with a viewBox has no intrinsic width, so
- * CSS `width: auto` just resolves against the container again.
+ * and lose the drawing when the dialog closes. `naturalWidth` says why the size has to
+ * be read rather than left to CSS.
  *
  * @param {Element} into an empty container inside the dialog
  * @param {Element} host the <nes-mermaid> that was tapped
@@ -105,8 +127,7 @@ export function zoomInto(into, host) {
   if (!into || !svg)
     return false
   const copy = svg.cloneNode(true)
-  const box = svg.getAttribute('viewBox')?.trim().split(/[\s,]+/)
-  const width = box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0
+  const width = naturalWidth(svg)
   if (width) {
     copy.style.inlineSize = `${width}px`
     copy.style.maxInlineSize = 'none'

@@ -98,3 +98,5 @@ it, so trust the table.
   testable with **no API key and no network**.
 - Never put a real key in a file, a command line, or a commit. Keys come from `.env`,
   which is gitignored.
+- A commit message follows [`.vscode/commit.instruction.md`](.vscode/commit.instruction.md) —
+  the only place this repo's version lives.

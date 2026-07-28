@@ -46,11 +46,15 @@ func TestAColumnReachesAnExistingDatabase(t *testing.T) {
 	}
 	defer func() { _ = s.Close() }()
 
-	has, err := s.hasColumn("documents", "doc_version")
-	if err != nil {
+	// Asked here rather than through a helper: one caller, and a helper with one caller is
+	// the dead code `make dead` reported.
+	var has int
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'doc_version'`,
+	).Scan(&has); err != nil {
 		t.Fatal(err)
 	}
-	if !has {
+	if has == 0 {
 		t.Fatal("the column did not reach the existing database — the runner is not doing its job")
 	}
 
