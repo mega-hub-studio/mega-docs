@@ -39,6 +39,22 @@ func TestPlumbingDoesNotImportVue(t *testing.T) {
 	if len(files) < 6 {
 		t.Fatalf("only %d files under %s/lib — has the layer moved?", len(files), uiSrc)
 	}
+	// This rule asserts an *absence*, so a pattern that matches nothing at all passes it
+	// for the wrong reason. The composables layer is the positive control: every file in it
+	// imports from vue by definition, so if the pattern finds none there it is broken, not
+	// satisfied. (It was, once — a reformat to single quotes silently disarmed it.)
+	control := filesIn(t, filepath.Join(uiSrc, "composables"), ".js")
+	matched := 0
+	for _, path := range control {
+		if reImportsVue.MatchString(readFile(t, path)) {
+			matched++
+		}
+	}
+	if matched == 0 {
+		t.Fatalf("reImportsVue matched none of the %d composables, which all import from vue — "+
+			"the pattern no longer matches this source, so this rule is not being enforced",
+			len(control))
+	}
 	for _, path := range files {
 		if reImportsVue.MatchString(readFile(t, path)) {
 			t.Errorf("%s imports vue. That file is plumbing: it must run in a bare console, "+
@@ -58,14 +74,23 @@ func TestComposablesDoNotImportEachOther(t *testing.T) {
 	if len(files) < 8 {
 		t.Fatalf("only %d composables — has the layer moved?", len(files))
 	}
+	seen := 0
 	for _, path := range files {
 		for _, m := range reImport.FindAllStringSubmatch(readFile(t, path), -1) {
+			seen++
 			if strings.HasPrefix(m[1], "./") && strings.HasSuffix(m[1], ".js") {
 				t.Errorf("%s imports %s — a composable may not reach for another composable's "+
 					"state. Pass what it needs in (a getter for anything reactive it does not "+
 					"own), or the flat set of files becomes a graph.", path, m[1])
 			}
 		}
+	}
+	// Every composable imports at least `ref` or `computed` from vue, so zero means the
+	// pattern stopped matching the source — not that the tree got clean. That is the failure
+	// this assertion exists for: it happened once, when the quote style changed.
+	if seen == 0 {
+		t.Fatalf("parsed %d import statements across %d composables — reImport no longer "+
+			"matches this source, so this rule is not being enforced", seen, len(files))
 	}
 }
 
@@ -99,7 +124,14 @@ func TestComponentsHoldNoLogic(t *testing.T) {
 // a surprise.
 func TestTheShellDoesNotReachForTransport(t *testing.T) {
 	const allowed = "./lib/viewport.js"
-	for _, m := range reImport.FindAllStringSubmatch(scriptOf(t, filepath.Join(uiSrc, "App.vue")), -1) {
+	imports := reImport.FindAllStringSubmatch(scriptOf(t, filepath.Join(uiSrc, "App.vue")), -1)
+	// The shell composes every composable and mounts every component, so a single-digit
+	// count means the pattern stopped matching rather than the shell going quiet.
+	if len(imports) < 8 {
+		t.Fatalf("parsed only %d imports in App.vue — reImport no longer matches this source, "+
+			"so this rule is not being enforced", len(imports))
+	}
+	for _, m := range imports {
 		if strings.HasPrefix(m[1], "./lib/") && m[1] != allowed {
 			t.Errorf("App.vue imports %s. The shell wires; transport and rendering belong "+
 				"behind a composable or a component. (%s is the one exception: it binds to "+
@@ -155,8 +187,14 @@ func stripComments(src string) string {
 }
 
 var (
-	reImportsVue   = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+"vue"`)
-	reImport       = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?"([^"]+)"`)
+	// Both quote styles, deliberately. These read JavaScript as *text*, so a formatting
+	// choice must not be able to disarm them — and one already did: the day eslint-stylistic
+	// started enforcing single quotes, a `"vue"`-only pattern matched nothing and rules 9, 10
+	// and 12b passed vacuously while `make check` stayed green. A regex enforcer that finds
+	// nothing looks exactly like a codebase with nothing to find, which is why the tests
+	// below also assert they parsed something.
+	reImportsVue = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+['"]vue['"]`)
+	reImport     = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?['"]([^'"]+)['"]`)
 	reScript       = regexp.MustCompile(`(?s)<script setup>(.*?)</script>`)
 	reBranch       = regexp.MustCompile(`(?m)^\s*(?:if|for|while|switch)\s*\(`)
 	reBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
