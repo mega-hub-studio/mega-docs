@@ -19,6 +19,12 @@
       "skillPath": "skills/building-components/SKILL.md",
       "computedHash": "20889af7cb9b3abca1e38824f7fffaa873eb0cc4d45187967b97bd85462cf934"
     },
+    "code-documenter": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-documenter/SKILL.md",
+      "computedHash": "49709db09641a9ab4196459835bfcbe565eb0581c23cb4eeb50ff80d2af88272"
+    },
     "golang-code-style": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
