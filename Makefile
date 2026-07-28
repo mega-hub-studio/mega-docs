@@ -18,6 +18,25 @@ UNIT ?= knowledge
 PORT ?= $(shell sed -n 's/^PORT=//p' .env 2>/dev/null | tail -1)
 HEALTH := http://127.0.0.1:$(or $(PORT),8080)/api/health
 
+# The supervisor is the only part of a deploy that is not portable: the binary, the .env, the
+# health check and the way it is published are the same on both. So it is two variables and
+# not a second target — a macOS copy of `deploy` would carry its own drifting version of the
+# four guards documented above it. Before this, `make deploy` on a Mac built the new binary
+# and then died on `systemctl`, leaving the old process serving and the log reading like a
+# deploy had happened.
+#
+# `kickstart -k` restarts an already-bootstrapped job and fails if there is none, which is
+# what `systemctl restart` does with an unknown unit — a missing agent must not look like a
+# successful deploy. Installing it is a first-install step, on the Deploy page.
+ifeq ($(shell uname -s),Darwin)
+LABEL  ?= dev.megadocs.knowledge
+RESTART := launchctl kickstart -k gui/$(shell id -u)/$(LABEL)
+STATUS  := launchctl print gui/$(shell id -u)/$(LABEL)
+else
+RESTART := sudo systemctl restart $(UNIT)
+STATUS  := systemctl status --no-pager -n 20 $(UNIT)
+endif
+
 # Where `go install` puts a tool, which is where the targets that install one look for it.
 # GOBIN wins when it is set, or `dead-deps` installs on every run and finds nothing.
 GOBIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
@@ -263,12 +282,12 @@ build:
 #               this host, so a local commit turned an upgrade into a half-finished rebase
 #               with a conflicted lockfile — mid-deploy, on the machine serving the team.
 #               --ff-only refuses instead, and says so while the old binary is still running.
-#   stale UI    web/dist is committed and embedded, and this host has no Node to rebuild it.
-#               A push that forgot `make ui` deploys a binary whose UI predates the change,
-#               which looks like the deploy silently did nothing. That test names it.
+#   stale UI    web/dist is committed and embedded, and a deploy host may have no Node to
+#               rebuild it. A push that forgot `make ui` deploys a binary whose UI predates
+#               the change, which looks like the deploy silently did nothing. That test names it.
 #   revision    printed before and after, so the log line answers "did this change anything?"
-#   health      a restart that fails leaves systemd retrying and the old answer cached in
-#               somebody's browser. Not verifying is how a broken deploy stays quiet.
+#   health      a restart that fails leaves the supervisor retrying and the old answer cached
+#               in somebody's browser. Not verifying is how a broken deploy stays quiet.
 #
 # Deliberately not here: `make ui`, `make check-full` (Node, and a browser, neither of which
 # a deploy host has) and any `git push`. This target only moves this machine to what origin
@@ -280,13 +299,13 @@ deploy:
 	@go test -tags "$(TAGS)" -count=1 -run TestBuiltUIMatchesItsSources ./web/ \
 		|| { echo "  refusing: web/dist is stale — run \`make ui\` where Node is, commit it, push"; exit 1; }
 	@$(MAKE) --no-print-directory build
-	sudo systemctl restart $(UNIT)
+	$(RESTART)
 	@for i in $$(seq 1 20); do \
 		curl -sf -o /dev/null "$(HEALTH)" && break || sleep 0.5; \
 	done; \
 	curl -sf "$(HEALTH)" | grep -q '"ok":true' \
 		|| { echo "  FAILED: $(UNIT) did not answer $(HEALTH) after the restart"; \
-		     systemctl status --no-pager -n 20 $(UNIT); exit 1; }
+		     $(STATUS); exit 1; }
 	@echo "  deployed: $$(git rev-parse --short HEAD) — $$(curl -s $(HEALTH))"
 
 # Probe a real provider: does it have both endpoints, what embedding width, does

@@ -558,15 +558,27 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
       <div class="card">
         <div class="head"><span class="title" lang="en">macOS</span><span class="title" lang="vi">macOS</span></div>
         <p lang="en">No systemd. <code>launchd</code> is the equivalent, and a user agent
-          needs no root — put this at
+          needs no root — so the deploy directory is under <code>$HOME</code> here rather than
+          <code>/opt</code>, which is what makes that true. Put this at
           <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
         <p lang="vi">Không có systemd. <code>launchd</code> là thứ tương đương, và một user
-          agent thì không cần root — đặt file này ở
-          <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
-        <div class="terminal"><span class="out">&lt;key&gt;Label&lt;/key&gt;            &lt;string&gt;dev.megadocs.knowledge&lt;/string&gt;
-&lt;key&gt;ProgramArguments&lt;/key&gt; &lt;array&gt;&lt;string&gt;/opt/knowledge/bin/knowledge&lt;/string&gt;&lt;/array&gt;
-&lt;key&gt;WorkingDirectory&lt;/key&gt; &lt;string&gt;/opt/knowledge&lt;/string&gt;
-&lt;key&gt;KeepAlive&lt;/key&gt;        &lt;true/&gt;</span><span class="cmd">launchctl load ~/Library/LaunchAgents/dev.megadocs.knowledge.plist</span></div>
+          agent thì không cần root — nên ở đây thư mục deploy nằm trong <code>$HOME</code> chứ
+          không phải <code>/opt</code>, chính điều đó làm cho "không cần root" là thật. Đặt
+          file này ở <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
+        <div class="terminal"><span class="out">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;             &lt;string&gt;dev.megadocs.knowledge&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;  &lt;array&gt;
+    &lt;string&gt;/Users/you/srv/knowledge/bin/knowledge&lt;/string&gt;&lt;/array&gt;
+  &lt;key&gt;WorkingDirectory&lt;/key&gt;  &lt;string&gt;/Users/you/srv/knowledge&lt;/string&gt;
+  &lt;key&gt;KeepAlive&lt;/key&gt;         &lt;true/&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;   &lt;string&gt;/Users/you/srv/knowledge/state/knowledge.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt; &lt;string&gt;/Users/you/srv/knowledge/state/knowledge.log&lt;/string&gt;
+&lt;/dict&gt;&lt;/plist&gt;</span><span class="cmd">launchctl bootstrap gui/$UID ~/Library/LaunchAgents/dev.megadocs.knowledge.plist</span><span class="out"># launchctl load is deprecated; bootstrap is the verb
+# every path inside a plist is absolute — launchd does not expand ~
+# there is no journalctl: the two log keys are where output goes</span></div>
       </div>
     </div>
 
@@ -585,6 +597,33 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
         <code>config.Load()</code> đọc <code>./.env</code> theo thư mục làm việc. Dòng
         <code>WorkingDirectory</code> ở trên là thứ làm cách thứ hai chạy được, và đó là cách
         không phải nhét key vào plist.</span>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">A Mac that sleeps is a Mac that is offline.</b>
+      <span lang="en">This is the macOS half of the WSL note above, and it looks identical to
+        the reader: the URL stops answering and nothing is wrong with the app. A laptop sleeps
+        on idle by default, and neither a tunnel nor a tailnet reliably wakes it. A user agent
+        also runs only while somebody is logged in, so after a reboot nothing serves until
+        they are. Take the sleep away on mains power only — <code>sudo pmset -c sleep 0</code> —
+        so it is a server while plugged in and a laptop on battery. Wrapping the binary in
+        <code>caffeinate -s</code> does the same job but on battery too, which is a flat
+        tax on a machine somebody carries. If it must survive a reboot with nobody logged in,
+        that is a <code>LaunchDaemon</code> in <code>/Library/LaunchDaemons</code> with a
+        <code>UserName</code> key — root, and FileVault still holds it until the disk is
+        unlocked once.</span>
+      <b lang="vi">Mac ngủ là Mac offline.</b>
+      <span lang="vi">Đây là nửa macOS của phần WSL ở trên, và với người dùng thì hai thứ
+        giống nhau y hệt: URL không trả lời, mà app thì không có lỗi gì. Laptop mặc định ngủ
+        khi rảnh, và cả tunnel lẫn tailnet đều không đánh thức nó một cách đáng tin. User agent
+        cũng chỉ chạy khi có người đã login, nên sau reboot thì không có gì phục vụ cho tới khi
+        có người đăng nhập. Chỉ bỏ sleep khi cắm điện — <code>sudo pmset -c sleep 0</code> —
+        để cắm sạc là server, rút sạc là laptop bình thường. Bọc binary trong
+        <code>caffeinate -s</code> cũng được, nhưng nó chặn sleep cả khi dùng pin, tức thu thuế
+        đều đặn trên một cái máy người ta mang đi. Nếu bắt buộc phải sống qua reboot mà không
+        ai login, thì đó là <code>LaunchDaemon</code> ở <code>/Library/LaunchDaemons</code> kèm
+        key <code>UserName</code> — cần root, và FileVault vẫn giữ nó lại tới khi có người mở
+        khoá đĩa một lần.</span>
     </div>
 
     <p lang="en">Re-index by hand, with the same one-liner, whenever the documents
