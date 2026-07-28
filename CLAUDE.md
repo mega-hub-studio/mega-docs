@@ -41,6 +41,39 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 14 | `go build`, `go install` and `git pull && make build` need **no Node**: `web/dist` is built by `make ui` and committed | `TestBuiltUIMatchesItsSources` (stale bundle), plus CI rebuilds from the lockfile and diffs |
 | 15 | Every feature a section documents names its routes, knobs and tests — and every `/api/` route and every variable `internal/config` reads is named by some section | `TestEverySpecNameExistsInTheCode`, `TestEveryRouteAndKnobIsSpecified` |
 | 16 | `spec.json` and `llms.txt` are generated from the pages, never written by hand | `TestSpecJSONIsGeneratedFromThePages`, `TestLLMsIndexListsEveryPage` |
+| 17 | **KISS, taken to the extreme: the smallest correct change, and a second copy of a fact is a bug.** Delete before you add | `make dead` (unreachable from any binary) · `make lint` (unused, dupl, goconst) · the rest is `prose only` |
+| 18 | **Four root documents, one job each.** A fifth is a parallel truth | `TestRootDocsAreTheFourWeKnowAbout` |
+| 19 | `README-MEGA-DOCS.md` is the **vNext brief, not the spec.** Code disagreeing with it is a gap with a recorded decision, never a bug to fix on sight | `TestRootDocsAreTheFourWeKnowAbout` (the join must stay in README.md) |
+
+Rule 17 is the one to apply before the other sixteen, because most of them exist to stop a
+second copy of something. Taken literally, in the order to try them:
+
+1. **Delete it.** Dead config, a knob nobody turns, a paragraph that restates the paragraph
+   above. `.env` used to set nine keys to their own defaults from `internal/config` — nine
+   numbers with two homes, and `ASSET_BASE`, which the code had already stopped reading.
+2. **Point at it.** A fact belongs to one file; everything else links. `changelog/` owns a
+   decision, `README.md` the reference, a guide `<section>` a feature.
+3. **Only then write it**, and write the smallest thing that is correct.
+
+The failure it prevents is not verbosity, it is *drift*: two copies of one fact are one
+copy plus a lie with a delay on it, and an agent that reads both loads the lie too.
+
+Rules 18–19 are that rule pointed at the documentation, and they are what keeps an agent's
+context clean — four files, no overlap, so reading the tree costs four reads and returns one
+answer per question:
+
+| file | owns | must not contain |
+|---|---|---|
+| `README.md` | the reference: file-by-file, "where do I add…?", the HTTP surface, the Now vs vNext join | rules, or a decision's history |
+| `CLAUDE.md` | these rules, the commands, the architecture and the traps | a feature description, or anything a test already asserts in prose form |
+| `AGENTS.md` | the two facts agents get wrong, and the **pinned** design-system docs | anything not aimed at an agent |
+| `README-MEGA-DOCS.md` | the vNext brief — the product this is becoming | any claim about what the code does today |
+
+The join between the last two is `README.md`'s **Now vs vNext** table: shipped, next, or
+blocked-and-on-what, with the decision in `changelog/`. Read it before implementing anything
+from the brief — three of its lines are settled decisions *against* the brief
+(`2026-07-28-vnext-collisions.md`, `2026-07-28-sot-decision.md`), and re-deriving them costs
+a day and lands on the wrong answer.
 
 Rules 15–16 are what make the guide pages the **spec** rather than a description of the
 code. A `<section>` that maps to code declares the mapping in its own markup:

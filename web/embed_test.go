@@ -451,3 +451,51 @@ func TestLLMsIndexListsEveryPage(t *testing.T) {
 		t.Error("want an error for an empty site base")
 	}
 }
+
+// ── the documentation set ─────────────────────────────────────────────────────
+
+// TestRootDocsAreTheFourWeKnowAbout guards critical rules 17–19: four root documents,
+// one job each, and the vision doc joined to reality in exactly one place.
+//
+// A fifth root .md is how a parallel truth starts — somebody writes NOTES.md or
+// ROADMAP.md, it disagrees with one of these four within a week, and every agent that
+// reads the tree now loads two answers to the same question. Adding one is allowed;
+// doing it silently is not, and this is the conversation.
+func TestRootDocsAreTheFourWeKnowAbout(t *testing.T) {
+	t.Parallel()
+
+	found, err := filepath.Glob("../*.md")
+	if err != nil {
+		t.Fatalf("globbing root docs: %v", err)
+	}
+	var got []string
+	for _, p := range found {
+		got = append(got, filepath.Base(p))
+	}
+	sort.Strings(got)
+
+	// README.md reference · CLAUDE.md rules + architecture · AGENTS.md the pins agents
+	// get wrong · README-MEGA-DOCS.md the vNext brief. Anything else belongs in
+	// changelog/ (a decision) or a guide page (a feature).
+	want := []string{"AGENTS.md", "CLAUDE.md", "README-MEGA-DOCS.md", "README.md"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("root docs are %v, want exactly %v — a fifth root document is a second\n"+
+			"place the truth can live. Put a decision in changelog/ and a feature in its\n"+
+			"guide section; if this file really is a fifth pillar, give it a job in\n"+
+			"CLAUDE.md rule 18 and add it here in the same commit.", got, want)
+	}
+
+	// The brief describes a product this code is not yet, so README.md carries the join:
+	// which lines already hold, which are next, and which are blocked and on what. Delete
+	// the join and README-MEGA-DOCS.md silently reads as a description of the tree.
+	readme, err := os.ReadFile("../README.md")
+	if err != nil {
+		t.Fatalf("README.md is the file-by-file reference; it must exist: %v", err)
+	}
+	for _, want := range []string{"Now vs vNext", "README-MEGA-DOCS.md"} {
+		if !strings.Contains(string(readme), want) {
+			t.Errorf("README.md no longer contains %q — the vNext brief is then an\n"+
+				"unjoined wish list, and the next agent reads it as the spec.", want)
+		}
+	}
+}
