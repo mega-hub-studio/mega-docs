@@ -114,7 +114,7 @@ export async function health() {
   try {
     const res = await fetch('/api/health')
     if (!res.ok)
-      return { online: false, writes: false, site: '' }
+      return { online: false, writes: false }
     const body = await res.json()
     // The runtime fields are what the status line reports. Absent or zero means
     // "unknown", and the strip prints nothing rather than a zero — an unmeasured
@@ -122,10 +122,6 @@ export async function health() {
     return {
       online: true,
       writes: !!body.writes,
-      // Where the published guide lives. It used to be templated into index.html; the
-      // bundle is a static file now, so the address arrives with everything else the
-      // server knows.
-      site: body.site || '',
       model: body.model || '',
       window: body.window || 0,
       priceIn: body.price_in || 0,
@@ -133,6 +129,6 @@ export async function health() {
     }
   }
   catch {
-    return { online: false, writes: false, site: '', model: '', window: 0, priceIn: 0, priceOut: 0 }
+    return { online: false, writes: false, model: '', window: 0, priceIn: 0, priceOut: 0 }
   }
 }

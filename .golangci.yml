@@ -57,7 +57,8 @@ linters:
     - gosec
     - bidichk
     - bodyclose
-    - noctx
+    # noctx is deliberately NOT here — it is in the disable list below, with the reason.
+    # Listing it in both is how a reader concludes it runs when it does not.
     - containedctx
     - fatcontext
     - sqlclosecheck

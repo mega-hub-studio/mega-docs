@@ -48,10 +48,6 @@ type Runtime struct {
 	Window   int
 	PriceIn  float64
 	PriceOut float64
-	// Site is where the guide is published. The app's header links it, and the bundle
-	// is a static file that cannot be told at build time — so it arrives here, with
-	// everything else this instance knows about itself.
-	Site string
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -79,8 +75,8 @@ func New(d Deps) http.Handler {
 	// asked for them on screen. The engine itself still refuses to discuss them —
 	// that rule is about what a *document* answer may contain.
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"site":%q,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
-		d.BAPass.enabled(), d.Runtime.Site, d.Runtime.Model, d.Runtime.Window,
+		`{"ok":true,"writes":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
+		d.BAPass.enabled(), d.Runtime.Model, d.Runtime.Window,
 		d.Runtime.PriceIn, d.Runtime.PriceOut)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

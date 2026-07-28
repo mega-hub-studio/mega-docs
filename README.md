@@ -38,10 +38,15 @@ decisions in [`changelog/`](changelog/), and what an agent gets wrong in
 cp .env.example .env      # then set AI_API_KEY; everything else is already its default
 make deps                 # go mod tidy
 
-# 1) Index your docs (folder or files; .md/.txt only)
+# 1) Put at least one document in docs/ — the folder ships EMPTY (a .gitkeep and
+#    nothing else), and `ingest` exits non-zero on "nothing was indexed" rather than
+#    reporting success over an empty index.
+cp README.md docs/        # or your own .md / .txt files
+
+# 2) Index it (folder or files; .md/.txt only)
 make ingest DOCS=./docs
 
-# 2) Start the chat server
+# 3) Start the chat server
 make server               # http://localhost:8080
 ```
 
@@ -70,7 +75,8 @@ decisions against it**, and re-deriving them lands on the wrong answer.
 | One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
 | WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
 | Three roles (Admin · BA · DEV) | two shared passwords, no accounts. Next: `gate(role)` + `ADMIN_PASS`, ~15 lines, no schema | 🟡 **next** |
-| Removed: Git sync | `scripts/corpus-sync.sh` is still the **only backup that exists**, on a `.path` unit. It goes when the off-box DB backup lands — not before | 🟡 **pending** |
+| Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **Nothing backs the corpus up automatically now**; that is the accepted cost | ✅ **decided** |
+| Cross-OS self-host (WSL2 · macOS) | one binary, no runtime; the tooling was already portable (`openssl dgst`, not `sha384sum`). Both supervisors documented on the Deploy page | ✅ **shipped** |
 | Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). Migration runner shipped; **off-box DB backup** has not | ⛔ **blocked** |
 
 The four rows that are a decision rather than a queue position:
@@ -95,10 +101,14 @@ The four rows that are a decision rather than a queue position:
   guide's own advice is that an error code beats a paraphrase. "One pipeline" is already
   true in the sense that matters — one path a question travels, one `Answer`. Invariant 4
   and `TestScopedSearchRanksWithinTheScope` stay with it.
-- **Git sync**: the brief removes it and the corpus will indeed stop living in git — but
-  `corpus-sync.sh` is what backs the corpus up *today*, and its replacement is the off-box
-  DB backup above. Deleting it first would leave a live deployment with no backup at all.
-  → [`changelog/2026-07-28-scope-decisions.md`](changelog/2026-07-28-scope-decisions.md)
+- **Git sync and folder watch are gone**, and with them the only thing that backed the
+  corpus up. That was raised as a risk and accepted deliberately: the brief removes both,
+  and carrying automation the brief deletes in order to protect a backup the brief does not
+  ask for is the redundancy this cleanup exists to remove. Backing up is now an operator
+  action — `git -C docs commit` — stated as such on the Deploy page. Whatever replaces it
+  arrives with the off-box DB backup above, not before.
+  → [`changelog/2026-07-28-drop-corpus-sync.md`](changelog/2026-07-28-drop-corpus-sync.md)
+  · [`scope-decisions`](changelog/2026-07-28-scope-decisions.md)
   · [`vnext-collisions`](changelog/2026-07-28-vnext-collisions.md)
 
 ## The published guide
@@ -125,9 +135,10 @@ an [llmstxt.org](https://llmstxt.org) index built by `cmd/rendocs` from the page
 themselves, so it cannot drift from them.
 
 The app binary does **not** serve the guide, and must not learn how: a second copy inside
-the app is noise on the surface people came to use, plus a copy to drift. It carries one
-link out (`SITE_URL`). Build the pages locally with
-`go run ./cmd/rendocs -d /tmp/site -base /vendor`.
+the app is noise on the surface people came to use, plus a copy to drift. It does not link
+out to it either — the guide is published from here on its own cadence, and an address
+compiled into a running server is one more thing to update when it moves. Build the pages
+locally with `go run ./cmd/rendocs -d /tmp/site -base /vendor`.
 
 *Published by CI on every push to `main` that touches the guide. If you fork this: turn
 Pages on once under Settings → Pages → Source **GitHub Actions**. A workflow token cannot

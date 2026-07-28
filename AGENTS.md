@@ -28,8 +28,8 @@ stays red until those names exist in the code. An `/api/` route or a config vari
 no section documents fails the build. The five steps are on the Dev page under
 ["These pages are the spec"](https://mega-hub-studio.github.io/mega-docs/dev.html#spec).
 
-The app binary does **not** serve these pages — it is the chat app and nothing else,
-and it carries one link out to the published guide. Do not add doc routes to it.
+The app binary does **not** serve these pages, and does not link out to them either — it
+is the chat app and nothing else. Do not add doc routes to it.
 
 ## Two facts that are easy to get wrong
 

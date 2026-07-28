@@ -62,7 +62,6 @@ func run() error {
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
-			Site: cfg.SiteURL,
 		},
 	})
 
@@ -80,7 +79,23 @@ func run() error {
 	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s)",
 		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
+	warnIfKeyless(cfg)
 	return srv.ListenAndServe()
+}
+
+// warnIfKeyless says at startup what used to be discovered on the first question. An empty
+// AI_API_KEY is *legal* — internal/ai sends no Authorization header when there is no key,
+// which is correct for a keyless endpoint — so this is a warning and not a refusal, unlike
+// `ingest`, which cannot do its one job without embeddings and says so as an error.
+//
+// The failure it replaces: a server that starts clean, serves the UI, and then answers the
+// first question with a provider 401 that names neither the variable nor the file.
+func warnIfKeyless(cfg config.Config) {
+	if cfg.APIKey != "" {
+		return
+	}
+	log.Printf("WARNING: AI_API_KEY is not set. Chat will fail on the first question unless")
+	log.Printf("         AI_BASE_URL (%s) is a keyless endpoint. Set it in .env.", cfg.BaseURL)
 }
 
 func describe(a server.Auth) string {

@@ -20,14 +20,13 @@ import { health } from '../lib/chat.js'
 export function useRuntime() {
   const online = ref(true) // optimistic: the first check has not answered yet
   const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
-  const runtime = ref({ site: '', model: '', window: 0, priceIn: 0, priceOut: 0 })
+  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0 })
 
   async function check() {
     const h = await health()
     online.value = h.online
     writes.value = h.writes
     runtime.value = {
-      site: h.site,
       model: h.model,
       window: h.window,
       priceIn: h.priceIn,

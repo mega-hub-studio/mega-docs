@@ -38,8 +38,9 @@ Build a **Knowledge Engine Platform** for enterprises with:
 - Local LLMs
 - Local Embeddings
 - CLI import *(as a way **in**. `ingest` stays as an operator recovery tool)*
-- Folder watch
-- Git sync *(pending: `scripts/corpus-sync.sh` is still the only backup that exists)*
+- Folder watch *(done — the `corpus-sync.path` unit is gone)*
+- Git sync *(done 2026-07-28 — `scripts/corpus-sync.sh` deleted. Nothing backs the corpus
+  up automatically now; backing up is an operator action)*
 - Background sync
 - Hybrid **provider and import** pipelines — *not* hybrid retrieval: vector + BM25 fused
   with RRF **stays**, because BM25 is the half that matches an error code or a config key
@@ -179,6 +180,17 @@ No YAML.
 No manual config.
 
 Reuse NES component library before creating new components.
+
+## Self-host: cross-OS, fastest path
+One binary, no runtime, nothing fetched at start — so the same artifact self-hosts on
+**WSL2** and **macOS** as well as a Linux VM. Only the process supervisor differs, and that
+difference is documented rather than abstracted away: systemd on Linux/WSL2, `launchd` on
+macOS. No Docker, no orchestration, no per-OS build.
+
+Two platform facts that cost an hour each if undocumented, and are therefore on the Deploy
+page: WSL2 ships with **systemd off** (`/etc/wsl.conf` → `[boot] systemd=true`), and
+`launchd` has **no `EnvironmentFile=`**, so the process must start with the right working
+directory for `.env` to be found.
 
 ## Success Metrics
 - One knowledge source

@@ -5,6 +5,7 @@ name: Deploy guide
 # exists, and while it's down. One page per role, each with its own URL:
 #
 #   index.html   the Guide  (web/docs.html)   — everyone, then BA
+#   ba.html      the BA runbook (web/ba.html) — BA / PM / support
 #   dev.html     the Dev page (web/dev.html)  — DEV
 #   deploy.html  the Deploy runbook (web/deploy.html)
 #   llms.txt     the llmstxt.org index for AI agents — generated from the pages

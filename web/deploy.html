@@ -324,7 +324,7 @@ done: 8/8 files, 74 chunks</span></div>
   <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
        the build if one is missing: a knob nobody documented is a knob nobody finds. -->
   <section id="settings" data-feature="settings"
-           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,SITE_URL,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
            data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
@@ -374,8 +374,6 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>CHAT_MODEL</code></th><td><code>gpt-4o-mini</code></td><td>model viết câu trả lời. Đổi nó là xoá cache — có chủ ý, vì cùng câu hỏi sẽ trả lời khác</td></tr>
           <tr lang="en"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>the model that indexes. The MVP is fixed on this one: changing it needs every document re-embedded and a matching <code>EMBED_DIM</code>, so it is a migration rather than a setting</td></tr>
           <tr lang="vi"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>model đi index. MVP cố định ở model này: đổi thì phải embed lại mọi tài liệu và <code>EMBED_DIM</code> phải khớp, nên đó là một cuộc migration chứ không phải một setting</td></tr>
-          <tr lang="en"><th><code>SITE_URL</code></th><td>the published guide</td><td>only if you fork the docs: it is the address the app links out to</td></tr>
-          <tr lang="vi"><th><code>SITE_URL</code></th><td>trang guide đã publish</td><td>chỉ khi bạn fork tài liệu: đây là địa chỉ app trỏ ra ngoài</td></tr>
         </tbody>
       </table>
     </div>

@@ -18,7 +18,6 @@ type Config struct {
 	Port       string
 	DBPath     string
 	CorpusDir  string
-	SiteURL    string
 	BaseURL    string
 	EmbedURL   string
 	APIKey     string
@@ -35,16 +34,13 @@ type Config struct {
 	BAPass     string
 }
 
-// DefaultSiteURL is where the guide is published. The app links out to it (the address
-// reaches the front end through /api/health, because the bundle is a static file), and it
-// is the base of the absolute URLs in /llms.txt — which indexes the documentation rather
-// than this host, so a fork should point it at its own Pages site.
-//
-// There is no ASSET_BASE any more: the app's assets are bundled into web/dist by Vite and
-// served from this binary, so there is no CDN to switch away from and nothing to vendor.
-// The *docs* pages still load the design system from jsDelivr with SRI — they are static
-// files with no build step, and cmd/rendocs takes their base as a flag.
-const DefaultSiteURL = "https://mega-hub-studio.github.io/mega-docs"
+// There is no SITE_URL here, and no ASSET_BASE. The guide is published from this
+// repository to its own Pages domain on its own cadence, and the app no longer links out
+// to it — one product, one surface, and nothing in the binary that has to be told where
+// the documentation moved. The address the *pages* use to reference themselves is
+// cmd/rendocs' `-site` flag, which is where it belongs: it is a property of a render, not
+// of a running server. Assets are bundled into web/dist by Vite and served from here, so
+// there is no CDN to switch away from either.
 
 // Load reads .env (if present) into the environment, then the environment into a Config.
 // Existing environment variables win over .env, so a systemd unit or a one-off
@@ -62,7 +58,6 @@ func Load() Config {
 		// a markdown file. Keeping both on one path is what makes the database
 		// derived: this directory is the source of truth, so put it in git.
 		CorpusDir: env("CORPUS_DIR", "docs"),
-		SiteURL:   env("SITE_URL", DefaultSiteURL),
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
 		// Empty means "same as chat". Split it when a gateway serves
 		// /chat/completions but not /embeddings — a RAG index needs both.
@@ -98,20 +93,30 @@ func env(k, def string) string {
 	return def
 }
 
+// envFloat and envInt both say so when a value is set but unparseable, rather than
+// returning the default in silence. The silence was the bug: `TOP_K=six` or a price with a
+// comma for a decimal separator became the default, and the symptom — retrieval feels
+// wrong, the status line prices nothing — points nowhere near the .env line that caused it.
+// Same reasoning as loadDotEnv's own warning below.
+
 func envFloat(k string, def float64) float64 {
 	if v := os.Getenv(k); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
+		f, err := strconv.ParseFloat(v, 64)
+		if err == nil {
 			return f
 		}
+		log.Printf("config: %s=%q is not a number, using %v", k, v, def)
 	}
 	return def
 }
 
 func envInt(k string, def int) int {
 	if v := os.Getenv(k); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
+		n, err := strconv.Atoi(v)
+		if err == nil {
 			return n
 		}
+		log.Printf("config: %s=%q is not a whole number, using %d", k, v, def)
 	}
 	return def
 }

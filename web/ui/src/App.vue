@@ -176,16 +176,6 @@ function replay(entry) {
       {{ other }}
     </button>
 
-    <!-- One link out, to the published guide on its own domain. The app does not serve
-         the docs: a second copy inside the binary is noise here and a copy to drift.
-         The address arrives from /api/health, so SITE_URL stays a server setting and
-         this bundle stays a static file. rel=noopener because it opens in a new tab. -->
-    <a
-      v-if="runtime.site" class="btn ghost icon sm" :href="runtime.site" target="_blank"
-      rel="noopener" :aria-label="t('app.guide')"
-    >
-      <nes-icon name="info" />
-    </a>
     <button
       v-if="turns.length && mode === 'dev'" class="btn ghost icon sm"
       :aria-label="t('app.newQuestion')" @click="reset"

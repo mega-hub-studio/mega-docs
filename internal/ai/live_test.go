@@ -48,7 +48,8 @@ func TestLiveEmbeddings(t *testing.T) {
 		if strings.Contains(err.Error(), "no embeddings endpoint") {
 			t.Fatalf("%s has no /embeddings.\n"+
 				"Ingest cannot work without it. Set EMBED_BASE_URL to a provider that does —\n"+
-				"e.g. EMBED_BASE_URL=http://localhost:11434/v1 with EMBED_MODEL=nomic-embed-text\n"+
+				"e.g. EMBED_BASE_URL=https://api.openai.com/v1 with EMBED_API_KEY set (one key is\n"+
+				"not valid at two vendors), EMBED_MODEL=text-embedding-3-small,\n"+
 				"and EMBED_DIM to match that provider — and leave AI_BASE_URL for chat.\n\n%v",
 				cfg.BaseURL, err)
 		}
