@@ -492,10 +492,10 @@ func TestRootDocsAreTheFourWeKnowAbout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("README.md is the file-by-file reference; it must exist: %v", err)
 	}
-	for _, want := range []string{"Now vs vNext", "README-MEGA-DOCS.md"} {
-		if !strings.Contains(string(readme), want) {
+	for _, marker := range []string{"Now vs vNext", "README-MEGA-DOCS.md"} {
+		if !strings.Contains(string(readme), marker) {
 			t.Errorf("README.md no longer contains %q — the vNext brief is then an\n"+
-				"unjoined wish list, and the next agent reads it as the spec.", want)
+				"unjoined wish list, and the next agent reads it as the spec.", marker)
 		}
 	}
 }

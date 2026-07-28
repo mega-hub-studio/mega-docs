@@ -218,15 +218,29 @@ a `TextDecoder` or `visualViewport`.
    must agree: relative to `CORPUS_DIR`, folders kept, `..`/absolute/hidden/`qa/`
    refused. Two spellings of one file become two documents, each cited separately.
 
-### The schema has no migrations — on purpose
+### New tables come from schema.sql; new columns need a migration
 
-`schema.sql` is `CREATE TABLE IF NOT EXISTS` only, and it is applied on every start.
-That means **a new column never reaches a database that already exists**: the table is
-there, so the statement does nothing, and every query naming the column fails at
-runtime on the deployed instance while passing locally against a fresh file.
+`schema.sql` is `CREATE TABLE IF NOT EXISTS` only, applied on every start, so **a new
+column never reaches a database that already has the table**: the statement finds the
+table and does nothing, and every query naming the column fails at runtime on the
+deployed instance while passing locally against a fresh file.
 
-There is no migration runner because there does not need to be one — invariant 1 says
-the database is derived. The upgrade path for a schema change is to rebuild:
+That was survivable for exactly as long as invariant 1 held alone — the upgrade path was
+`rm knowledge.db && ingest corpus`, one provider bill. vNext inverts the source of truth,
+and with nothing to rebuild from, a change that cannot reach an existing database cannot
+ship. So `internal/db/migrate.go` exists now, deliberately built *before* the corpus
+directory stops being written to: doing it in the other order removes the way back.
+
+It is small on purpose — forward only, one transaction per migration, and a
+`schema_version` **table** rather than `user_version`, because the first question anyone
+asks an odd-behaving database is which migrations it has actually seen. Read the file's own
+header before adding one; the rules that matter are: never renumber an `id`, and never edit
+the SQL of a migration that has shipped.
+
+Still worth trying before paying for a column at all: derive the value at query time, or
+encode it in an existing one (the scope lives inside `answers.q_norm` for exactly this
+reason). And while the DB is still derived, the rebuild remains the cheaper fix for a
+mistake:
 
 ```bash
 sudo systemctl stop knowledge
@@ -235,11 +249,9 @@ rm -f state/knowledge.db state/knowledge.db-wal state/knowledge.db-shm
 sudo systemctl start knowledge
 ```
 
-So the real cost of a column is one re-ingest, and the two ways to avoid paying it are
-worth trying first: derive the value at query time, or encode it in an existing column
-(the scope lives inside `answers.q_norm` for exactly this reason). Write the rebuild
-into the changelog entry for any change that needs it, or the next person meets it as
-a runtime error.
+**The remaining blocker for the inversion is backup, not schema.** "Put the documents
+folder in git" stops being the backup story the moment the DB is the only copy, and today
+nothing backs it up. See *Now vs vNext* in `README.md`.
 
 ### Traps that have already cost time
 

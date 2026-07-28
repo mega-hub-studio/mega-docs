@@ -1,5 +1,17 @@
 # Mega Knowledge Engine Platform vNext
 
+> **This is the brief, not the spec.** Every line below describes the product this is
+> becoming; none of it describes the tree you are reading. Before implementing anything
+> from here, read **Now vs vNext** in [`README.md`](README.md) — it marks each line
+> shipped, next, or blocked-and-on-what. Three are **settled decisions against this
+> brief** (hybrid retrieval stays; the source-of-truth inversion is blocked on a migration
+> runner and an off-box backup; PDF/DOCX is an open parser choice), and the reasoning is in
+> [`changelog/`](changelog/). Re-deriving them costs a day and lands on the wrong answer.
+>
+> Keep this file a statement of intent. A claim about what the code does today goes in
+> `README.md` — that is critical rule 19, and `TestRootDocsAreTheFourWeKnowAbout` fails
+> when the join disappears.
+
 ## Vision
 Build a **Knowledge Engine Platform** for enterprises with:
 - ChatGPT-like AI chat
