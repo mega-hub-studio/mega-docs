@@ -68,12 +68,24 @@ main {
 
 /* The question. No message-bubble recipe exists, so this is the one piece of
    app-owned styling — a gold classifier bar mirroring .card's accent bar.
-   font-family is set explicitly because it's an <h2> (for the document outline
-   and screen-reader navigation) but it is *body* copy, and DESIGN.md is firm
-   that chrome is mono and body is sans — don't mix the roles. */
+
+   Three properties are set because it's an <h2> (for the document outline and
+   screen-reader navigation) while being *body* copy, and base.css styles it as
+   the heading the tag claims:
+     font-family  DESIGN.md is firm that chrome is mono and body is sans — don't
+                  mix the roles.
+     text-wrap    `h1,h2,h3` get `balance`, which is right for a three-word
+                  headline and wrong for a sentence: it spends the width making
+                  the lines equal instead of filling them, so a 34-character
+                  question broke to a second line with a third of a phone's
+                  width unused beside it. `wrap` is the initial value — greedy
+                  fill, which is what a sentence wants.
+   Both reach the two surfaces that render a question, ChatTurn and TicketCard,
+   because both use this class on an <h2>. */
 .q {
   font-family: var(--font-body);
   font-size: var(--fs-body); font-weight: 700; line-height: var(--lh-body);
+  text-wrap: wrap;
   color: var(--ink);
   border-inline-start: var(--accent-bar) solid var(--gold);
   padding-inline-start: var(--sp-3);
