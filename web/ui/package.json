@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "format": "eslint . --fix",
     "check:full": "make -C ../.. check-full"
   },
   "dependencies": {

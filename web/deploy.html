@@ -219,10 +219,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>Back up</th><td>Put the documents directory in <b>git</b>. That is the backup: <code>knowledge.db</code> is derived from it, and <code>./bin/ingest docs</code> rebuilds the whole thing — including the answers BAs confirmed, which are files in <code>docs/qa/</code>. A snapshot of the database is only a shortcut back to a running state (<code>sqlite3 knowledge.db ".backup out.db"</code> while it runs — a plain copy of a live database can tear).</td></tr>
-          <tr lang="vi"><th>Backup</th><td>Đưa thư mục tài liệu vào <b>git</b>. Đó mới là backup: <code>knowledge.db</code> được dựng ra từ nó, và <code>./bin/ingest docs</code> dựng lại toàn bộ — kể cả câu trả lời BA đã confirm, vì chúng là file trong <code>docs/qa/</code>. Snapshot database chỉ là đường tắt để quay lại trạng thái đang chạy (<code>sqlite3 knowledge.db ".backup out.db"</code> khi đang chạy — copy trực tiếp một database đang mở có thể bị lỗi dở dang).</td></tr>
-          <tr lang="en"><th>Commit what the app writes, automatically</th><td><code>scripts/corpus-sync.sh</code> commits and pushes whatever lands in the corpus, from either write path (a confirm or a browser import). Drive it from a <code>.path</code> unit watching the folder — event-driven, because there is nothing to do until a file changes. Keep a slow timer as the backstop: a <code>.path</code> unit stops watching while the job it triggered runs, so a file written in that window raises no event.</td></tr>
-          <tr lang="vi"><th>Tự commit những gì app ghi ra</th><td><code>scripts/corpus-sync.sh</code> commit và push mọi thứ xuất hiện trong corpus, từ cả hai đường ghi (BA confirm hoặc import từ browser). Chạy nó bằng một unit <code>.path</code> theo dõi thư mục — theo sự kiện, vì không có gì phải làm cho tới khi có file thay đổi. Vẫn nên có một timer chậm làm lưới an toàn: unit <code>.path</code> ngừng theo dõi trong lúc job nó gọi đang chạy, nên file ghi trong khoảng đó không sinh sự kiện.</td></tr>
+          <tr lang="en"><th>Back up</th><td>Put the documents directory in <b>git</b>, <b>by hand</b> — nothing automates it. That is the backup: <code>knowledge.db</code> is derived from it, and <code>./bin/ingest docs</code> rebuilds the whole thing — including the answers BAs confirmed, which are files in <code>docs/qa/</code>. A snapshot of the database is only a shortcut back to a running state (<code>sqlite3 knowledge.db ".backup out.db"</code> while it runs — a plain copy of a live database can tear).</td></tr>
+          <tr lang="vi"><th>Backup</th><td>Đưa thư mục tài liệu vào <b>git</b>, <b>làm tay</b> — không có gì tự động làm việc này. Đó mới là backup: <code>knowledge.db</code> được dựng ra từ nó, và <code>./bin/ingest docs</code> dựng lại toàn bộ — kể cả câu trả lời BA đã confirm, vì chúng là file trong <code>docs/qa/</code>. Snapshot database chỉ là đường tắt để quay lại trạng thái đang chạy (<code>sqlite3 knowledge.db ".backup out.db"</code> khi đang chạy — copy trực tiếp một database đang mở có thể bị lỗi dở dang).</td></tr>
           <tr lang="en"><th>Review what BAs published</th><td><code>git diff docs/qa/</code>. Every confirm is one file, so the knowledge base has a review trail without anyone opening the database.</td></tr>
           <tr lang="vi"><th>Xem BA đã publish gì</th><td><code>git diff docs/qa/</code>. Mỗi lần confirm là một file, nên knowledge base có vết để review mà không cần mở database.</td></tr>
           <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>
@@ -417,6 +415,61 @@ ReadWritePaths=/opt/knowledge
 WantedBy=multi-user.target</span></div>
 
     <div class="terminal"><span class="cmd">sudo chmod 600 /opt/knowledge/.env</span><span class="out"># it holds the provider key</span><span class="cmd">sudo systemctl enable --now knowledge</span><span class="cmd">journalctl -u knowledge -f</span></div>
+
+    <h3 lang="en">WSL and macOS</h3>
+    <h3 lang="vi">WSL và macOS</h3>
+    <p lang="en">The binary is the same on every platform — one file, no runtime, nothing
+      fetched at start. Only the supervisor differs, so this is the whole of cross-OS
+      self-hosting.</p>
+    <p lang="vi">Binary giống nhau trên mọi nền tảng — một file, không runtime, không tải gì
+      lúc khởi động. Chỉ khác nhau ở cái trông process, nên đây là toàn bộ chuyện self-host
+      đa hệ điều hành.</p>
+
+    <div class="grid two">
+      <div class="card">
+        <div class="head"><span class="title" lang="en">WSL2</span><span class="title" lang="vi">WSL2</span></div>
+        <p lang="en">The unit above works, but <b>systemd is off by default</b> — without
+          this, <code>systemctl</code> does not exist and nothing above can be installed.
+          Enable it once, then restart the VM from Windows:</p>
+        <p lang="vi">Unit ở trên chạy được, nhưng <b>systemd mặc định bị tắt</b> — không có
+          bước này thì <code>systemctl</code> không tồn tại và không cài được gì ở trên. Bật
+          một lần, rồi restart VM từ Windows:</p>
+        <div class="terminal"><span class="out">
+# /etc/wsl.conf
+[boot]
+systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># run this in Windows, not in the shell</span></div>
+      </div>
+      <div class="card">
+        <div class="head"><span class="title" lang="en">macOS</span><span class="title" lang="vi">macOS</span></div>
+        <p lang="en">No systemd. <code>launchd</code> is the equivalent, and a user agent
+          needs no root — put this at
+          <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
+        <p lang="vi">Không có systemd. <code>launchd</code> là thứ tương đương, và một user
+          agent thì không cần root — đặt file này ở
+          <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
+        <div class="terminal"><span class="out">&lt;key&gt;Label&lt;/key&gt;            &lt;string&gt;dev.megadocs.knowledge&lt;/string&gt;
+&lt;key&gt;ProgramArguments&lt;/key&gt; &lt;array&gt;&lt;string&gt;/opt/knowledge/bin/knowledge&lt;/string&gt;&lt;/array&gt;
+&lt;key&gt;WorkingDirectory&lt;/key&gt; &lt;string&gt;/opt/knowledge&lt;/string&gt;
+&lt;key&gt;KeepAlive&lt;/key&gt;        &lt;true/&gt;</span><span class="cmd">launchctl load ~/Library/LaunchAgents/dev.megadocs.knowledge.plist</span></div>
+      </div>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">launchd does not read <code>.env</code>.</b>
+      <span lang="en">systemd's <code>EnvironmentFile=</code> has no launchd equivalent, so
+        the plist has to carry the key in <code>EnvironmentVariables</code> — or the process
+        must start with <code>WorkingDirectory</code> set, because
+        <code>config.Load()</code> reads <code>./.env</code> relative to the working
+        directory. The <code>WorkingDirectory</code> line above is what makes the second
+        option work, and it is the one that keeps the key out of a plist.</span>
+      <b lang="vi">launchd không đọc <code>.env</code>.</b>
+      <span lang="vi"><code>EnvironmentFile=</code> của systemd không có thứ tương đương ở
+        launchd, nên hoặc plist phải mang key trong <code>EnvironmentVariables</code>, hoặc
+        process phải chạy với <code>WorkingDirectory</code> đúng chỗ — vì
+        <code>config.Load()</code> đọc <code>./.env</code> theo thư mục làm việc. Dòng
+        <code>WorkingDirectory</code> ở trên là thứ làm cách thứ hai chạy được, và đó là cách
+        không phải nhét key vào plist.</span>
+    </div>
 
     <p lang="en">Re-index by hand, with the same one-liner, whenever the documents
       change. It exits non-zero if anything failed, so a failure is visible:</p>
