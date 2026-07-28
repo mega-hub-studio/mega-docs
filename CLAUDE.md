@@ -82,6 +82,7 @@ make lint                  # golangci-lint alone (see .golangci.yml — every di
 make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
+make check-wt              # optional: drives every diagram walkthrough (prev/next + highlight)
 make ui                    # build the app's front end (Vite) into web/dist — commit the output
 make ui-dev                # Vite dev server on :5173 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
@@ -108,9 +109,18 @@ the package directory and `config.Load()` reads `./.env`. Prefix it:
 Run `make smoke` after touching the prompt or retrieval — the dev page names it as
 the check that fails when a reply stops citing its file.
 
+A diagram gets a **walkthrough** by writing markup, not script: wrap the inlined SVG in
+`<nes-focus-svg id="X">`, author the steps as `<div id="X-steps">` with
+`data-title`/`data-title-vi`/`data-focus` children, and add `<nes-walkthrough for="X">`.
+`docsbase.html` folds them into the component's step JSON for every diagram on every page —
+in a *classic* inline script, because `<nes-walkthrough>` reads its steps once at upgrade
+time and `elements.min.js` is a module (so it runs later). `data-focus` is a `|`-separated
+list matched against node text, case-insensitively. With JS off, every step's prose is
+still on the page in both languages.
+
 Other targets: `make switch-embed` (move embeddings to another provider: validates
-the key *before* dropping the index), `make vendor` (fetch + sha384-verify CDN assets
-for `ASSET_BASE=/vendor`), `make diagram` (re-render `web/*.mmd`; the SVG is committed
+the key *before* dropping the index), `make vendor` (fetch + sha384-verify the docs pages'
+CDN assets, for `rendocs -base /vendor`), `make diagram` (re-render `web/*.mmd`; the SVG is committed
 and `make check` fails if the source hash drifts).
 
 ## Architecture

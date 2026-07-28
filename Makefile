@@ -11,7 +11,7 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui ui ui-dev
+.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
 
 deps:
 	go mod tidy
@@ -51,6 +51,13 @@ ui:
 # `make server` in another shell first.
 ui-dev:
 	@cd web/ui && npm run dev
+
+# The walkthroughs, driven. Separate from check-ui because it answers a different
+# question: check-ui measures layout, this one measures behaviour — prev/next, the dots,
+# the keyboard, and whether each step's `data-focus` still matches a node in its diagram.
+# A renamed node lights nothing, which no layout measurement would notice.
+check-wt:
+	@./scripts/check-walkthroughs.sh
 
 # The browser check: what a screenshot shows, measured. Not in `check` — it needs a
 # browser, and this product needs no Node at all (see CLAUDE.md rule 14). Run it after

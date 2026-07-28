@@ -131,7 +131,66 @@ view.scrollToEnd();                            // viewport.js</span></div>
     <p class="lede" lang="vi">Một câu hỏi, tám chặng, và hai chặng có thể trả về sớm. Mọi
       thứ phía dưới trong trang này là một cái núm trên một trong các hộp này.</p>
 
-    <div class="mermaid-view"><%diagram "retrieval"%></div>
+    <nes-focus-svg id="pipe">
+      <div class="mermaid-view"><%diagram "retrieval"%></div>
+    </nes-focus-svg>
+
+    <!-- Titles name the nodes they spotlight, so they are not translated: the diagram is
+         one shared SVG, and the component sets a title with textContent anyway. -->
+    <div class="steps" id="pipe-steps">
+      <div data-title="1 · cached?" data-title-vi="1 · có trong cache?" data-focus="cached?|free answer|question + scope">
+        <p lang="en">The question and the scope are normalised into one key first. A hit
+          returns the stored answer and stops here — no embedding, no retrieval, no
+          completion, no cost. That is why a repeated question is free, and why the scope
+          is part of the key rather than the signature.</p>
+        <p lang="vi">Câu hỏi và scope được chuẩn hoá thành một key trước. Nếu trúng thì trả
+          lại câu trả lời đã lưu và dừng tại đây — không embed, không truy xuất, không gọi
+          model, không tốn tiền. Đó là lý do hỏi lại thì miễn phí, và là lý do scope nằm
+          trong <i>key</i> chứ không nằm trong signature.</p>
+      </div>
+      <div data-title="2 · two retrievers" data-title-vi="2 · hai đường tìm" data-focus="embed|vectors|keywords">
+        <p lang="en">A miss runs <i>both</i> searches: the question becomes a vector for
+          meaning, and the same text goes to BM25 for keywords. Keywords are what find an
+          error code, a config key or a function name that semantic search walks past. A
+          scope filters both of them <b>before</b> they rank.</p>
+        <p lang="vi">Nếu trượt cache thì chạy <i>cả hai</i> đường tìm: câu hỏi thành vector
+          để tìm theo nghĩa, và cùng đoạn text đó đi vào BM25 để tìm theo từ khoá. Từ khoá
+          là thứ bắt được mã lỗi, tên config, tên hàm — những cái tìm theo nghĩa bỏ sót.
+          Scope lọc <b>cả hai</b> trước khi chúng xếp hạng.</p>
+      </div>
+      <div data-title="3 · RRF fuse" data-title-vi="3 · hợp nhất RRF" data-focus="rrf fuse|top k">
+        <p lang="en">Two rankings, one list: reciprocal-rank fusion takes position rather
+          than score, so a vector distance and a BM25 weight never have to be compared on
+          the same scale. Then <code>TOP_K</code> sections survive — this is the step that
+          decides quality, because a section that does not get here cannot be cited.</p>
+        <p lang="vi">Hai bảng xếp hạng thành một danh sách: RRF lấy <i>thứ hạng</i> chứ
+          không lấy điểm, nên khoảng cách vector và trọng số BM25 không phải so trên cùng
+          một thang. Rồi <code>TOP_K</code> đoạn đi tiếp — đây là bước quyết định chất
+          lượng, vì đoạn không tới được đây thì không thể được dẫn nguồn.</p>
+      </div>
+      <div data-title="4 · prompt + context" data-title-vi="4 · prompt + ngữ cảnh" data-focus="prompt + context">
+        <p lang="en">Those sections go in as the <i>only</i> allowed source, with the
+          instruction to say so when the answer is not in them. The prompt's hash is part
+          of the cache signature, so editing this step invalidates every answer produced
+          under the old rules instead of serving them forever.</p>
+        <p lang="vi">Các đoạn đó được đưa vào như <i>nguồn duy nhất</i> được phép dùng, kèm
+          yêu cầu phải nói rõ khi không có thông tin. Hash của prompt là một phần của cache
+          signature, nên sửa bước này là xoá mọi câu trả lời sinh ra theo luật cũ, thay vì
+          phục vụ chúng mãi mãi.</p>
+      </div>
+      <div data-title="5 · stream, then store" data-title-vi="5 · stream, rồi lưu" data-focus="stream, cite|store in cache">
+        <p lang="en">Tokens stream out as they arrive, then the citations land as a list —
+          mid-stream a <code>[1]</code> has nothing to point at yet. A real answer is
+          stored; a whole miss never is, so the next person's identical question is asked
+          again rather than answered from a failure.</p>
+        <p lang="vi">Token stream về ngay khi tới, rồi danh sách dẫn nguồn mới về — giữa
+          lúc stream thì <code>[1]</code> chưa có gì để trỏ tới. Câu trả lời thật thì được
+          lưu; câu trả lời trượt hoàn toàn thì không, nên người sau hỏi đúng câu đó sẽ được
+          hỏi lại chứ không nhận về một lần thất bại.</p>
+      </div>
+    </div>
+
+    <nes-walkthrough for="pipe" aria-label="How an answer is built / Câu trả lời được dựng thế nào"></nes-walkthrough>
 
     <dl class="datalist">
       <dt lang="en">cached?</dt>
@@ -726,7 +785,40 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       ship là đúng thứ host sẽ chạy. Dùng cái đầu để làm việc, cái sau để kiểm thứ bạn sắp
       commit.</p>
 
-    <div class="mermaid-view"><%diagram "devloop"%></div>
+    <nes-focus-svg id="loops">
+      <div class="mermaid-view"><%diagram "devloop"%></div>
+    </nes-focus-svg>
+
+    <div class="steps" id="loops-steps">
+      <div data-title="1 · the fast loop" data-title-vi="1 · vòng nhanh" data-focus="you edit a .vue|vite :5173|browser :5173">
+        <p lang="en">Vite serves the component you are editing and swaps it into the running
+          page — measured at zero full reloads, with the conversation already on screen
+          surviving. This is the loop you work in.</p>
+        <p lang="vi">Vite serve component bạn đang sửa và thay nó vào trang đang chạy — đo
+          được 0 lần full reload, cuộc hội thoại đang có trên màn hình vẫn còn nguyên. Đây
+          là vòng lặp bạn làm việc trong đó.</p>
+      </div>
+      <div data-title="2 · /api is real" data-title-vi="2 · /api là thật" data-focus="/api proxied|make server|sqlite + provider">
+        <p lang="en">Only the front end is a dev build. <code>/api</code> is forwarded to
+          <code>make server</code> on :8080 — real SQLite, real provider, real corpus — so
+          nothing about an answer is faked while you work on how it looks.</p>
+        <p lang="vi">Chỉ frontend là bản dev. <code>/api</code> được chuyển sang
+          <code>make server</code> ở :8080 — SQLite thật, provider thật, corpus thật — nên
+          không có gì về câu trả lời bị giả lập trong lúc bạn sửa phần hiển thị.</p>
+      </div>
+      <div data-title="3 · the shipping loop" data-title-vi="3 · vòng ship" data-focus="make ui|web/dist|make build|binary serves">
+        <p lang="en">The other branch is what the host runs: <code>make ui</code> builds the
+          bundle, <code>web/dist</code> is committed, and the binary embeds it. So a deploy
+          needs no Node — and an SFC edit changes nothing on :8080 until you walk this
+          branch, which is the design rather than a bug.</p>
+        <p lang="vi">Nhánh còn lại là thứ host chạy: <code>make ui</code> build bundle,
+          <code>web/dist</code> được commit, và binary embed nó. Nên deploy không cần Node —
+          và sửa SFC thì :8080 không đổi gì cho tới khi bạn đi hết nhánh này, đó là thiết kế
+          chứ không phải bug.</p>
+      </div>
+    </div>
+
+    <nes-walkthrough for="loops" aria-label="Two loops / Hai vòng lặp"></nes-walkthrough>
 
     <h3 lang="en">Once, after cloning</h3>
     <h3 lang="vi">Một lần, sau khi clone</h3>
@@ -843,7 +935,49 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
       ứng với code thì khai báo luôn trong markup của nó, và <code>make check</code> sẽ đỏ
       khi mối nối đó sai ở bất kỳ chiều nào.</p>
 
-    <div class="mermaid-view"><%diagram "specflow"%></div>
+    <nes-focus-svg id="specloop">
+      <div class="mermaid-view"><%diagram "specflow"%></div>
+    </nes-focus-svg>
+
+    <div class="steps" id="specloop-steps">
+      <div data-title="1 · write the section" data-title-vi="1 · viết mục tài liệu" data-focus="a feature to build|write the section">
+        <p lang="en">Before any code: the section, on the page for whoever will use the
+          feature. If it cannot be explained to that audience in a paragraph, the design is
+          not finished — which is the cheapest place to find that out.</p>
+        <p lang="vi">Trước khi viết code: viết mục tài liệu, trên trang của người sẽ dùng
+          tính năng đó. Nếu không giải thích được cho đối tượng đó trong một đoạn thì thiết
+          kế còn chưa xong — và đây là chỗ rẻ nhất để phát hiện điều đó.</p>
+      </div>
+      <div data-title="2 · annotate" data-title-vi="2 · gắn annotation" data-focus="annotate">
+        <p lang="en">Four attributes on that <code>&lt;section&gt;</code>: a stable id, the
+          routes, the environment variables, the tests. This is the join — the thing that
+          was missing when prose and code lived in four places with nothing between
+          them.</p>
+        <p lang="vi">Bốn attribute trên <code>&lt;section&gt;</code> đó: id ổn định, route,
+          biến môi trường, test. Đây chính là mối nối — thứ đã thiếu khi văn bản và code
+          nằm ở bốn chỗ mà không có gì liên kết.</p>
+      </div>
+      <div data-title="3 · make check goes red" data-title-vi="3 · make check đỏ" data-focus="make check|write the test">
+        <p lang="en">It fails while a name you declared does not exist yet, so the test name
+          in the markup is literally the test you write next. Red here is the point, not a
+          problem: it is the spec asking for the code.</p>
+        <p lang="vi">Nó đỏ khi một cái tên bạn khai còn chưa tồn tại, nên tên test trong
+          markup đúng là test bạn viết tiếp. Đỏ ở đây là mục đích, không phải sự cố: đó là
+          spec đang yêu cầu code.</p>
+      </div>
+      <div data-title="4 · green, and published" data-title-vi="4 · xanh, và publish" data-focus="spec.json|an agent reads it">
+        <p lang="en">When it goes green the documentation is already correct — it was the
+          input. <code>spec.json</code> and <code>llms.txt</code> regenerate from the pages
+          on the next push, so an agent picking up the next change reads what you just
+          wrote rather than what somebody remembers.</p>
+        <p lang="vi">Khi xanh thì tài liệu đã đúng sẵn — vì nó là đầu vào.
+          <code>spec.json</code> và <code>llms.txt</code> tự sinh lại từ các trang ở lần
+          push kế tiếp, nên AI agent nhận việc tiếp theo đọc đúng thứ bạn vừa viết, không
+          phải thứ ai đó nhớ được.</p>
+      </div>
+    </div>
+
+    <nes-walkthrough for="specloop" aria-label="Spec first / Spec trước"></nes-walkthrough>
 
     <h3 lang="en">The five steps, in order</h3>
     <h3 lang="vi">Năm bước, theo thứ tự</h3>
@@ -980,8 +1114,10 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
           <tr lang="en"><th>a whole page (new role)</th><td>a field on <code>web.Nav</code>, its address in <code>StaticNav</code>, a render func, one entry in <code>web.Pages</code> — which <code>cmd/rendocs</code>, <code>llms.txt</code> and <code>spec.json</code> all walk</td></tr>
           <tr lang="vi"><th>cả một trang (role mới)</th><td>một field trong <code>web.Nav</code>, địa chỉ trong <code>StaticNav</code>, một render func, một entry trong <code>web.Pages</code> — <code>cmd/rendocs</code>, <code>llms.txt</code> và <code>spec.json</code> đều đi qua danh sách đó</td></tr>
           <tr lang="en"><th>a diagram</th><td><code>web/*.mmd</code> then <code>make diagram</code>; the SVG is committed and a test fails if its source drifts</td></tr>
+          <tr lang="en"><th>a walkthrough for that diagram</th><td>wrap it in <code>&lt;nes-focus-svg id="X"&gt;</code>, author steps as <code>&lt;div id="X-steps"&gt;</code> children with <code>data-title</code> · <code>data-title-vi</code> · <code>data-focus</code>, add <code>&lt;nes-walkthrough for="X"&gt;</code>. <code>docsbase.html</code> wires every one; <code>data-focus</code> matches node text</td></tr>
           <tr lang="en"><th>confidence that it looks right</th><td><code>make check-ui</code> — renders these pages, serves them and measures them in Chromium at 390 and 1440, both languages: characters per box, the gap between every pair of blocks, the index, the finder</td></tr>
           <tr lang="vi"><th>một sơ đồ</th><td><code>web/*.mmd</code> rồi <code>make diagram</code>; SVG được commit và có test đỏ nếu source lệch</td></tr>
+          <tr lang="vi"><th>walkthrough cho sơ đồ đó</th><td>bọc nó trong <code>&lt;nes-focus-svg id="X"&gt;</code>, viết các step thành con của <code>&lt;div id="X-steps"&gt;</code> với <code>data-title</code> · <code>data-title-vi</code> · <code>data-focus</code>, thêm <code>&lt;nes-walkthrough for="X"&gt;</code>. <code>docsbase.html</code> tự đấu dây hết; <code>data-focus</code> khớp theo text của node</td></tr>
           <tr lang="vi"><th>chắc chắn là nhìn đúng</th><td><code>make check-ui</code> — render các trang này, serve rồi đo bằng Chromium ở 390 và 1440, cả hai ngôn ngữ: số ký tự mỗi ô, khoảng cách giữa mọi cặp block, mục lục, ô tìm kiếm</td></tr>
         </tbody>
       </table>

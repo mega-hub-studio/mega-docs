@@ -204,7 +204,56 @@
          stepper earns its keep on the Guide's pipeline where five stages need
          explaining one at a time. The SVG is rendered at build time from web/loop.mmd,
          so it paints with the page and needs none of mermaid at runtime. -->
-    <div class="mermaid-view"><%diagram "loop"%></div>
+    <nes-focus-svg id="gaploop">
+      <div class="mermaid-view"><%diagram "loop"%></div>
+    </nes-focus-svg>
+
+    <!-- Titles name the diagram nodes they spotlight, so they stay in one language: the
+         SVG is shared, and the component sets a title with textContent. -->
+    <div class="steps" id="gaploop-steps">
+      <div data-title="1 · not in the documents" data-title-vi="1 · tài liệu không có" data-focus="dev asks|not in the documents">
+        <p lang="en">Somebody asked something the documents do not cover, and the app said
+          so instead of inventing an answer. That sentence is the useful part: it is a
+          question you now know your team needs answered.</p>
+        <p lang="vi">Có người hỏi một thứ mà tài liệu không có, và app nói thẳng ra chứ
+          không bịa. Chính câu đó là phần hữu ích: giờ bạn biết team đang cần câu trả lời
+          nào.</p>
+      </div>
+      <div data-title="2 · Ask BA" data-title-vi="2 · bấm Ask BA" data-focus="ask ba|queue: open">
+        <p lang="en">One tap sends you the question <i>and</i> the answer that failed, so
+          you can see whether the documents are wrong or merely silent. The same question
+          filed twice is one ticket — nobody has to check first.</p>
+        <p lang="vi">Một cú bấm gửi cho bạn cả câu hỏi <i>và</i> câu trả lời đã sai, để bạn
+          thấy tài liệu sai hay chỉ đang thiếu. Cùng một câu báo hai lần vẫn là một ticket —
+          không ai phải kiểm trước.</p>
+      </div>
+      <div data-title="3 · you answer it" data-title-vi="3 · bạn trả lời" data-focus="ba drafts|confirm">
+        <p lang="en">Draft as often as you like; confirming is the decision. Short and exact
+          beats long and hedged, because this text is what the next answer will be built
+          from — and it needs the words people actually search for.</p>
+        <p lang="vi">Lưu nháp bao nhiêu lần cũng được; confirm mới là quyết định. Ngắn và
+          chính xác hơn dài và mơ hồ, vì đoạn text này là thứ câu trả lời sau sẽ dựng từ đó —
+          và nó cần đúng những từ người ta thật sự tìm.</p>
+      </div>
+      <div data-title="4 · it becomes a document" data-title-vi="4 · thành một tài liệu" data-focus="file in qa/|indexed + approved">
+        <p lang="en">Your answer is written into <code>docs/qa/</code> as a real file, then
+          indexed. Not a database row: a file, so it is visible in a diff, goes into git
+          with everything else, and survives a rebuild of the index.</p>
+        <p lang="vi">Câu trả lời của bạn được ghi vào <code>docs/qa/</code> thành một file
+          thật, rồi mới index. Không phải một dòng trong database: một file — nên nó thấy
+          được trong diff, đi vào git cùng mọi thứ khác, và sống sót khi index dựng lại.</p>
+      </div>
+      <div data-title="5 · and then it is free" data-title-vi="5 · và sau đó là miễn phí" data-focus="next answer cites it|and then it is free">
+        <p lang="en">The next person who asks gets it with a citation to that file. The one
+          after that gets it from the cache: no provider call, no cost. One answer from you,
+          paid for once.</p>
+        <p lang="vi">Người hỏi tiếp theo nhận được nó kèm dẫn nguồn tới đúng file đó. Người
+          sau nữa nhận từ cache: không gọi provider, không tốn tiền. Một câu trả lời của bạn,
+          trả tiền đúng một lần.</p>
+      </div>
+    </div>
+
+    <nes-walkthrough for="gaploop" aria-label="From a gap to a document / Từ phần thiếu thành tài liệu"></nes-walkthrough>
 
     <h3 lang="en">The four states, and who moves each one</h3>
     <h3 lang="vi">Bốn trạng thái, và ai chuyển</h3>

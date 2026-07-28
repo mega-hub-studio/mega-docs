@@ -136,38 +136,11 @@
          (web/howitworks.mmd → `make diagram`) and inlined here, so it paints with
          the page, costs no request, and needs none of mermaid's ~800KB at runtime.
 
-         The five explanations are authored below as ordinary markup and turned into
-         the walkthrough's step JSON by script. That way one copy of the prose serves
-         both paths: with JS you get the stepper that spotlights the stage it is
-         describing, and with JS off the diagram and all five explanations are simply
-         there, in both languages. -->
-    <script>
-      customElements.define("nes-focus-svg", class extends HTMLElement {
-        // <nes-walkthrough for> is duck-typed — it spotlights whatever its target's
-        // highlight() does. <nes-mermaid> is the usual target, but its job is to
-        // *render* mermaid at runtime, which this page deliberately does not ship.
-        // So this supplies only that one method, against the same contract the
-        // design system's focus CSS already reads: .nes-focus on the nodes,
-        // .has-focus on .mermaid-view.
-        highlight(focus) {
-          const view = this.querySelector(".mermaid-view");
-          if (!view) return;
-          const want = (Array.isArray(focus) ? focus : []).map((s) => String(s).toLowerCase());
-          let first = null;
-          for (const n of view.querySelectorAll(".node, .cluster")) {
-            const text = (n.textContent || "").trim().toLowerCase();
-            const on = want.some((w) => text.includes(w));
-            n.classList.toggle("nes-focus", on);
-            if (on && !first) first = n;
-          }
-          view.classList.toggle("has-focus", !!first);
-          // The box is height-capped on a phone, so the node being described can be
-          // out of sight. "nearest" scrolls the diagram box only — never the page.
-          if (first) first.scrollIntoView({ block: "nearest", inline: "nearest" });
-        }
-      });
-    </script>
-
+         The five explanations are authored below as ordinary markup; docsbase.html folds
+         them into the walkthrough's step JSON. One copy of the prose serves both paths:
+         with JS you get the stepper that spotlights the stage it describes, and with JS
+         off the diagram and all five explanations are simply there, in both
+         languages. -->
     <nes-focus-svg id="hiw">
       <div class="mermaid-view"><%diagram "howitworks"%></div>
     </nes-focus-svg>
@@ -176,7 +149,7 @@
          spotlights, and the diagram is one shared SVG. (The walkthrough sets its
          title with textContent, so markup there is impossible anyway.) -->
     <div class="steps" id="hiw-steps">
-      <div data-title="1 · ingest" data-focus=".md|ingest">
+      <div data-title="1 · ingest" data-title-vi="1 · ingest" data-focus=".md|ingest">
         <p lang="en">You point <code>make ingest</code> at a folder. Every
           <code>.md</code> / <code>.txt</code> file is read once — nothing leaves the
           machine except the text sent for embedding.</p>
@@ -184,7 +157,7 @@
           <code>.md</code> / <code>.txt</code> được đọc một lần — không gì ra khỏi
           máy ngoài đoạn text gửi đi embed.</p>
       </div>
-      <div data-title="2 · SQLite" data-focus="sqlite">
+      <div data-title="2 · SQLite" data-title-vi="2 · SQLite" data-focus="sqlite">
         <p lang="en">Each file is split into sections, each section becomes a vector,
           and both land in <b>one SQLite file</b>. That file is the whole database — and it is
           rebuilt from the folder above, so the folder is what you back up.</p>
@@ -192,7 +165,7 @@
           hai nằm trong <b>một file SQLite</b>. File đó là toàn bộ database — và nó dựng lại
           được từ thư mục ở trên, nên thứ cần backup là thư mục đó.</p>
       </div>
-      <div data-title="3 · hybrid search" data-focus="your question|hybrid search">
+      <div data-title="3 · hybrid search" data-title-vi="3 · tìm kiểu hybrid" data-focus="your question|hybrid search">
         <p lang="en">Your question runs as <i>both</i> a meaning search and a keyword
           search (BM25), and the two rankings are fused. Keyword is what finds error
           codes, config keys and function names that pure semantic search walks
@@ -202,14 +175,14 @@
           được mã lỗi, tên config, tên hàm — những cái tìm theo ngữ nghĩa thuần bỏ
           sót.</p>
       </div>
-      <div data-title="4 · top matches" data-focus="top matches">
+      <div data-title="4 · top matches" data-title-vi="4 · đoạn khớp nhất" data-focus="top matches">
         <p lang="en">Only the best few sections move on. This is the step that decides
           quality: if the answer is wrong, it is usually because the right section
           never got here.</p>
         <p lang="vi">Chỉ vài đoạn tốt nhất đi tiếp. Đây là bước quyết định chất
           lượng: nếu câu trả lời sai, thường là vì đoạn đúng không tới được đây.</p>
       </div>
-      <div data-title="5 · grounded answer" data-focus="grounded answer">
+      <div data-title="5 · grounded answer" data-title-vi="5 · trả lời có căn cứ" data-focus="grounded answer">
         <p lang="en">The model is told to answer <b>only</b> from those sections, and
           to say so when the answer isn't in them. It streams back word by word, and
           every <code>[1]</code> is a link down to the file it came from.</p>
@@ -221,29 +194,6 @@
 
     <nes-walkthrough for="hiw" aria-label="How it works / Cách hoạt động"></nes-walkthrough>
 
-    <script>
-      // Fold the markup above into the step JSON the walkthrough reads, then drop the
-      // original. Runs during parse, so the JSON is in place before the deferred
-      // elements.min.js upgrades the element. If anything here fails, the prose stays
-      // on the page rather than vanishing — the reader loses the stepper, not the
-      // content.
-      (() => {
-        const src = document.getElementById("hiw-steps");
-        const wt = document.querySelector('nes-walkthrough[for="hiw"]');
-        if (!src || !wt) return;
-        const steps = [...src.children].map((d) => ({
-          title: d.dataset.title,
-          focus: (d.dataset.focus || "").split("|").filter(Boolean),
-          body: d.innerHTML,
-        }));
-        if (!steps.length) return;
-        const json = document.createElement("script");
-        json.type = "application/json";
-        json.textContent = JSON.stringify(steps);
-        wt.appendChild(json);
-        src.remove();
-      })();
-    </script>
 
   </section>
 
