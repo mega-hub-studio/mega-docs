@@ -17,7 +17,8 @@
     "dompurify": "3.4.12",
     "marked": "18.0.7",
     "mermaid": "11.16.0",
-    "vue": "3.5.40"
+    "vue": "3.5.40",
+    "vue-i18n": "11.4.8"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.2.0",

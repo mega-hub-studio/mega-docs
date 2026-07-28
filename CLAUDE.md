@@ -270,7 +270,7 @@ can hold it:
 
 One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
 `scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
-`importer`, `tickets`, `nestree`, `finder`.
+`importer`, `tickets`, `nestree`, `finder`, `lang` (i18n — the only door to vue-i18n).
 
 Three rules keep the layers from leaking:
 

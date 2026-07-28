@@ -193,8 +193,8 @@ var (
 	// and 12b passed vacuously while `make check` stayed green. A regex enforcer that finds
 	// nothing looks exactly like a codebase with nothing to find, which is why the tests
 	// below also assert they parsed something.
-	reImportsVue = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+['"]vue['"]`)
-	reImport     = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?['"]([^'"]+)['"]`)
+	reImportsVue   = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+['"]vue['"]`)
+	reImport       = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?['"]([^'"]+)['"]`)
 	reScript       = regexp.MustCompile(`(?s)<script setup>(.*?)</script>`)
 	reBranch       = regexp.MustCompile(`(?m)^\s*(?:if|for|while|switch)\s*\(`)
 	reBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)

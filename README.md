@@ -135,6 +135,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                                     chat.js · qa.js · upload.js   transport (SSE, tickets, import)
                                     answer.js · diagram.js        rendering (markdown, mermaid)
                                     library.js · session.js · viewport.js  corpus, storage, keyboard
+                                    i18n.js        the EN/VI catalogues + the stored choice
                   src/styles.css    layout only; 8bit-nes owns the components
 web/ui/src/composables/   one composable per concern, and nothing else in them
                   conversation.js  turns, ask/regenerate/stop/reset, persistence
@@ -149,6 +150,7 @@ web/ui/src/composables/   one composable per concern, and nothing else in them
                   tickets.js       four states, one path, one draft per ticket
                   nestree.js       the <nes-tree> payload and its rebuild rules
                   finder.js        the first screen's document menu: one query, ranked rows
+                  lang.js          useT(): the only door to i18n a component may use
 
 **Where do I add…?**
 

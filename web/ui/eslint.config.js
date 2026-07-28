@@ -53,8 +53,11 @@ export default antfu({
     // A component that reads a prop it never declared is the same class of bug seen from
     // the other side.
     'vue/require-explicit-emits': 'error',
-    // Custom elements from the design system are not unknown components.
-    'vue/no-undef-components': ['error', { ignorePatterns: ['nes-.*'] }],
+    // Two families of tag this rule cannot see a definition for, and both are real:
+    // `nes-*` are the design system's custom elements, and `i18n-t` is vue-i18n's own
+    // component, registered globally by `app.use(i18n)` in main.js. Everything else that
+    // is undefined is the bug this rule exists to catch.
+    'vue/no-undef-components': ['error', { ignorePatterns: ['nes-.*', 'i18n-t'] }],
   },
 }, {
   files: ['**/*.vue'],

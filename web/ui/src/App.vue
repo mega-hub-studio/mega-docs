@@ -32,6 +32,7 @@ import StatusLine from './components/StatusLine.vue'
 import { useConversation } from './composables/conversation.js'
 import { useCorpus } from './composables/corpus.js'
 import { useDiagrams } from './composables/diagrams.js'
+import { useT } from './composables/lang.js'
 import { useQaLoop } from './composables/qaloop.js'
 import { useRuntime } from './composables/runtime.js'
 import { useScope } from './composables/scope.js'
@@ -48,6 +49,7 @@ const zoom = useTemplateRef('zoom') // <dialog>: the diagram viewer
 const zoomBody = useTemplateRef('zoomBody')
 
 /* ── state, one concern per composable ── */
+const { t, lang, langs, setLang } = useT()
 const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
 const { online, writes, runtime, check, watchNetwork } = useRuntime()
@@ -137,26 +139,42 @@ function replay(entry) {
     <!-- the light tracks /api/health, so it means something -->
     <span
       class="badge clear" :data-accent="online ? 'good' : 'crit'"
-      :aria-label="online ? 'Server online' : 'Server unreachable'"
+      :aria-label="online ? t('app.online') : t('app.offline')"
     >●</span>
     <!-- The mark: a stack of documents, which is what this is. Muted on purpose —
          .eyebrow's own treatment — because the only green in this bar means something
          (the health dot, the selected mode) and a logo is not a status. -->
     <span class="brand">
       <nes-icon name="layers" aria-hidden="true" />
-      <span class="eyebrow">mega-docs</span>
+      <span class="eyebrow">{{ t('app.brand') }}</span>
     </span>
 
     <!-- Two jobs, one screen. .segment is the library's single-choice control:
          aria-pressed carries the state, since the fill alone isn't announced. -->
-    <div class="segment grow" role="group" aria-label="Mode">
+    <div class="segment grow" role="group" :aria-label="t('app.mode')">
       <button type="button" :aria-pressed="String(mode === 'dev')" @click="setMode('dev')">
-        ASK
+        {{ t('app.ask') }}
       </button>
       <button type="button" :aria-pressed="String(mode === 'ba')" @click="setMode('ba')">
-        BA<template v-if="queue.open"> · {{ queue.open }}</template>
+        {{ t('app.ba') }}<template v-if="queue.open"> · {{ queue.open }}</template>
       </button>
     </div>
+
+    <!-- EN / VI. With two languages the honest control is a button showing the one you are
+         not in, not a dropdown of one alternative — and it is a real <button>, so it is
+         reachable by keyboard and announced. The choice is stored under the same key the
+         guide's pages use, so switching here follows a reader to the docs and back.
+
+         `lang` is the locale, so it is displayed uppercased by CSS rather than by a second
+         string: the catalogues would otherwise need EN/VI entries that are the same two
+         letters in both. -->
+    <button
+      v-for="other in langs.filter(l => l !== lang)" :key="other"
+      class="btn ghost sm lang" type="button" :aria-label="`${t('app.language')}: ${other}`"
+      @click="setLang(other)"
+    >
+      {{ other }}
+    </button>
 
     <!-- One link out, to the published guide on its own domain. The app does not serve
          the docs: a second copy inside the binary is noise here and a copy to drift.
@@ -164,13 +182,13 @@ function replay(entry) {
          this bundle stays a static file. rel=noopener because it opens in a new tab. -->
     <a
       v-if="runtime.site" class="btn ghost icon sm" :href="runtime.site" target="_blank"
-      rel="noopener" aria-label="Guide (opens the documentation site)"
+      rel="noopener" :aria-label="t('app.guide')"
     >
       <nes-icon name="info" />
     </a>
     <button
       v-if="turns.length && mode === 'dev'" class="btn ghost icon sm"
-      aria-label="New question" @click="reset"
+      :aria-label="t('app.newQuestion')" @click="reset"
     >
       <nes-icon name="plus" />
     </button>

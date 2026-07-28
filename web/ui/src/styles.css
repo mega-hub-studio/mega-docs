@@ -277,3 +277,11 @@ main.ba {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* The EN/VI toggle: the locale code is data, so the display case is CSS. Mono and
+   uppercase like every other piece of chrome in the bar. */
+.bar .lang {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-chrome);
+}

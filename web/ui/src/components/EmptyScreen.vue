@@ -14,6 +14,7 @@
    documents" reads identically for both and that cost an afternoon once.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { useFinder } from '../composables/finder.js'
+import { useT } from '../composables/lang.js'
 import { coverQuestion, docTitle, shortDate } from '../lib/library.js'
 import { STATUS } from '../lib/qa.js'
 
@@ -26,6 +27,7 @@ const props = defineProps({
 defineEmits(['ask', 'replay'])
 
 // A getter, not `props.corpus.documents`: the corpus object is replaced on every refresh.
+const { t } = useT()
 const { query, shown, extra } = useFinder({ documents: () => props.corpus.documents })
 </script>
 
@@ -33,7 +35,7 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
   <!-- .empty ships the dashed panel + centred mono copy -->
   <div class="empty">
     <span class="icon">◈</span>
-    <span class="title">Ask the source of truth</span>
+    <span class="title">{{ t('empty.title') }}</span>
 
     <!-- What's indexed, stated up front. An empty index used to be indistinguishable
          from a broken retriever: you asked, and got "not found in the documents" with no
@@ -43,16 +45,19 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
          sentence: as prose inside .empty's 42ch cap they wrapped mid-phrase ("Every
          claim / cited."), which is exactly the ragged line a metric bar cannot produce. -->
     <div v-if="corpus.state === 'ready'" class="note-stats">
-      <span><nes-icon name="file" /> {{ corpus.docs }} documents</span>
-      <span><nes-icon name="layers" /> {{ corpus.chunks }} retrievable sections</span>
-      <span><nes-icon name="check" /> every claim cited</span>
+      <span><nes-icon name="file" /> {{ t('empty.documents', { n: corpus.docs }) }}</span>
+      <span><nes-icon name="layers" /> {{ t('empty.sections', { n: corpus.chunks }) }}</span>
+      <span><nes-icon name="check" /> {{ t('empty.cited') }}</span>
     </div>
 
     <!-- Not a paragraph either: both of these are a message with a tone and a next
          action, which is what .callout is for. -->
     <div v-else-if="corpus.state === 'empty'" class="callout warn">
       <nes-icon name="warn" />
-      <p>Nothing is indexed yet — run <code>make ingest DOCS=./docs</code>, then ask.</p>
+      <!-- The command is not translated: it is typed verbatim into a shell. -->
+      <i18n-t keypath="empty.nothingIndexed" tag="p" scope="global">
+        <template #cmd><code>make ingest DOCS=./docs</code></template>
+      </i18n-t>
     </div>
     <!-- `gotcha` is the library's --crit-accented callout. There is no `.callout.crit`:
          crit is a *badge* fill, so spelling it here fell through to the default gold and
@@ -60,9 +65,9 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
          states this pair exists to tell apart. -->
     <div v-else-if="corpus.state === 'unavailable'" class="callout gotcha">
       <nes-icon name="alertCircle" />
-      <p>Can't read the index. Check the server, then reload.</p>
+      <p>{{ t('empty.unavailable') }}</p>
     </div>
-    <p v-else>Grounded answers from approved docs — every claim cited.</p>
+    <p v-else>{{ t('empty.fallback') }}</p>
 
     <!-- The document menu. Was three pre-built sentences in a `.suggest` wrap, which is
          the library's recipe for short follow-up *chips*: given sentence-length labels it
@@ -79,12 +84,12 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
         <nes-icon name="search" />
         <input
           v-model="query" type="search" autocomplete="off" spellcheck="false"
-          placeholder="Filter documents…" aria-label="Filter the indexed documents"
+          :placeholder="t('empty.filter')" :aria-label="t('empty.filterLabel')"
         >
         <!-- Plain .badge, not .clear: in this design system `clear` is the *good/green*
              status fill, not "quiet". On a section count it claims a pass state that has no
              meaning and renders as the loudest thing on the row. -->
-        <span class="badge" :title="`Showing ${shown.length} of ${corpus.documents.length} indexed documents`">
+        <span class="badge" :title="t('empty.showing', { shown: shown.length, total: corpus.documents.length })">
           {{ shown.length }}/{{ corpus.documents.length }}</span>
       </div>
 
@@ -106,10 +111,10 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
 
       <!-- Never truncate in silence: when the corpus is bigger than the menu, say so and
            name the way to reach the rest. -->
-      <p v-if="extra" class="palette-empty">{{ extra }} more match — type to narrow.</p>
+      <p v-if="extra" class="palette-empty">{{ t('empty.moreMatch', { n: extra }) }}</p>
 
       <p v-if="!shown.length" class="palette-empty">
-        No indexed document matches “{{ query }}”.
+        {{ t('empty.noMatch', { q: query }) }}
       </p>
     </div>
 
@@ -120,7 +125,7 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
          when it upgrades, which would fight Vue over the v-for list inside it. -->
     <details v-if="history.length" class="corpus">
       <summary>
-        <span class="eyebrow">Asked before ({{ history.length }}) — free to repeat</span>
+        <span class="eyebrow">{{ t('empty.askedBefore', { n: history.length }) }}</span>
       </summary>
       <!-- The same .result row as the menu above, so the two lists read as one grid.
            A question is body copy, so it must not arrive as uppercase mono chrome the
@@ -144,11 +149,11 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
             <span class="result-title">{{ h.question }}</span>
             <!-- A scoped row is only free in its own scope, so replaying it restores that
                  scope — the path is why the folder is about to change. -->
-            <span class="result-path">{{ h.scope || "whole corpus" }}</span>
+            <span class="result-path">{{ h.scope || t('empty.wholeCorpus') }}</span>
           </span>
           <span
             v-if="h.hits" class="result-hint"
-            :title="`${h.hits} free repeats so far`"
+            :title="t('empty.freeRepeats', { n: h.hits })"
           >{{ h.hits }}×</span>
         </button>
       </div>
@@ -161,15 +166,23 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
     <details v-if="queue.tickets.length" class="corpus">
       <summary>
         <span class="eyebrow">
-          Questions with a BA ({{ queue.tickets.length }})</span>
+          {{ t('empty.withBa', { n: queue.tickets.length }) }}</span>
       </summary>
       <ol class="timeline">
-        <li v-for="t in queue.tickets" :key="t.id" :data-accent="STATUS[t.status].accent">
-          <div class="time">#{{ t.id }} · {{ shortDate(t.updated_at) }}</div>
+        <!-- `ticket`, not `t`: the loop variable used to be `t`, which now shadows the
+             translate function of the same name — so a `t('key')` added inside this loop
+             would silently read a property off the ticket instead. vue/no-template-shadow
+             caught it; the rename is the fix that cannot come back. -->
+        <li
+          v-for="ticket in queue.tickets" :key="ticket.id"
+          :data-accent="STATUS[ticket.status].accent"
+        >
+          <div class="time">#{{ ticket.id }} · {{ shortDate(ticket.updated_at) }}</div>
           <div class="title">
-            <span class="badge" :class="STATUS[t.status].badge">{{ STATUS[t.status].label }}</span>
+            <span class="badge" :class="STATUS[ticket.status].badge">
+              {{ STATUS[ticket.status].label }}</span>
           </div>
-          <p>{{ t.question }}</p>
+          <p>{{ ticket.question }}</p>
         </li>
       </ol>
     </details>
