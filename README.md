@@ -238,7 +238,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
 |---|---|
 | `GET /` | the app (revalidated with an ETag — it pins the asset versions) |
 | `GET /assets/…` | the bundle, `immutable`: every name carries a content hash |
-| `GET /api/health` | `{ok,writes,site,model,window,price_in,price_out}` — the light in the top bar, whether BA mode can publish, and what the status line reports |
+| `GET /api/health` | `{ok,writes,model,window,price_in,price_out}` — the light in the top bar, whether BA mode can publish, and what the status line reports. No `site`: the binary does not link out to the guide (see `CLAUDE.md`) |
 | `POST /api/chat` | `{question, scope?, fresh?}` → SSE: `token` · `citations` · `done{cached,in,out}`, or `error` |
 | `GET /api/corpus` | `{docs,chunks,approved,documents[]}` — what is indexed, with full paths |
 | `GET · POST /api/tickets` | read the queue · file a gap |

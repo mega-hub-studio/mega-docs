@@ -45,7 +45,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 18 | **Four root documents, one job each.** A fifth is a parallel truth | `TestRootDocsAreTheFourWeKnowAbout` |
 | 19 | `README-MEGA-DOCS.md` is the **vNext brief, not the spec.** Code disagreeing with it is a gap with a recorded decision, never a bug to fix on sight | `TestRootDocsAreTheFourWeKnowAbout` (the join must stay in README.md) |
 | 20 | **No overhead, no over-engineering.** No abstraction with one caller, no knob nobody turns, no layer for a future that has not arrived. The cheapest correct thing wins | `make dead` · `make lint` (`unused`) · `npx knip` · `TestEveryRouteAndKnobIsSpecified` (a new knob must earn a documented section) · the rest is `prose only` |
-| 21 | **No new test file, no unit/E2E scaffold for a change.** Extend the test that already owns the rule, and verify the real product: `make smoke`, `make live`, `make server` + a real request, the built binary | `prose only` — `make smoke` and `make live` are the verification of record |
+| 21 | **No new test file, no unit/E2E scaffold for a change.** Extend the test that already owns the rule; verify against the running product | `prose only` — `make smoke` and `make live` are the verification of record |
 | 22 | **Complexity hides behind one seam; the call site reads as intent.** Modern idiom, the plainest syntax that is correct, no ceremony, no comment that restates its code — and a name a *grep* resolves, because an agent infers from what it can find | `make lint` (`gocyclo` 16 · `nestif` · `funlen` · `gocritic` · `intrange` · `usestdlibvars` · `godot`) · `make lint-js` (`no-var`, `prefer-const`, `prefer-template`, 22 `unicorn/*`, 15 `jsdoc/*` — all at `--max-warnings 0`) |
 | 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; this file records only where this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
 
@@ -63,71 +63,38 @@ order to try them:
 The failure it prevents is not verbosity, it is *drift*: two copies of one fact are one
 copy plus a lie with a delay on it, and an agent that reads both loads the lie too.
 
-Rule 20 is its twin aimed at time rather than copies: rule 17 stops a fact being written
-**twice**, rule 20 stops it being written **early**. Three questions, in order, before any
-structure that is not the code doing the job:
+Rule 20 is its twin aimed at time rather than copies: 17 stops a fact being written
+**twice**, 20 stops it being written **early**. Three questions before adding any structure
+that is not the code doing the job — *who calls it twice?* (an interface with one
+implementation is indirection charging rent; the three seams in `internal/server` earn
+theirs, each has a real fake behind it), *who turns it?* (a knob sitting at its own default,
+and a new one costs a documented section before `make check` goes green), *what breaks today
+without it?* ("we'll need it when…" pays now for a benefit dated later). It is mostly
+`prose only` on purpose: an over-built abstraction that is wired up is *reachable*, so
+`make dead` sees nothing wrong with it and only the reviewer does.
 
-1. **Who calls it twice?** An interface with one implementation, a composable with one
-   consumer, a helper wrapping one call — indirection charging rent for flexibility nobody
-   asked for. The three seams in `internal/server` earn theirs: each has a real fake behind
-   it, which is what lets the whole HTTP surface test with no key and no database.
-2. **Who turns it?** A knob left at its own default forever is a second home for a number —
-   `.env`'s nine keys, again. A new one costs a documented section before `make check` goes
-   green, and that is the right price to charge.
-3. **What breaks today without it?** "We'll need it when…" pays now for a benefit dated
-   later. A future need belongs in `changelog/`, not in the code — that is what the *Now vs
-   vNext* table is for.
+Rule 21 is 20 aimed at the tests. The enforcer column above is a **closed set** — every
+rule already names the file that owns it, so an assertion extends that file, while a 21st
+test file, a fixture server, a mock of a fake or a browser rig for one button each cost more
+to keep than the bug they would catch. What replaces them is the running product; which
+command proves what is in *Commands* below. The line this does not cross: an invariant still
+needs its enforcer, or rule 15's red-first order and CI stop meaning anything.
 
-The measure is the next reader, human or agent: fewer moving parts beat a clever
-arrangement of many, and a deleted layer never needs documenting, testing or explaining.
-This rule is mostly `prose only` on purpose — an over-built abstraction that is *wired up*
-is reachable, so `make dead` sees nothing wrong with it. Nobody but the reviewer catches it.
+Rule 22 is where those meet the syntax. Complexity is not deleted, it is **placed**: one
+seam holds it and the caller reads as intent — `const { turns, ask } = useConversation(…)`,
+with the SSE parse and the `AbortController` nowhere near the shell. So the question is
+*which layer can hold the mess* (see *Front end*), never whether to add a wrapper. Then the
+plainest modern syntax, and neither half is taste — both are lint findings: Go 1.22 idiom
+(`for i := range n`, `slices`/`maps`, `strings.Cut`, `errors.Is` and `%w`), ESM JavaScript
+with `const`, `?.`/`??` and no `var`, early return over `else`, and a named function — never
+a comment apologising — when `gocyclo`, `nestif` or `funlen` push back.
 
-Rule 21 is rule 20 applied to the tests themselves. The enforcer column above is a **closed
-set**: every rule already names the file that owns it, so a change extends that file — a
-21st test file, a fixture server, a mock of a fake, a browser rig for one button, all cost
-more to maintain than the bug they would have caught. What replaces them is the real thing,
-in this order:
-
-1. **`make server` and ask it.** The product answers or it does not; no harness can be
-   wrong about that.
-2. **`make smoke`** after touching the prompt or retrieval, **`make live`** after touching
-   the provider — both run against a real provider, and both are already the checks the dev
-   page names.
-3. **`make ui` then the built binary** for anything in `web/ui`. `make ui-dev` proves the
-   SFC, not the deploy.
-
-The line this does not cross: an *invariant* still needs its enforcer, or rule 15's
-red-first order stops working and CI stops meaning anything. So put the assertion in the
-test file that already owns that rule, and leave the file count where it is.
-
-Rule 22 is where 17 and 20 meet the syntax. Complexity is not deleted, it is **placed**:
-one seam holds it and the line calling it reads as the intent — `const { turns, ask } =
-useConversation(…)` says what happens, while the SSE parse, the `AbortController` and the
-persistence never appear in the shell. That is the same "hide it" the four front-end layers
-already encode, so the question is *which layer can hold the mess*, never whether to write a
-wrapper: a seam with one caller and nothing behind it is rule 20's rent, not hiding.
-
-Then the plainest syntax that is correct: an early return instead of an `else`, one
-expression instead of a temporary read once, the standard library instead of the hand-rolled
-loop (`strings.Cut`, `slices.Contains` — both found and applied). `gocyclo` at 16, `nestif`
-and `funlen` are the ceiling, and when a function reaches it the fix is a named function,
-never a comment apologising for the nesting. Clever is not the same as short; if a reader
-has to decode the line, it was the wrong line.
-
-**Modern** means the idiom of the version this repo is actually on, and both linters already
-say which: Go 1.22 — `for i := range n` (`intrange`), `slices`/`maps` over a hand-written
-loop, `strings.Cut`, `errors.Is`/`%w`, `usestdlibvars` for the named constant; JavaScript —
-ESM only, `const`, template literals, destructuring, `?.` and `??`, and no `var` anywhere
-(`no-var`, `prefer-const`, `prefer-template`, `object-shorthand` and 22 `unicorn/*` rules,
-every one of them at error). Nothing here is a matter of taste: it is a lint finding.
-
-The second reader is an **agent**, and it infers only from what it can find. So: one obvious
-place per thing, a name that carries the fact (`isMiss`, `SafePath`, `cacheKey` — each
-findable by the word you would search for), no alias, no re-export chain, no barrel file. A
-symbol a `grep` resolves in one hop costs one read; the same symbol behind two indirections
-costs three and gets guessed instead. That is the DX argument and the token argument, and
-they happen to be the same argument.
+The second reader is an **agent**, which infers only from what it can find: one obvious place
+per thing, a name carrying the fact (`isMiss`, `SafePath`, `cacheKey`), no alias, no
+re-export chain, no barrel file. A symbol `grep` resolves in one hop costs one read; behind
+two indirections it costs three and gets guessed instead. Rule 23 is that economy applied to
+the style itself — the conventions are already written and pinned, so read the row in
+*Conventions* rather than re-deriving them.
 
 Rules 18–19 are rule 17 pointed at the documentation, and they are what keeps an agent's
 context clean — four files, no overlap, so reading the tree costs four reads and returns one
@@ -453,21 +420,18 @@ address held by a running server is a second home for a fact that already has on
   existing comments are the style guide; match their density and voice. Deleted on sight:
   a line restating the line below it, a banner, a commented-out branch, a `TODO` with no
   owner — `changelog/` holds the future and `git log` holds the past.
-- **In `web/ui` a comment that documents an API is JSDoc, and nothing else.** A `@typedef`
-  for a payload that crosses a layer, `@param`/`@returns` only where the name does not
-  already say it, and a description that adds a fact the signature cannot — the shape in
-  [`src/lib/chat.js`](web/ui/src/lib/chat.js),
-  [`answer.js`](web/ui/src/lib/answer.js) and
-  [`diagram.js`](web/ui/src/lib/diagram.js) is the reference. Fifteen `jsdoc/*` rules run at
-  `--max-warnings 0`, so a tag naming a parameter that no longer exists fails `make check`,
-  not review. In Go the same job is the doc comment: it starts with the identifier and ends
-  in a period (`godot`).
-- **Seventeen skills are vendored, hash-pinned and mandatory reading — not a library to
-  re-add.** `.claude/skills/*` are symlinks into `.agents/skills/*`, and `skills-lock.json`
-  carries a content hash per skill, so none of them can drift under you. Rule 23 in one
-  table — read the row for what you are touching, and `ponytail` (laziest thing that works,
-  YAGNI, stdlib before code) before any of them, because it is rules 17 and 20 written by
-  somebody else:
+- **In `web/ui`, an API comment is JSDoc and nothing else:** a `@typedef` for a payload that
+  crosses a layer, `@param`/`@returns` only where the name does not already say it, a
+  description adding a fact the signature cannot. [`chat.js`](web/ui/src/lib/chat.js),
+  [`answer.js`](web/ui/src/lib/answer.js) and [`diagram.js`](web/ui/src/lib/diagram.js) are
+  the reference. Fifteen `jsdoc/*` rules run at `--max-warnings 0`, so a tag naming a
+  parameter that no longer exists fails `make check`, not review; in Go the same job is the
+  doc comment — identifier first, full stop last (`godot`).
+- **Seventeen skills are vendored and hash-pinned in `skills-lock.json` — read them, don't
+  re-add them.** `.claude/skills/*` symlink `.agents/skills/*`, so neither agent's set can
+  drift from the other. Rule 23 is this table: the row for what you are touching, and
+  `ponytail` (laziest thing that works, YAGNI, stdlib before code — rules 17 and 20 written
+  by somebody else) before any of them.
 
   | touching | read first | from |
   |---|---|---|
@@ -480,8 +444,7 @@ address held by a running server is a second home for a fact that already has on
   | `vite.config.js`, the bundle | `vite` | `antfu/skills` |
   | `eslint.config.js`, tooling | `antfu` | `antfu/skills` |
 
-  Two are vendored and do **not** apply here, which is worth knowing before an agent
-  "fits" one: `pnpm` — this repo is npm with a committed `package-lock.json` — and
-  `antfu-design`, which is UnoCSS-first while layout here is `web/ui/src/styles.css` over
-  8bit-nes. And a skill never outranks a rule above: where they disagree, the rule wins and
-  the disagreement goes in `changelog/`.
+  Two are vendored and do **not** apply, worth knowing before an agent "fits" one: `pnpm`
+  (this repo is npm, with a committed `package-lock.json`) and `antfu-design` (UnoCSS-first,
+  while layout here is `web/ui/src/styles.css` over 8bit-nes). A skill never outranks a rule
+  above — where they disagree the rule wins, and the disagreement goes in `changelog/`.

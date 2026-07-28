@@ -4,8 +4,9 @@
 
      online  drives the light in the header *and* the status line's OFFLINE state
      writes  tells BA mode it is read-only before someone types an answer into it
-     runtime the model name, the prices the status line may show, and the address of
-             the published guide (the header links it, and a static bundle cannot know it)
+     runtime the model name and the prices the status line may show — nothing else. There
+             was a guide address here too; the binary no longer links out to the guide, so
+             /api/health no longer reports one and neither does this.
 
    Zero means unknown, and stays zero. The strip prints nothing rather than a zero,
    because an unmeasured cost and a cost of nothing are different facts.
