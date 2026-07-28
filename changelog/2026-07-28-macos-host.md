@@ -70,7 +70,24 @@ too, which is a flat tax on a machine somebody carries. A LaunchAgent also runs 
 someone is logged in — surviving a reboot unattended means a `LaunchDaemon` with a
 `UserName` key, and FileVault still holds that until the disk is unlocked once.
 
-### Two cleanups
+### CI builds and tests on darwin now, so the claim has two platforms behind it
+
+A second job in [`check.yml`](../.github/workflows/check.yml): `macos-latest`, `make test`
+then `make build`. Four steps, no Node, no `make vendor`.
+
+Not a matrix over the existing job — lint, ESLint, deadcode, the credential scan and the
+bundle rebuild are platform-independent, so running them twice doubles the gate and returns
+no new fact. And `make test`, not `make build` alone: compiling and linking the bindings is
+not the failure worth catching, because sqlite-vec is registered *through* cgo and
+`internal/db` drives it against a real database — a darwin difference shows up at run time
+or nowhere.
+
+It leaves `TestVendorTreeMatchesTheManifest` skipping with `vendor/ is empty`, deliberately:
+a fresh checkout has only `.gitkeep` under `web/vendor`, the tree is identical on every OS,
+and the Linux job checks it. That skip is covered there, not here — which is the distinction
+rule 24 asks anyone reading a green run to make.
+
+### Three cleanups
 
 - `{cmd/server,cmd/ingest,internal/db,internal/ai,internal/rag,web}` existed as a literal
   directory tree at the repo root — a brace expansion that never expanded, run by a shell
@@ -78,6 +95,12 @@ someone is logged in — surviving a reboot unattended means a `LaunchDaemon` wi
 - `README.md`'s *Now vs vNext* row for cross-OS self-host said "✅ shipped" on the strength
   of the documentation alone, while `make deploy` was Linux-only. The row now says what is
   true and names what it used to mean.
+- The `build:` comment in the Makefile claimed `web/vendor/` "gets embedded", so
+  `make vendor build` produced "an egress-free binary". It does not: the only embed of
+  anything vendor-shaped is `web/vendor.sha384` in `web/assets.go`, and the tree is read from
+  disk by `rendocs -base /vendor` and `make check-ui`. This cost something the same session it
+  was found — a `make vendor` step was nearly added to the darwin CI job on the strength of
+  it, which would have fetched every pinned asset to build a binary that never reads them.
 
 ---
 
@@ -145,12 +168,3 @@ git repo with a **private** remote once its folder layout stops moving.
 `2026-07-27-wsl-deploy-and-import.md` §3a already verified how, including why the remote
 must be SSH and not HTTPS.
 
----
-
-## 4. Not done, on purpose
-
-`.github/workflows/check.yml` runs `ubuntu-latest` only, so "cross-OS" is still proven by
-one platform plus a claim. A `macos-latest` job doing `make build` would make it two, and
-it is the cheapest honest version of that — the cgo SQLite bindings are the part that can
-break on darwin and nothing else in the gate is platform-specific. Left out because it was
-not in the approved scope, not because it is a bad idea.

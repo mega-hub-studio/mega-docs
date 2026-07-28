@@ -172,8 +172,9 @@ make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
 make check-wt              # optional: drives every diagram walkthrough (prev/next + highlight)
-#   both are driven by PinchTab: `npm i -g pinchtab`, then `pinchtab doctor` — which is also
-#   what they gate on, so "no browser" skips with the reason instead of failing. Each run
+#   both are driven by PinchTab: `npm i -g pinchtab`. They skip when it is not on PATH and
+#   fail, naming both causes, when it is there and starts no instance — nothing subtler is
+#   possible, because every pinchtab subcommand exits 0, an unknown one included. Each run
 #   starts its own instance on its own port and stops it after: PinchTab commands act on an
 #   instance's current tab, so sharing one with an editor or an MCP integration makes the
 #   measurements flaky (2 of 3 runs, measured). scripts/pinchtab.mjs is the only file that

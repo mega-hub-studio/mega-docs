@@ -20,12 +20,16 @@ if ! command -v node >/dev/null 2>&1 || [ -z "$PT" ]; then
   echo "  skipped check-ui (needs node + pinchtab on PATH — npm i -g pinchtab)"
   exit 0
 fi
-# `pinchtab doctor` is the only thing that can answer whether a browser is actually reachable,
-# so its verdict is the gate rather than a guess about install paths.
-if ! "$PT" doctor >/dev/null 2>&1; then
-  echo "  skipped check-ui (pinchtab has no browser — run \`pinchtab doctor\`)"
-  exit 0
-fi
+# There was a second guard here, `pinchtab doctor`, meant to turn "installed but no browser"
+# into a skip. It never fired, in either direction: 0.13.2 has no `doctor` — the command is
+# `health` — and **no pinchtab command can be gated on its exit code anyway**. Measured:
+# `pinchtab bogus-subcommand` exits 0, and `health` against a refused connection exits 0
+# while printing the refusal. So the guard passed on every machine, including the ones it
+# was written to skip.
+#
+# Deleted rather than rewritten against `health`, because the only honest detector is the
+# thing this script already does below: start an instance and see whether an id comes back.
+# A box with no pinchtab at all still skips, at the guard above.
 if [ -z "$(ls -A web/vendor 2>/dev/null)" ]; then
   make --no-print-directory vendor >/dev/null
 fi
@@ -62,9 +66,12 @@ done
 "$PT" --server "http://127.0.0.1:$ptport" instance stop >/dev/null 2>&1 || true
 inst=$("$PT" instance start --port "$ptport" --mode headless 2>/dev/null \
   | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -1)
+# This is the check's only real detector — see the deleted `doctor` guard above — so it names
+# both reasons an id can fail to come back, not just the one that happened first here.
 if [ -z "$inst" ]; then
-  echo "  FAILED check-ui: pinchtab could not start an instance on :$ptport." >&2
-  echo "  Set PINCHTAB_PORT to a free port, or stop what is on that one." >&2
+  echo "  FAILED check-ui: pinchtab started no instance on :$ptport." >&2
+  echo "  Either it has no browser (\`pinchtab health\`, \`pinchtab instances\`)," >&2
+  echo "  or that port is taken — set PINCHTAB_PORT to a free one." >&2
   exit 1
 fi
 

@@ -12,10 +12,7 @@ if ! command -v node >/dev/null 2>&1 || [ -z "$PT" ]; then
   echo "  skipped check-walkthroughs (needs node + pinchtab on PATH — npm i -g pinchtab)"
   exit 0
 fi
-if ! "$PT" doctor >/dev/null 2>&1; then
-  echo "  skipped check-walkthroughs (pinchtab has no browser — run \`pinchtab doctor\`)"
-  exit 0
-fi
+# No `pinchtab doctor` guard here either — see check-docs-ui.sh for why it never fired.
 if [ -z "$(ls -A web/vendor 2>/dev/null)" ]; then
   make --no-print-directory vendor >/dev/null
 fi
@@ -49,8 +46,9 @@ done
 inst=$("$PT" instance start --port "$ptport" --mode headless 2>/dev/null \
   | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -1)
 if [ -z "$inst" ]; then
-  echo "  FAILED check-walkthroughs: pinchtab could not start an instance on :$ptport." >&2
-  echo "  Set PINCHTAB_PORT_WT to a free port, or stop what is on that one." >&2
+  echo "  FAILED check-walkthroughs: pinchtab started no instance on :$ptport." >&2
+  echo "  Either it has no browser (\`pinchtab health\`, \`pinchtab instances\`)," >&2
+  echo "  or that port is taken — set PINCHTAB_PORT_WT to a free one." >&2
   exit 1
 fi
 

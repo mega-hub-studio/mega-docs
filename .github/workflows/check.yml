@@ -1,7 +1,8 @@
 name: check
 
 # `make check` on every push and pull request — the same gate a human runs before
-# deploying, in the one place nobody can skip.
+# deploying, in the one place nobody can skip. Two jobs: the gate on Linux, and the
+# cgo layer built and exercised on darwin, because a deploy host can be either.
 #
 # Why this exists: until now the tests only ran on a laptop and on the deploy host,
 # so a broken commit reached `main` looking fine and failed at `make check` *during*
@@ -82,5 +83,38 @@ jobs:
 
       # The gate proves the code is correct; this proves it still builds into the two
       # binaries a deploy actually installs.
+      - name: make build
+        run: make build
+
+  # The only platform-specific thing in this repo is the cgo layer — sqlite-vec and FTS5 are
+  # C — and a deploy host can be macOS now: the Deploy page documents launchd and `make deploy`
+  # picks its supervisor from `uname -s`. Until this job existed, "cross-OS self-host" in
+  # README.md was one platform plus a claim.
+  #
+  # Deliberately *not* a matrix over the job above. Lint, ESLint, deadcode, the credential
+  # scan and the bundle rebuild are platform-independent, so running them twice doubles the
+  # gate and returns no new fact.
+  #
+  # `make test` and not `make build` alone, because compiling and linking the bindings is not
+  # the failure worth catching: sqlite-vec is registered through cgo and internal/db exercises
+  # it against a real database, so a darwin difference surfaces at run time or nowhere.
+  #
+  # No `make vendor` and no Node, because nothing here reads either. That leaves
+  # TestVendorTreeMatchesTheManifest skipping with "vendor/ is empty", which is the intent —
+  # the vendor tree is identical on every OS and the job above checks it. Read that skip as
+  # covered there, not as covered here.
+  darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: make test
+        run: make test
+
       - name: make build
         run: make build

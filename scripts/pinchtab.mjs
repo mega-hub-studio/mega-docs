@@ -3,7 +3,9 @@
 // It replaced Playwright, which had been reached through a hardcoded
 // `/opt/node22/lib/node_modules/playwright/index.mjs`: a path that existed on one machine.
 // When it did not exist the checks *skipped*, silently, and a skipped check reads exactly
-// like a passing one. PinchTab is on PATH or it is not, and `pinchtab doctor` says which.
+// like a passing one. PinchTab is on PATH or it is not, and the wrapper skips on that alone:
+// nothing else about this CLI can be gated on, because every subcommand exits 0 — an unknown
+// one, and `health` against a refused connection, both included.
 //
 // Both checks measure rather than click: almost every question they ask is answered by one
 // `eval` returning a plain object, so this exposes `evalJson` as the main verb and keeps

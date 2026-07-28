@@ -268,8 +268,10 @@ server:
 ingest:
 	go run -tags "$(TAGS)" ./cmd/ingest $(DOCS)
 
-# Compile a single self-contained binary. Whatever is in web/vendor/ at this
-# point gets embedded, so `make vendor build` produces an egress-free binary.
+# Compile the two binaries. web/vendor/ is not part of either: only web/vendor.sha384 is
+# embedded (web/assets.go), and the tree itself is read from disk by tooling — `rendocs -base
+# /vendor` and `make check-ui`. So nothing here needs `make vendor` first, and a CI job that
+# runs one before a build pays for an asset fetch the binary never sees.
 build:
 	go build -tags "$(TAGS)" -o bin/knowledge ./cmd/server
 	go build -tags "$(TAGS)" -o bin/ingest   ./cmd/ingest
