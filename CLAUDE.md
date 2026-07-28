@@ -48,6 +48,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 21 | **No new test file, no unit/E2E scaffold for a change.** Extend the test that already owns the rule; verify against the running product | `prose only` — `make smoke` and `make live` are the verification of record |
 | 22 | **Complexity hides behind one seam; the call site reads as intent.** Modern idiom, the plainest syntax that is correct, no ceremony, no comment that restates its code — and a name a *grep* resolves, because an agent infers from what it can find | `make lint` (`gocyclo` 16 · `nestif` · `funlen` · `gocritic` · `intrange` · `usestdlibvars` · `godot`) · `make lint-js` (`no-var`, `prefer-const`, `prefer-template`, 22 `unicorn/*`, 15 `jsdoc/*` — all at `--max-warnings 0`) |
 | 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; this file records only where this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
+| 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 
 Rules 17 and 20 are the two to apply before the rest, because most of the others exist to
 stop a second copy of something or a part nobody needed. Rule 17 taken literally, in the
@@ -88,6 +89,17 @@ plainest modern syntax, and neither half is taste — both are lint findings: Go
 (`for i := range n`, `slices`/`maps`, `strings.Cut`, `errors.Is` and `%w`), ESM JavaScript
 with `const`, `?.`/`??` and no `var`, early return over `else`, and a named function — never
 a comment apologising — when `gocyclo`, `nestif` or `funlen` push back.
+
+Rule 24 is the hard one, and it is hard because debt in this repo is not a backlog item —
+it is a **lie in the gate**. A suppressed finding makes rule 13's zero mean "zero minus the
+ones we hid", a deferred marker makes the code claim a plan nobody owns, a half-migration
+makes `schema.sql` disagree with a deployed database, and a doc left behind makes an agent
+read the lie (rule 17). So both markers are lint errors now — `godox` in Go,
+`no-warning-comments` in `web/ui`, each free because this tree has none — and a `//nolint`
+must name its linter *and* its reason (`nolintlint`); the four in the tree do. What a
+deferred note would have said goes in `changelog/`, dated, next to the decision, or gets
+done in the same change. Done means `make check-full` green, and reading its *skipped*
+lines rather than assuming a green run covered them.
 
 The second reader is an **agent**, which infers only from what it can find: one obvious place
 per thing, a name carrying the fact (`isMiss`, `SafePath`, `cacheKey`), no alias, no
@@ -148,7 +160,10 @@ Every Go command needs the build tags — `sqlite-vec` and FTS5 are cgo, and a p
 
 ```bash
 make deps                  # go mod tidy
-make check                 # THE GATE: tests, gofmt, go vet, golangci-lint, deadcode, credential scan
+make check-full            # THE FINAL GATE — run before saying anything is done: ui → check
+#                            → build → check-ui → check-wt, cheapest stage first
+make check                 # what CI gates on, and what you run while working: tests, gofmt,
+#                            go vet, golangci-lint, eslint, deadcode, credential scan
 make lint                  # golangci-lint alone (see .golangci.yml — every disable has a reason)
 make lint-fix              # …applying what it can fix; read the diff
 make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules

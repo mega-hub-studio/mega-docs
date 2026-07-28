@@ -124,5 +124,12 @@ export default antfu({
     'jsdoc/no-multi-asterisks': 'off',
     // package.json key order is npm's business, not a correctness question.
     'jsonc/sort-keys': 'off',
+    // The JS half of CLAUDE.md rule 24, and the counterpart of `godox` on the Go side. A
+    // deferred-work marker in a bundle is debt with no owner and no date: this tree has
+    // none, so the rule is free today and stays that way. What such a note would have said
+    // belongs in `changelog/`, dated and beside the decision — or it gets done in the same
+    // change. (The banned words live in `terms` below, never in a comment, or this rule
+    // reports its own configuration — which is exactly what happened when it was written.)
+    'no-warning-comments': ['error', { location: 'anywhere', terms: ['todo', 'fixme', 'xxx', 'hack'] }],
   },
 })

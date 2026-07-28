@@ -1,7 +1,7 @@
 /* ══ answer.js — markdown → safe, cited HTML ══════════════════════════════════
    Hides: marked configuration, DOMPurify, and the "[n]" → <a class="cite"> pass.
 
-     answerHtml(markdown, { count: 2, srcId: (n) => `s7-${n}` })
+     turnHtml(turn, diagramsReady, (n) => `s7-${n}`)
 
    `marked` and `DOMPurify` are npm dependencies bundled by Vite, imported here and
    nowhere else in the app. This is still the only file that knows they exist — that part
@@ -16,21 +16,52 @@ import { isDiagram } from './diagram.js'
 let configured = false
 
 /**
- * Render one answer.
- * @param {string} markdown  raw model output
- * @param {{ nums?: number[], srcId?: (n: number) => string }} sources
- *   nums  — the citation numbers that exist. NOT a count: the engine returns only
- *   the sources the answer cited, keeping their original numbers, so an answer
- *   that used [2] alone arrives with nums [2] and one source. Comparing against a
- *   length would leave that marker unlinked.
- *   srcId — element id for source n. Omit either and no linking happens (the
- *   right behaviour mid-stream, when the citation list hasn't arrived yet).
- *   diagrams — turn ```mermaid fences into <nes-mermaid>. Off while streaming (half
- *   a graph is a parse error) and off until the renderer is actually loaded, so the
- *   fallback is the code block the model wrote.
+ * Render one conversation turn. This is `answerHtml` with the two mid-stream rules applied,
+ * and it lives here rather than in ChatTurn.vue because both are decisions about what the
+ * HTML may contain — which is this file's job — and a component that decides is a branch
+ * rule 11 forbids. What they decide:
+ *
+ *   · no citation links while streaming — the source list only lands at the end, so a "[1]"
+ *     mid-stream has nothing to point at
+ *   · no diagrams until the renderer has arrived AND the stream has finished — <nes-mermaid>
+ *     must never exist before the thing that draws it, and a half-written fence is not a
+ *     diagram yet
+ *
+ * @param {{ a: string, streaming?: boolean, citations?: {n: number}[] }} turn
+ * @param {boolean} diagramsReady whether the lazy mermaid chunk has loaded
+ * @param {(n: number) => string} srcId maps a citation number to its source element id
+ */
+export function turnHtml(turn, diagramsReady, srcId) {
+  const done = !turn.streaming
+  return answerHtml(turn.a, {
+    diagrams: done && diagramsReady,
+    // The numbers, not how many: the engine returns only the sources the answer cited and
+    // keeps their original n, so [2] can arrive alone.
+    nums: done ? turn.citations.map(c => c.n) : [],
+    srcId,
+  })
+}
+
+/**
+ * Render one answer. Not exported: `turnHtml` above is the only caller, and each option below
+ * is a decision it already makes. An export with one in-file caller is a second entry point
+ * to keep in agreement with the first — `knip` said so the moment ChatTurn.vue stopped using
+ * it.
+ *
+ * @param {string} markdown raw model output
+ * @param {{ nums?: number[], srcId?: (n: number) => string, diagrams?: boolean }} sources
+ *   nums — the citation numbers that exist. NOT a count: the engine returns only the sources
+ *   the answer cited, keeping their original numbers, so an answer that used [2] alone
+ *   arrives with nums [2] and one source. Comparing against a length would leave that marker
+ *   unlinked.
+ *   srcId — element id for source n. Omit either and no linking happens, which is the right
+ *   behaviour mid-stream, when the citation list has not arrived yet.
+ *   diagrams — turn ```mermaid fences into &lt;nes-mermaid&gt;. Off while streaming (half a
+ *   graph is a parse error) and off until the renderer is actually loaded, so the fallback is
+ *   the code block the model wrote.
  * @returns {string} sanitized HTML
  */
-export function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}) {
+function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}) {
   if (!configured) {
     marked.setOptions({ breaks: true })
     configured = true

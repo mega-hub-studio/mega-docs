@@ -70,11 +70,14 @@ decisions against it**, and re-deriving them lands on the wrong answer.
 | OpenAI only; no local LLMs or embeddings | one OpenAI-compatible client, no other SDK | ✅ **shipped** |
 | Never render raw HTML | `marked → DOMPurify`, then components built from *parsed values* | ✅ **shipped** |
 | Markdown Components → NES Renderer | `dressTables · dressTaskLists · linkCites · asDiagrams` | ✅ **shipped** |
-| Reuse NES before creating components | app CSS owns exactly one override, named in `AGENTS.md` | ✅ **shipped** |
+| Reuse NES before creating components | app CSS owns exactly two overrides, both named in `AGENTS.md` | ✅ **shipped** |
 | PDF / DOCX upload | **out of scope** — `.md · .markdown · .txt`, and the refusal names the converter | ✅ **decided** |
 | One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
 | WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
 | Three roles (Admin · BA · DEV) | two shared passwords, no accounts. Next: `gate(role)` + `ADMIN_PASS`, ~15 lines, no schema | 🟡 **next** |
+| BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | create, update and delete ship — import, re-import the same path to replace, and remove behind the library's `.perm` confirmation in `ImportPanel.vue` (the file goes to `docs/.trash/`). Preview · Version · Publish · Archive · Reindex: not built | 🟡 **partial** |
+| Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two have no field in `Reply` at all | 🟡 **next** |
+| Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist; `schema.sql` has none of the other five. They are new *tables*, so `CREATE TABLE IF NOT EXISTS` reaches an existing database and they cost no re-ingest | 🟡 **next** |
 | Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **Nothing backs the corpus up automatically now**; that is the accepted cost | ✅ **decided** |
 | Cross-OS self-host (WSL2 · macOS) | one binary, no runtime; the tooling was already portable (`openssl dgst`, not `sha384sum`). Both supervisors documented on the Deploy page | ✅ **shipped** |
 | Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). Migration runner shipped; **off-box DB backup** has not | ⛔ **blocked** |

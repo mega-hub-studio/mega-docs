@@ -1,8 +1,14 @@
 /* ══ App CSS — LAYOUT ONLY, mobile-first ══════════════════════════════════
    Rule this file follows: if 8bit-nes ships a recipe, use the recipe. Nothing
-   here re-styles a component (no colours, borders, fonts or sizes of its own)
-   — it only positions the shell and adapts to a narrow, touch, on-screen-
-   keyboard viewport. Every value comes from a token in tokens.css.
+   here gives a component colours, borders or fonts of its own — it positions
+   the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
+   value comes from a token in tokens.css.
+
+   Two rules do overrule how a component sizes *itself*, which is the library's
+   job and so has to be named: `.palette-list` (a bug 0.7.3 has not fixed, delete
+   on the release that does) and `.prose` (permanent — the recipe measures for a
+   page of unbounded width, and this app's column is already bounded). Both carry
+   the reasoning where they are written; AGENTS.md keeps the count.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.
@@ -81,6 +87,21 @@ main {
 
 .a .head { justify-content: space-between; }
 
+/* The answer fills the card. `.prose` caps itself at `max-inline-size: 72ch` — about
+   545px at --fs-body — which is the right reflex for the recipe's own use case, a prose
+   block dropped straight into a page of unbounded width. Here the width is already
+   bounded: `main` is 760px, so the card's content box is ~700px and the cap is a *second*
+   measure inside the first. It cost ~168px of every answer, and it did not cost them
+   evenly — a paragraph only rewraps, but a table cannot, so the columns of a UI-spec table
+   were crushed to one word per line ("Panel" breaking into "Pane"/"l") with 168px of empty
+   card beside them. A diagram lost the same 168 and drew its labels smaller to fit.
+
+   So the reading measure stays where it can only be one thing — the column — and the
+   answer uses the room it has. This does mean a paragraph can now run to ~92ch instead of
+   72; that is the trade, and it is the right way round, because 92ch of body text is
+   readable and a table folded into three words per column is not. */
+.prose { max-inline-size: none; }
+
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
    styles inline code only) — the one recipe the app has to supply. */
 .prose pre {
@@ -113,8 +134,8 @@ main {
    phone line-break that .note-stats' flex-wrap produces. */
 .empty > .note-stats { justify-content: center; }
 
-/* THE ONE LOCAL OVERRIDE OF THE DESIGN SYSTEM — 8bit-nes 0.7.3 lacks the fix (AGENTS.md
-   names it too). 0.7.3 caps .palette-list at min(50vh, 340px) and scrolls it, which is right
+/* OVERRIDE 1 OF 2, AND THE ONLY ONE THAT IS A BUG — 8bit-nes 0.7.3 lacks the fix (AGENTS.md
+   names it too; override 2 is `.prose`, above, which is permanent). 0.7.3 caps .palette-list at min(50vh, 340px) and scrolls it, which is right
    for the modal its docs describe ("drop it in a modal"). In the page it made a *nested*
    scroller: measured on an iPhone 14, three of seven documents were visible and the other
    four were behind an inner scrollbar — a scroll trap on touch, and the same documents this
@@ -333,18 +354,7 @@ main.ba .datalist { align-items: baseline; }
    it shrink below its content and scroll — without it a flex child floors at its content
    height and the dialog grows past the screen instead. */
 .diagram-zoom > .head { flex: none; }
-/* The frame goes: the dialog is already a bordered panel of the same colour, so
-   .mermaid-view's own border is a second one drawn a few pixels inside the first — and
-   on a 390px screen its padding and border spend 36px of the width the drawing came
-   here to get. The library drops it in the same situation (`nes-tabs.lens`); the
-   scrolling, which is the part that matters, stays the library's. */
-.diagram-zoom .zoom-view { flex: 1; min-block-size: 0; border: 0; padding: 0; }
-.diagram-zoom .zoom-view svg { display: block; }
-/* Full screen there is no backdrop left to tap and no Escape key to press, so this
-   button is the only way out — it gets a real 44px target rather than the `sm` the
-   markup asks for, which is sized for a mouse. */
-.diagram-zoom > .head .btn { min-inline-size: 2.75rem; min-block-size: 2.75rem; }
-
+.diagram-zoom .zoom-view { flex: 1; min-block-size: 0; }
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
@@ -365,7 +375,6 @@ main.ba .datalist { align-items: baseline; }
     margin: auto;
     padding: var(--sp-5);
   }
-  .diagram-zoom > .head .btn { min-inline-size: 0; min-block-size: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

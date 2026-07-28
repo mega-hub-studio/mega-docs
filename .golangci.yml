@@ -44,6 +44,10 @@ linters:
     - predeclared
     - errname
     - asciicheck
+    # godox: a TODO is debt with no owner and no date, and this tree has none — enabling it
+    # at zero costs nothing today and is the only machine check CLAUDE.md rule 24 can have.
+    # What a TODO was for goes in changelog/ (dated, with the decision) or is done now.
+    - godox
     # complexity
     - gocyclo
     - nestif

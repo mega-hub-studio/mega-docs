@@ -233,4 +233,23 @@ func TestRemovingADocumentIsGated(t *testing.T) {
 			t.Errorf("the reply does not say where the file went: %s", res.Body.String())
 		}
 	})
+
+	// A document name is whatever someone called their file, so it reaches this route
+	// percent-encoded — `lib/upload.js` encodes each segment separately, keeping "/" as the
+	// separator while a space or a "#" is escaped. This asserts the other half of that
+	// contract: ServeMux unescapes the wildcard, so the engine is handed the real name. Get
+	// it wrong and "Q3 pricing.md" is undeletable through the UI while every test with a
+	// tidy file name passes.
+	t.Run("an encoded name is unescaped before the engine sees it", func(t *testing.T) {
+		imp := &fakeImporter{}
+		srv := importServer(imp, "pw")
+		res := do(t, srv, http.MethodDelete, "/api/documents/business/Q3%20pricing%20%232.md", "",
+			map[string]string{"X-BA-Pass": "pw"})
+		if res.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", res.Code, res.Body.String())
+		}
+		if len(imp.removed) != 1 || imp.removed[0] != "business/Q3 pricing #2.md" {
+			t.Errorf("the engine got %q, want the decoded name", imp.removed)
+		}
+	})
 }

@@ -71,14 +71,25 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
-2. **There is exactly one local override of the design system, and it names its
-   version.** `web/ui/src/styles.css` un-caps `.palette-list` (`max-block-size: none`)
-   because **8bit-nes 0.7.3** sizes it for the modal its own docs describe —
-   `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested*
-   scroller which hid four of seven documents on a phone. Delete the rule when a release
-   ships an in-page variant of `.palette`; the request is in the changelog. `docsbase.html`
-   overrides nothing — it used to patch two accessibility gaps, and 0.7.1 ships both, so
-   they were removed after measuring rather than assumed.
+2. **There are exactly two local overrides of the design system, and they are different
+   kinds.** Both live in `web/ui/src/styles.css`, and each says next to itself which kind
+   it is:
+
+   - **A bug, so it is dated.** `.palette-list` is un-capped (`max-block-size: none`)
+     because **8bit-nes 0.7.3** sizes it for the modal its own docs describe —
+     `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested*
+     scroller which hid four of seven documents on a phone. Delete the rule when a release
+     ships an in-page variant of `.palette`; the request is in the changelog.
+   - **A context difference, so it is permanent.** `.prose` is un-capped
+     (`max-inline-size: none`) because the recipe's `72ch` is a reading measure for a prose
+     block dropped into a page of unbounded width. This app's column is already bounded at
+     760px, so the cap was a second measure inside the first: it left ~168px of every
+     answer card empty while crushing the tables and diagrams *in* that answer, which
+     cannot rewrap the way a paragraph can. No release will "fix" this — the recipe is
+     right for its own case.
+
+   `docsbase.html` overrides nothing — it used to patch two accessibility gaps, and 0.7.1
+   ships both, so they were removed after measuring rather than assumed.
 
    The other app rules on library classes are *placement*, not overrides, and the
    difference is worth keeping straight: `align-self`/`text-align` on `.empty`'s children

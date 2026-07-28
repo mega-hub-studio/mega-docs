@@ -106,11 +106,27 @@ func TestComponentsHoldNoLogic(t *testing.T) {
 	if len(files) < 4 {
 		t.Fatalf("only %d components — has the layer moved?", len(files))
 	}
+	// Both patterns assert an absence, so the same trap as reImportsVue applies: one that
+	// matches nothing passes for the wrong reason. App.vue is the positive control for the
+	// ternary — it is the shell, which this rule does not govern, and it reads a stored mode
+	// with one. If the pattern cannot find that, it is broken rather than satisfied.
+	if !reTernary.MatchString(stripComments(scriptOf(t, filepath.Join(uiSrc, "App.vue")))) {
+		t.Fatal("reTernary matched nothing in App.vue, which branches on the stored mode — " +
+			"the pattern no longer matches this source, so this rule is not being enforced")
+	}
 	for _, path := range files {
-		if m := reBranch.FindString(stripComments(scriptOf(t, path))); m != "" {
+		script := stripComments(scriptOf(t, path))
+		if m := reBranch.FindString(script); m != "" {
 			t.Errorf("%s: `%s` in <script setup>. A component with a branch is a composable "+
 				"nobody wrote yet — move it into one and let the template ask the question.",
 				path, strings.TrimSpace(m))
+		}
+		// The template may branch all it likes — `{{ importing ? 'IMPORTING…' : 'CHOOSE' }}`
+		// is how a template asks a question. This is about <script setup> deciding.
+		if m := reTernary.FindString(script); m != "" {
+			t.Errorf("%s: `%s` in <script setup>. A ternary is still a branch — put the rule "+
+				"in the lib/ module or composable that owns it, so it can be read and tested "+
+				"without mounting anything.", path, strings.TrimSpace(m))
 		}
 	}
 }
@@ -193,10 +209,16 @@ var (
 	// and 12b passed vacuously while `make check` stayed green. A regex enforcer that finds
 	// nothing looks exactly like a codebase with nothing to find, which is why the tests
 	// below also assert they parsed something.
-	reImportsVue   = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+['"]vue['"]`)
-	reImport       = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?['"]([^'"]+)['"]`)
-	reScript       = regexp.MustCompile(`(?s)<script setup>(.*?)</script>`)
-	reBranch       = regexp.MustCompile(`(?m)^\s*(?:if|for|while|switch)\s*\(`)
+	reImportsVue = regexp.MustCompile(`(?m)^\s*import\s+[^;]*from\s+['"]vue['"]`)
+	reImport     = regexp.MustCompile(`(?m)^\s*import\s+(?:[^;]*?from\s+)?['"]([^'"]+)['"]`)
+	reScript     = regexp.MustCompile(`(?s)<script setup>(.*?)</script>`)
+	reBranch     = regexp.MustCompile(`(?m)^\s*(?:if|for|while|switch)\s*\(`)
+	// A ternary is a branch that reBranch cannot see: it is an expression, so it never
+	// starts a line with a keyword. One escaped for exactly that long — ChatTurn.vue decided
+	// two mid-stream rendering rules (`streaming ? [] : citations`) inside <script setup>
+	// while rule 11 reported clean. `[^.?]` after the `?` keeps optional chaining (`a?.b`)
+	// and nullish coalescing (`a ?? b`) out of it; both are value access, not a decision.
+	reTernary      = regexp.MustCompile(`\?[^.?][^:\n]*:`)
 	reBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	reLineComment  = regexp.MustCompile(`(?m)//.*$`)
 )
