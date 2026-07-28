@@ -268,10 +268,16 @@ for (const [key, n] of [["index.html@390", 1], ["ba.html@390", 1], ["dev.html@39
   need(out[key].en.diagrams.length >= n, `${key}: no rendered diagram`);
 }
 
-console.log(JSON.stringify(Object.fromEntries(Object.entries(out).map(([k, v]) =>
-  [k, { sections: v.en.sections, ids: v.en.ids, subs: v.en.subs, toc: v.en.toc,
-        diagrams: v.en.diagrams, hScroll: v.en.hScroll }])), null, 1));
-if (fails.length) console.log("\n" + fails.join("\n"));
+// The measurements print only when a check is red. Green, they were ~400 lines of JSON
+// scrolling past the one line that carries the verdict — and this is a gate whose whole
+// value is that its output means something. Red, every number that produced the failure is
+// still here, above the failure itself.
+if (fails.length) {
+  console.log(JSON.stringify(Object.fromEntries(Object.entries(out).map(([k, v]) =>
+    [k, { sections: v.en.sections, ids: v.en.ids, subs: v.en.subs, toc: v.en.toc,
+          diagrams: v.en.diagrams, hScroll: v.en.hScroll }])), null, 1));
+  console.log("\n" + fails.join("\n"));
+}
 console.log(fails.length ? "\nDOCS: FAIL" : "\nDOCS: PASS");
 // No teardown here: the browser instance belongs to the wrapper that started it, and it stops
 // it on the way out — including when this exits non-zero.

@@ -1,56 +1,17 @@
 #!/usr/bin/env bash
 # Renders the guide, serves it, and drives every diagram walkthrough in a real browser.
 #
-# Same shape as check-docs-ui.sh, and the same reasoning — see its header for why the browser
-# instance is started here on its own port rather than shared. Different default ports so the
-# two checks can run back to back (or at once) without fighting over either one.
+# Same rig as check-docs-ui.sh, because it is literally the same file now — guide-rig.sh.
+# Different default ports, so the two checks can run back to back (or at once) without
+# fighting over either one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PT=$(command -v pinchtab || true)
-if ! command -v node >/dev/null 2>&1 || [ -z "$PT" ]; then
-  echo "  skipped check-walkthroughs (needs node + pinchtab on PATH — npm i -g pinchtab)"
-  exit 0
-fi
-# No `pinchtab doctor` guard here either — see check-docs-ui.sh for why it never fired.
-if [ -z "$(ls -A web/vendor 2>/dev/null)" ]; then
-  make --no-print-directory vendor >/dev/null
-fi
-
+rig_name=check-walkthroughs
+rig_portvar=PINCHTAB_PORT_WT
 port=${PORT_WT:-8125}
 ptport=${PINCHTAB_PORT_WT:-9875}
-dir=$(mktemp -d)
-# The kill is reaped rather than left for bash to notice — see check-docs-ui.sh for the
-# stray `Terminated: 15` line that costs.
-cleanup() {
-  rm -rf "$dir"
-  [ -n "${srv:-}" ] && { kill "$srv"; wait "$srv"; } 2>/dev/null || true
-  [ -n "${inst:-}" ] && "$PT" instance stop "$inst" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
-
-go run ./cmd/rendocs -d "$dir" -base /vendor >/dev/null
-cp -r web/vendor "$dir/vendor"
-cp web/*.svg "$dir/"
-
-python3 -m http.server "$port" -d "$dir" >/dev/null 2>&1 &
-srv=$!
-for _ in $(seq 1 40); do
-  curl -sf -o /dev/null "http://127.0.0.1:$port/index.html" && break
-  sleep 0.25
-done
-
-# See check-docs-ui.sh: free the port first, and treat a failure to start as a failure rather
-# than a skip. A missing browser is a skip; a busy port is a broken run.
-"$PT" --server "http://127.0.0.1:$ptport" instance stop >/dev/null 2>&1 || true
-inst=$("$PT" instance start --port "$ptport" --mode headless 2>/dev/null \
-  | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -1)
-if [ -z "$inst" ]; then
-  echo "  FAILED check-walkthroughs: pinchtab started no instance on :$ptport." >&2
-  echo "  Either it has no browser (\`pinchtab health\`, \`pinchtab instances\`)," >&2
-  echo "  or that port is taken — set PINCHTAB_PORT_WT to a free one." >&2
-  exit 1
-fi
+. scripts/guide-rig.sh
 
 PINCHTAB_BIN="$PT" PINCHTAB_SERVER="http://127.0.0.1:$ptport" \
   node scripts/check-walkthroughs.mjs "http://127.0.0.1:$port"

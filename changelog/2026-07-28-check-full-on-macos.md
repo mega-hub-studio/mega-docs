@@ -115,6 +115,64 @@ Left alone: forcing `isInEditor: false` would buy nothing today (rule 20's "what
 without it?"), and the answer is nothing. Recorded because the line is alarming, the check
 takes ten minutes, and the next person to see it should not have to redo it.
 
+## Second pass: what the quiet gate then showed
+
+With the shouting stopped, `make check-full` printed **813 lines** on a green run and the
+verdict was three of them. Everything below came out of reading the rest.
+
+**813 → 139 lines**, and 115 of what is left is Vite's per-asset table — kept deliberately:
+CLAUDE.md names chunk sizes as the only signal that would catch mermaid moving into first
+paint.
+
+| what | it was | it is |
+|---|---|---|
+| `rendocs` progress | `fmt.Fprintf(os.Stderr, …)`, so it survived the `>/dev/null` both wrappers already wrote — 12 lines a run | `fmt.Printf` — the redirect now does what it says, and a human running it by hand still sees it |
+| the measurement JSON | ~650 lines printed on **green**, ahead of `DOCS: PASS` | printed only when red, where every number that produced the failure still is |
+| `pinchtab doctor` guard | a skip that could not fire | deleted |
+| "free the port first" | a no-op | an id looked up from `instances` |
+| the browser | leaked, one per run | stopped, and the stop is checked |
+
+### Three guards that had never once run
+
+Each was written for a real failure, each silenced its own error, and each was doing nothing.
+
+- **`pinchtab doctor`** — 0.13.2 has no `doctor` (the command is `health`), and it would not
+  have mattered: **no pinchtab subcommand can be gated on its exit code**. Measured:
+  `pinchtab bogus-subcommand` exits 0, and `health` against a refused connection exits 0 while
+  printing the refusal. Deleted rather than ported to `health`, because the honest detector is
+  the `instance start` twenty lines below it. A box with no pinchtab still skips.
+- **`instance stop` with no id**, the line whose comment says it frees a port left by an
+  interrupted run: the CLI answers `Error: accepts 1 arg(s), received 0`, into the
+  `2>/dev/null` beside it. So the guard against `409 port already reserved` had never run, and
+  the 409 is exactly what turned up the day the failure message started quoting pinchtab
+  instead of guessing at the cause — which is the whole argument for quoting it.
+- **the EXIT trap's `instance stop`**, which reported success and left the instance `running`.
+  Cause found by printing what it actually said: `404 page not found`. `PINCHTAB_SERVER` was
+  exported for the node command's convenience, and it retargets **every** pinchtab call —
+  including a trap eighty lines away, at an instance's own server, which does not serve the
+  instance API. Not exported any more; the wrapper puts it on the command line that needs it.
+  That was the leak feeding the 409, so both ends of that loop are closed.
+
+### One rig, not two copies of one
+
+`scripts/guide-rig.sh` is new and is not a new layer: it is the ~50 lines both wrappers
+already had, minus one copy. The trigger was counting — five fixes in this session
+(the reaped `kill`, the `doctor` guard, the readiness wait, the stale sweep, the error
+message) each had to be applied **twice**, which is rule 17's drift on a schedule. Each
+wrapper is now four variables and the node call.
+
+The one behaviour it adds, because it is where it belongs: `instance start` answers
+`"status": "starting"` and returns, so the driver's boot navigation raced a browser that was
+not up and lost about half the time — one `Error 500: navigate: context canceled` per run,
+retried green. It waits for `instances` to say `running` instead. Two runs each of both
+checks: no 500, nothing leaked.
+
+### Also gone
+
+`web/ui/package.json` had `"check:full": "make -C ../.. check-full"`, referenced nowhere and
+documented nowhere — a second door to the one command CLAUDE.md calls the gate. It was also
+the only finding `npx knip` had (as "unlisted binary: make"); knip is clean now.
+
 ## Verified
 
 `make check-full` end to end on this machine: bundle rebuilt, Go tests + vet + golangci-lint
@@ -122,5 +180,15 @@ at zero + **deadcode 0 unreachable** + secret scan, both binaries, `DOCS: PASS`,
 `WALKTHROUGHS: PASS`. `check-ui` and `check-wt` re-run twice more after the driver change,
 same verdicts, no stray lines.
 
+After the second pass, and each of these measured rather than assumed:
+
+- `make check-full` green, **139 lines**, `pinchtab instances` unchanged before and after.
+- `check-ui` and `check-wt` twice each on the shared rig: `PASS`, no `Error 500`, no leak.
+- The **red** path, forced by tightening one assertion to something impossible: 474 lines —
+  the full measurement JSON, then the failures, then `DOCS: FAIL`, exit 1, trap clean.
+- `npx knip` in `web/ui`: nothing.
+- `make dead`: ran, 0 unreachable.
+
 Not verified here: CI. The deleted install step means the first push is what proves
-`make dead` installs the tool on a runner as well as on a laptop.
+`make dead` installs the tool on a runner as well as on a laptop — and the `darwin` job added
+alongside it is the other thing only a push can answer.

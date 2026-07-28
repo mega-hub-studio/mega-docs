@@ -97,9 +97,15 @@ for (const [page, ids] of PAGES) {
     errs.push(...pt.drain(`${page}@${w}`));
   }
 }
-console.log(JSON.stringify(out, null, 1));
-if (errs.length) console.log("\npage errors:\n" + errs.join("\n"));
-if (fails.length) console.log("\n" + fails.join("\n"));
-console.log(fails.length || errs.length ? "\nWALKTHROUGHS: FAIL" : "\nWALKTHROUGHS: PASS");
+// The measurements print only when something is wrong with them. On a green run they were
+// ~250 lines of JSON nobody reads, ahead of the one line anybody does — and `make check-full`
+// is the command whose whole value is that its output means something.
+const red = fails.length || errs.length;
+if (red) {
+  console.log(JSON.stringify(out, null, 1));
+  if (errs.length) console.log("\npage errors:\n" + errs.join("\n"));
+  if (fails.length) console.log("\n" + fails.join("\n"));
+}
+console.log(red ? "\nWALKTHROUGHS: FAIL" : "\nWALKTHROUGHS: PASS");
 // The browser instance belongs to the wrapper that started it; it stops it on the way out.
-process.exit(fails.length || errs.length ? 1 : 0);
+process.exit(red ? 1 : 0);

@@ -177,8 +177,9 @@ make check-wt              # optional: drives every diagram walkthrough (prev/ne
 #   possible, because every pinchtab subcommand exits 0, an unknown one included. Each run
 #   starts its own instance on its own port and stops it after: PinchTab commands act on an
 #   instance's current tab, so sharing one with an editor or an MCP integration makes the
-#   measurements flaky (2 of 3 runs, measured). scripts/pinchtab.mjs is the only file that
-#   knows a CLI is involved.
+#   measurements flaky (2 of 3 runs, measured). Two files know a CLI is involved and no
+#   others: scripts/guide-rig.sh renders, serves and owns the browser for both checks — the
+#   wrappers are four variables each — and scripts/pinchtab.mjs drives it.
 make ui                    # build the app's front end (Vite) into web/dist — commit the output
 make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
