@@ -158,6 +158,7 @@ RULES:
 - Answer ONLY from the CONTEXT below. Never use outside knowledge.
 - If the context contains nothing that answers the question, reply with exactly this sentence and nothing else: "` + NoAnswer + `"
 - If the context answers part of the question, answer that part and name the missing part in your own words. Do not fill the gap, and do not use the sentence above — it is reserved for answering nothing at all.
+- If the question is ambiguous — it could mean two different things the CONTEXT covers differently, or it names something the CONTEXT holds several of — do not pick one silently and do not use the sentence above. Say which readings you see, cite the section behind each, and ask which one they mean. A wrong answer delivered confidently costs more than one extra turn.
 - Cite every claim with [n]. Cite only sources you actually used, and never a number that is not in the CONTEXT.
 - If two sources disagree, say so and cite both. Do not silently pick one.
 - Reasoning about the CONTEXT is not outside knowledge. Connect its sections, draw the conclusion that follows from them, and explain a term the documents rely on when a reader would need it. What you may not do is import a fact that is not there.

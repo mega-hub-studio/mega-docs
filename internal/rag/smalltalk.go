@@ -38,6 +38,7 @@ const (
 	identity
 	capability
 	runtimeMeta
+	tooVague
 )
 
 // Matched against the whole question, lowercased and trimmed of punctuation. Anchored on
@@ -59,6 +60,18 @@ var smallTalkPatterns = []struct {
 	// on screen reads as broken, and it cost a completion each time — measured at 1414ms on
 	// the deployed instance for "model gì", with the answer visible two centimetres below.
 	{runtimeMeta, regexp.MustCompile(`^((d(u|ù)ng |b(a|ạ)n d(u|ù)ng )?model (g(i|ì)|n(a|à)o)|what model( (are you|do you use))?|which model)$`)},
+	// A question with no content word in it — pure interrogative or filler. Retrieval has
+	// nothing to match, so the reply used to be the no-answer sentence, which blames the
+	// documents for a question that was never asked. Asking back is both cheaper and the
+	// only honest response.
+	//
+	// This list is short and *whole-string* anchored on purpose, and that restraint is the
+	// entire correctness argument. A single word is very often a perfectly good query here —
+	// "hoàn tiền", "TOP_K", "BA_PASS", "RRF" — because half of retrieval is keyword matching.
+	// Guessing at vagueness by length, or by "fewer than three words", would swallow exactly
+	// the lookups this engine is best at. Only a question that contains *no* content word at
+	// all belongs here.
+	{tooVague, regexp.MustCompile(`^(l(a|à)m sao|l(a|à)m th(e|ế) n(a|à)o|th(e|ế) n(a|à)o|nh(u|ư) th(e|ế) n(a|à)o|sao|sao v(a|ậ)y|v(a|ậ)y|v(a|ậ)y (a|à)|(c(a|á)i )?g(i|ì)|c(a|á)i (d|đ)(o|ó)|n(o|ó) l(a|à) g(i|ì)|(the )?what|what\?*|how|how\?*|why|huh|hmm|test|\?+|help me|t(o|ô)i mu(o|ố)n bi(e|ế)t)$`)},
 }
 
 // Vietnamese if the question carries a Vietnamese-only letter, English otherwise. Crude on
@@ -74,12 +87,19 @@ var viLetters = regexp.MustCompile(`[ăâđêôơưàáảãạằắẳẵặ�
 // anything about the corpus's *contents* — the first screen already lists those, measured,
 // and a sentence invented here could disagree with it.
 func smallTalk(question string) (string, bool) {
-	q := strings.ToLower(strings.TrimSpace(question))
-	q = strings.TrimRight(q, " .!?…,;:")
-	if q == "" {
+	raw := strings.ToLower(strings.TrimSpace(question))
+	if raw == "" {
 		return "", false
 	}
-	vi := viLetters.MatchString(q)
+	q := strings.TrimRight(raw, " .!?…,;:")
+	vi := viLetters.MatchString(raw)
+	// Trimming the trailing punctuation is what lets "hello!" match "hello" — but it also
+	// eats a question that is *only* punctuation, and "?" on its own left an empty string
+	// that fell through to retrieval and came back as the no-answer sentence. Punctuation
+	// with nothing in front of it is the vaguest question there is.
+	if q == "" {
+		return smallTalkReply(tooVague, vi), true
+	}
 	for _, p := range smallTalkPatterns {
 		if !p.re.MatchString(q) {
 			continue
@@ -160,6 +180,26 @@ func smallTalkReply(kind smallTalkKind, vi bool) string {
 			"To change it, set `CHAT_MODEL` in `.env` and restart. Note that the model is part of " +
 			"the cache signature, so changing it invalidates every cached answer — which is " +
 			"correct: an answer produced by a different model is a different answer."
+	case tooVague:
+		// Ask back, and make the asking useful: say what would make it answerable, in the
+		// vocabulary this corpus rewards. A bare "could you clarify?" spends a turn and
+		// teaches nothing; naming the shape of a good question means the next attempt lands.
+		if vi {
+			return "Bạn muốn biết cụ thể điều gì? Câu vừa rồi chưa đủ để tôi biết nên tìm ở đâu.\n\n" +
+				"Hiệu quả nhất là nêu **đúng từ có trong tài liệu**: một mã lỗi, tên config, mã quy " +
+				"định, hoặc tên nghiệp vụ. Ví dụ:\n\n" +
+				"- *thay vì* \"làm sao\" → \"làm sao huỷ booking đã thanh toán\"\n" +
+				"- *thay vì* \"cái đó\" → \"quy trình hoàn tiền cho booking huỷ muộn\"\n\n" +
+				"Chưa biết bắt đầu từ đâu thì bấm một tài liệu ở màn hình đầu — tôi sẽ nói tài liệu " +
+				"đó bao gồm những gì, rồi bạn hỏi sâu vào đúng phần cần."
+		}
+		return "Could you be more specific? There is not enough in that to know where to look.\n\n" +
+			"What works best is **the words the documents use**: an error code, a config key, a " +
+			"rule id, or the name of the process. For example:\n\n" +
+			"- *instead of* \"how\" → \"how do I cancel a paid booking\"\n" +
+			"- *instead of* \"that thing\" → \"the refund process for a late cancellation\"\n\n" +
+			"If you are not sure where to start, tap a document on the first screen — I will tell " +
+			"you what it covers, and you can go deeper from there."
 	case notSmallTalk:
 		return ""
 	}
