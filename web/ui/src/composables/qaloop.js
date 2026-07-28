@@ -6,19 +6,23 @@
    The history sits here too, because it is the same fact from the other side: a
    question the corpus already answered, replayable for nothing.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { ref } from "vue";
+import { shallowRef } from "vue";
 import * as qa from "../lib/qa.js";
 
 const EMPTY = { tickets: [], open: 0, answered: 0, confirmed: 0, rejected: 0 };
 
 /**
  * @param {{ toast: Function }} deps
- * @returns {{ queue: import("vue").Ref<object>, history: import("vue").Ref<object[]>,
+ * @returns {{ queue: import("vue").ShallowRef<object>, history: import("vue").ShallowRef<object[]>,
  *   refresh: () => Promise<void>, file: (turn: object) => Promise<void> }}
  */
 export function useQaLoop({ toast }) {
-  const queue = ref(EMPTY);
-  const history = ref([]);
+  // shallowRef for both: a ticket and a history row are read, never edited — the loop
+  // re-fetches instead (`refresh` below), which replaces `.value` and triggers anyway.
+  // Deep reactivity here would proxy up to 100 tickets plus 20 history rows to watch for
+  // writes that never happen. A ticket the BA confirms comes back from the server.
+  const queue = shallowRef(EMPTY);
+  const history = shallowRef([]);
 
   /** Failures stay silent on purpose: a stale badge beats an error banner thrown over
    *  a working conversation. */

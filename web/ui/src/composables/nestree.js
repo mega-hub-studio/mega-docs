@@ -26,7 +26,7 @@ import { onMounted, watch } from "vue";
  * @param {string} [scope] the active scope, whose ancestors start expanded
  * @returns {Array<object>} nodes for the element's JSON payload
  */
-export function treeNodes(documents, scope = "") {
+function treeNodes(documents, scope = "") {
   const root = { children: new Map() };
   for (const d of documents || []) {
     const segs = String(d.path || "")
