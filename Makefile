@@ -89,8 +89,17 @@ dead:
 
 # Nothing key-shaped may be committed. .env is gitignored; this catches the case
 # where a key gets pasted into a tracked file by accident.
+# Two of the exclusions are generated files whose content is hashes by definition:
+# web/dist (Vite's bundle, where minified third-party code matches by accident) and the npm
+# lockfile (every entry carries a sha512 integrity string). Excluding the *build output* is
+# not a blind spot — a key can only reach the bundle from web/ui/src, which is scanned.
+#
+# git grep only sees TRACKED files, which is worth knowing before trusting a green run:
+# running this before `git add` scans a smaller tree than CI does. That is exactly how the
+# lockfile got past a local `make check` and failed on the first push.
 secrets:
-	@! git grep -nIE '(sk|api|key|token)[-_]?[A-Za-z0-9]{24,}' -- . ':!*.sha384' ':!scripts/*' \
+	@! git grep -nIE '(sk|api|key|token)[-_]?[A-Za-z0-9]{24,}' -- . \
+		':!*.sha384' ':!scripts/*' ':!web/dist/*' ':!web/ui/package-lock.json' \
 		|| { echo "^ that looks like a credential in a tracked file"; exit 1; }
 
 test:

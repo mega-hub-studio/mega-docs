@@ -218,6 +218,11 @@ a runtime error.
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the
   header's stacking context.
+- **`make secrets` only sees *tracked* files.** It is `git grep`, so running the gate
+  before `git add` scans a smaller tree than CI does — a new generated file can pass locally
+  and fail on the first push. That happened with `web/ui/package-lock.json` (every entry
+  carries a sha512 integrity string) and `web/dist` (minified third-party code matching by
+  accident). Both are excluded now, with the reason next to them.
 - **`go ./...` walks into `web/ui/node_modules`.** One npm dependency (flatted) ships a Go
   package, and the linter reported seven findings from somebody else's code. The Go tool has
   no directory ignore, so the Makefile spells the packages out: `PKGS := ./cmd/... ./internal/... ./web`.
