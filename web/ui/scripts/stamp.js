@@ -26,9 +26,11 @@ function walk(dir, out = []) {
   return out
 }
 
-// sourceHash is exported so the same definition serves the plugin and any script that
-// wants to check freshness without running a build.
-export function sourceHash(root) {
+// Not exported: the only other place that needs this definition is Go, and
+// `uiSourceHash` in web/embed_test.go reimplements it deliberately — a test that imported
+// the thing it checks would pass on a bug in it. The "any script that wants to check
+// freshness" this was exported for was never written; `knip` said so.
+function sourceHash(root) {
   const files = [
     ...walk(join(root, 'src')),
     join(root, 'index.html'),

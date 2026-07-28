@@ -9,7 +9,7 @@
    diagram arrives inside v-html, so Vue never sees it as a component, and `nes:render`
    is the library's own event and bubbles to here.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { answerHtml, fileName } from '../lib/answer.js'
+import { fileName, section, turnHtml } from '../lib/answer.js'
 import { STATUS } from '../lib/qa.js'
 
 const props = defineProps({
@@ -23,19 +23,9 @@ defineEmits(['copy', 'regenerate', 'askBA', 'diagramDrawn', 'zoomDiagram'])
 
 const srcId = n => `s${props.turn.id}-${n}`
 
-/**
- * Render this answer. No citation links mid-stream: the list only lands at the end, and
- *  until then a "[1]" has nothing to point at.
- */
-function html() {
-  return answerHtml(props.turn.a, {
-    diagrams: !props.turn.streaming && props.diagramsReady,
-    // The numbers, not how many: the engine returns only the sources the answer cited
-    // and keeps their original n, so [2] can arrive alone.
-    nums: props.turn.streaming ? [] : props.turn.citations.map(c => c.n),
-    srcId,
-  })
-}
+// What may appear in the answer mid-stream is a rendering rule, so it lives in
+// lib/answer.js with the rest of them. This says only "render this turn".
+const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
 </script>
 
 <template>
@@ -72,12 +62,15 @@ function html() {
       />
 
       <!-- official grounded-answer recipe: .sources rows that the inline .cite markers
-           in the prose above link down to -->
+           in the prose above link down to. Both halves show a leaf and keep the whole
+           value in `title`: .source-host is the recipe's short secondary label — dim, mono,
+           --fs-label — so a full breadcrumb in it wrapped to a second line and lost the
+           indent under the filename. See lib/answer.js. -->
       <ol v-if="turn.citations.length" class="sources">
         <li v-for="c in turn.citations" :id="srcId(c.n)" :key="c.n" class="source">
           <span class="source-n">{{ c.n }}</span>
           <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
-          <span v-if="c.heading" class="source-host">{{ c.heading }}</span>
+          <span v-if="c.heading" class="source-host" :title="c.heading">{{ section(c.heading) }}</span>
         </li>
       </ol>
 

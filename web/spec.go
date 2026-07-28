@@ -192,7 +192,7 @@ func list(v string) []string {
 		return nil
 	}
 	var out []string
-	for _, part := range strings.Split(v, ",") {
+	for part := range strings.SplitSeq(v, ",") {
 		if p := strings.TrimSpace(clean(part)); p != "" {
 			out = append(out, p)
 		}

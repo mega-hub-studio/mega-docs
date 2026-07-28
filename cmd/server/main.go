@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"knowledge-engine/internal/ai"
@@ -59,10 +60,14 @@ func run() error {
 	handler := server.New(server.Deps{
 		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
 		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
+		// The Admin screen reads the config it is describing, so the inventory is a closure
+		// over cfg rather than a snapshot: one source for what the knobs are, in the package
+		// that defines them.
+		Settings: func() any { return cfg.Inventory() }, AdminPass: server.AdminPass(cfg.AdminPass),
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
-			Site: cfg.SiteURL,
+			Version: revision(),
 		},
 	})
 
@@ -77,10 +82,67 @@ func run() error {
 
 	// The UI's build is in the startup line because the bundle is committed: "which
 	// front end is this binary serving" is otherwise unanswerable without unzipping it.
-	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s)",
-		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg))
+	// The revision answers the other half — `build` is a hash of web/ui alone, so a Go-only
+	// deploy reuses it and would look like nothing shipped.
+	log.Printf("mega-docs %s on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s, admin: %s)",
+		describeRev(), addr, build.Vue, build.Nes, build.Sources[:8],
+		describe(auth), writes(cfg), admin(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
+	warnIfKeyless(cfg)
 	return srv.ListenAndServe()
+}
+
+// warnIfKeyless says at startup what used to be discovered on the first question. An empty
+// AI_API_KEY is *legal* — internal/ai sends no Authorization header when there is no key,
+// which is correct for a keyless endpoint — so this is a warning and not a refusal, unlike
+// `ingest`, which cannot do its one job without embeddings and says so as an error.
+//
+// The failure it replaces: a server that starts clean, serves the UI, and then answers the
+// first question with a provider 401 that names neither the variable nor the file.
+func warnIfKeyless(cfg config.Config) {
+	if cfg.APIKey != "" {
+		return
+	}
+	log.Printf("WARNING: AI_API_KEY is not set. Chat will fail on the first question unless")
+	log.Printf("         AI_BASE_URL (%s) is a keyless endpoint. Set it in .env.", cfg.BaseURL)
+}
+
+// revision is the commit this binary was built from, short, with a `+` when the tree was
+// dirty. Go stamps it into every binary built from a checkout, so there is no VERSION file
+// to forget to bump and no `-ldflags -X` in the Makefile — which matters because the deploy
+// is `git pull && make build`, and a version anybody has to remember to edit is a version
+// that lies. Empty for `go install` from a module proxy, which carries no VCS stamp, and
+// the UI prints nothing rather than a placeholder.
+func revision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	rev, dirty := "", false
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if len(rev) > 7 {
+		rev = rev[:7]
+	}
+	if dirty && rev != "" {
+		rev += "+"
+	}
+	return rev
+}
+
+// describeRev is the startup line's version field: the revision, or a name for its absence,
+// because a blank space between "mega-docs" and "on http://" reads as a formatting bug.
+func describeRev() string {
+	if rev := revision(); rev != "" {
+		return rev
+	}
+	return "(no vcs stamp)"
 }
 
 func describe(a server.Auth) string {
@@ -99,6 +161,16 @@ func writes(cfg config.Config) string {
 		return "read-only (BA_PASS unset)"
 	}
 	return "BA into " + cfg.CorpusDir
+}
+
+// admin says whether the read-only settings screen exists. One word in the startup line for
+// the same reason `writes` earns one: an operator who set ADMIN_PASS wants to see that it was
+// picked up, and one who did not should not go looking for a screen that is not there.
+func admin(cfg config.Config) string {
+	if cfg.AdminPass == "" {
+		return "off (ADMIN_PASS unset)"
+	}
+	return "on"
 }
 
 // warnIfExposed says the quiet part out loud: this app has no access control of

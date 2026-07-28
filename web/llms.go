@@ -78,7 +78,9 @@ func LLMs(siteBase string) ([]byte, error) {
 		"writes.\n")
 	b.WriteString("- The SQLite file is derived. `CORPUS_DIR` (default `docs`) is the " +
 		"source of truth, including the answers BAs confirm, which are written there as " +
-		"`qa/ticket-N.md` — so back up that directory (git), not the database.\n")
+		"`qa/ticket-N.md` — so deleting the database costs an index, not a document. There " +
+		"is no backup story by design: documents enter through one controlled path, the BA " +
+		"WebUI import, and removal is a soft delete into `.trash/`.\n")
 	b.WriteString("- A repeated question is answered from a local cache: no provider " +
 		"call, no cost. Any ingest invalidates the whole cache, so a cached answer " +
 		"never outlives the sources it cites.\n")

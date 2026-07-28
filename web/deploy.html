@@ -200,9 +200,9 @@ done: 8/8 files, 74 chunks</span></div>
       </div>
       <div class="card">
         <div class="head"><span class="title" lang="en">Cloud VM</span><span class="title" lang="vi">VM cloud</span></div>
-        <p lang="en">Always up and easy to back up, but the key and the index live
+        <p lang="en">Always up and easy to snapshot, but the key and the index live
           off-site. 2 vCPU is plenty — the heavy work is the provider's.</p>
-        <p lang="vi">Luôn online và dễ backup, nhưng key và index nằm ngoài công
+        <p lang="vi">Luôn online và dễ snapshot, nhưng key và index nằm ngoài công
           ty. 2 vCPU là thừa đủ — phần nặng là việc của provider.</p>
       </div>
     </div>
@@ -219,10 +219,6 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>Back up</th><td>Put the documents directory in <b>git</b>. That is the backup: <code>knowledge.db</code> is derived from it, and <code>./bin/ingest docs</code> rebuilds the whole thing — including the answers BAs confirmed, which are files in <code>docs/qa/</code>. A snapshot of the database is only a shortcut back to a running state (<code>sqlite3 knowledge.db ".backup out.db"</code> while it runs — a plain copy of a live database can tear).</td></tr>
-          <tr lang="vi"><th>Backup</th><td>Đưa thư mục tài liệu vào <b>git</b>. Đó mới là backup: <code>knowledge.db</code> được dựng ra từ nó, và <code>./bin/ingest docs</code> dựng lại toàn bộ — kể cả câu trả lời BA đã confirm, vì chúng là file trong <code>docs/qa/</code>. Snapshot database chỉ là đường tắt để quay lại trạng thái đang chạy (<code>sqlite3 knowledge.db ".backup out.db"</code> khi đang chạy — copy trực tiếp một database đang mở có thể bị lỗi dở dang).</td></tr>
-          <tr lang="en"><th>Commit what the app writes, automatically</th><td><code>scripts/corpus-sync.sh</code> commits and pushes whatever lands in the corpus, from either write path (a confirm or a browser import). Drive it from a <code>.path</code> unit watching the folder — event-driven, because there is nothing to do until a file changes. Keep a slow timer as the backstop: a <code>.path</code> unit stops watching while the job it triggered runs, so a file written in that window raises no event.</td></tr>
-          <tr lang="vi"><th>Tự commit những gì app ghi ra</th><td><code>scripts/corpus-sync.sh</code> commit và push mọi thứ xuất hiện trong corpus, từ cả hai đường ghi (BA confirm hoặc import từ browser). Chạy nó bằng một unit <code>.path</code> theo dõi thư mục — theo sự kiện, vì không có gì phải làm cho tới khi có file thay đổi. Vẫn nên có một timer chậm làm lưới an toàn: unit <code>.path</code> ngừng theo dõi trong lúc job nó gọi đang chạy, nên file ghi trong khoảng đó không sinh sự kiện.</td></tr>
           <tr lang="en"><th>Review what BAs published</th><td><code>git diff docs/qa/</code>. Every confirm is one file, so the knowledge base has a review trail without anyone opening the database.</td></tr>
           <tr lang="vi"><th>Xem BA đã publish gì</th><td><code>git diff docs/qa/</code>. Mỗi lần confirm là một file, nên knowledge base có vết để review mà không cần mở database.</td></tr>
           <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>
@@ -238,6 +234,101 @@ done: 8/8 files, 74 chunks</span></div>
     </div>
   </section>
 
+  <!-- ══ admin ═════════════════════════════════════════════════════════════════
+       Read-mostly on purpose. The thing an operator could not do before this screen was
+       *see* a setting: the effective value of a knob lived in .env, in internal/config's
+       defaults, and in whatever the environment already had — and which one won was a
+       guess. Editing is deliberately not here; every knob is read at startup, so a write
+       path would need persistence and a reload for a value nobody changes twice a year. -->
+  <section id="admin" data-feature="admin"
+           data-api="GET /api/settings" data-env="ADMIN_PASS"
+           data-test="TestSettingsNeedTheAdminPassword,TestSettingsRedactEverySecret">
+    <h2 lang="en">Admin: what this instance actually is</h2>
+    <h2 lang="vi">Admin: instance này thực sự là gì</h2>
+    <p class="lede" lang="en">One screen at <code>/#/admin</code>, three tabs, and nothing
+      on it changes anything. It answers the question every other page can only describe:
+      <i>what is this running instance configured to do, right now?</i></p>
+    <p class="lede" lang="vi">Một màn hình ở <code>/#/admin</code>, ba tab, và không thứ gì
+      trên đó thay đổi được cái gì. Nó trả lời câu hỏi mà mọi trang khác chỉ mô tả được:
+      <i>instance đang chạy này được cấu hình để làm gì, ngay lúc này?</i></p>
+
+    <div class="callout gotcha">
+      <b lang="en">No <code>ADMIN_PASS</code>, no screen.</b>
+      <span lang="en">The route is not registered and the tab does not render — the same
+        shape as <code>BA_PASS</code>, for the same reason: forgetting to configure a secret
+        must never be how you end up without one. A settings list carries the *provenance*
+        of every password on the box, so it cannot be open the way
+        <code>/api/health</code> is.</span>
+      <b lang="vi">Không có <code>ADMIN_PASS</code> thì không có màn hình.</b>
+      <span lang="vi">Route không được đăng ký và tab không render — cùng hình dạng với
+        <code>BA_PASS</code>, cùng lý do: quên cấu hình một secret không bao giờ được là
+        cách bạn kết thúc mà không có nó. Danh sách setting mang theo *nguồn gốc* của mọi
+        mật khẩu trên máy, nên nó không thể mở như <code>/api/health</code>.</span>
+    </div>
+
+    <nes-tabs>
+      <section data-label="Settings" selected>
+        <p lang="en">Every variable <code>internal/config</code> reads, grouped the way
+          <code>.env.example</code> groups them, and each row carries the part that used to
+          be a guess: <b>where the value came from</b> — <code>.env</code>, the process
+          environment, or the built-in default. A password shows <code>set</code> or
+          <code>unset</code> and never its value.</p>
+        <p lang="vi">Mọi biến <code>internal/config</code> đọc, nhóm y như
+          <code>.env.example</code>, và mỗi dòng mang đúng phần trước đây phải đoán:
+          <b>giá trị đến từ đâu</b> — <code>.env</code>, môi trường tiến trình, hay giá trị
+          mặc định. Mật khẩu hiện <code>set</code> hoặc <code>unset</code>, không bao giờ
+          hiện giá trị.</p>
+        <div class="callout memo">
+          <b lang="en">Everything here is read at startup.</b>
+          <span lang="en">Changing one means editing <code>.env</code> and restarting — the
+            screen says so once, at the top, rather than badging all nineteen rows.
+            <code>EMBED_DIM</code> is the one that costs more than a restart: a different
+            width means re-embedding the whole corpus.</span>
+          <b lang="vi">Mọi giá trị ở đây đọc lúc khởi động.</b>
+          <span lang="vi">Đổi một cái là sửa <code>.env</code> rồi restart — màn hình nói
+            điều đó một lần ở trên đầu, thay vì dán badge lên cả mười chín dòng.
+            <code>EMBED_DIM</code> là cái đắt hơn một lần restart: đổi độ rộng nghĩa là
+            embed lại toàn bộ corpus.</span>
+        </div>
+      </section>
+
+      <section data-label="Runtime">
+        <p lang="en">What the binary is, not what it was configured with: the front end
+          build it is serving (Vue, 8bit-nes and the bundle's own hash — otherwise
+          unanswerable without unzipping the binary), how long it has been up, the size of
+          the derived index, and the corpus counts <code>/api/corpus</code> already
+          reports.</p>
+        <p lang="vi">Binary <i>là</i> gì, không phải nó được cấu hình bằng gì: bản build
+          front end đang phục vụ (Vue, 8bit-nes và hash của chính bundle — nếu không thì
+          phải giải nén binary mới trả lời được), nó đã chạy bao lâu, index dẫn xuất lớn cỡ
+          nào, và số liệu corpus mà <code>/api/corpus</code> vốn đã trả về.</p>
+      </section>
+
+      <section data-label="Usage">
+        <p lang="en">What has been asked, from <code>/api/history</code>: the question, how
+          many times it was answered from cache, and the folder it was scoped to. That is
+          the honest version of "analytics" for an instance with no accounts — usage of the
+          corpus, not of people.</p>
+        <p lang="vi">Đã có những gì được hỏi, từ <code>/api/history</code>: câu hỏi, số lần
+          nó được trả lời từ cache, và thư mục nó bị thu hẹp vào. Đó là bản trung thực của
+          "analytics" cho một instance không có tài khoản — thống kê corpus, không phải
+          thống kê con người.</p>
+      </section>
+    </nes-tabs>
+
+    <div class="callout memo">
+      <b lang="en">Documents are never touched from here.</b>
+      <span lang="en">Import, remove, confirm and dismiss stay in
+        <a href="<%.BAURL%>#import">BA mode</a>, where the person doing that work already
+        is. Two screens with the same button is one button and one lie about which
+        matters.</span>
+      <b lang="vi">Không bao giờ thao tác tài liệu từ đây.</b>
+      <span lang="vi">Import, xoá, confirm và dismiss ở lại
+        <a href="<%.BAURL%>#import">chế độ BA</a>, nơi người làm việc đó vốn đã ở. Hai màn
+        hình cùng một cái nút là một cái nút và một lời nói dối về cái nào mới đúng.</span>
+    </div>
+  </section>
+
   <!-- ══ upgrading ═════════════════════════════════════════════════════════════
        The UI is compiled in, so "replace the binary" is not optional — and the one
        upgrade that needs a re-index is stated with a *checkable condition* rather
@@ -246,19 +337,42 @@ done: 8/8 files, 74 chunks</span></div>
   <section>
     <h2 lang="en">Upgrading</h2>
     <h2 lang="vi">Nâng cấp</h2>
-    <p class="lede" lang="en">Four lines. The build step is not optional: the whole UI
-      is compiled into the binary, so pulling without building leaves the old bytes
-      being served.</p>
-    <p class="lede" lang="vi">Bốn dòng. Bước build không phải tuỳ chọn: toàn bộ UI được
-      compile vào binary, nên pull mà không build thì vẫn đang phục vụ bytes cũ.</p>
+    <p class="lede" lang="en">One command. The build step is not optional — the whole UI is
+      compiled into the binary, so pulling without building leaves the old bytes being
+      served — and <code>make deploy</code> is the four lines with the four ways they go
+      wrong already handled.</p>
+    <p class="lede" lang="vi">Một lệnh. Bước build không phải tuỳ chọn: toàn bộ UI được
+      compile vào binary, nên pull mà không build thì vẫn đang phục vụ bytes cũ — và
+      <code>make deploy</code> là bốn dòng đó, kèm sẵn bốn kiểu sai đã từng xảy ra.</p>
 
-    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; git pull origin main</span><span class="cmd">make build</span><span class="cmd">sudo systemctl restart knowledge</span><span class="cmd">curl -s localhost:8080/api/health</span><span class="out ok">{"ok":true,"writes":true}</span></div>
-    <p lang="en">That last line is the check that matters: <code>"writes":true</code> means
-      <code>BA_PASS</code> was picked up, so BA mode can publish. <code>"writes":false</code>
-      means the instance is read-only.</p>
-    <p lang="vi">Dòng cuối là chỗ cần xem: <code>"writes":true</code> nghĩa là
-      <code>BA_PASS</code> đã được nhận, chế độ BA publish được. <code>"writes":false</code>
-      là instance đang chỉ-đọc.</p>
+    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; make deploy</span><span class="out">  before: 228607e</span><span class="out">  deployed: 9c4a34d — {"ok":true,"writes":true,…,"version":"9c4a34d"}</span></div>
+    <p lang="en">What it adds over typing the four by hand, each one a failure that has
+      happened on this host: <code>git pull <b>--ff-only</b></code>, because a deploy
+      checkout is a mirror and a local commit here turns an upgrade into a half-finished
+      rebase, mid-deploy, on the machine serving the team; a check that <code>web/dist</code>
+      is not stale, because this host has no Node and a push that forgot <code>make ui</code>
+      deploys a UI that predates the change; the revision before and after, so the output
+      answers "did that change anything?"; and a health check afterwards, because a restart
+      that fails leaves systemd retrying quietly.</p>
+    <p lang="vi">Nó thêm gì so với gõ tay bốn dòng — mỗi thứ là một lỗi đã xảy ra trên host
+      này: <code>git pull <b>--ff-only</b></code>, vì bản checkout để deploy là một bản sao,
+      và một commit local ở đây biến việc nâng cấp thành một cuộc rebase dở dang, ngay giữa
+      lúc deploy, trên máy đang phục vụ cả nhóm; kiểm tra <code>web/dist</code> có cũ không,
+      vì host không có Node nên một lần push quên <code>make ui</code> sẽ deploy ra UI cũ hơn
+      thay đổi; in revision trước và sau, để output trả lời được "có đổi gì không?"; và
+      health check sau khi restart, vì restart thất bại thì systemd cứ retry trong im lặng.</p>
+    <p lang="en">Two fields in that JSON are the check that matters.
+      <code>"writes":true</code> means <code>BA_PASS</code> was picked up, so BA mode can
+      publish; <code>"writes":false</code> means the instance is read-only.
+      <code>"version"</code> is the commit the running binary was built from — the same
+      string the app shows in its status line, so "which version is deployed?" is answerable
+      without shell access. A trailing <code>+</code> means it was built from a dirty tree.</p>
+    <p lang="vi">Hai field trong JSON đó là chỗ cần xem. <code>"writes":true</code> nghĩa là
+      <code>BA_PASS</code> đã được nhận, chế độ BA publish được; <code>"writes":false</code>
+      là instance đang chỉ-đọc. <code>"version"</code> là commit mà binary đang chạy được
+      build ra — đúng chuỗi mà app hiện ở status line, nên "đang deploy version nào?" trả lời
+      được mà không cần vào shell. Có dấu <code>+</code> ở cuối là build từ cây làm việc còn
+      bẩn.</p>
 
     <p lang="en">The front end needs nothing extra here: it is built by
       <code>make ui</code> into <code>web/dist</code>, which is committed, so
@@ -300,25 +414,25 @@ done: 8/8 files, 74 chunks</span></div>
       khi có người hỏi.</p>
 
     <div class="callout memo">
-      <b lang="en">Three kinds of change need that same rebuild.</b>
-      <span lang="en">There is no schema migration and deliberately so — the database is
-        derived, so the upgrade path is to rebuild it. (1) A change to how documents are
+      <b lang="en">Two kinds of change need that same rebuild.</b>
+      <span lang="en">A schema change does <i>not</i>: the server carries a forward-only
+        migration runner, so a new table or column reaches a database that already exists.
+        What a migration cannot do is re-derive rows that were written under an older rule,
+        and that is what the rebuild is for. (1) A change to how documents are
         <i>split</i> into sections: the existing rows were split by the old rule and stay
-        that way until re-ingested. (2) A new database column: <code>schema.sql</code> is
-        <code>CREATE TABLE IF NOT EXISTS</code>, so an existing table never gains one, and
-        queries naming it fail at runtime while passing on a fresh file. (3) A change to
-        how a document path is stored. Everything else — a prompt edit, a new model, a
-        retrieval parameter — invalidates the answer cache on its own and needs
-        nothing.</span>
-      <b lang="vi">Ba loại thay đổi cần dựng lại như trên.</b>
-      <span lang="vi">Không có migration schema, và đó là chủ ý — database là thứ dựng lại
-        được, nên cách nâng cấp là dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành
-        đoạn: các dòng đang có vẫn theo luật cũ tới khi ingest lại. (2) Thêm column mới:
-        <code>schema.sql</code> chỉ có <code>CREATE TABLE IF NOT EXISTS</code>, nên bảng đã
-        tồn tại sẽ không bao giờ có column đó, và query gọi tên nó sẽ lỗi lúc chạy dù test
-        trên file mới vẫn xanh. (3) Thay đổi cách lưu path tài liệu. Còn lại — sửa prompt,
-        đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không cần
-        gì thêm.</span>
+        that way until re-ingested. (2) A change to how a document path is stored — two
+        spellings of one file become two documents, each cited separately. Everything
+        else — a prompt edit, a new model, a retrieval parameter — invalidates the answer
+        cache on its own and needs nothing.</span>
+      <b lang="vi">Hai loại thay đổi cần dựng lại như trên.</b>
+      <span lang="vi">Thay đổi schema thì <i>không</i>: server có sẵn một migration runner
+        chạy một chiều, nên bảng mới hay column mới vẫn tới được database đang tồn tại. Thứ
+        migration không làm được là dựng lại những dòng đã ghi theo luật cũ — và đó mới là
+        việc của bước dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành đoạn: các dòng
+        đang có vẫn theo luật cũ tới khi ingest lại. (2) Thay đổi cách lưu path tài liệu —
+        hai cách viết của cùng một file thành hai document, được dẫn nguồn riêng. Còn lại —
+        sửa prompt, đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không
+        cần gì thêm.</span>
     </div>
   </section>
 
@@ -326,7 +440,7 @@ done: 8/8 files, 74 chunks</span></div>
   <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
        the build if one is missing: a knob nobody documented is a knob nobody finds. -->
   <section id="settings" data-feature="settings"
-           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,SITE_URL,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS,ADMIN_PASS"
            data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
@@ -348,6 +462,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>AUTH_PASS</code></th><td>trống (tắt)</td><td>bắt buộc nếu truy cập được từ ngoài tailnet/VPN</td></tr>
           <tr lang="en"><th><code>BA_PASS</code></th><td>empty (read-only)</td><td>set it to let BAs confirm answers into the documents. Empty means no write surface at all — reads and the queue still work. Keep it different from <code>AUTH_PASS</code>: everyone who reads shares that one.</td></tr>
           <tr lang="vi"><th><code>BA_PASS</code></th><td>trống (chỉ đọc)</td><td>đặt để BA confirm được câu trả lời vào tài liệu. Trống nghĩa là không có chỗ ghi nào — đọc và hàng đợi vẫn hoạt động. Nên khác <code>AUTH_PASS</code>: mật khẩu đó ai đọc cũng dùng chung.</td></tr>
+          <tr lang="en"><th><code>ADMIN_PASS</code></th><td>empty (no admin screen)</td><td>set it to open <b>Admin</b> — the read-only window onto this instance: every setting with the value it resolved to and where that came from, what the binary is running, and what has been asked. Empty means the screen and its route do not exist, the same way an unset <code>BA_PASS</code> removes the write surface rather than opening it</td></tr>
+          <tr lang="vi"><th><code>ADMIN_PASS</code></th><td>trống (không có màn Admin)</td><td>đặt để mở <b>Admin</b> — cửa sổ chỉ-đọc nhìn vào instance này: mọi setting kèm giá trị thực tế và nguồn của nó, binary đang chạy gì, và đã có những gì được hỏi. Trống nghĩa là màn hình và route đó không tồn tại, giống như <code>BA_PASS</code> trống thì không có mặt ghi chứ không phải mở toang</td></tr>
           <tr lang="en"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>the folder <code>ingest</code> reads and where a confirmed answer is written. The service needs write access to it (<code>ReadWritePaths</code> below).</td></tr>
           <tr lang="vi"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>thư mục <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm. Service cần quyền ghi vào đó (xem <code>ReadWritePaths</code> bên dưới).</td></tr>
           <tr lang="en"><th><code>EMBED_BASE_URL</code></th><td>same as chat</td><td>when the chat provider has no <code>/embeddings</code></td></tr>
@@ -376,8 +492,6 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>CHAT_MODEL</code></th><td><code>gpt-4o-mini</code></td><td>model viết câu trả lời. Đổi nó là xoá cache — có chủ ý, vì cùng câu hỏi sẽ trả lời khác</td></tr>
           <tr lang="en"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>the model that indexes. The MVP is fixed on this one: changing it needs every document re-embedded and a matching <code>EMBED_DIM</code>, so it is a migration rather than a setting</td></tr>
           <tr lang="vi"><th><code>EMBED_MODEL</code></th><td><code>text-embedding-3-small</code></td><td>model đi index. MVP cố định ở model này: đổi thì phải embed lại mọi tài liệu và <code>EMBED_DIM</code> phải khớp, nên đó là một cuộc migration chứ không phải một setting</td></tr>
-          <tr lang="en"><th><code>SITE_URL</code></th><td>the published guide</td><td>only if you fork the docs: it is the address the app links out to</td></tr>
-          <tr lang="vi"><th><code>SITE_URL</code></th><td>trang guide đã publish</td><td>chỉ khi bạn fork tài liệu: đây là địa chỉ app trỏ ra ngoài</td></tr>
         </tbody>
       </table>
     </div>
@@ -417,6 +531,100 @@ ReadWritePaths=/opt/knowledge
 WantedBy=multi-user.target</span></div>
 
     <div class="terminal"><span class="cmd">sudo chmod 600 /opt/knowledge/.env</span><span class="out"># it holds the provider key</span><span class="cmd">sudo systemctl enable --now knowledge</span><span class="cmd">journalctl -u knowledge -f</span></div>
+
+    <h3 lang="en">WSL and macOS</h3>
+    <h3 lang="vi">WSL và macOS</h3>
+    <p lang="en">The binary is the same on every platform — one file, no runtime, nothing
+      fetched at start. Only the supervisor differs, so this is the whole of cross-OS
+      self-hosting.</p>
+    <p lang="vi">Binary giống nhau trên mọi nền tảng — một file, không runtime, không tải gì
+      lúc khởi động. Chỉ khác nhau ở cái trông process, nên đây là toàn bộ chuyện self-host
+      đa hệ điều hành.</p>
+
+    <div class="grid two">
+      <div class="card">
+        <div class="head"><span class="title" lang="en">WSL2</span><span class="title" lang="vi">WSL2</span></div>
+        <p lang="en">The unit above works, but <b>systemd is off by default</b> — without
+          this, <code>systemctl</code> does not exist and nothing above can be installed.
+          Enable it once, then restart the VM from Windows:</p>
+        <p lang="vi">Unit ở trên chạy được, nhưng <b>systemd mặc định bị tắt</b> — không có
+          bước này thì <code>systemctl</code> không tồn tại và không cài được gì ở trên. Bật
+          một lần, rồi restart VM từ Windows:</p>
+        <div class="terminal"><span class="out">
+# /etc/wsl.conf
+[boot]
+systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># run this in Windows, not in the shell</span></div>
+      </div>
+      <div class="card">
+        <div class="head"><span class="title" lang="en">macOS</span><span class="title" lang="vi">macOS</span></div>
+        <p lang="en">No systemd. <code>launchd</code> is the equivalent, and a user agent
+          needs no root — so the deploy directory is under <code>$HOME</code> here rather than
+          <code>/opt</code>, which is what makes that true. Put this at
+          <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
+        <p lang="vi">Không có systemd. <code>launchd</code> là thứ tương đương, và một user
+          agent thì không cần root — nên ở đây thư mục deploy nằm trong <code>$HOME</code> chứ
+          không phải <code>/opt</code>, chính điều đó làm cho "không cần root" là thật. Đặt
+          file này ở <code>~/Library/LaunchAgents/dev.megadocs.knowledge.plist</code>:</p>
+        <div class="terminal"><span class="out">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;             &lt;string&gt;dev.megadocs.knowledge&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;  &lt;array&gt;
+    &lt;string&gt;/Users/you/srv/knowledge/bin/knowledge&lt;/string&gt;&lt;/array&gt;
+  &lt;key&gt;WorkingDirectory&lt;/key&gt;  &lt;string&gt;/Users/you/srv/knowledge&lt;/string&gt;
+  &lt;key&gt;KeepAlive&lt;/key&gt;         &lt;true/&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;   &lt;string&gt;/Users/you/srv/knowledge/state/knowledge.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt; &lt;string&gt;/Users/you/srv/knowledge/state/knowledge.log&lt;/string&gt;
+&lt;/dict&gt;&lt;/plist&gt;</span><span class="cmd">launchctl bootstrap gui/$UID ~/Library/LaunchAgents/dev.megadocs.knowledge.plist</span><span class="out"># launchctl load is deprecated; bootstrap is the verb
+# every path inside a plist is absolute — launchd does not expand ~
+# there is no journalctl: the two log keys are where output goes</span></div>
+      </div>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">launchd does not read <code>.env</code>.</b>
+      <span lang="en">systemd's <code>EnvironmentFile=</code> has no launchd equivalent, so
+        the plist has to carry the key in <code>EnvironmentVariables</code> — or the process
+        must start with <code>WorkingDirectory</code> set, because
+        <code>config.Load()</code> reads <code>./.env</code> relative to the working
+        directory. The <code>WorkingDirectory</code> line above is what makes the second
+        option work, and it is the one that keeps the key out of a plist.</span>
+      <b lang="vi">launchd không đọc <code>.env</code>.</b>
+      <span lang="vi"><code>EnvironmentFile=</code> của systemd không có thứ tương đương ở
+        launchd, nên hoặc plist phải mang key trong <code>EnvironmentVariables</code>, hoặc
+        process phải chạy với <code>WorkingDirectory</code> đúng chỗ — vì
+        <code>config.Load()</code> đọc <code>./.env</code> theo thư mục làm việc. Dòng
+        <code>WorkingDirectory</code> ở trên là thứ làm cách thứ hai chạy được, và đó là cách
+        không phải nhét key vào plist.</span>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">A Mac that sleeps is a Mac that is offline.</b>
+      <span lang="en">This is the macOS half of the WSL note above, and it looks identical to
+        the reader: the URL stops answering and nothing is wrong with the app. A laptop sleeps
+        on idle by default, and neither a tunnel nor a tailnet reliably wakes it. A user agent
+        also runs only while somebody is logged in, so after a reboot nothing serves until
+        they are. Take the sleep away on mains power only — <code>sudo pmset -c sleep 0</code> —
+        so it is a server while plugged in and a laptop on battery. Wrapping the binary in
+        <code>caffeinate -s</code> does the same job but on battery too, which is a flat
+        tax on a machine somebody carries. If it must survive a reboot with nobody logged in,
+        that is a <code>LaunchDaemon</code> in <code>/Library/LaunchDaemons</code> with a
+        <code>UserName</code> key — root, and FileVault still holds it until the disk is
+        unlocked once.</span>
+      <b lang="vi">Mac ngủ là Mac offline.</b>
+      <span lang="vi">Đây là nửa macOS của phần WSL ở trên, và với người dùng thì hai thứ
+        giống nhau y hệt: URL không trả lời, mà app thì không có lỗi gì. Laptop mặc định ngủ
+        khi rảnh, và cả tunnel lẫn tailnet đều không đánh thức nó một cách đáng tin. User agent
+        cũng chỉ chạy khi có người đã login, nên sau reboot thì không có gì phục vụ cho tới khi
+        có người đăng nhập. Chỉ bỏ sleep khi cắm điện — <code>sudo pmset -c sleep 0</code> —
+        để cắm sạc là server, rút sạc là laptop bình thường. Bọc binary trong
+        <code>caffeinate -s</code> cũng được, nhưng nó chặn sleep cả khi dùng pin, tức thu thuế
+        đều đặn trên một cái máy người ta mang đi. Nếu bắt buộc phải sống qua reboot mà không
+        ai login, thì đó là <code>LaunchDaemon</code> ở <code>/Library/LaunchDaemons</code> kèm
+        key <code>UserName</code> — cần root, và FileVault vẫn giữ nó lại tới khi có người mở
+        khoá đĩa một lần.</span>
+    </div>
 
     <p lang="en">Re-index by hand, with the same one-liner, whenever the documents
       change. It exits non-zero if anything failed, so a failure is visible:</p>

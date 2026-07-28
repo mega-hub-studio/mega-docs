@@ -11,8 +11,11 @@
 // `go test`, so what a screenshot shows is now measured: characters per box, the gap
 // between every pair of blocks, and the chrome of the header.
 //
-// Playwright is not a dependency of this product — it is a tool, like mermaid, and
-// `make check-ui` skips when it is not installed.
+// The browser is driven by PinchTab (scripts/pinchtab.mjs), which replaced Playwright. Not a
+// dependency of this product either — a tool, like mermaid — and `make check-ui` skips when
+// it is not installed. What changed with it: the old skip condition was a hardcoded
+// `/opt/node22/...` path that existed on one machine, so on every other machine this check
+// skipped silently, and a skipped check reads exactly like a passing one.
 //
 // Verifies the restructured four-page docs set: one page per role, each split into
 // feature-sized sections. Read on a phone (390) and on a laptop (1440), in both
@@ -23,30 +26,44 @@
 //     under 80rem, open rail above). So the check is "no row *wraps*", measured against
 //     the row's own line-height — not "the index fits on one line", which it never does.
 //   • inline links inside prose are exempt from WCAG 2.5.5 (the "inline" exception:
-//     their height is constrained by the line-height of the text around them). Only
-//     chrome controls — nav, toc, tabs, walkthrough — are held to 44px.
-import { chromium, devices } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+//     their height is constrained by the line-height of the text around them).
+//
+// ── ONE GAP, NAMED ──────────────────────────────────────────────────────────────
+// Touch-target size is NOT checked here any more, and it used to be: chrome controls
+// (nav, toc, tabs, walkthrough dots, the section finder) were held to 44px on the phone.
+//
+// That assertion needed a *coarse pointer*, because 8bit-nes sizes its chrome to 32px and
+// lifts it to 44px under `@media (pointer: coarse)`. Playwright supplied it through
+// `devices["iPhone 14"]`, which enables touch emulation. PinchTab has none: `--mobile` on
+// `set viewport` leaves `navigator.maxTouchPoints` at 0, `set media pointer coarse` reports
+// "applied" while `matchMedia("(pointer: coarse)")` stays false (CDP emulates a fixed set of
+// media features and `pointer` is not in it), and `--touch-events=enabled` through
+// `browser.extraFlags` changed nothing. "touch" appears nowhere in its CLI, config or API.
+//
+// So the rule is real and unchecked. It is guarded by 8bit-nes' own release testing —
+// AGENTS.md records that 0.6.1 shipped both touch fixes this repo reported, which is why the
+// app owns no coarse-pointer CSS of its own — and by looking at a phone. If PinchTab gains
+// touch emulation, the measurement to restore is a `small: [...]` list of chrome controls
+// under 44px; see changelog/2026-07-28-pinchtab-checks.md for what it looked like.
+import { open } from "./pinchtab.mjs";
 
 const BASE = process.argv[2] || "http://127.0.0.1:8123";
 const PAGES = ["index.html", "ba.html", "dev.html", "deploy.html"];
 
-const b = await chromium.launch();
 const errs = [];
-const watch = (p) => {
-  p.on("console", m => { if (m.type() === "error") errs.push(m.text()); });
-  p.on("pageerror", e => errs.push("pageerror: " + e.message));
-  p.on("requestfailed", r => errs.push("failed: " + r.url()));
-};
+const pt = open(`${BASE}/${PAGES[0]}`);
 
-const setLang = async (p, want) => {
-  if (await p.evaluate(() => document.documentElement.dataset.lang) !== want) {
-    await p.locator("#lang").click();
-    await p.waitForTimeout(250);
+const lang = () => document.documentElement.dataset.lang;
+
+const setLang = (want) => {
+  if (pt.evalJson(lang) !== want) {
+    pt.click("#lang");
+    pt.sleep(250);
   }
-  return p.evaluate(() => document.documentElement.dataset.lang);
+  return pt.evalJson(lang);
 };
 
-const measure = (p) => p.evaluate(() => {
+const measure = () => {
   const doc = document.documentElement;
   const seen = (e) => e.offsetParent !== null;
   const lang = doc.dataset.lang;
@@ -92,18 +109,6 @@ const measure = (p) => p.evaluate(() => {
       .filter(seen).map(a => a.getAttribute("href"))
       .filter(h => h.startsWith("./") || h.startsWith("#")))],
     anchors: [...document.querySelectorAll("[id]")].map(e => e.id),
-    // 44px applies to the chrome, not to a link in a sentence.
-    small: [...document.querySelectorAll(".bar a, .bar button, .pages a, nes-toc a, nes-toc button, nes-tabs button, .wt-dot, .wt-nav button")]
-      .filter(seen)
-      .map((e) => {
-        const r = e.getBoundingClientRect();
-        const a = getComputedStyle(e, "::after");
-        const g = (v) => (v === "auto" ? 0 : Math.max(0, -Number.parseFloat(v) || 0));
-        const h = a.content !== "none" && a.position === "absolute"
-          ? r.height + g(a.top) + g(a.bottom) : r.height;
-        return { label: e.textContent.trim().slice(0, 16), h: Math.round(h), w: Math.round(r.width) };
-      })
-      .filter(x => x.w > 0 && x.h < 44),
     lang: doc.lang,
     // ── what the phone screenshots showed and the checks above did not ──
     // A box too narrow to hold words. `.table th` is nowrap, so one long row header
@@ -162,22 +167,30 @@ const measure = (p) => p.evaluate(() => {
                          Number.parseInt(getComputedStyle(document.querySelector("nes-toc")).zIndex, 10) };
     })(),
   };
-});
+};
 
 const out = {};
-for (const width of [390, 1440]) {
-  const ctx = width === 390
-    ? await b.newContext(devices["iPhone 14"])
-    : await b.newContext({ viewport: { width: 1440, height: 900 } });
-  const p = await ctx.newPage();
-  watch(p);
+// 390×664 at dpr 3 with mobile emulation is Playwright's "iPhone 14" preset, spelled out.
+// The viewport is set *before* each navigation, never after: <nes-toc> picks rail-or-bar when
+// it upgrades and does not re-pick on resize, so a resized page reports the wrong shape.
+//
+// 1920 is here because --col has a rung there and nothing was measuring above it: the page
+// stopped growing at 960px and every check ran at 1440, so a wider column could widen a
+// table past its wrapper, or push the rail off, and both would have passed. It is the
+// cheapest rung to add — the measurements below are the ones already written.
+for (const [width, height, mobile] of [[390, 664, true], [1440, 900, false], [1920, 1080, false]]) {
   for (const page of PAGES) {
-    await p.goto(`${BASE}/${page}`, { waitUntil: "networkidle" });
+    pt.viewport(width, height, { dpr: mobile ? 3 : 1, mobile });
+    pt.nav(`${BASE}/${page}`);
     const r = {};
-    for (const lang of ["en", "vi"]) r[lang] = { got: await setLang(p, lang), ...await measure(p) };
+    for (const want of ["en", "vi"]) r[want] = { got: setLang(want), ...measureNow() };
     out[`${page}@${width}`] = r;
+    errs.push(...pt.drain(`${page}@${width}`));
   }
-  await ctx.close();
+}
+
+function measureNow() {
+  return pt.evalJson(measure);
 }
 
 // Link resolution over the union of what every page declares. Anchors are read from
@@ -222,9 +235,8 @@ for (const [key, r] of Object.entries(out)) {
     need(o.toc.dead.length === 0, `${key} ${lang}: toc rows point nowhere: ${o.toc.dead}`);
     need(o.toc.rail === !phone, `${key} ${lang}: toc shape rail=${o.toc.rail}`);
     if (phone) need(o.toc.now !== "", `${key} ${lang}: collapsed toc bar names no section`);
-    // 44px is the touch bar. At 1440 the pointer is fine and the library sizes its
-    // chrome down to 32px on purpose, so the rule only applies on the phone.
-    if (phone) need(o.small.length === 0, `${key} ${lang}: chrome under 44px: ${JSON.stringify(o.small)}`);
+    // No 44px assertion here — see ONE GAP, NAMED at the top of this file. The rule still
+    // holds; nothing in reach can emulate the coarse pointer it depends on.
     need(o.diagrams.every(d => d.nodes >= 5 && d.fits),
       `${key} ${lang}: diagrams ${JSON.stringify(o.diagrams)}`);
     need(o.narrow.length === 0,
@@ -242,7 +254,9 @@ for (const [key, r] of Object.entries(out)) {
     if (phone) {
       need(o.stacked && o.stacked.display === "block" && o.stacked.labelled > 0,
         `${key} ${lang}: table rows not stacked on a phone: ${JSON.stringify(o.stacked)}`);
-      need(o.find.h >= 44, `${key} ${lang}: finder is ${o.find.h}px tall`);
+      // `o.find.h` is still measured and still printed in the finder failure above — it is
+      // the height a coarse-pointer check would have asserted, kept as the diagnostic it can
+      // still be without the emulation to judge it.
     } else {
       need(o.stacked === null || o.stacked.display === "table-row",
         `${key} ${lang}: table rows stacked on a laptop: ${JSON.stringify(o.stacked)}`);
@@ -254,10 +268,17 @@ for (const [key, n] of [["index.html@390", 1], ["ba.html@390", 1], ["dev.html@39
   need(out[key].en.diagrams.length >= n, `${key}: no rendered diagram`);
 }
 
-console.log(JSON.stringify(Object.fromEntries(Object.entries(out).map(([k, v]) =>
-  [k, { sections: v.en.sections, ids: v.en.ids, subs: v.en.subs, toc: v.en.toc,
-        diagrams: v.en.diagrams, hScroll: v.en.hScroll }])), null, 1));
-if (fails.length) console.log("\n" + fails.join("\n"));
+// The measurements print only when a check is red. Green, they were ~400 lines of JSON
+// scrolling past the one line that carries the verdict — and this is a gate whose whole
+// value is that its output means something. Red, every number that produced the failure is
+// still here, above the failure itself.
+if (fails.length) {
+  console.log(JSON.stringify(Object.fromEntries(Object.entries(out).map(([k, v]) =>
+    [k, { sections: v.en.sections, ids: v.en.ids, subs: v.en.subs, toc: v.en.toc,
+          diagrams: v.en.diagrams, hScroll: v.en.hScroll }])), null, 1));
+  console.log("\n" + fails.join("\n"));
+}
 console.log(fails.length ? "\nDOCS: FAIL" : "\nDOCS: PASS");
-await b.close();
+// No teardown here: the browser instance belongs to the wrapper that started it, and it stops
+// it on the way out — including when this exits non-zero.
 process.exit(fails.length ? 1 : 0);

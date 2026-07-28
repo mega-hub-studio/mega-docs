@@ -8,14 +8,21 @@
      ask · regenerate · stop · copy · reset          the conversation
      askBA · baChanged · replay                      the loop that fills the gaps
      setScope · pickScope                            which folder answers
-     setMode                                         which screen you are on
 
-   Two modes, one screen:
-     DEV  asks the source of truth. When the answer is wrong or missing, one tap files
+   Which screen you are on is the router's answer now, not this file's — `/ask` and `/ba`
+   in the address, `router.js` for why. What is left here is the chrome both screens
+   share (the header, the dock, the diagram viewer) and the state both read:
+
+     ASK  asks the source of truth. When the answer is wrong or missing, one tap files
           the gap as a ticket, with the failed answer attached as evidence.
      BA   works that queue. Confirming an answer writes it into the corpus, where the
           next DEV retrieves it with a citation — and the second time anyone asks, it
           comes from the cache and costs nothing.
+
+   The state stays here rather than moving into the two route components, because an
+   answer has to keep streaming while a BA looks at the queue: the router unmounts a
+   screen, and an unmounted screen cannot hold an in-flight request. So the router
+   decides *which* screen renders and the template below decides what each is handed.
 
    Every composable is destructured, so the template names plain values and Vue unwraps
    them: `turns`, not `chat.turns.value`. The template holds markup and questions about
@@ -23,10 +30,8 @@
    belongs in one of them.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { toast } from '8bit-nes'
-import { onMounted, ref, useTemplateRef } from 'vue'
-import BaScreen from './components/BaScreen.vue'
-import ChatTurn from './components/ChatTurn.vue'
-import EmptyScreen from './components/EmptyScreen.vue'
+import { onMounted, useTemplateRef, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ScopePicker from './components/ScopePicker.vue'
 import StatusLine from './components/StatusLine.vue'
 import { useConversation } from './composables/conversation.js'
@@ -39,8 +44,6 @@ import { useScope } from './composables/scope.js'
 import { useStatusLine } from './composables/statusline.js'
 import { bindViewport } from './lib/viewport.js'
 
-const MODE_KEY = 'ke.mode' // a BA reopening the app wants the queue, not the prompt
-
 /* ── the DOM the app has to touch directly ── */
 const prompt = useTemplateRef('prompt') // busy must reach it as an attribute
 const dock = useTemplateRef('dock') // the keyboard/scroll maths measures it
@@ -49,10 +52,11 @@ const zoom = useTemplateRef('zoom') // <dialog>: the diagram viewer
 const zoomBody = useTemplateRef('zoomBody')
 
 /* ── state, one concern per composable ── */
+const route = useRoute() // which screen: the header, the dock and the props below read it
 const { t, lang, langs, setLang } = useT()
 const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
-const { online, writes, runtime, check, watchNetwork } = useRuntime()
+const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
@@ -81,7 +85,10 @@ const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useCo
 
 const statusLine = useStatusLine({ turns, busy, online, runtime })
 
-const mode = ref(localStorage.getItem(MODE_KEY) === 'ba' ? 'ba' : 'dev')
+// Arriving on a screen is when its lists are stale, and the queue is on both of them —
+// the BA works it, the empty screen lists what is already filed — so refresh on every
+// arrival rather than reasoning about which screen needed it.
+watch(() => route.name, refreshQueue)
 
 onMounted(() => {
   view = bindViewport(dock.value)
@@ -96,13 +103,6 @@ onMounted(() => {
 })
 
 /* ── intent ── */
-
-function setMode(next) {
-  mode.value = next
-  localStorage.setItem(MODE_KEY, next)
-  if (next === 'ba')
-    refreshQueue()
-}
 
 /** Picked from the tree: close the picker too, or the answer arrives behind it. */
 function pickScope(next) {
@@ -128,7 +128,6 @@ function baChanged(ticket) {
  *  labelled "free to repeat" is a broken promise.
  */
 function replay(entry) {
-  setMode('dev')
   setScope(entry.scope || '')
   ask(entry.question)
 }
@@ -149,15 +148,29 @@ function replay(entry) {
       <span class="eyebrow">{{ t('app.brand') }}</span>
     </span>
 
-    <!-- Two jobs, one screen. .segment is the library's single-choice control:
-         aria-pressed carries the state, since the fill alone isn't announced. -->
+    <!-- Two jobs, one screen. .segment is the library's single-choice control, and it
+         styles `> button` — so these stay real buttons and <router-link custom> renders
+         no element of its own, only the navigation and whether it is the current screen.
+         aria-pressed carries that state, since the fill alone isn't announced. -->
     <div class="segment grow" role="group" :aria-label="t('app.mode')">
-      <button type="button" :aria-pressed="String(mode === 'dev')" @click="setMode('dev')">
-        {{ t('app.ask') }}
-      </button>
-      <button type="button" :aria-pressed="String(mode === 'ba')" @click="setMode('ba')">
-        {{ t('app.ba') }}<template v-if="queue.open"> · {{ queue.open }}</template>
-      </button>
+      <router-link v-slot="{ isActive, navigate }" to="/ask" custom>
+        <button type="button" :aria-pressed="String(isActive)" @click="navigate">
+          {{ t('app.ask') }}
+        </button>
+      </router-link>
+      <router-link v-slot="{ isActive, navigate }" to="/ba" custom>
+        <button type="button" :aria-pressed="String(isActive)" @click="navigate">
+          {{ t('app.ba') }}<template v-if="queue.open"> · {{ queue.open }}</template>
+        </button>
+      </router-link>
+      <!-- Only where there is an admin surface to reach. A third button that answers 404 is
+           worse than no button: it teaches a reader the app is broken rather than that this
+           instance has no ADMIN_PASS. /api/health is what says so. -->
+      <router-link v-if="admin" v-slot="{ isActive, navigate }" to="/admin" custom>
+        <button type="button" :aria-pressed="String(isActive)" @click="navigate">
+          {{ t('app.admin') }}
+        </button>
+      </router-link>
     </div>
 
     <!-- EN / VI. With two languages the honest control is a button showing the one you are
@@ -176,43 +189,45 @@ function replay(entry) {
       {{ other }}
     </button>
 
-    <!-- One link out, to the published guide on its own domain. The app does not serve
-         the docs: a second copy inside the binary is noise here and a copy to drift.
-         The address arrives from /api/health, so SITE_URL stays a server setting and
-         this bundle stays a static file. rel=noopener because it opens in a new tab. -->
-    <a
-      v-if="runtime.site" class="btn ghost icon sm" :href="runtime.site" target="_blank"
-      rel="noopener" :aria-label="t('app.guide')"
-    >
-      <nes-icon name="info" />
-    </a>
     <button
-      v-if="turns.length && mode === 'dev'" class="btn ghost icon sm"
+      v-if="turns.length && route.name === 'ask'" class="btn ghost icon sm"
       :aria-label="t('app.newQuestion')" @click="reset"
     >
       <nes-icon name="plus" />
     </button>
   </header>
 
-  <main v-if="mode === 'dev'">
-    <EmptyScreen
-      v-if="!turns.length"
-      :corpus="corpus" :history="history" :queue="queue"
-      @ask="ask" @replay="replay"
-    />
-
-    <ChatTurn
-      v-for="turn in turns" :key="turn.id"
-      :turn="turn" :diagrams-ready="diagramsReady"
-      @copy="copy" @regenerate="regenerate" @ask-ba="askBA"
+  <!-- ══ The screen ═══════════════════════════════════════════════════════════
+       The router decides *which* one (router.js); this decides what each is handed,
+       because the state both read lives in the shell and not in the route. Two
+       branches rather than one set of bindings for both: a screen would otherwise be
+       passed the other's props, which Vue would put on its root element as attributes
+       and its listeners on the root as native events — `@copy` on the BA screen would
+       then fire whenever a BA copies text out of a ticket.
+       `route.name` rather than `Component`: before the first navigation resolves there
+       is no match yet, and `:is` on nothing is a warning per render.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <router-view v-slot="{ Component }">
+    <component
+      :is="Component" v-if="route.name === 'ask'"
+      :turns="turns" :corpus="corpus" :history="history" :queue="queue"
+      :diagrams-ready="diagramsReady"
+      @ask="ask" @replay="replay" @copy="copy" @regenerate="regenerate" @ask-ba="askBA"
       @diagram-drawn="drawn" @zoom-diagram="openZoom"
     />
-  </main>
-
-  <BaScreen
-    v-else :writes="writes" :online="online" :queue="queue"
-    :documents="corpus.documents" @changed="baChanged" @ask="setMode('dev')"
-  />
+    <component
+      :is="Component" v-else-if="route.name === 'ba'"
+      :writes="writes" :online="online" :queue="queue" :documents="corpus.documents"
+      @changed="baChanged"
+    />
+    <!-- Read-only, so it emits nothing. Runtime and Usage are props rather than a second
+         fetch: the shell already has both for the status line and the replay list. -->
+    <component
+      :is="Component" v-else-if="route.name === 'admin'"
+      :online="online" :writes="writes" :runtime="runtime" :corpus="corpus"
+      :history="history"
+    />
+  </router-view>
 
   <!-- ══ Diagram viewer ══════════════════════════════════════════════════════
        One dialog for every diagram in the thread: a <dialog class="modal"> is the
@@ -227,15 +242,26 @@ function replay(entry) {
         <nes-icon name="close" />
       </button>
     </div>
-    <!-- .mermaid-view is the library's own diagram frame: panel background, square
-         corners on the nodes, and scrolling. The copy is styled exactly like the
-         original because it is in the same kind of box. -->
-    <div ref="zoomBody" class="mermaid-view zoom-view" />
+    <!-- <nes-zoom> is the library's panner: wheel, drag, +/−/reset buttons and the
+         keyboard, over a CSS transform. It owns `.zoom-view` and `.zoom-stage` — this
+         used to borrow the *class* without the element, which is why the viewer had
+         `cursor: grab` and `overflow: hidden` (both that class's) and neither a drag
+         that worked nor a scroller. It moves whatever children it finds into its stage
+         at upgrade time, so the frame below has to be here in the markup, not appended
+         later. `.mermaid-view` is the library's diagram frame — panel, and the square
+         node corners the inline copy already has.
+         One thing it does not do: pinch. `.zoom-view` sets `touch-action: none` to own the
+         drag, and the element listens for `wheel` and pointers only — so on a phone you
+         pan with a finger and scale with its own +/− buttons. -->
+    <nes-zoom aria-label="Diagram — drag to pan, scroll to zoom">
+      <div ref="zoomBody" class="mermaid-view" />
+    </nes-zoom>
   </dialog>
 
-  <!-- The prompt belongs to asking. In BA mode there is nothing to send, so it goes away
-       rather than sitting there disabled. -->
-  <div v-show="mode === 'dev'" ref="dock" class="dock">
+  <!-- The prompt belongs to asking. On the BA screen there is nothing to send, so it goes
+       away rather than sitting there disabled. v-show, not v-if: the dock element is what
+       the keyboard maths bound at mount, and it has to stay the same element. -->
+  <div v-show="route.name === 'ask'" ref="dock" class="dock">
     <ScopePicker
       v-if="corpus.documents.length" ref="pick"
       :documents="corpus.documents" :docs="corpus.docs" :scope="scope"
@@ -252,6 +278,6 @@ function replay(entry) {
       @nes:submit="ask($event.detail.value)" @nes:stop="stop"
     />
 
-    <StatusLine :line="statusLine" :model="runtime.model" />
+    <StatusLine :line="statusLine" :model="runtime.model" :version="runtime.version" />
   </div>
 </template>

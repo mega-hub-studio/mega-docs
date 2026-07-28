@@ -1,33 +1,22 @@
 #!/usr/bin/env bash
 # Renders the guide, serves it, and measures it in a real browser.
-# Skips (0) rather than fails when the tooling is not installed: Playwright and a
-# browser are not dependencies of this product, and `make check` must stay runnable on
-# a box with neither.
+#
+# The rendering, serving, browser and cleanup are guide-rig.sh, shared with
+# check-walkthroughs.sh — read that file for why each part of it is the shape it is. What is
+# here is what makes this check this check: its ports and the script that does the measuring.
+#
+# Its own instance on its own port, like the other check: PinchTab commands act on an
+# instance's current tab, so an editor or an MCP integration sharing the default instance
+# navigates the tab out from under a measurement. Measured before this was added: 2 of 3 runs
+# failed on a shared instance, 0 of 3 on a dedicated one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PW=${PLAYWRIGHT_PATH:-/opt/node22/lib/node_modules/playwright/index.mjs}
-if ! command -v node >/dev/null 2>&1 || [ ! -f "$PW" ]; then
-  echo "  skipped check-ui (needs node + playwright at $PW)"
-  exit 0
-fi
-if [ ! -d web/vendor/8bit-nes* ] 2>/dev/null; then
-  make --no-print-directory vendor >/dev/null
-fi
-
-dir=$(mktemp -d)
-trap 'rm -rf "$dir"; [ -n "${srv:-}" ] && kill "$srv" 2>/dev/null || true' EXIT
-
-go run ./cmd/rendocs -d "$dir" -base /vendor >/dev/null
-cp -r web/vendor "$dir/vendor"
-cp web/*.svg "$dir/"
-
+rig_name=check-ui
+rig_portvar=PINCHTAB_PORT
 port=${PORT_UI:-8123}
-python3 -m http.server "$port" -d "$dir" >/dev/null 2>&1 &
-srv=$!
-for _ in $(seq 1 40); do
-  curl -sf -o /dev/null "http://127.0.0.1:$port/index.html" && break
-  sleep 0.25
-done
+ptport=${PINCHTAB_PORT:-9871}
+. scripts/guide-rig.sh
 
-node scripts/check-docs-ui.mjs "http://127.0.0.1:$port"
+PINCHTAB_BIN="$PT" PINCHTAB_SERVER="http://127.0.0.1:$ptport" \
+  node scripts/check-docs-ui.mjs "http://127.0.0.1:$port"

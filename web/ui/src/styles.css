@@ -1,20 +1,56 @@
 /* ══ App CSS — LAYOUT ONLY, mobile-first ══════════════════════════════════
    Rule this file follows: if 8bit-nes ships a recipe, use the recipe. Nothing
-   here re-styles a component (no colours, borders, fonts or sizes of its own)
-   — it only positions the shell and adapts to a narrow, touch, on-screen-
-   keyboard viewport. Every value comes from a token in tokens.css.
+   here gives a component colours, borders or fonts of its own — it positions
+   the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
+   value comes from a token in tokens.css.
+
+   One rule overrules how a component sizes *itself*, which is the library's job and so
+   has to be named: `.palette-list`, which 8bit-nes 0.8.0 still does not fix — delete it
+   on the release that does. A second one un-capped `.prose` until 0.8.0 moved that
+   measure onto the children, which is what this app had been patching around; reporting
+   it and then deleting the local rule is the shape to aim for. AGENTS.md keeps the count.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Local stacking scale. --z-overlay (100) stays reserved for the library's own
-   overlays, so a toast() is never trapped under the app chrome. */
+   overlays, so a toast() is never trapped under the app chrome.
+
+   --col is the one width this app owns, and it is here because several rules have to
+   agree on it:
+
+     --col      the shell. The conversation, the prompt, the scope picker and the
+                diagram viewer all share this edge — the prompt has to look attached
+                to the answers above it, so 760px used to be written out three times
+                and the viewer kept a fourth number of its own. One home instead.
+
+   Text measure is not here: 8bit-nes 0.8.0 owns it as `--prose-measure` on :root, and
+   the rules below borrow that rather than keeping a second copy of 72ch. Nor is
+   --mmd-fs — see :root below for why it cannot live on #app.
+
+   No breakpoint sets --col. `max-inline-size` with `margin-inline: auto` is already
+   fluid — it fills anything narrower and centres in anything wider — so the responsive
+   behaviour here is one declaration, not a ladder of queries. The one media query in
+   this file changes *padding*, which is the thing that genuinely differs on a phone. */
 #app {
   --z-bar: 10;
   --z-dock: 20;
+  --col: 80rem;
   min-block-size: 100dvh;
 }
+
+/* Diagram label size, and it has to be on :root rather than with the tokens above.
+   mermaidTheme() resolves it with getComputedStyle(document.documentElement), so a value
+   set on #app — a *descendant* — is never seen: custom properties inherit down, and the
+   library silently falls back to --fs-body. Measured, which is the only way that shows:
+   12px on #app rendered a 13.5px label.
+
+   Smaller than body copy because a node label is a landmark, not prose — and because with
+   htmlLabels off every label is measured at render time to size its box, so this shrinks
+   the *drawing* rather than the text inside boxes of the same size. Measured on a six-node
+   graph TD: 16px → 12px took the viewBox height from 723.84 to 617.63. */
+:root { --mmd-fs: 12px; }
 
 /* Kills the 300ms tap delay and double-tap-to-zoom; pinch-zoom is untouched,
    so the WCAG zoom affordance stays. (The library's own docs do the same.) */
@@ -50,24 +86,43 @@ html {
 
 /* ── conversation column ── */
 main {
-  max-inline-size: 760px; margin-inline: auto;
+  max-inline-size: var(--col); margin-inline: auto;
   padding: var(--sp-4) var(--sp-3);
   /* clears the fixed prompt, which grows as the textarea grows — measured at
      runtime into --dock-h rather than guessed */
   padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
 }
 
-.empty { margin-block-start: var(--sp-6); }
+/* The ask panel does not scale with the shell. --col is sized for an *answer* — a table,
+   a diagram — and this screen is a prompt with a file list under it: stretched to 1280px
+   its rows become a few words at one end of a very long line, and the eye has nothing to
+   land on. It keeps roughly the width the whole app had before, centred in the new one. */
+.empty {
+  max-inline-size: 48rem; margin-inline: auto;
+  margin-block-start: var(--sp-6);
+}
 .turn + .turn { margin-block-start: var(--sp-6); }
 
 /* The question. No message-bubble recipe exists, so this is the one piece of
    app-owned styling — a gold classifier bar mirroring .card's accent bar.
-   font-family is set explicitly because it's an <h2> (for the document outline
-   and screen-reader navigation) but it is *body* copy, and DESIGN.md is firm
-   that chrome is mono and body is sans — don't mix the roles. */
+
+   Three properties are set because it's an <h2> (for the document outline and
+   screen-reader navigation) while being *body* copy, and base.css styles it as
+   the heading the tag claims:
+     font-family  DESIGN.md is firm that chrome is mono and body is sans — don't
+                  mix the roles.
+     text-wrap    `h1,h2,h3` get `balance`, which is right for a three-word
+                  headline and wrong for a sentence: it spends the width making
+                  the lines equal instead of filling them, so a 34-character
+                  question broke to a second line with a third of a phone's
+                  width unused beside it. `wrap` is the initial value — greedy
+                  fill, which is what a sentence wants.
+   Both reach the two surfaces that render a question, ChatTurn and TicketCard,
+   because both use this class on an <h2>. */
 .q {
   font-family: var(--font-body);
   font-size: var(--fs-body); font-weight: 700; line-height: var(--lh-body);
+  text-wrap: wrap;
   color: var(--ink);
   border-inline-start: var(--accent-bar) solid var(--gold);
   padding-inline-start: var(--sp-3);
@@ -80,6 +135,15 @@ main {
 .source { flex-wrap: wrap; }        /* long doc name + heading stack instead of overflowing */
 
 .a .head { justify-content: space-between; }
+
+/* Text keeps a reading measure while the shell does not, which is what makes --col: 80rem
+   safe — widening it without this buys a wide table at the price of 160-character prose.
+   Inside `.prose` that split is the library's since 0.8.0 (`--prose-measure` on the
+   children, and the constructs whose content *is* width opting out). These three are the
+   text this app renders *outside* `.prose`, so they borrow the same token. */
+.q,
+.sources,
+main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
    styles inline code only) — the one recipe the app has to supply. */
@@ -113,8 +177,8 @@ main {
    phone line-break that .note-stats' flex-wrap produces. */
 .empty > .note-stats { justify-content: center; }
 
-/* THE ONE LOCAL OVERRIDE OF THE DESIGN SYSTEM — 8bit-nes 0.7.3 lacks the fix (AGENTS.md
-   names it too). 0.7.3 caps .palette-list at min(50vh, 340px) and scrolls it, which is right
+/* THE ONE LOCAL OVERRIDE OF THE DESIGN SYSTEM — 8bit-nes 0.8.0 still lacks the fix
+   (AGENTS.md names it too). It caps .palette-list at min(50vh, 340px) and scrolls it, which is right
    for the modal its docs describe ("drop it in a modal"). In the page it made a *nested*
    scroller: measured on an iPhone 14, three of seven documents were visible and the other
    four were behind an inner scrollbar — a scroll trap on touch, and the same documents this
@@ -161,7 +225,10 @@ main.ba {
 }
 .ticket { display: flex; flex-direction: column; gap: var(--sp-3); }
 .ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
-.ticket .textarea { inline-size: 100%; }
+/* Fills the card on a phone, measured on a desktop: what gets typed here becomes a
+   document, and drafting a paragraph across the full 80rem is the same long-line problem
+   as reading one. `inline-size` and `max-inline-size` together are what make it both. */
+.ticket .textarea { inline-size: 100%; max-inline-size: var(--prose-measure); }
 /* The three actions wrap instead of shrinking: a 44px target that has been
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
@@ -222,7 +289,7 @@ main.ba .datalist code { overflow-wrap: anywhere; }
      overlap measured from visualViewport (0 whenever no keyboard is up). */
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
-.dock nes-chat-prompt { display: block; max-inline-size: 760px; margin-inline: auto; }
+.dock nes-chat-prompt { display: block; max-inline-size: var(--col); margin-inline: auto; }
 
 /* The scope picker: a closed row above the prompt naming the folder answers come
    from, opening into the corpus tree.
@@ -235,7 +302,7 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    hundred documents becomes a dock taller than the phone — and the dock's height is
    what the conversation is padded by, so it would push the answer off screen. */
 .scopepick {
-  max-inline-size: 760px; margin: 0 auto var(--sp-2);
+  max-inline-size: var(--col); margin: 0 auto var(--sp-2);
   background: var(--screen);
 }
 .scopepick > summary {
@@ -263,10 +330,10 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 }
 
 /* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
-   wide, was squeezed into 289, and its 16px labels rendered at about 4px. The natural
-   width is pinned in JS (diagram.fit — it lives in the viewBox, where CSS cannot reach
-   it) and the scrolling is the library's own .mermaid-view, so the page itself never
-   scrolls sideways.
+   wide, was squeezed into 289, and its 16px labels rendered at about 4px. Here it stays
+   fitted anyway — the card is the shape of the thing, not the reading of it — and the
+   scrolling is the library's own .mermaid-view, so the page never scrolls sideways.
+   Reading it properly is the viewer's job, and <nes-zoom> is what does it.
 
    Height is capped for the same reason in the other direction: a tall flowchart would
    push the answer's citations off screen, and the sources are the point. */
@@ -279,11 +346,45 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   font-family: var(--font-mono); font-size: var(--fs-label);
   letter-spacing: var(--ls-chrome); color: var(--muted); text-align: end;
 }
-/* The viewer: wider than the library's 32rem default, because the whole point is the
-   drawing at its own size, and scrolling in both axes rather than shrinking again. */
-.diagram-zoom { inline-size: min(96vw, 1200px); }
-.diagram-zoom .zoom-view { overflow: auto; max-block-size: 76vh; }
-.diagram-zoom .zoom-view svg { display: block; }
+/* ── the viewer ──
+   Where a diagram is actually *read*, so every pixel this dialog does not use is a pixel
+   of diagram nobody can see. On a phone that is the whole screen, and it was not: the
+   library's `.modal` is `min(92vw, 32rem)` with `--sp-5` of padding, which spends about a
+   third of a 390px screen on chrome around the one thing the reader came for.
+
+   So the base — the phone — is edge to edge, and <nes-zoom> takes whatever the head
+   leaves. Panning and scaling are the component's; this file only says how big its box is.
+
+   `dvh`, not `vh`: the browser's own chrome slides away as you scroll and `vh` is frozen
+   at the tallest state, so the bottom of a `100vh` dialog sits under the URL bar exactly
+   when the diagram is at its widest and you are panning it.
+
+   `display` gets its own rule, qualified by [open], because the cascade compares origin
+   before specificity: an unqualified `.diagram-zoom { display: flex }` beats the UA's
+   `dialog:not([open]) { display: none }` and the viewer never hides — visible, empty and
+   unclosable, however correctly close() runs. The geometry stays unqualified for the
+   mirror reason: [open] would outweigh the desktop rule below. */
+.diagram-zoom[open] { display: flex; }
+.diagram-zoom {
+  inline-size: 100dvw; max-inline-size: 100dvw;
+  block-size: 100dvh; max-block-size: 100dvh;
+  margin: 0;
+  flex-direction: column;
+  padding: var(--sp-3);
+  /* Landscape is how a wide diagram gets read on a phone, which is also where the notch
+     is on the inline edge rather than the top. */
+  padding-block-start: max(var(--sp-3), env(safe-area-inset-top));
+  padding-block-end: max(var(--sp-3), env(safe-area-inset-bottom));
+  padding-inline-start: max(var(--sp-3), env(safe-area-inset-left));
+  padding-inline-end: max(var(--sp-3), env(safe-area-inset-right));
+}
+/* The head is a fixed cost; the panner gets the rest. `min-block-size: 0` is what lets it
+   shrink below its content — without it a flex child floors at its content height and the
+   dialog grows past the screen instead. Targeted at `nes-zoom` and not at its `.zoom-view`:
+   the class belongs to the component, and reaching past the element into its internals is
+   exactly the mistake this replaced. */
+.diagram-zoom > .head { flex: none; }
+.diagram-zoom > nes-zoom { flex: 1; min-block-size: 0; }
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
@@ -294,6 +395,16 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
+  /* The viewer stops being the screen and becomes a dialog again: a pointer has a window
+     manager behind it, the page around the modal is context worth keeping, and the
+     backdrop turns back into a way to close it. Still wider than the library's 32rem —
+     the whole point is the drawing at its own size. */
+  .diagram-zoom {
+    inline-size: min(96vw, var(--col)); max-inline-size: min(96vw, var(--col));
+    block-size: auto; max-block-size: 90dvh;
+    margin: auto;
+    padding: var(--sp-5);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

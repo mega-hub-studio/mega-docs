@@ -59,7 +59,12 @@ func main() {
 		if err := os.WriteFile(path, page, 0o600); err != nil {
 			die(err)
 		}
-		fmt.Fprintf(os.Stderr, "rendocs: wrote %s (%d bytes)\n", path, len(page))
+		// stdout, because this is what the command produces when it works. On stderr it
+		// survived the `>/dev/null` both browser wrappers already write, so six lines of
+		// "wrote" rode along with every `make check-full` — twelve, across the two checks.
+		// A person running this by hand still sees them; a check that redirected them does
+		// not, which is what the redirect said.
+		fmt.Printf("rendocs: wrote %s (%d bytes)\n", path, len(page))
 	}
 }
 

@@ -37,6 +37,11 @@ type Deps struct {
 	Auth    Auth      // optional Basic credentials; zero value = open
 	BAPass  BAPass    // gates the write actions; empty = no write surface
 	Runtime Runtime   // what the status line reports; zero values simply hide fields
+	// Settings is the Admin screen's payload, and AdminPass is what opens it. Both are
+	// optional and both must be present: nil or an empty password leaves GET /api/settings
+	// unregistered, so an instance with no admin secret has no admin surface to find.
+	Settings  func() any
+	AdminPass AdminPass
 }
 
 // Runtime is what an answer costs and what produced it — everything the status line
@@ -48,10 +53,11 @@ type Runtime struct {
 	Window   int
 	PriceIn  float64
 	PriceOut float64
-	// Site is where the guide is published. The app's header links it, and the bundle
-	// is a static file that cannot be told at build time — so it arrives here, with
-	// everything else this instance knows about itself.
-	Site string
+	// Version is the commit the binary was built from — the one field here that says
+	// nothing about an answer. It is reported so "which version is deployed?" has an
+	// answer on the screen and from `curl /api/health`, rather than requiring shell access
+	// to the host that serves it. Empty means the build carried no VCS stamp.
+	Version string
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -60,12 +66,16 @@ type Runtime struct {
 // domain, so it is not served here — one surface, one job.
 //
 //	GET  /            index.html          revalidated (it names hashed assets)
-//	GET  /api/health  {"ok":true,"writes":bool} — open, so probes need no secret
+//	GET  /api/health  {"ok","writes","admin","model","window","price_in","price_out"} — open,
+//	                  so probes need no secret. No "site": the app does not link to the guide
 //	POST /api/chat    SSE: cached · token · citations · done · error
 //	GET  /api/corpus  {"docs":n,"chunks":n,"approved":n,"documents":[…]}
 //	GET  /api/tickets · POST /api/tickets · POST /api/tickets/{id}/{action}
 //	POST /api/documents  import .md/.txt into the corpus — same gate as a confirm
+//	DELETE /api/documents/{path…}  remove a document and its chunks — same gate
 //	GET  /api/history answers still free to replay
+//	GET  /api/settings  every knob with the provenance of its value — needs X-Admin-Pass,
+//	                  and unregistered entirely when ADMIN_PASS is unset
 //	GET  /assets/…    the built bundle      immutable (every name has a content hash)
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
@@ -78,10 +88,17 @@ func New(d Deps) http.Handler {
 	// The model name and prices are deliberate disclosure, not a leak: an operator
 	// asked for them on screen. The engine itself still refuses to discuss them —
 	// that rule is about what a *document* answer may contain.
+	// `admin` is here for the same reason `writes` is: the front end is a static bundle and
+	// cannot discover which routes exist. Without it the Admin tab would have to render and
+	// then fail on 403, which teaches a reader that the app is broken rather than that this
+	// instance has no admin secret.
+	// `version` is the deployed commit. It is disclosure of a public repository's revision,
+	// not a secret, and it is what makes a deploy verifiable from the UI: the alternative was
+	// reading journalctl on the host, which the person asking usually cannot reach.
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"site":%q,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
-		d.BAPass.enabled(), d.Runtime.Site, d.Runtime.Model, d.Runtime.Window,
-		d.Runtime.PriceIn, d.Runtime.PriceOut)
+		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"version":%q}`,
+		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
+		d.Runtime.PriceIn, d.Runtime.PriceOut, d.Runtime.Version)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its
@@ -97,6 +114,7 @@ func New(d Deps) http.Handler {
 	if d.Docs != nil {
 		documents(mux, d.Docs, d.BAPass)
 	}
+	settings(mux, d.Settings, d.AdminPass)
 
 	// "/{$}" matches only the root, so the file servers below never see it.
 	mux.Handle("GET /{$}", revalidate(etag(d.Index), serveBytes(d.Index, "text/html; charset=utf-8")))

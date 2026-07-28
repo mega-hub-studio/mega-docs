@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -30,37 +28,7 @@ type Knowledge interface {
 // is generous for that and far short of a document upload.
 const maxTicket = 64 << 10 // 64 KiB
 
-// BAPass gates every action that changes what the engine will say: confirming an
-// answer into the corpus, dismissing a question, and importing a document.
-//
-// Reads stay open. This app has no accounts, so the password is the whole
-// difference between "anyone on the tailnet can read the documents" — which is the
-// point of it — and "anyone on the tailnet can rewrite them", which is not.
-//
-// An unset password means no write surface at all, not open writes: forgetting to
-// configure a secret must never be the way you end up without one.
-type BAPass string
-
-func (p BAPass) enabled() bool { return p != "" }
-
-// gate wraps the handlers that write. 403 when writes are off (nothing to unlock),
-// 401 when the password is wrong (retry with a different one).
-func (p BAPass) gate(h http.HandlerFunc) http.HandlerFunc {
-	if !p.enabled() {
-		return func(w http.ResponseWriter, _ *http.Request) {
-			http.Error(w, "writes are disabled: BA_PASS is not set on this instance", http.StatusForbidden)
-		}
-	}
-	want := sha256.Sum256([]byte(p))
-	return func(w http.ResponseWriter, r *http.Request) {
-		got := sha256.Sum256([]byte(r.Header.Get("X-BA-Pass")))
-		if subtle.ConstantTimeCompare(got[:], want[:]) != 1 {
-			http.Error(w, "wrong BA password", http.StatusUnauthorized)
-			return
-		}
-		h(w, r)
-	}
-}
+// BAPass and its gate live in gate.go, with the admin one — one compare, two secrets.
 
 // tickets wires the whole loop onto one mux. Reads and filing a gap are open —
 // a DEV who cannot report a gap will simply stop reporting them.
@@ -93,7 +61,7 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 		writeJSON(w, t)
 	})
 
-	mux.HandleFunc("POST /api/tickets/{id}/{action}", pass.gate(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/tickets/{id}/{action}", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			http.Error(w, "bad ticket id", http.StatusBadRequest)

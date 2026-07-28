@@ -98,6 +98,42 @@ export async function send(files, dir = '', onProgress = () => {}) {
   return out
 }
 
+/**
+ * Take one document out of the corpus.
+ *
+ * The server moves the file into `.trash/` inside the corpus rather than unlinking it, so a
+ * mis-click is recoverable with one `mv` — which matters more than usual here, because
+ * nothing backs the corpus up automatically any more.
+ *
+ * Each segment is encoded separately: the route is `{path...}`, so `/` has to survive as a
+ * separator while a space or a `#` in a file name must not.
+ *
+ * @param {string} path the document's identity, as /api/corpus reports it
+ * @throws {WrongPass} when the password is missing, wrong, or writes are off
+ * @returns {Promise<{path: string, trash: string}>} where it went; `trash` is empty when the
+ *   file was already gone and only the index row was cleaned
+ */
+export async function remove(path) {
+  const url = `/api/documents/${String(path).split('/').map(encodeURIComponent).join('/')}`
+  let res
+  try {
+    res = await fetch(url, { method: 'DELETE', headers: { 'X-BA-Pass': pass() } })
+  }
+  catch {
+    throw new Error('Can\'t reach the server')
+  }
+  if (res.status === 401 || res.status === 403) {
+    setPass('')
+    throw new WrongPass((await res.text()).trim() || 'Not allowed')
+  }
+  if (!res.ok) {
+    // 400 here is "not a usable path" or "not in the corpus" — a sentence worth showing,
+    // not a status code to translate.
+    throw new Error((await res.text()).trim() || `Server error ${res.status}`)
+  }
+  return res.json()
+}
+
 async function sendOne(file, dir) {
   const body = new FormData()
   if (dir.trim())

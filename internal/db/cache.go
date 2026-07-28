@@ -23,14 +23,17 @@ type Cached struct {
 	At        string          `json:"at"`
 }
 
-// keep caps the cache. 200 answers is more than a team asks between re-indexes,
-// and it keeps the one-file backup story honest.
+// keep caps the cache. 200 answers is more than a team asks between re-indexes, and it keeps
+// the one-file story honest: a database small enough to copy in a second is a database nobody
+// has to plan around.
 const keep = 200
 
 // Sig identifies the current state of the corpus. Any ingest changes the document
 // count or its timestamp, and any confirm ingests — so a cached answer can never
-// outlive the documents it cited. Cheap enough to call per request (two counts and
-// a MAX over indexed columns).
+// outlive the documents it cited. Cheap enough to call per request, but not because it is
+// indexed — there is no index on documents.updated_at, so the MAX scans the documents table.
+// That is fine while one row is one document and the count is in the hundreds; it is the
+// first thing to look at if Sig() ever shows up in a profile.
 func (s *Store) Sig() (string, error) {
 	var docs, chunks int
 	var newest sql.NullString

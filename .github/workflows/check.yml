@@ -1,7 +1,8 @@
 name: check
 
 # `make check` on every push and pull request — the same gate a human runs before
-# deploying, in the one place nobody can skip.
+# deploying, in the one place nobody can skip. Two jobs: the gate on Linux, and the
+# cgo layer built and exercised on darwin, because a deploy host can be either.
 #
 # Why this exists: until now the tests only ran on a laptop and on the deploy host,
 # so a broken commit reached `main` looking fine and failed at `make check` *during*
@@ -34,7 +35,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.26"
           cache: true
 
       # web/vendor/ is gitignored (the assets are fetched, never committed), and one
@@ -58,21 +59,13 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: web/ui
 
-      # golangci-lint and deadcode are optional in the Makefile — it skips them with a
-      # note when they are absent. On CI they are cheap, and the whole point is to not
-      # skip anything, so install them first. (staticcheck runs inside golangci-lint.)
-      #
-      # Both @latest currently need Go >= 1.25 to *build*, which is newer than the 1.22
-      # this module targets. That is fine and deliberate: GOTOOLCHAIN defaults to auto,
-      # so `go install` fetches the toolchain it needs for the tool only, and the module
-      # keeps compiling against its own version. Verified locally on Go 1.24.7 with
-      # golangci-lint 2.12.2 — the tree is at zero findings.
-      - name: Install the linters
-        run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-          go install golang.org/x/tools/cmd/deadcode@latest
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
+      # No linter and no deadcode step here: `make lint` installs the version pinned in the
+      # Makefile itself (GOLANGCI_VERSION) and `make dead` installs deadcode, so each tool
+      # has one installer for this repo instead of a copy here that can drift from the one a
+      # laptop has. That drift is not hypothetical: this workflow used to run `@latest` for
+      # the linter while developers had whatever they installed once, and the gate went
+      # green locally and red here on `goconst` and a new `gosec` rule. deadcode drifted the
+      # other way — installed here, skipped on a laptop, which reads exactly like a pass.
       - name: make check
         run: make check
 
@@ -90,5 +83,38 @@ jobs:
 
       # The gate proves the code is correct; this proves it still builds into the two
       # binaries a deploy actually installs.
+      - name: make build
+        run: make build
+
+  # The only platform-specific thing in this repo is the cgo layer — sqlite-vec and FTS5 are
+  # C — and a deploy host can be macOS now: the Deploy page documents launchd and `make deploy`
+  # picks its supervisor from `uname -s`. Until this job existed, "cross-OS self-host" in
+  # README.md was one platform plus a claim.
+  #
+  # Deliberately *not* a matrix over the job above. Lint, ESLint, deadcode, the credential
+  # scan and the bundle rebuild are platform-independent, so running them twice doubles the
+  # gate and returns no new fact.
+  #
+  # `make test` and not `make build` alone, because compiling and linking the bindings is not
+  # the failure worth catching: sqlite-vec is registered through cgo and internal/db exercises
+  # it against a real database, so a darwin difference surfaces at run time or nowhere.
+  #
+  # No `make vendor` and no Node, because nothing here reads either. That leaves
+  # TestVendorTreeMatchesTheManifest skipping with "vendor/ is empty", which is the intent —
+  # the vendor tree is identical on every OS and the job above checks it. Read that skip as
+  # covered there, not as covered here.
+  darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: make test
+        run: make test
+
       - name: make build
         run: make build

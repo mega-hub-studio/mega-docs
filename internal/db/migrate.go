@@ -123,19 +123,8 @@ func (s *Store) appliedMigrations() (map[int]bool, error) {
 	return applied, rows.Err()
 }
 
-// hasColumn reports whether a table already has a column. Exported to the package because
-// every "add a column" migration wants it: SQLite has no ADD COLUMN IF NOT EXISTS, and a
-// migration that has already run by other means (a hand-patched instance, a restored backup
-// from a newer version) must not fail the start-up of the whole engine.
-func (s *Store) hasColumn(table, column string) (bool, error) {
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT 1 FROM pragma_table_info(%q) WHERE name = ?`, table), column)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = rows.Close() }()
-	found := rows.Next()
-	if err := rows.Err(); err != nil {
-		return false, err
-	}
-	return found, nil
-}
+// There was a `hasColumn` helper here, written for the "add a column" migrations that do not
+// exist yet. `make dead` reported it unreachable from any binary — only its own test called
+// it — which is critical rule 17 arriving on schedule: the first migration that genuinely
+// needs to ask SQLite whether a column is already there can write the pragma query at the
+// point it asks, with the reason it asks in that migration's `why`.

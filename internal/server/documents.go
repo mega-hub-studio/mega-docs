@@ -50,7 +50,7 @@ func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
 	// so "booking/pricing.md" arrives whole — and it is passed to rag.Remove unvalidated
 	// on purpose: SafePath is the one place that decides what a document path may be, and
 	// a second opinion here would be a second thing to keep in agreement with it.
-	mux.HandleFunc("DELETE /api/documents/{path...}", pass.gate(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/documents/{path...}", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
 		removed, err := imp.Remove(r.Context(), r.PathValue("path"))
 		if err != nil {
 			// The engine's errors here are all "this path is not usable" or "it is not
@@ -61,7 +61,7 @@ func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
 		writeJSON(w, removed)
 	}))
 
-	mux.HandleFunc("POST /api/documents", pass.gate(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/documents", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxImport)
 		if err := r.ParseMultipartForm(maxDoc); err != nil {
 			http.Error(w, "the upload was too large or malformed", http.StatusBadRequest)

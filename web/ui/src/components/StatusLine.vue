@@ -16,6 +16,10 @@
 defineProps({
   line: { type: Object, required: true },
   model: { type: String, default: '' },
+  // The commit this server was built from, so "which version is deployed?" is answered by
+  // looking at the app rather than by reaching the host. Empty for a build with no VCS
+  // stamp, and then nothing renders — the same rule as every other field here.
+  version: { type: String, default: '' },
 })
 </script>
 
@@ -37,6 +41,15 @@ defineProps({
     <span class="sl-end">
       <span v-if="line.elapsed" class="sl-item">{{ line.elapsed }}</span>
       <span v-if="line.cost" class="sl-item" :title="line.costTitle">{{ line.cost }}</span>
+      <!-- Last, and the only field that is about the instance rather than the answer: a
+           deploy is verified by reading it. No icon, like the two fields beside it — and
+           deliberately not a `nes-icon name="branch"`, which this version of the library
+           does not define, so it would have rendered an empty box with no warning.
+           A trailing `+` means the host built from a dirty tree. -->
+      <span
+        v-if="version" class="sl-item"
+        :title="`Deployed revision: commit ${version} (a trailing + means the tree was dirty)`"
+      >@{{ version }}</span>
     </span>
   </div>
 </template>

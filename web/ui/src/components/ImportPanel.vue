@@ -30,6 +30,11 @@ const {
   folders,
   importDocs,
   pickDocs,
+  pending,
+  removing,
+  askRemove,
+  cancelRemove,
+  confirmRemove,
 } = useImporter({
   documents: () => props.documents,
   toast,
@@ -118,5 +123,51 @@ const {
     </dl>
 
     <p class="hint">PDF or DOCX? Convert first — <code>markitdown spec.pdf &gt; spec.md</code>.</p>
+
+    <!-- Removal belongs on this card rather than a screen of its own: it is the same
+         password, the same corpus, and the same person's job. Collapsed, because a BA opens
+         this card to *add* something far more often than to take one away — and an expanded
+         list of every indexed path would bury the import controls above it. -->
+    <details v-if="documents.length" class="corpus">
+      <summary>
+        <span class="eyebrow">Remove a document — {{ documents.length }} indexed</span>
+      </summary>
+      <dl class="datalist">
+        <template v-for="d in documents" :key="d.path">
+          <dt><code>{{ d.path }}</code></dt>
+          <dd>
+            <button
+              class="btn ghost sm" data-accent="crit"
+              :disabled="!!removing || !!pending" @click="askRemove(d.path)"
+            >
+              {{ removing === d.path ? 'REMOVING…' : 'REMOVE' }}
+            </button>
+          </dd>
+        </template>
+      </dl>
+    </details>
+
+    <!-- .perm is the library's own gate: one request, one decision, the target shown
+         verbatim. Exactly right here — the paths in the list above differ by one word, so
+         the thing that must be unambiguous is *which* document, not the wording of the
+         warning. -->
+    <div v-if="pending" class="perm" role="alertdialog" aria-live="polite">
+      <span class="perm-kind">Remove</span>
+      <code class="perm-target">{{ pending }}</code>
+      <p class="perm-why">
+        Answers that cite this stop citing it, and a BA-confirmed answer removed here is gone
+        from the queue's history too. The file moves to <code>docs/.trash/</code> rather than
+        being deleted, so one <code>mv</code> puts it back — worth knowing, because nothing
+        else backs the corpus up.
+      </p>
+      <div class="perm-actions">
+        <button class="btn" data-accent="crit" @click="confirmRemove">
+          REMOVE IT
+        </button>
+        <button class="btn ghost" @click="cancelRemove">
+          CANCEL
+        </button>
+      </div>
+    </div>
   </section>
 </template>
