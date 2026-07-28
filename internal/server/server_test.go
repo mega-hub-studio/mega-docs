@@ -67,6 +67,22 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+// The deployed revision has to reach the browser, because that is the whole point of
+// stamping it: the UI shows it, so "which version is running?" is answered by looking at
+// the screen instead of by reaching the host. A field the shell never sees would be a
+// version nobody can read.
+func TestHealthReportsTheDeployedRevision(t *testing.T) {
+	h := New(Deps{
+		Answers: &fakeAnswers{},
+		Index:   []byte("<html>index</html>"),
+		Assets:  fstest.MapFS{},
+		Runtime: Runtime{Version: "9c4a34d"},
+	})
+	if body := do(t, h, "GET", "/api/health", "", nil).Body.String(); !strings.Contains(body, `"version":"9c4a34d"`) {
+		t.Errorf("health = %q, want it to report version 9c4a34d", body)
+	}
+}
+
 func TestIndexIsRevalidatedAndCachesWithETag(t *testing.T) {
 	h := newTestServer(&fakeAnswers{})
 

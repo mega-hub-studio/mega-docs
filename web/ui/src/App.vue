@@ -278,6 +278,6 @@ function replay(entry) {
       @nes:submit="ask($event.detail.value)" @nes:stop="stop"
     />
 
-    <StatusLine :line="statusLine" :model="runtime.model" />
+    <StatusLine :line="statusLine" :model="runtime.model" :version="runtime.version" />
   </div>
 </template>

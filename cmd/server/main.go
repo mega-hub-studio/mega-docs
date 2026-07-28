@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"knowledge-engine/internal/ai"
@@ -66,6 +67,7 @@ func run() error {
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
+			Version: revision(),
 		},
 	})
 
@@ -80,8 +82,11 @@ func run() error {
 
 	// The UI's build is in the startup line because the bundle is committed: "which
 	// front end is this binary serving" is otherwise unanswerable without unzipping it.
-	log.Printf("mega-docs on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s, admin: %s)",
-		addr, build.Vue, build.Nes, build.Sources[:8], describe(auth), writes(cfg), admin(cfg))
+	// The revision answers the other half — `build` is a hash of web/ui alone, so a Go-only
+	// deploy reuses it and would look like nothing shipped.
+	log.Printf("mega-docs %s on http://%s (ui: vue %s · 8bit-nes %s · build %s, auth: %s, writes: %s, admin: %s)",
+		describeRev(), addr, build.Vue, build.Nes, build.Sources[:8],
+		describe(auth), writes(cfg), admin(cfg))
 	warnIfExposed(cfg.BindAddr, auth)
 	warnIfKeyless(cfg)
 	return srv.ListenAndServe()
@@ -100,6 +105,44 @@ func warnIfKeyless(cfg config.Config) {
 	}
 	log.Printf("WARNING: AI_API_KEY is not set. Chat will fail on the first question unless")
 	log.Printf("         AI_BASE_URL (%s) is a keyless endpoint. Set it in .env.", cfg.BaseURL)
+}
+
+// revision is the commit this binary was built from, short, with a `+` when the tree was
+// dirty. Go stamps it into every binary built from a checkout, so there is no VERSION file
+// to forget to bump and no `-ldflags -X` in the Makefile — which matters because the deploy
+// is `git pull && make build`, and a version anybody has to remember to edit is a version
+// that lies. Empty for `go install` from a module proxy, which carries no VCS stamp, and
+// the UI prints nothing rather than a placeholder.
+func revision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	rev, dirty := "", false
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if len(rev) > 7 {
+		rev = rev[:7]
+	}
+	if dirty && rev != "" {
+		rev += "+"
+	}
+	return rev
+}
+
+// describeRev is the startup line's version field: the revision, or a name for its absence,
+// because a blank space between "mega-docs" and "on http://" reads as a formatting bug.
+func describeRev() string {
+	if rev := revision(); rev != "" {
+		return rev
+	}
+	return "(no vcs stamp)"
 }
 
 func describe(a server.Auth) string {

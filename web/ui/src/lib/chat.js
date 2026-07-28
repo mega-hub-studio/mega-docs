@@ -130,6 +130,9 @@ export async function health() {
       window: body.window || 0,
       priceIn: body.price_in || 0,
       priceOut: body.price_out || 0,
+      // The commit this server was built from. Absent for a binary with no VCS stamp, and
+      // the strip prints nothing rather than a placeholder — same rule as the prices.
+      version: body.version || '',
     }
   }
   catch {
@@ -141,6 +144,7 @@ export async function health() {
       window: 0,
       priceIn: 0,
       priceOut: 0,
+      version: '',
     }
   }
 }

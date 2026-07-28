@@ -11,7 +11,14 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
+# The deploy host's two facts, both overridable (`make deploy UNIT=… PORT=…`). PORT is read
+# from .env rather than repeated here, because .env is what the server itself reads — a port
+# written twice is a health check that passes against nothing on the day one of them changes.
+UNIT ?= knowledge
+PORT ?= $(shell sed -n 's/^PORT=//p' .env 2>/dev/null | tail -1)
+HEALTH := http://127.0.0.1:$(or $(PORT),8080)/api/health
+
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy
 
 deps:
 	go mod tidy
@@ -223,6 +230,40 @@ ingest:
 build:
 	go build -tags "$(TAGS)" -o bin/knowledge ./cmd/server
 	go build -tags "$(TAGS)" -o bin/ingest   ./cmd/ingest
+
+# Re-deploy this host: pull, build, restart, prove it came back. Four things it does that
+# the hand-typed `git pull && make build && sudo systemctl restart knowledge` does not, each
+# one a failure that has already happened here:
+#
+#   --ff-only   a deploy checkout is a mirror, not a branch. `pull.rebase=true` is set on
+#               this host, so a local commit turned an upgrade into a half-finished rebase
+#               with a conflicted lockfile — mid-deploy, on the machine serving the team.
+#               --ff-only refuses instead, and says so while the old binary is still running.
+#   stale UI    web/dist is committed and embedded, and this host has no Node to rebuild it.
+#               A push that forgot `make ui` deploys a binary whose UI predates the change,
+#               which looks like the deploy silently did nothing. That test names it.
+#   revision    printed before and after, so the log line answers "did this change anything?"
+#   health      a restart that fails leaves systemd retrying and the old answer cached in
+#               somebody's browser. Not verifying is how a broken deploy stays quiet.
+#
+# Deliberately not here: `make ui`, `make check-full` (Node, and a browser, neither of which
+# a deploy host has) and any `git push`. This target only moves this machine to what origin
+# already has.
+deploy:
+	@git diff --quiet || { echo "  refusing: working tree is dirty — commit or stash first"; git status --short; exit 1; }
+	@echo "  before: $$(git rev-parse --short HEAD)"
+	git pull --ff-only
+	@go test -tags "$(TAGS)" -count=1 -run TestBuiltUIMatchesItsSources ./web/ \
+		|| { echo "  refusing: web/dist is stale — run \`make ui\` where Node is, commit it, push"; exit 1; }
+	@$(MAKE) --no-print-directory build
+	sudo systemctl restart $(UNIT)
+	@for i in $$(seq 1 20); do \
+		curl -sf -o /dev/null "$(HEALTH)" && break || sleep 0.5; \
+	done; \
+	curl -sf "$(HEALTH)" | grep -q '"ok":true' \
+		|| { echo "  FAILED: $(UNIT) did not answer $(HEALTH) after the restart"; \
+		     systemctl status --no-pager -n 20 $(UNIT); exit 1; }
+	@echo "  deployed: $$(git rev-parse --short HEAD) — $$(curl -s $(HEALTH))"
 
 # Probe a real provider: does it have both endpoints, what embedding width, does
 # chat stream? Skipped unless AI_API_KEY is set (read from .env).

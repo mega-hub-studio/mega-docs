@@ -53,6 +53,11 @@ type Runtime struct {
 	Window   int
 	PriceIn  float64
 	PriceOut float64
+	// Version is the commit the binary was built from — the one field here that says
+	// nothing about an answer. It is reported so "which version is deployed?" has an
+	// answer on the screen and from `curl /api/health`, rather than requiring shell access
+	// to the host that serves it. Empty means the build carried no VCS stamp.
+	Version string
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -87,10 +92,13 @@ func New(d Deps) http.Handler {
 	// cannot discover which routes exist. Without it the Admin tab would have to render and
 	// then fail on 403, which teaches a reader that the app is broken rather than that this
 	// instance has no admin secret.
+	// `version` is the deployed commit. It is disclosure of a public repository's revision,
+	// not a secret, and it is what makes a deploy verifiable from the UI: the alternative was
+	// reading journalctl on the host, which the person asking usually cannot reach.
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g}`,
+		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"version":%q}`,
 		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
-		d.Runtime.PriceIn, d.Runtime.PriceOut)
+		d.Runtime.PriceIn, d.Runtime.PriceOut, d.Runtime.Version)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its

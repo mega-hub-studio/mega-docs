@@ -4,7 +4,8 @@
 
      online  drives the light in the header *and* the status line's OFFLINE state
      writes  tells BA mode it is read-only before someone types an answer into it
-     runtime the model name and the prices the status line may show — nothing else. There
+     runtime the model name, the prices and the deployed revision the status line may
+             show — nothing else. There
              was a guide address here too; the binary no longer links out to the guide, so
              /api/health no longer reports one and neither does this.
 
@@ -22,7 +23,7 @@ export function useRuntime() {
   const online = ref(true) // optimistic: the first check has not answered yet
   const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
   const admin = ref(false) // same, and for the same reason: no surface until it is proven
-  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0 })
+  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0, version: '' })
 
   async function check() {
     const h = await health()
@@ -34,6 +35,10 @@ export function useRuntime() {
       window: h.window,
       priceIn: h.priceIn,
       priceOut: h.priceOut,
+      // Which commit is serving this page. It belongs with the runtime facts rather than in
+      // a composable of its own: it arrives in the same request and answers the same kind of
+      // question — what is this instance, right now.
+      version: h.version,
     }
   }
 
