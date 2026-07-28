@@ -67,7 +67,14 @@ func (s *Store) migrate() error {
 			chunk_id INTEGER PRIMARY KEY,
 			embedding FLOAT[%d]
 		)`, s.dim)
-	_, err := s.db.Exec(q)
+	if _, err := s.db.Exec(q); err != nil {
+		return err
+	}
+	// After schema.sql, so a fresh database gets its tables and then walks the migration
+	// list finding nothing to do — one code path instead of "new" and "existing" diverging.
+	// This is what lets a *column* reach a database that already exists, which
+	// CREATE TABLE IF NOT EXISTS never could. See migrate.go for why that matters now.
+	_, err := s.migrateVersioned()
 	return err
 }
 
