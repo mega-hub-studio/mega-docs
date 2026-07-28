@@ -19,6 +19,24 @@ CREATE TABLE IF NOT EXISTS chunks (
   status      TEXT    NOT NULL DEFAULT 'draft'   -- draft | approved
 );
 
+-- Every query that touches a chunk by its document goes through this: the scope filter
+-- (both retrievers), the Search join, the per-document DELETE on re-ingest, the corpus
+-- stats LEFT JOIN, and the confirm that marks a document's chunks approved.
+--
+-- Without it, scoping a search is `SCAN c` — every chunk row read whole, including the
+-- `content` TEXT, to answer a question about which document it belongs to. With it the
+-- planner reports `SCAN c USING COVERING INDEX chunks_document_id`: the same walk over the
+-- index alone, so a corpus of 100k chunks reads a few hundred KB instead of every byte of
+-- every chunk. Measured with EXPLAIN QUERY PLAN, before and after, on a real database.
+--
+-- An index is also the one schema change this repo can make for free. "The schema has no
+-- migrations" is about *columns*: CREATE TABLE IF NOT EXISTS does nothing to a table that
+-- already exists, so a new column never arrives. CREATE INDEX IF NOT EXISTS does arrive —
+-- an index is derived from rows that are already there. So this needs no re-ingest and no
+-- provider bill, on a running deployment, which is exactly why it belongs here rather than
+-- in a note about a future rebuild.
+CREATE INDEX IF NOT EXISTS chunks_document_id ON chunks(document_id);
+
 -- QA tickets: the BA ⇄ DEV loop. A DEV files the question the documents could
 -- not answer; a BA answers it and confirms that answer into the corpus, where the
 -- next DEV retrieves it with a citation.
