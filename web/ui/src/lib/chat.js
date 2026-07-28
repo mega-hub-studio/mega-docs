@@ -22,72 +22,87 @@
  *   retrieval to one document or folder; "" is the whole corpus.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = "" } = {}) {
-  const ctrl = new AbortController();
-  const done = run(question, { onToken, onCitations, onDone, fresh, scope }, ctrl.signal);
-  return { done, stop: () => ctrl.abort() };
+export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '' } = {}) {
+  const ctrl = new AbortController()
+  const done = run(question, { onToken, onCitations, onDone, fresh, scope }, ctrl.signal)
+  return { done, stop: () => ctrl.abort() }
 }
 
 async function run(question, handlers, signal) {
-  let res;
+  let res
   try {
-    res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, fresh: handlers.fresh, scope: handlers.scope }),
       signal,
-    });
-  } catch (e) {
-    if (e.name === "AbortError") return; // the user's own decision, not an error
-    throw new Error("Can't reach the server");
+    })
   }
-  if (!res.ok) throw new Error(`Server error ${res.status}`);
+  catch (e) {
+    if (e.name === 'AbortError')
+      return // the user's own decision, not an error
+    throw new Error('Can\'t reach the server')
+  }
+  if (!res.ok)
+    throw new Error(`Server error ${res.status}`)
 
   try {
-    for await (const frame of frames(res.body)) apply(frame, handlers);
-  } catch (e) {
-    if (e.name !== "AbortError") throw e;
+    for await (const frame of frames(res.body)) apply(frame, handlers)
+  }
+  catch (e) {
+    if (e.name !== 'AbortError')
+      throw e
   }
 }
 
 /* An SSE frame is "event: x\ndata: y" blocks separated by a blank line, and a
    network chunk can split one anywhere — so hold the tail back until it closes. */
 async function* frames(body) {
-  const reader = body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
+  const reader = body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
   for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const blocks = buf.split("\n\n");
-    buf = blocks.pop();
-    for (const b of blocks) yield parse(b);
+    const { value, done } = await reader.read()
+    if (done)
+      break
+    buf += dec.decode(value, { stream: true })
+    const blocks = buf.split('\n\n')
+    buf = blocks.pop()
+    for (const b of blocks) yield parse(b)
   }
 }
 
 function parse(block) {
-  let event = "message";
-  let data = "";
-  for (const line of block.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  let event = 'message'
+  let data = ''
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:'))
+      event = line.slice(6).trim()
+    else if (line.startsWith('data:'))
+      data += line.slice(5).trim()
   }
-  if (!data) return null;
+  if (!data)
+    return null
   try {
-    return { event, payload: JSON.parse(data) };
-  } catch {
-    return null; // a half-written frame is not worth crashing a stream over
+    return { event, payload: JSON.parse(data) }
+  }
+  catch {
+    return null // a half-written frame is not worth crashing a stream over
   }
 }
 
 function apply(frame, { onToken, onCitations, onDone }) {
-  if (!frame) return;
-  const { event, payload } = frame;
-  if (event === "token") onToken?.(payload.t);
-  else if (event === "citations") onCitations?.(payload);
-  else if (event === "done") onDone?.({ cached: !!payload.cached, in: payload.in || 0, out: payload.out || 0 });
-  else if (event === "error") throw new Error(payload.message);
+  if (!frame)
+    return
+  const { event, payload } = frame
+  if (event === 'token')
+    onToken?.(payload.t)
+  else if (event === 'citations')
+    onCitations?.(payload)
+  else if (event === 'done')
+    onDone?.({ cached: !!payload.cached, in: payload.in || 0, out: payload.out || 0 })
+  else if (event === 'error')
+    throw new Error(payload.message)
 }
 
 /**
@@ -97,9 +112,10 @@ function apply(frame, { onToken, onCitations, onDone }) {
  */
 export async function health() {
   try {
-    const res = await fetch("/api/health");
-    if (!res.ok) return { online: false, writes: false, site: "" };
-    const body = await res.json();
+    const res = await fetch('/api/health')
+    if (!res.ok)
+      return { online: false, writes: false, site: '' }
+    const body = await res.json()
     // The runtime fields are what the status line reports. Absent or zero means
     // "unknown", and the strip prints nothing rather than a zero — an unmeasured
     // cost and a cost of nothing are different facts.
@@ -109,13 +125,14 @@ export async function health() {
       // Where the published guide lives. It used to be templated into index.html; the
       // bundle is a static file now, so the address arrives with everything else the
       // server knows.
-      site: body.site || "",
-      model: body.model || "",
+      site: body.site || '',
+      model: body.model || '',
       window: body.window || 0,
       priceIn: body.price_in || 0,
       priceOut: body.price_out || 0,
-    };
-  } catch {
-    return { online: false, writes: false, site: "", model: "", window: 0, priceIn: 0, priceOut: 0 };
+    }
+  }
+  catch {
+    return { online: false, writes: false, site: '', model: '', window: 0, priceIn: 0, priceOut: 0 }
   }
 }

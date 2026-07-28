@@ -11,7 +11,7 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
+.PHONY: deps check check-full test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
 
 deps:
 	go mod tidy
@@ -23,6 +23,33 @@ check: test secrets
 	@$(MAKE) --no-print-directory lint
 	@$(MAKE) --no-print-directory lint-js
 	@$(MAKE) --no-print-directory dead
+
+# ── THE FINAL GATE: one command to run after implementing anything ──
+# `check` is what CI gates on and what you run while working. This is the superset you
+# run *before* saying it is done, and the order is the point: each stage is cheaper than
+# the next, so the first thing to break is the first thing you hear about.
+#
+#   1. ui        rebuild the bundle FIRST — TestBuiltUIMatchesItsSources (inside `check`)
+#                compares web/dist against a hash of its sources, so running `check`
+#                before this reports a stale bundle rather than the bug you introduced.
+#   2. check     gofmt · vet · every Go test · golangci-lint · deadcode · credential scan
+#                · eslint (which is also the formatter now: style rules are errors, so a
+#                missing reformat fails here rather than in review)
+#   3. build     both binaries, because `go build` catches what `go vet` does not
+#   4. check-ui  the guide rendered, served and measured in Chromium, both languages
+#   5. check-wt  every diagram walkthrough driven prev/next at two viewports
+#
+# 4 and 5 need node + playwright and *skip* (0) without them, so this target stays
+# runnable on a box that has neither — read the "skipped" lines rather than assuming a
+# green run covered them. Same for deadcode inside `check`.
+check-full:
+	@$(MAKE) --no-print-directory ui
+	@$(MAKE) --no-print-directory check
+	@$(MAKE) --no-print-directory build
+	@$(MAKE) --no-print-directory check-ui
+	@$(MAKE) --no-print-directory check-wt
+	@echo ""
+	@echo "  check-full: PASS — bundle fresh, Go + JS clean, guide and walkthroughs measured"
 
 # golangci-lint, configured by .golangci.yml — which explains every linter it turns off,
 # because the stock config reports 591 issues on this tree and a gate that always shouts

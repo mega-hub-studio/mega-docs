@@ -9,9 +9,9 @@
    The password is checked before it is stored. Storing it unchecked is how a typo used to
    survive until the first upload and then look like a broken import.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { ref } from "vue";
-import * as qa from "../lib/qa.js";
-import * as upload from "../lib/upload.js";
+import { ref } from 'vue'
+import * as qa from '../lib/qa.js'
+import * as upload from '../lib/upload.js'
 
 /**
  * @param {{ toast: Function }} deps
@@ -19,42 +19,49 @@ import * as upload from "../lib/upload.js";
  *   fail: (e: Error, prefix?: string) => void }}
  */
 export function useGate({ toast }) {
-  const unlocked = ref(!!qa.pass());
-  const passInput = ref("");
-  const unlocking = ref(false);
-  const unlockError = ref("");
+  const unlocked = ref(!!qa.pass())
+  const passInput = ref('')
+  const unlocking = ref(false)
+  const unlockError = ref('')
 
   async function unlock() {
-    const candidate = passInput.value.trim();
-    if (!candidate) return;
-    unlockError.value = "";
-    unlocking.value = true;
+    const candidate = passInput.value.trim()
+    if (!candidate)
+      return
+    unlockError.value = ''
+    unlocking.value = true
     try {
       if (!(await upload.verify(candidate))) {
-        unlockError.value = "That password does not open the gate. Reads still work.";
-        return;
+        unlockError.value = 'That password does not open the gate. Reads still work.'
+        return
       }
-      qa.setPass(candidate);
-      unlocked.value = !!qa.pass();
-      passInput.value = "";
-    } catch (e) {
-      unlockError.value = e.message;
-    } finally {
-      unlocking.value = false;
+      qa.setPass(candidate)
+      unlocked.value = !!qa.pass()
+      passInput.value = ''
+    }
+    catch (e) {
+      unlockError.value = e.message
+    }
+    finally {
+      unlocking.value = false
     }
   }
 
-  /** What to do when a write comes back refused. A refused password has to say so *in the
-   *  form*, not only in a toast: the thing being read is the card that just vanished. */
-  function fail(e, prefix = "") {
+  /**
+   * What to do when a write comes back refused. A refused password has to say so *in the
+   *  form*, not only in a toast: the thing being read is the card that just vanished.
+   */
+  function fail(e, prefix = '') {
     if (e instanceof qa.WrongPass) {
-      unlocked.value = false;
-      if (prefix) unlockError.value = prefix + e.message;
-      toast(`<b>Locked.</b> ${e.message}`, { accent: "crit" });
-    } else {
-      toast(`<b>${e.message}</b>`, { accent: "crit" });
+      unlocked.value = false
+      if (prefix)
+        unlockError.value = prefix + e.message
+      toast(`<b>Locked.</b> ${e.message}`, { accent: 'crit' })
+    }
+    else {
+      toast(`<b>${e.message}</b>`, { accent: 'crit' })
     }
   }
 
-  return { unlocked, passInput, unlocking, unlockError, unlock, fail };
+  return { unlocked, passInput, unlocking, unlockError, unlock, fail }
 }

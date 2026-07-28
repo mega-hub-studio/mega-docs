@@ -9,16 +9,16 @@
    The drafts live here, not on the server's copy of the ticket: someone typing an answer
    must not have it overwritten by the next queue refresh.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { reactive, ref, watch } from "vue";
-import * as qa from "../lib/qa.js";
+import { reactive, ref, watch } from 'vue'
+import * as qa from '../lib/qa.js'
 
 /* What each transition means, said once. A confirm is the only one worth celebrating: it
    is the moment a gap became part of the documents. */
 const TOASTS = {
-  draft: (t) => `<b>Draft saved.</b> Ticket #${t.id} is not published yet.`,
-  confirm: (t) => `<b>In the knowledge base.</b> ${t.doc} — the next question retrieves it.`,
-  reject: (t) => `<b>Dismissed #${t.id}.</b> It stays on the list, with your reason.`,
-};
+  draft: t => `<b>Draft saved.</b> Ticket #${t.id} is not published yet.`,
+  confirm: t => `<b>In the knowledge base.</b> ${t.doc} — the next question retrieves it.`,
+  reject: t => `<b>Dismissed #${t.id}.</b> It stays on the list, with your reason.`,
+}
 
 /**
  * @param {{ tickets: () => object[], toast: Function, onMoved: (t: object|null) => void,
@@ -27,8 +27,8 @@ const TOASTS = {
  *   a confirm, which is the one the chat thread has to reflect.
  */
 export function useTickets({ tickets, toast, onMoved, onLocked }) {
-  const drafts = reactive({}); // ticket id → the answer being typed
-  const working = ref(0); // id of the ticket currently being published
+  const drafts = reactive({}) // ticket id → the answer being typed
+  const working = ref(0) // id of the ticket currently being published
 
   // Seed each editor from the server's copy, and keep doing it as the queue refreshes —
   // without overwriting an answer someone is halfway through typing.
@@ -36,26 +36,29 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
     tickets,
     (list) => {
       for (const t of list) {
-        if (drafts[t.id] === undefined) drafts[t.id] = t.answer || "";
+        if (drafts[t.id] === undefined)
+          drafts[t.id] = t.answer || ''
       }
     },
     { immediate: true },
-  );
+  )
 
   async function move(ticket, action) {
-    working.value = ticket.id;
-    const answer = (drafts[ticket.id] || "").trim();
+    working.value = ticket.id
+    const answer = (drafts[ticket.id] || '').trim()
     try {
-      const updated = await qa.act(ticket.id, action, { answer, note: answer });
-      drafts[ticket.id] = updated.answer || "";
-      toast(TOASTS[action](updated), { accent: action === "reject" ? "warn" : "good" });
-      onMoved(action === "confirm" ? updated : null);
-    } catch (e) {
-      onLocked(e);
-    } finally {
-      working.value = 0;
+      const updated = await qa.act(ticket.id, action, { answer, note: answer })
+      drafts[ticket.id] = updated.answer || ''
+      toast(TOASTS[action](updated), { accent: action === 'reject' ? 'warn' : 'good' })
+      onMoved(action === 'confirm' ? updated : null)
+    }
+    catch (e) {
+      onLocked(e)
+    }
+    finally {
+      working.value = 0
     }
   }
 
-  return { drafts, working, move };
+  return { drafts, working, move }
 }

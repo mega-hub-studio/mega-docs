@@ -10,38 +10,40 @@
    Zero means unknown, and stays zero. The strip prints nothing rather than a zero,
    because an unmeasured cost and a cost of nothing are different facts.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { ref } from "vue";
-import { health } from "../lib/chat.js";
+import { ref } from 'vue'
+import { health } from '../lib/chat.js'
 
 /**
  * @returns {{ online: import("vue").Ref<boolean>, writes: import("vue").Ref<boolean>,
  *   runtime: import("vue").Ref<object>, check: () => Promise<void>, watchNetwork: () => void }}
  */
 export function useRuntime() {
-  const online = ref(true); // optimistic: the first check has not answered yet
-  const writes = ref(false); // pessimistic: never offer a write surface we cannot prove
-  const runtime = ref({ site: "", model: "", window: 0, priceIn: 0, priceOut: 0 });
+  const online = ref(true) // optimistic: the first check has not answered yet
+  const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
+  const runtime = ref({ site: '', model: '', window: 0, priceIn: 0, priceOut: 0 })
 
   async function check() {
-    const h = await health();
-    online.value = h.online;
-    writes.value = h.writes;
+    const h = await health()
+    online.value = h.online
+    writes.value = h.writes
     runtime.value = {
       site: h.site,
       model: h.model,
       window: h.window,
       priceIn: h.priceIn,
       priceOut: h.priceOut,
-    };
+    }
   }
 
-  /** The browser knows about the network before a request fails, so listen — but only
+  /**
+   * The browser knows about the network before a request fails, so listen — but only
    *  trust it in one direction: "offline" is a fact, "online" only means the interface
-   *  came back, so it triggers a real check. */
+   *  came back, so it triggers a real check.
+   */
   function watchNetwork() {
-    addEventListener("online", check);
-    addEventListener("offline", () => (online.value = false));
+    addEventListener('online', check)
+    addEventListener('offline', () => (online.value = false))
   }
 
-  return { online, writes, runtime, check, watchNetwork };
+  return { online, writes, runtime, check, watchNetwork }
 }

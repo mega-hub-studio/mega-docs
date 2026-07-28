@@ -12,27 +12,27 @@
 //    contains a diagram needs it, so src/lib/diagram.js imports it dynamically and
 //    Rollup gives it its own chunk. Nothing else may import it statically — that would
 //    silently move it into the first paint.
-import { fileURLToPath } from "node:url";
-import vue from "@vitejs/plugin-vue";
-import { defineConfig } from "vite";
-import { stamp } from "./scripts/stamp.js";
+import { fileURLToPath } from 'node:url'
+import vue from '@vitejs/plugin-vue'
+import { defineConfig } from 'vite'
+import { stamp } from './scripts/stamp.js'
 
 export default defineConfig({
-  root: fileURLToPath(new URL(".", import.meta.url)),
+  root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [
     // <nes-*> are custom elements from the design system, not Vue components. This is a
     // *compile-time* decision: SFC templates are compiled by this plugin, so telling the
     // runtime alone would be too late and every <nes-icon> would warn about a missing
     // component and render nothing.
-    vue({ template: { compilerOptions: { isCustomElement: tag => tag.startsWith("nes-") } } }),
+    vue({ template: { compilerOptions: { isCustomElement: tag => tag.startsWith('nes-') } } }),
     stamp(),
   ],
   build: {
-    outDir: fileURLToPath(new URL("../dist", import.meta.url)),
+    outDir: fileURLToPath(new URL('../dist', import.meta.url)),
     emptyOutDir: true,
     // The binary serves /assets/* with a one-year immutable cache, which is only safe
     // because every name carries a content hash.
-    assetsDir: "assets",
+    assetsDir: 'assets',
     // No source maps in the committed build. They were 12 MB of the 16 — generated
     // files, rewritten wholesale on every build, in a repository that has to stay
     // clonable. Debugging happens in `npm run dev`, which has the real sources.
@@ -47,10 +47,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8080",
+      '/api': {
+        target: 'http://127.0.0.1:8080',
         changeOrigin: false,
       },
     },
   },
-});
+})

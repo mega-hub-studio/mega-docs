@@ -10,21 +10,21 @@
    otherwise arrive behind an open panel. A component that owns a <details> owns closing
    it, rather than handing the element out.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { useTemplateRef } from "vue";
-import CorpusTree from "./CorpusTree.vue";
+import { useTemplateRef } from 'vue'
+import CorpusTree from './CorpusTree.vue'
 
 defineProps({
   documents: { type: Array, default: () => [] },
   docs: { type: Number, default: 0 },
-  scope: { type: String, default: "" },
-});
+  scope: { type: String, default: '' },
+})
 
-defineEmits(["pick", "clear"]);
+defineEmits(['pick', 'clear'])
 
-const panel = useTemplateRef("panel");
+const panel = useTemplateRef('panel')
 // No guard: the shell calls this through `pick.value?.close()`, so it only ever runs on a
 // mounted component, and a mounted component always has its own root element.
-defineExpose({ close: () => (panel.value.open = false) });
+defineExpose({ close: () => (panel.value.open = false) })
 </script>
 
 <template>

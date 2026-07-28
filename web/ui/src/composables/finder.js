@@ -6,8 +6,8 @@
    State is one string. The ranking and the matching are pure functions in library.js, so
    this holds no branch — which is also what keeps the component free of one.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { computed, ref } from "vue";
-import { rankDocs } from "../lib/library.js";
+import { computed, ref } from 'vue'
+import { rankDocs } from '../lib/library.js'
 
 /* How many rows the menu draws at once.
    The library's `.palette-list` caps itself at 340px with `overflow-y: auto`, which is
@@ -17,7 +17,7 @@ import { rankDocs } from "../lib/library.js";
    So the app un-caps the height (styles.css) and caps the row count here instead, at
    roughly the same visual budget — and the header says `shown / total`, so a corpus larger
    than this never gets truncated silently. */
-const MAX_ROWS = 8;
+const MAX_ROWS = 8
 
 /**
  * @param {{ documents: () => object[] }} deps `documents` is a getter, not an array:
@@ -27,8 +27,8 @@ const MAX_ROWS = 8;
  *   extra: import("vue").ComputedRef<number> }}
  */
 export function useFinder({ documents }) {
-  const query = ref("");
-  const matches = computed(() => rankDocs(documents(), query.value));
+  const query = ref('')
+  const matches = computed(() => rankDocs(documents(), query.value))
   return {
     query,
     shown: computed(() => matches.value.slice(0, MAX_ROWS)),
@@ -37,5 +37,5 @@ export function useFinder({ documents }) {
     // is a composable nobody wrote. `shown` is empty exactly when `matches` is, so the
     // no-match branch needs nothing else.
     extra: computed(() => Math.max(0, matches.value.length - MAX_ROWS)),
-  };
+  }
 }

@@ -13,20 +13,20 @@
    distinguishes an empty index from an unreachable one, because "not found in the
    documents" reads identically for both and that cost an afternoon once.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { useFinder } from "../composables/finder.js";
-import { coverQuestion, docTitle, shortDate } from "../lib/library.js";
-import { STATUS } from "../lib/qa.js";
+import { useFinder } from '../composables/finder.js'
+import { coverQuestion, docTitle, shortDate } from '../lib/library.js'
+import { STATUS } from '../lib/qa.js'
 
 const props = defineProps({
   corpus: { type: Object, required: true },
   history: { type: Array, default: () => [] },
   queue: { type: Object, required: true },
-});
+})
 
-defineEmits(["ask", "replay"]);
+defineEmits(['ask', 'replay'])
 
 // A getter, not `props.corpus.documents`: the corpus object is replaced on every refresh.
-const { query, shown, extra } = useFinder({ documents: () => props.corpus.documents });
+const { query, shown, extra } = useFinder({ documents: () => props.corpus.documents })
 </script>
 
 <template>

@@ -10,51 +10,57 @@
    most annoying thing a mobile chat UI can do.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const KEY = "ke.session.v1"; // bump the suffix if the turn shape changes
-const MAX_TURNS = 30; // a phone doesn't need more, and quota is finite
-const SAVE_DELAY = 400; // coalesce a burst of streamed tokens into one write
+const KEY = 'ke.session.v1' // bump the suffix if the turn shape changes
+const MAX_TURNS = 30 // a phone doesn't need more, and quota is finite
+const SAVE_DELAY = 400 // coalesce a burst of streamed tokens into one write
 
 /** @returns {Array<object>} the stored turns, or [] */
 export function load() {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const turns = JSON.parse(raw);
-    if (!Array.isArray(turns)) return [];
-    return turns.filter(valid).map(settle);
-  } catch {
-    return []; // unreadable or from an older shape — start clean, don't crash
+    const raw = localStorage.getItem(KEY)
+    if (!raw)
+      return []
+    const turns = JSON.parse(raw)
+    if (!Array.isArray(turns))
+      return []
+    return turns.filter(valid).map(settle)
+  }
+  catch {
+    return [] // unreadable or from an older shape — start clean, don't crash
   }
 }
 
-let timer = null;
-let pending = null;
+let timer = null
+let pending = null
 
 /** Persist the conversation. Debounced; failures are ignored on purpose. */
 export function save(turns) {
   // Snapshot now, write later: turns are Vue proxies and will keep changing
   // while the debounce waits.
-  pending = turns.slice(-MAX_TURNS).map(settle);
-  clearTimeout(timer);
-  timer = setTimeout(flush, SAVE_DELAY);
+  pending = turns.slice(-MAX_TURNS).map(settle)
+  clearTimeout(timer)
+  timer = setTimeout(flush, SAVE_DELAY)
 }
 
 export function clear() {
-  clearTimeout(timer);
-  pending = null;
+  clearTimeout(timer)
+  pending = null
   try {
-    localStorage.removeItem(KEY);
-  } catch {
+    localStorage.removeItem(KEY)
+  }
+  catch {
     /* nothing to do */
   }
 }
 
 function flush() {
-  clearTimeout(timer);
-  if (!pending) return;
+  clearTimeout(timer)
+  if (!pending)
+    return
   try {
-    localStorage.setItem(KEY, JSON.stringify(pending));
-  } catch {
+    localStorage.setItem(KEY, JSON.stringify(pending))
+  }
+  catch {
     // Private mode, or quota exhausted. Persistence is a convenience: the
     // conversation on screen is unaffected, so there is nothing to report.
   }
@@ -63,13 +69,14 @@ function flush() {
 /* A phone rarely closes a tab — it backgrounds it, and iOS may then evict the
    page without ever running another timer. pagehide/visibilitychange are the last
    guaranteed moments to write, so the debounce never costs a lost answer. */
-addEventListener("pagehide", flush);
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") flush();
-});
+addEventListener('pagehide', flush)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden')
+    flush()
+})
 
 function valid(t) {
-  return t && typeof t.q === "string" && t.q !== "";
+  return t && typeof t.q === 'string' && t.q !== ''
 }
 
 /* A turn that was streaming when the page went away is finished as far as the
@@ -79,13 +86,13 @@ function settle(t) {
   return {
     id: t.id,
     q: t.q,
-    a: t.a ?? "",
+    a: t.a ?? '',
     citations: Array.isArray(t.citations) ? t.citations : [],
     // The scope explains the answer — which folder it came from — so it has to come
     // back with it, or a restored thread looks like it was asked of everything.
-    scope: t.scope ?? "",
-    error: t.error ?? "",
+    scope: t.scope ?? '',
+    error: t.error ?? '',
     ms: t.ms ?? 0,
     streaming: false,
-  };
+  }
 }

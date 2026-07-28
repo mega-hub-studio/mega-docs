@@ -14,35 +14,35 @@
    .textarea, .badge, .callout, .pbar, .datalist — so this screen owns no component
    styling of its own.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { toast } from "8bit-nes";
-import { useGate } from "../composables/gate.js";
-import { useTickets } from "../composables/tickets.js";
-import ImportPanel from "./ImportPanel.vue";
-import TicketCard from "./TicketCard.vue";
+import { toast } from '8bit-nes'
+import { useGate } from '../composables/gate.js'
+import { useTickets } from '../composables/tickets.js'
+import ImportPanel from './ImportPanel.vue'
+import TicketCard from './TicketCard.vue'
 
 const props = defineProps({
   writes: Boolean, // does this instance allow a BA to publish at all
   online: Boolean, // unreachable is not read-only, and must not read as it
   queue: { type: Object, required: true }, // the ASK screen lists it too
   documents: { type: Array, default: () => [] },
-});
+})
 
-const emit = defineEmits(["changed", "ask"]);
+const emit = defineEmits(['changed', 'ask'])
 
-const gate = useGate({ toast });
-const { unlocked, passInput, unlocking, unlockError, unlock } = gate;
+const gate = useGate({ toast })
+const { unlocked, passInput, unlocking, unlockError, unlock } = gate
 
 const { drafts, working, move } = useTickets({
   tickets: () => props.queue.tickets,
   toast,
-  onMoved: ticket => emit("changed", ticket),
+  onMoved: ticket => emit('changed', ticket),
   onLocked: gate.fail,
-});
+})
 
 // The importer is ImportPanel's own concern — it is the only thing that renders it, and
 // a composable belongs to whoever shows its state. What comes back here is what the
 // shell has to know about: a file landed, or the password was refused.
-const importRefused = e => gate.fail(e, "The server refused the password: ");
+const importRefused = e => gate.fail(e, 'The server refused the password: ')
 </script>
 
 <template>

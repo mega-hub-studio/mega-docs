@@ -8,22 +8,22 @@
    that says which: pick "booking/calendar" and the next answer is retrieved from that
    subtree only, cited from it, and cached under it.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { useTemplateRef } from "vue";
-import { useNesTree } from "../composables/nestree.js";
+import { useTemplateRef } from 'vue'
+import { useNesTree } from '../composables/nestree.js'
 
 const props = defineProps({
   documents: { type: Array, default: () => [] },
-  scope: { type: String, default: "" },
-});
+  scope: { type: String, default: '' },
+})
 
-const emit = defineEmits(["pick"]);
+const emit = defineEmits(['pick'])
 
 useNesTree({
-  host: useTemplateRef("host"),
+  host: useTemplateRef('host'),
   documents: () => props.documents,
   scope: () => props.scope,
-  onPick: scope => emit("pick", scope),
-});
+  onPick: scope => emit('pick', scope),
+})
 </script>
 
 <template>

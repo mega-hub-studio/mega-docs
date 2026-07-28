@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "format": "eslint . --fix",
+    "check:full": "make -C ../.. check-full"
   },
   "dependencies": {
     "8bit-nes": "0.7.3",

@@ -1,0 +1,31 @@
+# The same values web/ui/eslint.config.js enforces, so an editor saving a file cannot
+# produce a diff that the gate then rejects. Kept at the repo root because it also has to
+# cover the Go side, the Makefile and the guide's templates — none of which ESLint sees.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# gofmt is the authority here and it indents with tabs. Nothing else may set this, or the
+# two formatters disagree on every line of every Go file.
+[*.go]
+indent_style = tab
+
+# Tabs are syntax in a Makefile: a recipe line indented with spaces is a hard error.
+[Makefile]
+indent_style = tab
+
+# The guide's pages are Go templates with `<% %>` delimiters and both languages inline.
+# No formatter parses them, so they are hand-indented at two spaces and nothing here
+# should try to reflow them.
+[*.{html,svg,mmd}]
+trim_trailing_whitespace = false
+
+[*.md]
+# A trailing double space is a hard line break in Markdown.
+trim_trailing_whitespace = false

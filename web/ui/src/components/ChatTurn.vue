@@ -9,22 +9,24 @@
    diagram arrives inside v-html, so Vue never sees it as a component, and `nes:render`
    is the library's own event and bubbles to here.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { answerHtml, fileName } from "../lib/answer.js";
-import { STATUS } from "../lib/qa.js";
+import { answerHtml, fileName } from '../lib/answer.js'
+import { STATUS } from '../lib/qa.js'
 
 const props = defineProps({
   turn: { type: Object, required: true },
   // Whether the 3.4 MB renderer has arrived. Until it has, a fenced diagram stays a
   // fenced diagram: <nes-mermaid> must never exist before the thing that draws it.
   diagramsReady: Boolean,
-});
+})
 
-defineEmits(["copy", "regenerate", "askBA", "diagramDrawn", "zoomDiagram"]);
+defineEmits(['copy', 'regenerate', 'askBA', 'diagramDrawn', 'zoomDiagram'])
 
-const srcId = n => `s${props.turn.id}-${n}`;
+const srcId = n => `s${props.turn.id}-${n}`
 
-/** Render this answer. No citation links mid-stream: the list only lands at the end, and
- *  until then a "[1]" has nothing to point at. */
+/**
+ * Render this answer. No citation links mid-stream: the list only lands at the end, and
+ *  until then a "[1]" has nothing to point at.
+ */
 function html() {
   return answerHtml(props.turn.a, {
     diagrams: !props.turn.streaming && props.diagramsReady,
@@ -32,7 +34,7 @@ function html() {
     // and keeps their original n, so [2] can arrive alone.
     nums: props.turn.streaming ? [] : props.turn.citations.map(c => c.n),
     srcId,
-  });
+  })
 }
 </script>
 
@@ -63,10 +65,10 @@ function html() {
       <!-- eslint-disable-next-line vue/no-v-html — answer.js sanitises with DOMPurify,
            which is the whole reason that module exists; see its header. -->
       <div
-        class="prose" v-html="html()"
-        @nes:render="$emit('diagramDrawn', $event)"
+        class="prose" @nes:render="$emit('diagramDrawn', $event)"
         @click="$emit('zoomDiagram', $event)"
         @keydown="$emit('zoomDiagram', $event)"
+        v-html="html()"
       />
 
       <!-- official grounded-answer recipe: .sources rows that the inline .cite markers

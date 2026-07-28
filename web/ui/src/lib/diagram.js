@@ -20,8 +20,8 @@
    decides whether to fetch the renderer, and the one that decides which block to
    replace. If they disagree, the answer either loads 3.4 MB for nothing or shows a
    fence it could have drawn. */
-const KIND =
-  /^\s*(?:%%\{[^}]*\}%%\s*)?(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4Context|sankey-beta|xychart-beta|block-beta)\b/i;
+const KIND
+  = /^\s*(?:%%\{[^}]*\}%%\s*)?(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4Context|sankey-beta|xychart-beta|block-beta)\b/i
 
 /**
  * Is this code block a diagram?
@@ -35,7 +35,7 @@ const KIND =
  * @param {string} source the block's own text
  */
 export function isDiagram(source) {
-  return KIND.test(source || "");
+  return KIND.test(source || '')
 }
 
 /**
@@ -45,16 +45,18 @@ export function isDiagram(source) {
  * with "graph" and fetch the renderer for an answer with nothing to draw.
  */
 export function hasDiagram(markdown) {
-  let inFence = false;
-  for (const line of String(markdown || "").split("\n")) {
+  let inFence = false
+  for (const line of String(markdown || '').split('\n')) {
     if (/^\s*(?:```|~~~)/.test(line)) {
-      if (!inFence && /^\s*(?:```|~~~)\s*mermaid\b/i.test(line)) return true;
-      inFence = !inFence;
-      continue;
+      if (!inFence && /^\s*(?:```|~~~)\s*mermaid\b/i.test(line))
+        return true
+      inFence = !inFence
+      continue
     }
-    if (inFence && isDiagram(line)) return true;
+    if (inFence && isDiagram(line))
+      return true
   }
-  return false;
+  return false
 }
 
 /* ── reading a diagram on a phone ──────────────────────────────────────────────
@@ -74,15 +76,16 @@ export function hasDiagram(markdown) {
  * @param {Element} host the <nes-mermaid> that just drew
  */
 export function onRender(host) {
-  if (!host?.querySelector?.("svg") || host.dataset.zoomable) return;
-  host.dataset.zoomable = "1";
-  host.setAttribute("role", "button");
-  host.setAttribute("tabindex", "0");
-  host.setAttribute("aria-label", "Open this diagram full screen");
-  const hint = document.createElement("span");
-  hint.className = "zoom-hint";
-  hint.textContent = "⤢ TAP TO ZOOM";
-  host.append(hint);
+  if (!host?.querySelector?.('svg') || host.dataset.zoomable)
+    return
+  host.dataset.zoomable = '1'
+  host.setAttribute('role', 'button')
+  host.setAttribute('tabindex', '0')
+  host.setAttribute('aria-label', 'Open this diagram full screen')
+  const hint = document.createElement('span')
+  hint.className = 'zoom-hint'
+  hint.textContent = '⤢ TAP TO ZOOM'
+  host.append(hint)
 }
 
 /**
@@ -98,18 +101,19 @@ export function onRender(host) {
  * @returns {boolean} false when there was no drawing to show
  */
 export function zoomInto(into, host) {
-  const svg = host?.querySelector?.("svg");
-  if (!into || !svg) return false;
-  const copy = svg.cloneNode(true);
-  const box = svg.getAttribute("viewBox")?.trim().split(/[\s,]+/);
-  const width = box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0;
+  const svg = host?.querySelector?.('svg')
+  if (!into || !svg)
+    return false
+  const copy = svg.cloneNode(true)
+  const box = svg.getAttribute('viewBox')?.trim().split(/[\s,]+/)
+  const width = box?.length >= 4 ? Math.round(Number.parseFloat(box[2])) : 0
   if (width) {
-    copy.style.inlineSize = `${width}px`;
-    copy.style.maxInlineSize = "none";
+    copy.style.inlineSize = `${width}px`
+    copy.style.maxInlineSize = 'none'
   }
-  reid(copy, svg.id);
-  into.replaceChildren(copy);
-  return true;
+  reid(copy, svg.id)
+  into.replaceChildren(copy)
+  return true
 }
 
 /**
@@ -122,15 +126,16 @@ export function zoomInto(into, host) {
  * background. That was the first version of this, and it looked like a broken renderer.
  */
 function reid(copy, oldId) {
-  if (!oldId) return;
-  const fresh = `${oldId}-zoom`;
-  copy.id = fresh;
-  for (const style of copy.querySelectorAll("style")) {
-    style.textContent = style.textContent.split(`#${oldId}`).join(`#${fresh}`);
+  if (!oldId)
+    return
+  const fresh = `${oldId}-zoom`
+  copy.id = fresh
+  for (const style of copy.querySelectorAll('style')) {
+    style.textContent = style.textContent.split(`#${oldId}`).join(`#${fresh}`)
   }
 }
 
-let loading = null;
+let loading = null
 
 /**
  * Make sure mermaid is available.
@@ -138,21 +143,22 @@ let loading = null;
  *   leaves the fenced code block alone, which is a worse diagram but a real answer.
  */
 export function ready() {
-  if (window.mermaid) return Promise.resolve(true);
+  if (window.mermaid)
+    return Promise.resolve(true)
   // One in-flight load, however many diagrams arrive at once.
   loading ??= load().catch(() => {
-    loading = null; // a later answer may succeed where this one failed
-    return false;
-  });
-  return loading;
+    loading = null // a later answer may succeed where this one failed
+    return false
+  })
+  return loading
 }
 
 async function load() {
-  const m = await import("mermaid");
+  const m = await import('mermaid')
   // <nes-mermaid> looks at globalThis.mermaid first and only falls back to fetching a
   // URL, so handing it the module here is what keeps the renderer a bundled chunk
   // instead of a second network request. The element still applies its own theme to an
   // instance it did not create.
-  globalThis.mermaid = m.default ?? m;
-  return true;
+  globalThis.mermaid = m.default ?? m
+  return true
 }

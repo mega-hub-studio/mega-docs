@@ -12,7 +12,7 @@
 /** @typedef {{ path: string, title: string, chunks: number, approved: number, updated_at: string }} Doc */
 /** @typedef {{ state: "ready"|"empty"|"unavailable", docs: number, chunks: number, approved: number, documents: Doc[] }} Corpus */
 
-const NONE = { state: "unavailable", docs: 0, chunks: 0, approved: 0, documents: [] };
+const NONE = { state: 'unavailable', docs: 0, chunks: 0, approved: 0, documents: [] }
 
 /**
  * Fetch the indexed corpus. Resolves to a usable object in every case.
@@ -20,15 +20,17 @@ const NONE = { state: "unavailable", docs: 0, chunks: 0, approved: 0, documents:
  */
 export async function loadCorpus() {
   try {
-    const res = await fetch("/api/corpus");
-    if (!res.ok) return NONE;
-    const c = await res.json();
+    const res = await fetch('/api/corpus')
+    if (!res.ok)
+      return NONE
+    const c = await res.json()
     // "ready" needs retrievable *chunks*, not just document rows. A failed ingest
     // can leave documents with nothing indexed under them, and calling that ready
     // is how you get a UI that promises answers it can never give.
-    return { ...c, state: c.chunks > 0 ? "ready" : "empty" };
-  } catch {
-    return NONE;
+    return { ...c, state: c.chunks > 0 ? 'ready' : 'empty' }
+  }
+  catch {
+    return NONE
   }
 }
 
@@ -47,14 +49,15 @@ export async function loadCorpus() {
  * @returns {Doc[]}
  */
 export function rankDocs(documents, query) {
-  const q = query.trim().toLowerCase();
-  const ranked = [...(documents || [])].sort((a, b) => b.chunks - a.chunks);
+  const q = query.trim().toLowerCase()
+  const ranked = [...(documents || [])].sort((a, b) => b.chunks - a.chunks)
   // `includes("")` is true for every string, so this early return changes no result — it
   // skips one array and N `docTitle()` calls (measured 54µs at the server's 100-document
   // ceiling) on the empty-query path, which is every render until somebody types.
-  if (!q) return ranked;
-  return ranked.filter((d) =>
-    `${docTitle(d)} ${d.path || ""}`.toLowerCase().includes(q));
+  if (!q)
+    return ranked
+  return ranked.filter(d =>
+    `${docTitle(d)} ${d.path || ''}`.toLowerCase().includes(q))
 }
 
 /**
@@ -73,13 +76,13 @@ export function rankDocs(documents, query) {
  * @returns {string}
  */
 export function coverQuestion(doc) {
-  return `What does ${docTitle(doc)} cover?`;
+  return `What does ${docTitle(doc)} cover?`
 }
 
 /** A file name is not a sentence: "booking-list_v2.md" → "booking list v2". */
 export function docTitle(doc) {
-  const name = doc.title || (doc.path || "").split("/").pop() || "";
-  return name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim();
+  const name = doc.title || (doc.path || '').split('/').pop() || ''
+  return name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').trim()
 }
 
 /* Built once at module scope, not per call. `toLocaleDateString` re-resolves the locale
@@ -88,10 +91,10 @@ export function docTitle(doc) {
    field, so every keystroke re-evaluates every template expression in the component —
    including the date on each of up to 100 tickets in a *collapsed* disclosure. That was
    5.6ms of avoidable work per keystroke at the server's ticket ceiling. */
-const SHORT_DATE = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+const SHORT_DATE = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 
 /** "2026-07-25T09:10:11Z" → "25 Jul" — dense enough for a phone row. */
 export function shortDate(iso) {
-  const d = new Date((iso || "").replace(" ", "T") + (iso?.endsWith("Z") ? "" : "Z"));
-  return Number.isNaN(+d) ? "" : SHORT_DATE.format(d);
+  const d = new Date((iso || '').replace(' ', 'T') + (iso?.endsWith('Z') ? '' : 'Z'))
+  return Number.isNaN(+d) ? '' : SHORT_DATE.format(d)
 }

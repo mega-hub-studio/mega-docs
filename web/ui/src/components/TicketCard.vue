@@ -9,22 +9,22 @@
    switching tabs and coming back expects it), and a component that keeps its own copy of
    somebody else's state is the drift this split exists to prevent.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { shortDate } from "../lib/library.js";
-import { STATUS } from "../lib/qa.js";
+import { shortDate } from '../lib/library.js'
+import { STATUS } from '../lib/qa.js'
 
 const props = defineProps({
   ticket: { type: Object, required: true },
-  draft: { type: String, default: "" },
+  draft: { type: String, default: '' },
   unlocked: Boolean,
   writes: Boolean,
   // The id of the ticket currently being written, or null — one at a time, so a
   // double-tap cannot confirm twice.
   working: { type: [Number, String], default: null },
-});
+})
 
-defineEmits(["update:draft", "move"]);
+defineEmits(['update:draft', 'move'])
 
-const busy = () => props.working === props.ticket.id;
+const busy = () => props.working === props.ticket.id
 </script>
 
 <template>

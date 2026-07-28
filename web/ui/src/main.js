@@ -7,20 +7,21 @@
 // One import of the design system, for both halves of what it is: `setMute` is a helper,
 // and the module's side effect is defining <nes-icon>, <nes-chat-prompt>, <nes-tree> and
 // <nes-mermaid>. Importing it twice would say otherwise.
-import { setMute } from "8bit-nes";
-import { createApp } from "vue";
-import App from "./App.vue";
+import { setMute } from '8bit-nes'
+import { createApp } from 'vue'
+import App from './App.vue'
 
-import "8bit-nes/all.css";
-import "./styles.css";
+import '8bit-nes/all.css'
+import './styles.css'
 
 // The chiptune SFX default to on. In a work tool opened on a phone the first send
 // shouldn't make noise — default to silent, but only on a first visit, so a deliberate
 // un-mute is remembered.
-if (localStorage.getItem("nes_mute") === null) setMute(true);
+if (localStorage.getItem('nes_mute') === null)
+  setMute(true)
 
-const app = createApp(App);
+const app = createApp(App)
 // No isCustomElement here: templates are compiled at *build* time, so that decision
 // lives in vite.config.js. Setting it at runtime would be too late — the compiled render
 // functions would already be resolving <nes-icon> as a Vue component.
-app.mount("#app");
+app.mount('#app')

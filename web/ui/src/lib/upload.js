@@ -10,12 +10,12 @@
    one upload.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-import { pass, setPass, WrongPass } from "./qa.js";
+import { pass, setPass, WrongPass } from './qa.js'
 
 /** What the file picker offers, and what a drop is filtered against. */
-export const ACCEPT = ".md,.markdown,.txt";
+export const ACCEPT = '.md,.markdown,.txt'
 
-const EXTS = [".md", ".markdown", ".txt"];
+const EXTS = ['.md', '.markdown', '.txt']
 
 /**
  * The folders already in the corpus, deepest paths collapsed to each level, so the
@@ -24,23 +24,23 @@ const EXTS = [".md", ".markdown", ".txt"];
  * @param {{path: string}[]} documents from /api/corpus
  */
 export function folders(documents = []) {
-  const seen = new Set();
+  const seen = new Set()
   for (const d of documents) {
-    const parts = String(d.path || "").split("/");
-    parts.pop(); // the file name
-    for (let i = 1; i <= parts.length; i++) seen.add(parts.slice(0, i).join("/"));
+    const parts = String(d.path || '').split('/')
+    parts.pop() // the file name
+    for (let i = 1; i <= parts.length; i++) seen.add(parts.slice(0, i).join('/'))
   }
-  return [...seen].sort();
+  return [...seen].sort()
 }
 
 /** Split a drop into what can be sent and what cannot, so the UI can say both. */
 export function sort(files) {
-  const ok = [];
-  const rejected = [];
+  const ok = []
+  const rejected = []
   for (const f of [...files]) {
-    (EXTS.some((e) => f.name.toLowerCase().endsWith(e)) ? ok : rejected).push(f);
+    (EXTS.some(e => f.name.toLowerCase().endsWith(e)) ? ok : rejected).push(f)
   }
-  return { ok, rejected };
+  return { ok, rejected }
 }
 
 /**
@@ -55,17 +55,18 @@ export function sort(files) {
  * @returns {Promise<boolean>}
  */
 export async function verify(candidate) {
-  let res;
+  let res
   try {
-    res = await fetch("/api/documents", {
-      method: "POST",
-      headers: { "X-BA-Pass": candidate },
+    res = await fetch('/api/documents', {
+      method: 'POST',
+      headers: { 'X-BA-Pass': candidate },
       body: new FormData(),
-    });
-  } catch {
-    throw new Error("Can't reach the server");
+    })
   }
-  return res.status !== 401 && res.status !== 403;
+  catch {
+    throw new Error('Can\'t reach the server')
+  }
+  return res.status !== 401 && res.status !== 403
 }
 
 /**
@@ -83,43 +84,45 @@ export async function verify(candidate) {
  * @throws {WrongPass} when the password is missing, wrong, or writes are off
  * @returns {Promise<{uploaded: {path: string, chunks: number}[], failed: {name: string, error: string}[], chunks: number}>}
  */
-export async function send(files, dir = "", onProgress = () => {}) {
-  const out = { uploaded: [], failed: [], chunks: 0 };
-  let done = 0;
-  onProgress(0, files.length);
+export async function send(files, dir = '', onProgress = () => {}) {
+  const out = { uploaded: [], failed: [], chunks: 0 }
+  let done = 0
+  onProgress(0, files.length)
   for (const f of files) {
-    const one = await sendOne(f, dir);
-    out.uploaded.push(...one.uploaded);
-    out.failed.push(...one.failed);
-    out.chunks += one.chunks || 0;
-    onProgress(++done, files.length);
+    const one = await sendOne(f, dir)
+    out.uploaded.push(...one.uploaded)
+    out.failed.push(...one.failed)
+    out.chunks += one.chunks || 0
+    onProgress(++done, files.length)
   }
-  return out;
+  return out
 }
 
 async function sendOne(file, dir) {
-  const body = new FormData();
-  if (dir.trim()) body.append("dir", dir.trim());
+  const body = new FormData()
+  if (dir.trim())
+    body.append('dir', dir.trim())
   // webkitRelativePath is set when a *folder* was picked, and it carries the
   // structure the person already built on their own disk — keep it rather than
   // flattening a tree they organised.
-  body.append("files", file, file.webkitRelativePath || file.name);
+  body.append('files', file, file.webkitRelativePath || file.name)
 
-  let res;
+  let res
   try {
-    res = await fetch("/api/documents", { method: "POST", headers: { "X-BA-Pass": pass() }, body });
-  } catch {
-    throw new Error("Can't reach the server");
+    res = await fetch('/api/documents', { method: 'POST', headers: { 'X-BA-Pass': pass() }, body })
+  }
+  catch {
+    throw new Error('Can\'t reach the server')
   }
   if (res.status === 401 || res.status === 403) {
-    setPass("");
-    throw new WrongPass((await res.text()).trim() || "Not allowed");
+    setPass('')
+    throw new WrongPass((await res.text()).trim() || 'Not allowed')
   }
   // 400 with a JSON body means "nothing usable", and it still names the file.
   // Throwing that away would leave the user with "Server error 400" for a problem
   // whose description is one line long.
-  if (res.headers.get("Content-Type")?.includes("application/json")) {
-    return res.json();
+  if (res.headers.get('Content-Type')?.includes('application/json')) {
+    return res.json()
   }
-  throw new Error((await res.text()).trim() || `Server error ${res.status}`);
+  throw new Error((await res.text()).trim() || `Server error ${res.status}`)
 }

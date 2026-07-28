@@ -15,8 +15,8 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 defineProps({
   line: { type: Object, required: true },
-  model: { type: String, default: "" },
-});
+  model: { type: String, default: '' },
+})
 </script>
 
 <template>

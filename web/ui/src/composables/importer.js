@@ -12,8 +12,8 @@
                 indexed and the eighth named — in one list, because to the person who
                 dropped them there was one list.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { computed, ref } from "vue";
-import * as upload from "../lib/upload.js";
+import { computed, ref } from 'vue'
+import * as upload from '../lib/upload.js'
 
 /**
  * @param {{ documents: () => object[], toast: Function, onLocked: (e: Error) => void,
@@ -22,52 +22,56 @@ import * as upload from "../lib/upload.js";
  *   the shell replaces wholesale after every import.
  */
 export function useImporter({ documents, toast, onLocked, onIndexed }) {
+  const importDir = ref('') // the folder this batch lands in — the scope a reader browses
+  const importing = ref(false)
+  const progress = ref({ done: 0, total: 0 })
+  const dragging = ref(false) // a drop target that doesn't light up reads as inert
+  const imported = ref(null) // {uploaded, failed, chunks} from the last import
 
-  const importDir = ref(""); // the folder this batch lands in — the scope a reader browses
-  const importing = ref(false);
-  const progress = ref({ done: 0, total: 0 });
-  const dragging = ref(false); // a drop target that doesn't light up reads as inert
-  const imported = ref(null); // {uploaded, failed, chunks} from the last import
-
-  /** The folders that already exist, so the picker suggests the structure rather than
-   *  inviting a fourth spelling of "engineering". */
-  const folders = computed(() => upload.folders(documents()));
+  /**
+   * The folders that already exist, so the picker suggests the structure rather than
+   *  inviting a fourth spelling of "engineering".
+   */
+  const folders = computed(() => upload.folders(documents()))
 
   async function importDocs(files) {
-    const { ok, rejected } = upload.sort(files);
-    dragging.value = false;
+    const { ok, rejected } = upload.sort(files)
+    dragging.value = false
     if (!ok.length) {
-      toast(`<b>Nothing to import.</b> Only ${upload.ACCEPT} — convert a PDF first.`, { accent: "warn" });
-      return;
+      toast(`<b>Nothing to import.</b> Only ${upload.ACCEPT} — convert a PDF first.`, { accent: 'warn' })
+      return
     }
-    importing.value = true;
-    imported.value = null;
-    progress.value = { done: 0, total: ok.length };
+    importing.value = true
+    imported.value = null
+    progress.value = { done: 0, total: ok.length }
     try {
       const r = await upload.send(ok, importDir.value, (done, total) => {
-        progress.value = { done, total };
-      });
-      r.failed = [...r.failed, ...rejected.map((f) => ({ name: f.name, error: `not ${upload.ACCEPT}` }))];
-      imported.value = r;
+        progress.value = { done, total }
+      })
+      r.failed = [...r.failed, ...rejected.map(f => ({ name: f.name, error: `not ${upload.ACCEPT}` }))]
+      imported.value = r
       if (r.uploaded.length) {
         toast(`<b>${r.uploaded.length} document(s) indexed.</b> ${r.chunks} sections — ask about them now.`, {
-          accent: "good",
-        });
-        onIndexed();
-      } else {
-        toast("<b>Nothing was indexed.</b> See the list below.", { accent: "crit" });
+          accent: 'good',
+        })
+        onIndexed()
       }
-    } catch (e) {
-      onLocked(e);
-    } finally {
-      importing.value = false;
+      else {
+        toast('<b>Nothing was indexed.</b> See the list below.', { accent: 'crit' })
+      }
+    }
+    catch (e) {
+      onLocked(e)
+    }
+    finally {
+      importing.value = false
     }
   }
 
   /** The file picker and a drop end in the same place. */
   function pickDocs(e) {
-    importDocs(e.target.files);
-    e.target.value = ""; // so picking the same file twice still fires
+    importDocs(e.target.files)
+    e.target.value = '' // so picking the same file twice still fires
   }
 
   return {
@@ -80,5 +84,5 @@ export function useImporter({ documents, toast, onLocked, onIndexed }) {
     folders,
     importDocs,
     pickDocs,
-  };
+  }
 }

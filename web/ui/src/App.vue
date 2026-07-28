@@ -22,44 +22,44 @@
    state a composable already answered — a branch that needs a variable of its own
    belongs in one of them.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { toast } from "8bit-nes";
-import { onMounted, ref, useTemplateRef } from "vue";
-import BaScreen from "./components/BaScreen.vue";
-import ChatTurn from "./components/ChatTurn.vue";
-import EmptyScreen from "./components/EmptyScreen.vue";
-import ScopePicker from "./components/ScopePicker.vue";
-import StatusLine from "./components/StatusLine.vue";
-import { useConversation } from "./composables/conversation.js";
-import { useCorpus } from "./composables/corpus.js";
-import { useDiagrams } from "./composables/diagrams.js";
-import { useQaLoop } from "./composables/qaloop.js";
-import { useRuntime } from "./composables/runtime.js";
-import { useScope } from "./composables/scope.js";
-import { useStatusLine } from "./composables/statusline.js";
-import { bindViewport } from "./lib/viewport.js";
+import { toast } from '8bit-nes'
+import { onMounted, ref, useTemplateRef } from 'vue'
+import BaScreen from './components/BaScreen.vue'
+import ChatTurn from './components/ChatTurn.vue'
+import EmptyScreen from './components/EmptyScreen.vue'
+import ScopePicker from './components/ScopePicker.vue'
+import StatusLine from './components/StatusLine.vue'
+import { useConversation } from './composables/conversation.js'
+import { useCorpus } from './composables/corpus.js'
+import { useDiagrams } from './composables/diagrams.js'
+import { useQaLoop } from './composables/qaloop.js'
+import { useRuntime } from './composables/runtime.js'
+import { useScope } from './composables/scope.js'
+import { useStatusLine } from './composables/statusline.js'
+import { bindViewport } from './lib/viewport.js'
 
-const MODE_KEY = "ke.mode"; // a BA reopening the app wants the queue, not the prompt
+const MODE_KEY = 'ke.mode' // a BA reopening the app wants the queue, not the prompt
 
 /* ── the DOM the app has to touch directly ── */
-const prompt = useTemplateRef("prompt"); // busy must reach it as an attribute
-const dock = useTemplateRef("dock"); // the keyboard/scroll maths measures it
-const pick = useTemplateRef("pick"); // the picker: closed after a scope is picked
-const zoom = useTemplateRef("zoom"); // <dialog>: the diagram viewer
-const zoomBody = useTemplateRef("zoomBody");
+const prompt = useTemplateRef('prompt') // busy must reach it as an attribute
+const dock = useTemplateRef('dock') // the keyboard/scroll maths measures it
+const pick = useTemplateRef('pick') // the picker: closed after a scope is picked
+const zoom = useTemplateRef('zoom') // <dialog>: the diagram viewer
+const zoomBody = useTemplateRef('zoomBody')
 
 /* ── state, one concern per composable ── */
-const { scope, setScope } = useScope();
-const { corpus, refresh: refreshCorpus } = useCorpus();
-const { online, writes, runtime, check, watchNetwork } = useRuntime();
-const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast });
+const { scope, setScope } = useScope()
+const { corpus, refresh: refreshCorpus } = useCorpus()
+const { online, writes, runtime, check, watchNetwork } = useRuntime()
+const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
-  = useDiagrams({ zoom, zoomBody });
+  = useDiagrams({ zoom, zoomBody })
 
 // viewport.js binds to a real element, so it can only exist after mount. The
 // conversation is given a function rather than the object, and a scroll before mount is
 // a no-op instead of a crash.
-let view = null;
-const scroll = opts => view?.scrollToEnd(opts);
+let view = null
+const scroll = opts => view?.scrollToEnd(opts)
 
 const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useConversation({
   scope,
@@ -69,58 +69,66 @@ const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useCo
   // Everything an answer can have changed, in one place. Cheap, and cheaper than
   // reasoning about which of them this particular answer touched.
   onSettled: (turn) => {
-    if (turn.error) check();
-    if (corpus.value.state !== "ready") refreshCorpus();
-    loadFor(turn.a);
+    if (turn.error)
+      check()
+    if (corpus.value.state !== 'ready')
+      refreshCorpus()
+    loadFor(turn.a)
   },
-});
+})
 
-const statusLine = useStatusLine({ turns, busy, online, runtime });
+const statusLine = useStatusLine({ turns, busy, online, runtime })
 
-const mode = ref(localStorage.getItem(MODE_KEY) === "ba" ? "ba" : "dev");
+const mode = ref(localStorage.getItem(MODE_KEY) === 'ba' ? 'ba' : 'dev')
 
 onMounted(() => {
-  view = bindViewport(dock.value);
-  check();
-  refreshCorpus();
-  refreshQueue();
+  view = bindViewport(dock.value)
+  check()
+  refreshCorpus()
+  refreshQueue()
   if (turns.value.length) {
-    scroll({ force: true });
-    loadFor(turns.value.map(t => t.a).join("\n"));
+    scroll({ force: true })
+    loadFor(turns.value.map(t => t.a).join('\n'))
   }
-  watchNetwork();
-});
+  watchNetwork()
+})
 
 /* ── intent ── */
 
 function setMode(next) {
-  mode.value = next;
-  localStorage.setItem(MODE_KEY, next);
-  if (next === "ba") refreshQueue();
+  mode.value = next
+  localStorage.setItem(MODE_KEY, next)
+  if (next === 'ba')
+    refreshQueue()
 }
 
 /** Picked from the tree: close the picker too, or the answer arrives behind it. */
 function pickScope(next) {
-  setScope(next);
-  pick.value?.close();
+  setScope(next)
+  pick.value?.close()
 }
 
-/** The BA screen moved something. What changed is never only one thing: a confirm or an
+/**
+ * The BA screen moved something. What changed is never only one thing: a confirm or an
  *  import changes the corpus, which invalidates the cache, which empties the history —
- *  so refresh all three instead of reasoning about it. */
+ *  so refresh all three instead of reasoning about it.
+ */
 function baChanged(ticket) {
-  refreshQueue();
-  refreshCorpus();
-  if (ticket) markConfirmed(ticket);
+  refreshQueue()
+  refreshCorpus()
+  if (ticket)
+    markConfirmed(ticket)
 }
 
-/** Re-ask a cached question. Free — but only in the scope it was answered in: the same
+/**
+ * Re-ask a cached question. Free — but only in the scope it was answered in: the same
  *  words in another folder are another question, and buying a completion from a panel
- *  labelled "free to repeat" is a broken promise. */
+ *  labelled "free to repeat" is a broken promise.
+ */
 function replay(entry) {
-  setMode("dev");
-  setScope(entry.scope || "");
-  ask(entry.question);
+  setMode('dev')
+  setScope(entry.scope || '')
+  ask(entry.question)
 }
 </script>
 

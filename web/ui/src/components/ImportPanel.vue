@@ -11,14 +11,14 @@
    The composable owns every branch (which files are usable, how far the batch got, what
    failed and why). This file owns how that reads.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { toast } from "8bit-nes";
-import { useImporter } from "../composables/importer.js";
+import { toast } from '8bit-nes'
+import { useImporter } from '../composables/importer.js'
 
 const props = defineProps({
   documents: { type: Array, default: () => [] },
-});
+})
 
-const emit = defineEmits(["indexed", "locked"]);
+const emit = defineEmits(['indexed', 'locked'])
 
 const {
   accept,
@@ -33,9 +33,9 @@ const {
 } = useImporter({
   documents: () => props.documents,
   toast,
-  onIndexed: () => emit("indexed"),
-  onLocked: e => emit("locked", e),
-});
+  onIndexed: () => emit('indexed'),
+  onLocked: e => emit('locked', e),
+})
 </script>
 
 <template>
