@@ -219,6 +219,15 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		onToken = func(string) {}
 	}
 
+	// A greeting is not a question about the documents, so the grounding rules never
+	// applied to it — see smalltalk.go. Answered before the cache as well as before the
+	// provider: the reply is a constant, so storing it would spend a row to remember
+	// something that is already free.
+	if reply, ok := smallTalk(question); ok {
+		onToken(reply)
+		return Reply{}, nil
+	}
+
 	// A signature we can't read means "don't cache", never "fail the question".
 	sig, sigErr := e.sig()
 	if sigErr == nil && !a.Fresh {

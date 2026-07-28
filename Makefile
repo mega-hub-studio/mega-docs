@@ -11,7 +11,7 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check check-full test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
+.PHONY: deps check check-full ui-deps test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
 
 deps:
 	go mod tidy
@@ -69,14 +69,29 @@ lint:
 # and embedded by the binary — so `go build`, `go install` and `git pull && make build` on
 # the host all keep working without Node. That is the whole reason a build artefact is in
 # git, and TestBuiltUIMatchesItsSources is what stops it going stale.
-ui:
-	@cd web/ui && \
-		{ [ -d node_modules ] || npm ci --no-audit --no-fund; } && \
-		npm run build
+# node_modules has to match the lockfile, and "it exists" is not the same question.
+# `[ -d node_modules ] || npm ci` was the old test, so a `git pull` that *added* a
+# dependency left a directory that existed and was stale — and the failure surfaced as a
+# Vite overlay saying `Failed to resolve import "vue-i18n" from "src/main.js"`, pointing at
+# your own source, which is the least useful place to look. That happened, on the commit
+# that added vue-i18n.
+#
+# npm writes node_modules/.package-lock.json on every install, so a lockfile newer than that
+# stamp means the tree is behind. Installing is the right move rather than only reporting:
+# nobody wants "run npm ci" from a target whose whole job is to build the front end.
+UI_STAMP := web/ui/node_modules/.package-lock.json
+ui-deps:
+	@if [ ! -f $(UI_STAMP) ] || [ web/ui/package-lock.json -nt $(UI_STAMP) ]; then \
+		echo "  web/ui/node_modules is missing or behind package-lock.json — installing"; \
+		cd web/ui && npm ci --no-audit --no-fund; \
+	fi
+
+ui: ui-deps
+	@cd web/ui && npm run build
 
 # HMR against the real engine: serves the UI on :5173 and proxies /api to :8080, so run
 # `make server` in another shell first.
-ui-dev:
+ui-dev: ui-deps
 	@cd web/ui && npm run dev
 
 # The walkthroughs, driven. Separate from check-ui because it answers a different
