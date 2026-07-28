@@ -710,6 +710,124 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
     </div>
   </section>
 
+  <!-- ══ running it locally ═══════════════════════════════════════════════════
+       Written after doing it: every command here was run, and the HMR claim was
+       measured (the DOM swapped with zero full reloads). The diagram is rendered from
+       web/devloop.mmd — mermaid never reaches this page. -->
+  <section id="local" data-feature="local-dev"
+           data-env="PORT,BIND_ADDR"
+           data-test="TestBuiltUIMatchesItsSources,TestBuiltAppIsEmbedded">
+    <h2 lang="en">Running it on your machine</h2>
+    <h2 lang="vi">Chạy trên máy bạn</h2>
+    <p class="lede" lang="en">Two loops out of one edit. The fast one never builds the
+      binary; the shipping one is exactly what the host runs. Use the first to work and the
+      second to check what you are about to commit.</p>
+    <p class="lede" lang="vi">Một lần sửa, hai vòng lặp. Vòng nhanh không build binary; vòng
+      ship là đúng thứ host sẽ chạy. Dùng cái đầu để làm việc, cái sau để kiểm thứ bạn sắp
+      commit.</p>
+
+    <div class="mermaid-view"><%diagram "devloop"%></div>
+
+    <h3 lang="en">Once, after cloning</h3>
+    <h3 lang="vi">Một lần, sau khi clone</h3>
+    <div class="terminal"><span class="cmd">make ui</span><span class="out">npm ci + vite build → web/dist</span></div>
+    <p lang="en">Needed again only when <code>package.json</code> changes.</p>
+    <p lang="vi">Chỉ cần chạy lại khi <code>package.json</code> đổi.</p>
+
+    <h3 lang="en">The fast loop: two terminals</h3>
+    <h3 lang="vi">Vòng nhanh: hai terminal</h3>
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">The engine, on :8080</b>
+        <b lang="vi">Engine, ở :8080</b>
+        <div class="terminal"><span class="cmd">make server</span><span class="out">mega-docs on http://127.0.0.1:8080 (ui: vue 3.5.40 · 8bit-nes 0.7.2 · build 4efbc3b0, …)</span></div>
+        <p lang="en">Reads <code>.env</code>, so it is the real engine: real SQLite, real
+          provider, real corpus. That startup line names the UI build the binary carries,
+          which is how you tell whether it has your latest <code>make ui</code>.</p>
+        <p lang="vi">Nó đọc <code>.env</code>, nên đây là engine thật: SQLite thật, provider
+          thật, corpus thật. Dòng startup in luôn bản build UI mà binary đang mang — đó là
+          cách biết nó đã có <code>make ui</code> mới nhất của bạn hay chưa.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Vite, on :5173</b>
+        <b lang="vi">Vite, ở :5173</b>
+        <div class="terminal"><span class="cmd">make ui-dev</span><span class="out">VITE ready in 343 ms
+  ➜  Local:   http://localhost:5173/</span></div>
+        <p lang="en">Open <b>:5173</b>, not :8080. Vite serves the front end you are editing
+          and forwards <code>/api</code> to the engine, so the UI is your working copy while
+          everything behind it is real.</p>
+        <p lang="vi">Mở <b>:5173</b>, không phải :8080. Vite serve frontend bạn đang sửa và
+          chuyển <code>/api</code> sang engine, nên UI là bản đang sửa còn mọi thứ phía sau
+          đều là thật.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">What the fast loop buys, measured.</b>
+      <span lang="en">Editing a component swapped the DOM with <b>zero full reloads</b> — the
+        conversation already on screen survived it. Dev also serves <b>unbundled</b> modules
+        (30 requests to <code>/src/…</code> on first paint), so a stack trace names
+        <code>composables/conversation.js</code> and a breakpoint lands in the file you
+        wrote. Vue DevTools works here; it does not on the production bundle.</span>
+      <b lang="vi">Vòng nhanh đổi lại được gì, đo thật.</b>
+      <span lang="vi">Sửa một component thì DOM đổi với <b>0 lần full reload</b> — cuộc hội
+        thoại đang có trên màn hình vẫn còn nguyên. Chế độ dev cũng serve module <b>chưa
+        bundle</b> (30 request tới <code>/src/…</code> ở lần vẽ đầu), nên stack trace ghi
+        đúng <code>composables/conversation.js</code> và breakpoint rơi vào file bạn viết.
+        Vue DevTools dùng được ở đây; ở bundle production thì không.</span>
+    </div>
+
+    <h3 lang="en">The shipping loop</h3>
+    <h3 lang="vi">Vòng ship</h3>
+    <div class="terminal"><span class="cmd">make ui        # vite build → web/dist (commit this)</span><span class="cmd">make build     # bin/knowledge + bin/ingest, embedding web/dist</span><span class="cmd">./bin/knowledge</span><span class="out">open http://localhost:8080 — the exact bytes the host will serve</span></div>
+    <p lang="en">This is the one to open before committing: same bundle, same hashed asset
+      names, same immutable caching, no CDN. <code>make build</code> deliberately does
+      <b>not</b> run Vite — a deploy host has no Node and must not need one.</p>
+    <p lang="vi">Đây là cái nên mở trước khi commit: cùng bundle, cùng tên asset có hash,
+      cùng cách cache immutable, không CDN. <code>make build</code> cố tình <b>không</b> chạy
+      Vite — host deploy không có Node và không được cần Node.</p>
+
+    <h3 lang="en">When it looks broken</h3>
+    <h3 lang="vi">Khi thấy nó hỏng</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>What you see</th><th>What it is</th></tr>
+          <tr lang="vi"><th>Bạn thấy</th><th>Thực chất là gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>:5173 opens, health dot is red, asking fails</th><td>no engine — <code>make server</code> is not running. Vite proxies <code>/api</code>; it does not answer it</td></tr>
+          <tr lang="vi"><th>:5173 mở được, đèn health đỏ, hỏi thì lỗi</th><td>chưa có engine — <code>make server</code> chưa chạy. Vite chỉ proxy <code>/api</code>, nó không tự trả lời</td></tr>
+          <tr lang="en"><th>an SFC edit changes nothing on :8080</th><td>working as intended: :8080 serves the bundle compiled into the binary. Use :5173, or <code>make ui &amp;&amp; make build</code></td></tr>
+          <tr lang="vi"><th>sửa SFC mà :8080 không đổi gì</th><td>đúng như thiết kế: :8080 serve bundle đã compile vào binary. Dùng :5173, hoặc <code>make ui &amp;&amp; make build</code></td></tr>
+          <tr lang="en"><th><code>make check</code> says "run <code>make ui</code>"</th><td>web/dist is older than web/ui. That is <code>TestBuiltUIMatchesItsSources</code> doing its job — rebuild and commit the output</td></tr>
+          <tr lang="vi"><th><code>make check</code> báo "run <code>make ui</code>"</th><td>web/dist cũ hơn web/ui. Đó là <code>TestBuiltUIMatchesItsSources</code> đang làm việc của nó — build lại rồi commit output</td></tr>
+          <tr lang="en"><th>the answer never streams and the log is quiet</th><td>the provider, not the UI. Check <code>AI_BASE_URL</code> and the key in <code>.env</code>; <code>make live</code> asks the provider directly</td></tr>
+          <tr lang="vi"><th>câu trả lời không stream mà log im lặng</th><td>là provider, không phải UI. Kiểm <code>AI_BASE_URL</code> và key trong <code>.env</code>; <code>make live</code> gọi trực tiếp provider</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">Before you commit a UI change.</b>
+      <span lang="en"><code>make lint-js</code> (ESLint over <code>web/ui</code>, zero
+        findings expected) → <code>make ui</code> → <code>make check</code>. The last one
+        covers the freshness of <code>web/dist</code>, and CI rebuilds it from the lockfile
+        and diffs the bytes, so a bundle cannot carry anything its sources do not
+        produce.</span>
+      <b lang="vi">Trước khi commit một thay đổi UI.</b>
+      <span lang="vi"><code>make lint-js</code> (ESLint trên <code>web/ui</code>, kỳ vọng 0
+        finding) → <code>make ui</code> → <code>make check</code>. Cái cuối kiểm luôn độ mới
+        của <code>web/dist</code>, và CI build lại từ lockfile rồi so byte — nên bundle không
+        thể chứa thứ mà source không sinh ra.</span>
+    </div>
+  </section>
+
   <!-- ══ spec-driven ═══════════════════════════════════════════════════════
        Last, because it is the section that tells you where everything above came
        from: these pages are the spec, and the build enforces the join. The diagram

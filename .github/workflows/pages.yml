@@ -31,6 +31,9 @@ on:
       - web/llms.go
       - web/spec.go
       - web/docsbase.html
+      # The diagrams are inlined into the pages, so a re-render has to republish them.
+      # A glob rather than five names: the next one would otherwise be missed silently.
+      - web/*.svg
       - web/vendor.sha384
       - web/embed.go
       - web/assets.go

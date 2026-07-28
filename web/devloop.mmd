@@ -1,0 +1,16 @@
+%% Source of truth for the "running it locally" diagram on the Dev page.
+%% Rendered to web/devloop.svg by `make diagram` — mermaid never ships to the browser.
+%%
+%% Two loops out of one edit, which is the whole point of the picture: the fast one goes
+%% through Vite and never touches the binary, the shipping one goes through the committed
+%% bundle. Shallow and short-labelled like the other four: it is read on a phone.
+%%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 28, "padding": 6, "useMaxWidth": true}}}%%
+graph TD
+  Edit["you edit a .vue"] --> Vite["vite :5173"]
+  Vite -->|"hot swap, no reload"| Browser["browser :5173"]
+  Vite -->|"/api proxied"| Engine["make server :8080"]
+  Engine --> Store["sqlite + provider"]
+  Edit --> Ui["make ui"]
+  Ui --> Dist["web/dist, committed"]
+  Dist --> Build["make build"]
+  Build --> Binary["binary serves :8080"]

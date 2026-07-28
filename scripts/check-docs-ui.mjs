@@ -109,7 +109,12 @@ const measure = (p) => p.evaluate(() => {
     // A box too narrow to hold words. `.table th` is nowrap, so one long row header
     // used to leave ~4 characters for each value column and every cell wrapped one
     // word per line. Measured in characters, because px means nothing without a size.
-    narrow: [...document.querySelectorAll("main .table td, main .table th, main .step > .body")]
+    // Every recipe on these pages that holds a sentence. `.datalist` was added after a
+    // screenshot showed its value column at fourteen characters on a phone — the same
+    // failure as the tables, in a recipe the first version of this check did not look at.
+    narrow: [...document.querySelectorAll(
+      "main .table td, main .table th, main .step > .body, main .datalist dd, main .timeline p",
+    )]
       .filter(seen).filter(e => e.textContent.trim().length > 12)
       .map(e => ({ txt: e.textContent.trim().slice(0, 24),
                    ch: Math.round(e.getBoundingClientRect().width /

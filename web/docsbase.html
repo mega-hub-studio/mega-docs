@@ -253,6 +253,20 @@
     .table th, .table td { min-inline-size: 14ch; }
   }
 
+  /* ── a key/value list on a phone is one column ──
+     `.datalist` is a two-column grid (`auto 1fr`), and the design system does stack it —
+     but inside a container query at 320px, which needs a `container-type` ancestor these
+     pages never establish. So at 390px it stayed two columns, and a long key (a Go test
+     name, a rule id) took the `auto` track: measured at fourteen characters for the value,
+     wrapping every second word. Same answer as the tables below: the key becomes a label
+     above its value. */
+  @media (max-width: 39.999rem) {
+    main .datalist { grid-template-columns: 1fr; gap: 0; }
+    main .datalist > dt { margin-block-start: var(--flow); }
+    main .datalist > dt:first-child { margin-block-start: 0; }
+    main .datalist > dd { margin-block-start: 2px; }
+  }
+
   /* ── a table on a phone is a list of rows, not a grid ──
      Scrolling sideways was the wrong answer at 390px. `.table th` is `white-space:
      nowrap`, so a row header takes its full width and a three-column row left about
