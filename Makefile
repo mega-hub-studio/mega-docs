@@ -11,7 +11,7 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-.PHONY: deps check check-full ui-deps test lint lint-fix lint-js dead secrets live smoke server ingest build switch-embed vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
+.PHONY: deps check check-full ui-deps test lint lint-fix lint-js dead secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev
 
 deps:
 	go mod tidy
@@ -185,12 +185,6 @@ live:
 # answer streams and cites it.
 smoke:
 	sh scripts/smoke.sh
-
-# Point embeddings at another provider: validate the key, then re-index (vectors
-# from two models are not comparable). Edit .env first — it is the source of truth.
-#   DIR=/opt/knowledge SERVICE=knowledge make switch-embed
-switch-embed:
-	sh scripts/switch-embed.sh
 
 # Download + digest-verify the front-end's CDN assets into web/vendor/, so the
 # binary can serve them itself (ASSET_BASE=/vendor). Pins live in web/vendor.sha384.

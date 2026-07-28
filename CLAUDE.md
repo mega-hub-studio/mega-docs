@@ -118,8 +118,7 @@ time and `elements.min.js` is a module (so it runs later). `data-focus` is a `|`
 list matched against node text, case-insensitively. With JS off, every step's prose is
 still on the page in both languages.
 
-Other targets: `make switch-embed` (move embeddings to another provider: validates
-the key *before* dropping the index), `make vendor` (fetch + sha384-verify the docs pages'
+Other targets: `make vendor` (fetch + sha384-verify the docs pages'
 CDN assets, for `rendocs -base /vendor`), `make diagram` (re-render `web/*.mmd`; the SVG is committed
 and `make check` fails if the source hash drifts).
 
