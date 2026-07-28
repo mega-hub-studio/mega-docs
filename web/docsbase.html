@@ -484,23 +484,17 @@
   const toc = document.querySelector("nes-toc");
   const TOC_LABEL = { en: "On this page", vi: "Trên trang này" };
 
-  // Only write an attribute that actually changed. Writing the same value still
-  // fires attributeChangedCallback, and each rebuild replaces the bar's "current
-  // section" span while the component's active id stays the same — so its update is
-  // skipped and the fresh span is left blank. On a first load in English (what the
-  // markup already says) that would empty the bar before anyone scrolled.
+  // Only write an attribute that actually changed: every write fires
+  // attributeChangedCallback and rebuilds the whole index, and a first load in English
+  // would otherwise rebuild twice to arrive at what the markup already says.
+  // A redundant rebuild is merely wasted work now — up to 8bit-nes 0.7.2 it also blanked
+  // the collapsed bar, because the component kept the active id across a rebuild and then
+  // skipped filling the fresh "current section" span. 0.7.3 forgets it, which is why the
+  // order these two are written in is no longer load-bearing.
   const setIf = (name, value) => {
     if (toc && toc.getAttribute(name) !== value) toc.setAttribute(name, value);
   };
 
-  // `label` is written BEFORE `levels`, and the order is load-bearing. A language
-  // change writes both, so the index rebuilds twice, and only the rebuild that also
-  // changes which headings are indexed leaves the component with a *different* first
-  // heading id than the one it still thinks is active — the one case where its
-  // "current section" update is not skipped. With the writes the other way round the
-  // label rebuild came last and the collapsed bar stayed blank for good: measured on a
-  // phone, every page, after one tap on VI/EN. (The component's own fix is to forget
-  // the active id when it rebuilds; until a release carries it, the order does it.)
   // The finder is the index in one field: <nes-toc> has already resolved every heading
   // to an id for the reading language, so the options are its own rows. Nothing is
   // fetched, nothing is indexed twice, and it cannot list a section that is not there.

@@ -1,6 +1,8 @@
 #!/bin/sh
-# Vendor the front-end's CDN assets into web/vendor/ so the binary can serve them
-# itself (ASSET_BASE=/vendor) — for networks with no egress to a CDN.
+# Vendor the *docs pages'* CDN assets into web/vendor/, so the guide can be rendered and
+# read on a network with no egress: `rendocs -base /vendor`, which is also how
+# `make check-ui` measures the pages. The app needs nothing from here — its dependencies
+# are bundled into web/dist by Vite.
 #
 # Reads web/vendor.sha384: one "<pkg>@<ver>/<path>  sha384-<base64>" per line.
 # Fetches each package's tarball straight from the npm registry (not the CDN —
@@ -78,4 +80,4 @@ if [ -d "$OUT" ]; then
 fi
 
 echo "vendor: $count files verified into web/vendor/"
-echo "        rebuild to embed them (make build), then run with ASSET_BASE=/vendor"
+echo "        render the guide against them with: rendocs -base /vendor"

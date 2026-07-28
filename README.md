@@ -371,52 +371,50 @@ cost is re-embedding the corpus.
   publish it through a tailnet or a Cloudflare Tunnel rather than opening a port — see
   the **[Deploy page](https://mega-hub-studio.github.io/mega-docs/deploy.html)**.
 
-## Frontend assets (CDN, pinned)
+## Frontend assets: two manifests, one design system
 
-The UI is one embedded HTML file that pulls four things from jsDelivr: Vue,
-`marked`, DOMPurify, and the [8-BIT NES](https://github.com/TuTranMVP/8bit-components)
-design system (**0.7.2**). All of it is version-pinned *and* hash-pinned:
+Both front ends use [8-BIT NES](https://github.com/TuTranMVP/8bit-components) (**0.7.3**),
+and each gets it a different way — which is the whole reason there are two manifests and
+neither knows the other's versions:
 
-| | pin |
-|---|---|
-| one origin | a single `preconnect`ed host → one DNS + TLS handshake for every asset |
-| exact versions | `vue@3.5.40`, `marked@18.0.7`, `dompurify@3.4.12`, `8bit-nes@0.7.2` — a pinned jsDelivr URL is `immutable`, cached a year, and can't change under a deployed page |
-| `integrity` | `sha384` on all four; the browser refuses a byte that doesn't match |
-| `defer` + module | ~240 kB of `<script>` no longer blocks the parser; the app boots from the inline module, which runs after them by spec |
-| font `preload` | the three woff2 faces start with the stylesheet, at the exact URLs the CSS resolves — each fetched once |
+| | the app (`web/ui`) | the guide (`web/*.html`) |
+|---|---|---|
+| how it arrives | npm, bundled by Vite into `web/dist` — committed, embedded, served from the binary | jsDelivr at runtime: there is no build step, just four static files on GitHub Pages |
+| pinned in | [`web/ui/package.json`](web/ui/package.json), bytes in `package-lock.json` | [`web/vendor.sha384`](web/vendor.sha384) |
+| verified by | `npm ci` against the lockfile; CI rebuilds and diffs `web/dist` | `integrity="sha384-…"`, so the browser refuses a byte that doesn't match |
 
-**One line to upgrade.** [`web/vendor.sha384`](web/vendor.sha384) is the only place
-a version or a digest appears: `index.html` asks for
-`url "vue" "dist/vue.global.prod.js"` and Go resolves it from that manifest, which
-also drives `make vendor`. Change the line, run `make vendor`, done — and a
-half-finished bump (one file moved, the rest left behind) fails at **startup**, not
-in someone's browser. 8-BIT NES publishes its own digests at
-[`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json).
+What the guide's pins buy, since it is the half that fetches anything at all: one
+`preconnect`ed origin for every asset; an exact version, because a pinned jsDelivr URL is
+`immutable` and cannot change under a deployed page; and a `preload` for all three woff2
+faces, at the exact URLs the CSS resolves, so each is fetched once and starts during head
+parse rather than after the stylesheet.
 
-> **On 8bit-nes 0.7.2** (released 2026-07-27): housekeeping upstream — a dead-code
-> audit that dropped a `.log-time` hook this app never rendered. `elements.min.js` is
-> byte-identical to 0.7.1, only `all.min.css` moved, and all fifteen digests in the
-> package match its own `sri.json`. Taken because the drift is one line, not because
-> anything here needed it.
+**One line to upgrade the guide.** `web/vendor.sha384` is the only place its versions and
+digests appear — `docsbase.html` asks for `url "8bit-nes" "all.min.css"` and Go resolves
+both the URL and its `sri` from that manifest. Change the version, run `make vendor` for
+the digests, done; a half-finished bump fails at **startup**, not in someone's browser.
+8-BIT NES publishes its own digests at
+[`/sri.json`](https://tutranmvp.github.io/8bit-components/sri.json), and `AGENTS.md` quotes
+the version too — a test fails when the two disagree.
+
+> **On 8bit-nes 0.7.3** (released 2026-07-28): fixes a bug this project reported after
+> measuring it on a phone. Setting an observed attribute rebuilds `<nes-toc>`'s index, and
+> the component kept its active heading id across the rebuild — so `_mark()` skipped the
+> fresh "current section" span and left it blank. These pages write both `label` and
+> `levels` on a language toggle, which is two rebuilds back to back, and the collapsed bar
+> (which on a phone *is* the index) went empty on every page after one tap on VI/EN.
 >
-> **On 8bit-nes 0.7.1** (released 2026-07-27): the bump is one line plus
-> `make vendor`. Everything here is verified against the published tarball rather
-> than the changelog, because a release has already once been tagged without the fix
-> it claimed — all five digests match the package's own `sri.json`, and the README's
-> own documented `<head>` now quotes `@0.7.1` with matching digests (0.7.0 shipped
-> that pair mismatched, which would have blocked the stylesheet as an SRI failure;
-> the release now gates it with `check:pins`).
+> Upstream now forgets the id when it rebuilds, so `docsbase.html`'s workaround — writing
+> the two attributes in a load-bearing order — is gone. Only `elements.min.js` moved;
+> `all.min.css` and the three fonts are byte-identical to 0.7.2. Digests verified against
+> the published tarball rather than the changelog, because a release has already once been
+> tagged without the fix it claimed.
 >
-> 0.7.1 carries **both** accessibility fixes this project reported upstream, so
-> `web/docsbase.html` no longer overrides anything: prose links get ink colour plus an
-> underline, and a `.wt-dot` grows a 40px hit area on a coarse pointer. Verified by
-> measuring three builds — 0.7.1 with the overrides, 0.7.1 without them (identical
-> computed decoration and identical hit-test at 14px in all four directions), and
-> 0.7.0 without them as a control, where links fall back to body colour with no
-> underline and only the 12×12 dot is hittable.
->
-> It also keeps 0.6.1's two touch fixes (send button 44px, chat textarea 16px), so
-> `web/ui/src/styles.css` owns no `(pointer: coarse)` CSS either.
+> Earlier releases left their fixes behind, and they are why this repo overrides less than
+> it used to: 0.7.1 carried both accessibility fixes reported from here (prose links get
+> ink colour plus an underline; a `.wt-dot` grows a 40px hit area on a coarse pointer), so
+> `web/docsbase.html` overrides nothing, and 0.6.1's two touch fixes (send button 44px,
+> chat textarea 16px) are why `web/ui/src/styles.css` owns no `(pointer: coarse)` CSS.
 
 > **On the diagram.** The "how it works" picture is a mermaid graph, but mermaid
 > never reaches the browser: 8bit-nes deliberately does not bundle it (~800KB
