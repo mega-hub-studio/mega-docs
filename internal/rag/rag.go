@@ -179,8 +179,13 @@ type Ask struct {
 	// Scope narrows retrieval to one document or folder of the corpus; "" is all of
 	// it. It is the reader's own filter — "answer from the booking docs" — and it
 	// changes both what is retrieved and which cached answer applies.
-	Scope   string
-	Fresh   bool         // ignore any cached answer — what Regenerate means
+	Scope string
+	Fresh bool // ignore any cached answer — what Regenerate means
+	// History is the thread this question continues, oldest first. It is what lets a
+	// follow-up refer to the answer above it — and it takes the question out of the
+	// cache in both directions, because four words mean something different in every
+	// conversation. See memory.go.
+	History []Turn
 	OnToken func(string) // may be nil
 }
 
@@ -216,6 +221,10 @@ type Reply struct {
 // corpus, the chat model and the prompt — so re-indexing, changing the model, or
 // asking the same words about a different folder all produce a different answer
 // rather than a stale one.
+//
+// A question continuing a thread (Ask.History) is the exception at both ends: it is
+// rewritten into a standalone query before retrieval, and it touches no cache row in
+// either direction. See memory.go.
 func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	question := strings.TrimSpace(a.Question)
 	scope := Scope(a.Scope)
@@ -224,31 +233,44 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		onToken = func(string) {}
 	}
 
+	// The thread this question continues, in the model's own message shape. It is also
+	// the answer to "is this a follow-up", which changes three things below: whether a
+	// bare "how?" is vague, what retrieval runs on, and whether any of it may be cached.
+	turns := replay(a.History)
+
 	// A greeting is not a question about the documents, so the grounding rules never
 	// applied to it — see smalltalk.go. Answered before the cache as well as before the
 	// provider: the reply is a constant, so storing it would spend a row to remember
-	// something that is already free.
-	if reply, ok := smallTalk(question); ok {
+	// something that is already free. Before the rewrite too, so "cảm ơn" on the tenth
+	// message still costs nothing.
+	if reply, ok := smallTalk(question, len(turns) > 0); ok {
 		onToken(reply)
 		return Reply{}, nil
 	}
 
-	// A signature we can't read means "don't cache", never "fail the question".
+	// What retrieval runs on, which is not always what was typed: a follow-up is rewritten
+	// against the thread first, because a pronoun embeds to nothing. See memory.go.
+	query, spent := e.standalone(ctx, question, turns)
+
+	// A signature we can't read means "don't cache", never "fail the question". A
+	// follow-up means the same, and in both directions: served from a row it answers
+	// another conversation, stored in one it answers the next. One name for it, because
+	// reading and writing must never disagree about what may be cached.
 	sig, sigErr := e.sig()
-	if sigErr == nil && !a.Fresh {
-		if c, ok, err := e.store.Cached(sig, scope, question); err == nil && ok {
-			onToken(c.Answer)
-			var cites []Citation
-			_ = json.Unmarshal(c.Citations, &cites)
-			return Reply{Citations: cites, Cached: true}, nil
+	cacheable := sigErr == nil && len(turns) == 0
+	// `Fresh` excludes only the read: Regenerate says the stored answer was wrong, not
+	// that the answer replacing it is not worth keeping.
+	if cacheable && !a.Fresh {
+		if reply, ok := e.serveCached(sig, scope, question, onToken); ok {
+			return reply, nil
 		}
 	}
 
-	qv, err := e.ai.Embed(ctx, []string{question})
+	qv, err := e.ai.Embed(ctx, []string{query})
 	if err != nil {
 		return Reply{}, err
 	}
-	hits, err := e.store.Search(qv[0], question, e.topK, scope)
+	hits, err := e.store.Search(qv[0], query, e.topK, scope)
 	if err != nil {
 		return Reply{}, err
 	}
@@ -265,10 +287,13 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		cites[i] = Citation{N: n, DocPath: h.DocPath, Heading: h.Heading}
 	}
 
-	msgs := []ai.Msg{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: "CONTEXT:\n" + cb.String() + "\nQUESTION: " + question},
-	}
+	// The thread sits between the rules and this question, which is where a chat model
+	// expects it: the retrieved CONTEXT is fresh for every turn, so it belongs with the
+	// question it was retrieved for rather than with the conversation behind it.
+	msgs := make([]ai.Msg, 0, len(turns)+2)
+	msgs = append(msgs, ai.Msg{Role: "system", Content: systemPrompt})
+	msgs = append(msgs, turns...)
+	msgs = append(msgs, ai.Msg{Role: "user", Content: "CONTEXT:\n" + cb.String() + "\nQUESTION: " + question})
 	// Accumulate what the user is already seeing: the cache stores the answer, and
 	// re-serialising it from the model would cost the tokens twice.
 	var full strings.Builder
@@ -276,6 +301,11 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		full.WriteString(tok)
 		onToken(tok)
 	})
+	// The rewrite was a real completion on a real provider. Folding its usage in here —
+	// once, before every return below — keeps the status line reporting what this turn
+	// actually cost rather than the part of it that produced text on screen.
+	usage.PromptTokens += spent.PromptTokens
+	usage.CompletionTokens += spent.CompletionTokens
 	if err != nil {
 		return Reply{Citations: cites, Usage: usage}, err
 	}
@@ -288,7 +318,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// Only cache a grounded, complete answer. A cut-off stream or an ungrounded
 	// reply is exactly what someone will retry, and a cache that remembers it turns
 	// one bad answer into a permanent one.
-	if sigErr == nil && full.Len() > 0 && !isMiss(full.String()) {
+	if cacheable && full.Len() > 0 && !isMiss(full.String()) {
 		raw, _ := json.Marshal(cites)
 		_ = e.store.Cache(sig, db.Cached{Question: question, Scope: scope, Answer: full.String(), Citations: raw})
 	}
@@ -301,6 +331,24 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		return Reply{Usage: usage}, nil
 	}
 	return Reply{Citations: cites, Usage: usage}, nil
+}
+
+// serveCached replays a stored answer as if it had just been generated, so the client
+// needs no second code path for a free one — the tokens arrive the same way and `Cached`
+// is what says it cost nothing.
+//
+// A read error is a miss, not a failure: the answer is still available for the price of
+// a completion, and refusing the question because a cache could not be read would trade
+// a working answer for a saving.
+func (e *Engine) serveCached(sig, scope, question string, onToken func(string)) (Reply, bool) {
+	c, ok, err := e.store.Cached(sig, scope, question)
+	if err != nil || !ok {
+		return Reply{}, false
+	}
+	onToken(c.Answer)
+	var cites []Citation
+	_ = json.Unmarshal(c.Citations, &cites)
+	return Reply{Citations: cites, Cached: true}, true
 }
 
 // Corpus reports what has been indexed. It's a thin pass-through, but it keeps

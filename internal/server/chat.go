@@ -9,8 +9,12 @@ import (
 	"knowledge-engine/internal/rag"
 )
 
-// maxQuestion caps the request body. A question is a sentence, not an upload.
-const maxQuestion = 8 << 10 // 8 KiB
+// maxAsk caps the request body. A question is a sentence, but it arrives with the tail of
+// the conversation attached — the server keeps no session, so the thread rides along with
+// every follow-up. The cap is therefore the size of a few exchanges rather than of one
+// sentence; the client sends the last few turns and this is what stops a client from
+// deciding to send a thousand.
+const maxAsk = 64 << 10 // 64 KiB
 
 var errBadRequest = errors.New("bad request")
 
@@ -81,8 +85,12 @@ func readQuestion(r *http.Request) (rag.Ask, error) {
 		Question string `json:"question"`
 		Scope    string `json:"scope"` // a document or folder to answer from; "" = all
 		Fresh    bool   `json:"fresh"`
+		// History is the thread this question continues, oldest first — decoded straight
+		// into the engine's own type, because a second spelling of a turn would be a
+		// second thing to keep in step with the wire.
+		History []rag.Turn `json:"history"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxQuestion)).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxAsk)).Decode(&body); err != nil {
 		return rag.Ask{}, errBadRequest
 	}
 	q := strings.TrimSpace(body.Question)
@@ -90,6 +98,8 @@ func readQuestion(r *http.Request) (rag.Ask, error) {
 		return rag.Ask{}, errBadRequest
 	}
 	// The engine canonicalises the scope rather than the handler: it is part of the
-	// cache key, so exactly one place may decide what "booking/" means.
-	return rag.Ask{Question: q, Scope: body.Scope, Fresh: body.Fresh}, nil
+	// cache key, so exactly one place may decide what "booking/" means. The history is
+	// passed through untouched for the same reason: dropping an unanswered turn is a
+	// decision about what a model may read, and that belongs with the prompt.
+	return rag.Ask{Question: q, Scope: body.Scope, Fresh: body.Fresh, History: body.History}, nil
 }

@@ -86,27 +86,43 @@ var viLetters = regexp.MustCompile(`[ăâđêôơưàáảãạằắẳẵặ�
 // because a greeting is the one moment someone is definitely reading. Nothing here claims
 // anything about the corpus's *contents* — the first screen already lists those, measured,
 // and a sentence invented here could disagree with it.
-func smallTalk(question string) (string, bool) {
+//
+// inThread says there is a conversation behind this question, and it changes exactly one
+// verdict. Vagueness is a property of a question *plus* what came before it: "cái đó" or a
+// bare "how?" carries no content word, but the turn above it does, so asking back is the
+// wrong answer — the rewrite in memory.go resolves it against that turn and retrieval runs
+// on the result. Every other kind is unaffected: "cảm ơn" is thanks on the tenth message
+// as much as on the first.
+func smallTalk(question string, inThread bool) (string, bool) {
 	raw := strings.ToLower(strings.TrimSpace(question))
 	if raw == "" {
 		return "", false
 	}
 	q := strings.TrimRight(raw, " .!?…,;:")
-	vi := viLetters.MatchString(raw)
-	// Trimming the trailing punctuation is what lets "hello!" match "hello" — but it also
-	// eats a question that is *only* punctuation, and "?" on its own left an empty string
-	// that fell through to retrieval and came back as the no-answer sentence. Punctuation
-	// with nothing in front of it is the vaguest question there is.
+	kind := smallTalkKindOf(q)
+	if kind == notSmallTalk || (kind == tooVague && inThread) {
+		return "", false
+	}
+	return smallTalkReply(kind, viLetters.MatchString(raw)), true
+}
+
+// smallTalkKindOf classifies a question already lowercased and stripped of its trailing
+// punctuation.
+//
+// Trimming that punctuation is what lets "hello!" match "hello" — but it also eats a
+// question that is *only* punctuation, and "?" on its own left an empty string that fell
+// through to retrieval and came back as the no-answer sentence. Punctuation with nothing in
+// front of it is the vaguest question there is.
+func smallTalkKindOf(q string) smallTalkKind {
 	if q == "" {
-		return smallTalkReply(tooVague, vi), true
+		return tooVague
 	}
 	for _, p := range smallTalkPatterns {
-		if !p.re.MatchString(q) {
-			continue
+		if p.re.MatchString(q) {
+			return p.kind
 		}
-		return smallTalkReply(p.kind, vi), true
 	}
-	return "", false
+	return notSmallTalk
 }
 
 func smallTalkReply(kind smallTalkKind, vi bool) string {

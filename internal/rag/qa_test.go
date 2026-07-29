@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -441,6 +442,78 @@ func TestChangingTheChatModelInvalidatesTheCache(t *testing.T) {
 	}
 	if len(prov.Chats()) != calls+1 {
 		t.Error("the new model never reached the provider")
+	}
+}
+
+/* ══ Conversation memory ════════════════════════════════════════════════════════
+   A thread buys two things that must both hold, because either one alone is a bug:
+   retrieval has to run on what a follow-up *means*, and the cache has to stay out of
+   it in both directions. "còn bước 2 thì sao?" is five words that mean something
+   different in every conversation, so a row keyed on them is a wrong answer waiting
+   for the next person who types them. */
+
+// The acceptance test from changelog/2026-07-28-memory-and-external-search.md: the
+// second answer has to cite a section the second question's own words could never have
+// retrieved.
+func TestAFollowUpIsRewrittenForRetrievalAndNeverCached(t *testing.T) {
+	// The fake answers every chat call with this — the rewrite call included — so it
+	// doubles as the rewritten question, and a retrieval that ran on the rewrite shows
+	// up in the embedding log as this exact text.
+	const rewritten = "Which rule covers an unpaid deposit after 24 hours?"
+	e, prov := engine(t, &aitest.Provider{Reply: rewritten})
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	const first = "How does hybrid search rank results?"
+	answer, _, err := ask(t, e, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A follow-up with no content word in it: it embeds to nothing useful and gives BM25
+	// nothing to match, so retrieval on its own text would find the wrong sections or none.
+	const followUp = "còn bước 2 thì sao?"
+	embeds, chats := len(prov.Embedded()), len(prov.Chats())
+	reply, err := e.Answer(ctx, rag.Ask{
+		Question: followUp,
+		History:  []rag.Turn{{Q: first, A: answer}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := len(prov.Chats()) - chats; got != 2 {
+		t.Fatalf("a follow-up bought %d completions, want 2: one to rewrite it, one to answer it", got)
+	}
+	if got := len(prov.Embedded()) - embeds; got != 1 {
+		t.Fatalf("a follow-up made %d embedding calls, want 1", got)
+	}
+	if asked := prov.Embedded()[len(prov.Embedded())-1]; len(asked) != 1 || asked[0] != rewritten {
+		t.Errorf("retrieval embedded %q; the follow-up's own words retrieve nothing, so the rewrite is what had to be embedded", asked)
+	}
+	// The rewrite is asked for separately, and it is asked about the follow-up itself —
+	// no CONTEXT, because there is nothing to retrieve with yet.
+	if got := prov.Chats()[len(prov.Chats())-2]; got != followUp {
+		t.Errorf("the rewrite call asked about %q, not the follow-up", got)
+	}
+	// And the answering call is given the conversation, not just the sections: without
+	// this the answer has the context retrieval found and none of what was said above it.
+	sent := prov.Messages()[len(prov.Messages())-1]
+	for _, want := range []string{"user: " + first, "assistant: " + answer} {
+		if !slices.Contains(sent, want) {
+			t.Errorf("the answering call never saw %q", want)
+		}
+	}
+
+	if reply.Cached {
+		t.Error("a follow-up was served from the cache — that row belongs to whichever conversation stored it")
+	}
+	// Nothing was stored under those five words either. The same text in a fresh
+	// conversation is a different question, and it must be answered rather than replayed.
+	if _, reply, err := ask(t, e, followUp); err != nil || reply.Cached {
+		t.Errorf("the follow-up was cached under its own text: cached=%v err=%v", reply.Cached, err)
 	}
 }
 

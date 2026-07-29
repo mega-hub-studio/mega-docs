@@ -33,7 +33,7 @@
   <!-- ══ 1 · ask ═══════════════════════════════════════════════════════════ -->
   <section id="ask" data-feature="ask"
            data-api="POST /api/chat" data-env="TOP_K"
-           data-test="TestChatStreamsTokensThenCitationsThenDone,TestOnlyTheSourcesTheAnswerCitedAreReturned">
+           data-test="TestChatStreamsTokensThenCitationsThenDone,TestOnlyTheSourcesTheAnswerCitedAreReturned,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
     <h2 lang="en">1 · Ask so retrieval can find it</h2>
     <h2 lang="vi">1 · Hỏi sao cho truy xuất tìm được</h2>
     <p class="lede" lang="en">Half of search is keyword matching, so an exact term — an
@@ -58,6 +58,25 @@
           <tr lang="vi"><td>“cái này có tài liệu chưa?”</td><td>“tài liệu nào định nghĩa view mặc định của waiting list?”</td><td>hỏi về tài liệu, nên dẫn nguồn là câu trả lời</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">You can just keep talking.</b>
+      <span lang="en">A follow-up does not have to repeat itself: ask <i>“how do I cancel
+        a paid booking?”</i>, then <i>“and if it was refunded already?”</i>. The second
+        question is rewritten against the first before anything is searched, so it finds
+        the section its own five words never could. Two things follow from that — a
+        follow-up is never free, because those five words mean something different in every
+        conversation and no cached answer can be shared between them; and <b>Reset</b> is
+        how you start a subject that has nothing to do with the last one.</span>
+      <b lang="vi">Bạn cứ nói tiếp bình thường.</b>
+      <span lang="vi">Câu hỏi tiếp không cần nhắc lại: hỏi <i>“huỷ booking đã thanh toán
+        thế nào?”</i>, rồi <i>“còn nếu đã hoàn tiền rồi?”</i>. Câu sau được viết lại dựa
+        trên câu trước <i>trước khi</i> tìm kiếm, nên nó tìm ra đúng phần mà năm chữ của
+        chính nó không bao giờ tìm được. Hai điều đi kèm — câu hỏi tiếp không bao giờ miễn
+        phí, vì năm chữ đó mang nghĩa khác nhau trong mỗi cuộc hội thoại nên không có câu
+        trả lời cache nào dùng chung được; và <b>Reset</b> là cách bắt đầu một chủ đề không
+        liên quan gì tới chủ đề vừa rồi.</span>
     </div>
 
     <div class="callout memo">

@@ -134,13 +134,15 @@ view.scrollToEnd();                            // viewport.js</span></div>
   <section id="pipeline" data-feature="retrieval"
            data-api="POST /api/chat"
            data-env="TOP_K,CHAT_MODEL,EMBED_MODEL,EMBED_DIM"
-           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache">
+           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
     <h2 lang="en">How an answer is built</h2>
     <h2 lang="vi">Một câu trả lời được dựng thế nào</h2>
     <p class="lede" lang="en">One question, eight stages, and two of them can return early.
-      Everything below in this page is a knob on one of these boxes.</p>
-    <p class="lede" lang="vi">Một câu hỏi, tám chặng, và hai chặng có thể trả về sớm. Mọi
-      thứ phía dưới trong trang này là một cái núm trên một trong các hộp này.</p>
+      A question continuing a thread runs one more, ahead of all of them — see
+      <i>rewrite</i> below. Everything below in this page is a knob on one of these boxes.</p>
+    <p class="lede" lang="vi">Một câu hỏi, tám chặng, và hai chặng có thể trả về sớm. Câu hỏi
+      nối tiếp một đoạn hội thoại chạy thêm một chặng nữa, trước tất cả — xem <i>rewrite</i>
+      bên dưới. Mọi thứ phía dưới trong trang này là một cái núm trên một trong các hộp này.</p>
 
     <nes-focus-svg id="pipe">
       <div class="mermaid-view"><%diagram "retrieval"%></div>
@@ -153,11 +155,15 @@ view.scrollToEnd();                            // viewport.js</span></div>
         <p lang="en">The question and the scope are normalised into one key first. A hit
           returns the stored answer and stops here — no embedding, no retrieval, no
           completion, no cost. That is why a repeated question is free, and why the scope
-          is part of the key rather than the signature.</p>
+          is part of the key rather than the signature. A follow-up never reaches this
+          box: its words are not the question it is asking, so no row can be shared
+          between two conversations that happen to type them.</p>
         <p lang="vi">Câu hỏi và scope được chuẩn hoá thành một key trước. Nếu trúng thì trả
           lại câu trả lời đã lưu và dừng tại đây — không embed, không truy xuất, không gọi
           model, không tốn tiền. Đó là lý do hỏi lại thì miễn phí, và là lý do scope nằm
-          trong <i>key</i> chứ không nằm trong signature.</p>
+          trong <i>key</i> chứ không nằm trong signature. Câu hỏi nối tiếp thì không bao giờ
+          tới hộp này: chữ của nó không phải câu hỏi nó đang hỏi, nên không dòng cache nào
+          dùng chung được giữa hai cuộc hội thoại tình cờ gõ ra mấy chữ đó.</p>
       </div>
       <div data-title="2 · two retrievers" data-title-vi="2 · hai đường tìm" data-focus="embed|vectors|keywords">
         <p lang="en">A miss runs <i>both</i> searches: the question becomes a vector for
@@ -204,6 +210,22 @@ view.scrollToEnd();                            // viewport.js</span></div>
     <nes-walkthrough for="pipe" aria-label="How an answer is built / Câu trả lời được dựng thế nào"></nes-walkthrough>
 
     <dl class="datalist">
+      <dt lang="en">rewrite · a follow-up only</dt>
+      <dd lang="en">A question that continues a thread is rewritten into one that stands on
+        its own <i>before</i> anything is searched: “và bước 2?” has no term to embed and no
+        keyword to match, so retrieving on its own text finds the wrong sections or none —
+        the answer would have the conversation while retrieval had none of it. It costs one
+        cheap completion, its tokens are counted into the turn, and it is also what takes a
+        follow-up out of the cache in both directions. The thread arrives with the request
+        (<code>history</code>); the server holds no session.</dd>
+      <dt lang="vi">rewrite · chỉ với câu hỏi nối tiếp</dt>
+      <dd lang="vi">Câu hỏi nối tiếp một đoạn hội thoại được viết lại thành câu đứng độc lập
+        <i>trước khi</i> tìm bất cứ thứ gì: “và bước 2?” không có từ nào để embed và không có
+        từ khoá nào để khớp, nên truy xuất trên chính chữ của nó sẽ ra sai đoạn hoặc không ra
+        gì — câu trả lời thì có ngữ cảnh hội thoại mà truy xuất thì không. Nó tốn một
+        completion rẻ, token được tính vào lượt đó, và cũng chính nó đưa câu hỏi nối tiếp ra
+        khỏi cache theo cả hai chiều. Đoạn hội thoại đi kèm request (<code>history</code>);
+        server không giữ session.</dd>
       <dt lang="en">cached?</dt>
       <dd lang="en">Keyed on the normalised question <i>and its scope</i>, under a signature
         of the corpus + chat model + a hash of the prompt. A hit costs nothing: no embedding
@@ -270,8 +292,8 @@ view.scrollToEnd();                            // viewport.js</span></div>
         <tbody>
           <tr lang="en"><th><code>GET /api/health</code></th><td><code>{ok, writes, admin, model, window, price_in, price_out, version}</code> — whether BA mode can publish, whether this instance has an admin surface, plus what the status line reports. A zero means "not configured", and the strip prints nothing rather than a zero. <code>version</code> is the commit the binary was built from (Go's own VCS stamp, no <code>-ldflags</code>), which is how a deploy is verified from the UI instead of from journalctl</td><td>never, so probes need no secret</td></tr>
           <tr lang="vi"><th><code>GET /api/health</code></th><td><code>{ok, writes, admin, model, window, price_in, price_out, version}</code> — chế độ BA có publish được không, instance có mặt admin không, kèm dữ liệu cho status line. Giá trị 0 nghĩa là "chưa cấu hình", và thanh trạng thái để trống chứ không in số 0. <code>version</code> là commit mà binary được build ra (VCS stamp sẵn của Go, không cần <code>-ldflags</code>), nên xác minh deploy được ngay trên UI thay vì phải đọc journalctl</td><td>không bao giờ, để probe không cần secret</td></tr>
-          <tr lang="en"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> is a document path or the folder above it — answers come from that subtree only; <code>""</code> is the whole corpus</td><td>—</td></tr>
-          <tr lang="vi"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> là đường dẫn tài liệu hoặc thư mục chứa nó — câu trả lời chỉ lấy từ nhánh đó; <code>""</code> là toàn bộ corpus</td><td>—</td></tr>
+          <tr lang="en"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?, history?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> is a document path or the folder above it — answers come from that subtree only; <code>""</code> is the whole corpus. <code>history</code> is <code>[{q,a}]</code>, oldest first: the server holds no session, so a follow-up carries the thread it continues</td><td>—</td></tr>
+          <tr lang="vi"><th><code>POST /api/chat</code></th><td><code>{question, scope?, fresh?, history?}</code> → SSE: <code>token</code> · <code>citations</code> · <code>done{cached,in,out}</code> · <code>error</code>. <code>scope</code> là đường dẫn tài liệu hoặc thư mục chứa nó — câu trả lời chỉ lấy từ nhánh đó; <code>""</code> là toàn bộ corpus. <code>history</code> là <code>[{q,a}]</code>, cũ trước: server không giữ session, nên câu hỏi tiếp nối mang theo đoạn hội thoại của nó</td><td>—</td></tr>
           <tr lang="en"><th><code>GET /api/corpus</code></th><td>what is indexed, and how much of it is approved</td><td>—</td></tr>
           <tr lang="vi"><th><code>GET /api/corpus</code></th><td>đang index những gì, bao nhiêu đã approved</td><td>—</td></tr>
           <tr lang="en"><th><code>GET · POST /api/tickets</code></th><td>read the queue · file a gap</td><td>—</td></tr>
