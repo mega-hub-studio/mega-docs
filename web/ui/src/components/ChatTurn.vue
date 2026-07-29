@@ -50,6 +50,12 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
              turn keeps saying so long after the picker moved on. -->
         <span v-if="turn.scope" class="badge warn" :title="`Retrieved from ${turn.scope} only`">
           {{ turn.scope }}</span>
+        <!-- Which model produced this one. Only when a thread has more than one to choose
+             from would it change between turns, and then it is the difference between "the
+             cheap model wrote this" and "the strong one did" — a reader comparing two answers
+             has no other way to tell. Quiet by default: a plain .badge, not a status fill. -->
+        <span v-if="turn.model" class="badge" :title="`Answered by ${turn.model}`">
+          {{ turn.model }}</span>
         <span v-if="turn.streaming" class="spinner sm" aria-label="Generating" />
       </div>
 

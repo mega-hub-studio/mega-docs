@@ -34,6 +34,7 @@ import { onMounted, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ReleaseModal from './components/ReleaseModal.vue'
 import ScopePicker from './components/ScopePicker.vue'
+import SettingsDrawer from './components/SettingsDrawer.vue'
 import StatusLine from './components/StatusLine.vue'
 import { useConversation } from './composables/conversation.js'
 import { useCorpus } from './composables/corpus.js'
@@ -44,6 +45,7 @@ import { useQaLoop } from './composables/qaloop.js'
 import { useRelease } from './composables/release.js'
 import { useRuntime } from './composables/runtime.js'
 import { useScope } from './composables/scope.js'
+import { useSettings } from './composables/settings.js'
 import { useStatusLine } from './composables/statusline.js'
 import { bindViewport } from './lib/viewport.js'
 
@@ -83,8 +85,22 @@ const {
 let view = null
 const scroll = opts => view?.scrollToEnd(opts)
 
+// The reader's own choices, and the model is the one that leaves the browser: every question
+// carries it. A getter for the list, because /api/health answers after the first render.
+const {
+  el: settingsEl,
+  open: openSettings,
+  close: closeSettings,
+  picked,
+  current: pickedModel,
+  pick: pickModel,
+  muted,
+  mute,
+} = useSettings({ models: () => runtime.value.models })
+
 const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useConversation({
   scope,
+  model: picked,
   prompt,
   scroll,
   toast,
@@ -99,7 +115,7 @@ const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useCo
   },
 })
 
-const statusLine = useStatusLine({ turns, busy, online, runtime })
+const statusLine = useStatusLine({ turns, busy, online, runtime, model: pickedModel })
 
 // Arriving on a screen is when its lists are stale, and the queue is on both of them —
 // the BA works it, the empty screen lists what is already filed — so refresh on every
@@ -189,20 +205,14 @@ function replay(entry) {
       </router-link>
     </div>
 
-    <!-- EN / VI. With two languages the honest control is a button showing the one you are
-         not in, not a dropdown of one alternative — and it is a real <button>, so it is
-         reachable by keyboard and announced. The choice is stored under the same key the
-         guide's pages use, so switching here follows a reader to the docs and back.
-
-         `lang` is the locale, so it is displayed uppercased by CSS rather than by a second
-         string: the catalogues would otherwise need EN/VI entries that are the same two
-         letters in both. -->
+    <!-- One gear, one panel. The language button used to live here and is in the drawer now:
+         a control used twice a year was taking a quarter of a 390px bar, and settings that
+         are spread across three corners are settings nobody finds. -->
     <button
-      v-for="other in langs.filter(l => l !== lang)" :key="other"
-      class="btn ghost sm lang" type="button" :aria-label="`${t('app.language')}: ${other}`"
-      @click="setLang(other)"
+      class="btn ghost icon sm" type="button" :aria-label="t('app.settings')"
+      @click="openSettings"
     >
-      {{ other }}
+      <nes-icon name="gear" />
     </button>
 
     <!-- The dock comes back first, then the thread clears: `reset` focuses the prompt, and
@@ -254,6 +264,15 @@ function replay(entry) {
        rather than ours. Clicking the backdrop closes it — on a native dialog that click
        lands on the dialog element itself, which is what .self matches.
        ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Everything a reader decides, behind the gear. `ref` lives here because the button that
+       opens it is in the bar: the composable owns showModal()/close(), this owns who calls it. -->
+  <SettingsDrawer
+    ref="settingsEl" :models="runtime.models" :picked="picked" :current="pickedModel"
+    :muted="muted" :lang="lang" :langs="langs" :admin="admin"
+    :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :t="t"
+    @pick="pickModel" @mute="mute" @set-lang="setLang" @close="closeSettings"
+  />
+
   <dialog ref="zoom" class="modal diagram-zoom" @click.self="closeZoom" @close="closeZoom">
     <div class="head">
       <span class="title">Diagram</span>
@@ -340,8 +359,9 @@ function replay(entry) {
       />
 
       <StatusLine
-        :line="statusLine" :model="runtime.model" :version="runtime.version"
+        :line="statusLine" :model="picked || runtime.model" :version="runtime.version"
         :release="runtime.release" @show-release="openRelease"
+        @show-settings="openSettings"
       />
     </div>
   </div>

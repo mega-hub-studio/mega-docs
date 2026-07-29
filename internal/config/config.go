@@ -4,6 +4,8 @@ package config
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -29,15 +31,86 @@ type Config struct {
 	Window     int     // context window of ChatModel, in tokens; 0 = unknown
 	PriceIn    float64 // USD per 1M prompt tokens; 0 = don't price answers
 	PriceOut   float64 // USD per 1M completion tokens
-	AuthUser   string
-	AuthPass   string
-	BAPass     string
-	AdminPass  string
+	// Models is what a reader may pick between, first one the default. It is always at
+	// least one entry: with CHAT_MODELS unset it is the single model the four knobs above
+	// describe, which is exactly the instance that never wanted a picker.
+	Models    []Model
+	AuthUser  string
+	AuthPass  string
+	BAPass    string
+	AdminPass string
 	// fromFile is the set of keys .env supplied, which is the one thing os.Getenv cannot
 	// answer afterwards: loadDotEnv copies them into the environment, so by the time
 	// anything reads them a file value and a shell value look identical. Unexported — it is
 	// provenance for the Admin screen, not a knob.
 	fromFile map[string]bool
+}
+
+// Model is one chat model a reader may answer with, and the two numbers the status line
+// cannot guess about it. Zero in either display field means "unknown", which prints
+// nothing — the same rule the single-model knobs already follow, per model now.
+type Model struct {
+	Name     string  `json:"name"`
+	Window   int     `json:"window"`    // context window in tokens; 0 = unknown
+	PriceIn  float64 `json:"price_in"`  // USD per 1M prompt tokens; 0 = don't price
+	PriceOut float64 `json:"price_out"` // USD per 1M completion tokens
+}
+
+// parseModels reads CHAT_MODELS: `name:window:$in:$out`, comma-separated, first is the
+// default. Everything after the name is optional, so `CHAT_MODELS=gpt-4o-mini,gpt-4o` is a
+// legal two-model instance that simply prints no percentage and no cost.
+//
+// It returns an error rather than skipping a bad entry, and Load turns that into a refusal
+// to start. A typo here is not a cosmetic fault: the list is the allowlist the server
+// validates against and the price table the status line bills from, so a silently dropped
+// entry is a model a reader cannot pick and a wrong number is money reported wrong. The
+// same trade `web/vendor.sha384` already makes — fail at startup, not in a browser.
+func parseModels(spec string) ([]Model, error) {
+	var out []Model
+	for entry := range strings.SplitSeq(spec, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		name, rest, _ := strings.Cut(entry, ":")
+		m := Model{Name: strings.TrimSpace(name)}
+		if m.Name == "" {
+			return nil, fmt.Errorf("entry %q has no model name", entry)
+		}
+		fields := []any{&m.Window, &m.PriceIn, &m.PriceOut}
+		for i, field := range fields {
+			var have string
+			have, rest, _ = strings.Cut(rest, ":")
+			have = strings.TrimSpace(have)
+			if have == "" {
+				break
+			}
+			if err := assign(field, have); err != nil {
+				return nil, fmt.Errorf("%s: field %d (%q): %w", m.Name, i+2, have, err)
+			}
+		}
+		out = append(out, m)
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no model named")
+	}
+	return out, nil
+}
+
+// assign parses one numeric field of a CHAT_MODELS entry into whichever of the two kinds
+// it is. Two-line type switch rather than three near-identical parse blocks above.
+func assign(field any, text string) error {
+	switch f := field.(type) {
+	case *int:
+		n, err := strconv.Atoi(text)
+		*f = n
+		return err
+	case *float64:
+		n, err := strconv.ParseFloat(text, 64)
+		*f = n
+		return err
+	}
+	return nil
 }
 
 // Setting is one knob as an operator sees it on the Admin screen: what it is called, what
@@ -92,6 +165,7 @@ func Load() Config {
 		Window:   envInt("CONTEXT_WINDOW", 0),
 		PriceIn:  envFloat("PRICE_IN", 0),
 		PriceOut: envFloat("PRICE_OUT", 0),
+		Models:   models(),
 		AuthUser: env("AUTH_USER", "team"),
 		AuthPass: env("AUTH_PASS", ""), // empty = no auth
 		// Gates the two actions that change what the engine will say. Empty means
@@ -120,6 +194,7 @@ func (c Config) Inventory() []Setting {
 		c.set("provider", "EMBED_BASE_URL", embedURL(c.EmbedURL)),
 		c.secret("provider", "EMBED_API_KEY", c.EmbedKey),
 		c.set("models", "CHAT_MODEL", c.ChatModel),
+		c.set("models", "CHAT_MODELS", modelList(c.Models)),
 		c.set("models", "EMBED_MODEL", c.EmbedModel),
 		c.set("models", "EMBED_DIM", num(c.EmbedDim)),
 		c.set("models", "TOP_K", num(c.TopK)),
@@ -245,4 +320,44 @@ func loadDotEnv(path string) map[string]bool {
 		}
 	}
 	return set
+}
+
+// models resolves what a reader may pick between.
+//
+// CHAT_MODELS unset is not a missing setting, it is the single-model instance: the four
+// knobs that already describe one model *are* the one entry, so nothing needs re-configuring
+// to keep working and no fact is written twice. Set it and it supersedes all four — which is
+// why the Admin screen lists both rows, with CHAT_MODEL reading as the fallback it now is.
+//
+// A malformed list is fatal, deliberately. Every alternative is worse: falling back to the
+// default model answers questions with something the operator did not choose, and dropping
+// the bad entry hides a typo in a spending allowlist.
+func models() []Model {
+	spec := env("CHAT_MODELS", "")
+	if strings.TrimSpace(spec) == "" {
+		return []Model{{
+			Name:     env("CHAT_MODEL", "gpt-4o-mini"),
+			Window:   envInt("CONTEXT_WINDOW", 0),
+			PriceIn:  envFloat("PRICE_IN", 0),
+			PriceOut: envFloat("PRICE_OUT", 0),
+		}}
+	}
+	list, err := parseModels(spec)
+	if err != nil {
+		log.Fatalf("CHAT_MODELS is unreadable (%v)\n"+
+			"  format: name:window:$in-per-1M:$out-per-1M, comma-separated, first is the default\n"+
+			"  example: CHAT_MODELS=gpt-4o-mini:128000:0.15:0.60,gpt-4o:128000:2.50:10.00", err)
+	}
+	return list
+}
+
+// modelList is the CHAT_MODELS row on the Admin screen: the names only. The windows and
+// prices are already on the screen as their own rows, and repeating them here would be the
+// same number twice in one list.
+func modelList(list []Model) string {
+	names := make([]string, 0, len(list))
+	for _, m := range list {
+		names = append(names, m.Name)
+	}
+	return strings.Join(names, " · ")
 }

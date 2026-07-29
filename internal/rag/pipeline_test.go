@@ -380,3 +380,27 @@ func TestAnAnswerThatCitesNothingKeepsEverySource(t *testing.T) {
 		t.Error("an uncited answer was left with no provenance at all")
 	}
 }
+
+// engineWithModels is `engine` for the two things a model list changes: which window a thread
+// is trimmed to, and which key an answer is cached under. Same fake provider, same store.
+func engineWithModels(t *testing.T, p *aitest.Provider, models []rag.Model) (*rag.Engine, *aitest.Provider) {
+	t.Helper()
+	if p == nil {
+		p = &aitest.Provider{}
+	}
+	p.Dim = dim
+	prov, base := aitest.New(p)
+	t.Cleanup(prov.Close)
+
+	store, err := db.Open(filepath.Join(t.TempDir(), "models.db"), dim)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	client := ai.New(ai.Config{
+		ChatBaseURL: base, APIKey: "test-key",
+		EmbedModel: "embed-model", ChatModel: "chat-model",
+	})
+	return rag.New(store, client, rag.Options{TopK: 3, Models: models}), prov
+}

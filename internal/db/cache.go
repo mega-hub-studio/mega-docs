@@ -16,7 +16,10 @@ type Cached struct {
 	// Scope is the part of the corpus the answer was retrieved from — "" is the whole
 	// of it. Not a column: it lives inside the key (see cacheKey), so replaying a
 	// scoped answer can restore the scope it was answered under.
-	Scope     string          `json:"scope"`
+	Scope string `json:"scope"`
+	// Model is which chat model produced it, and it is in the key for the same reason the
+	// scope is: replaying a free answer has to replay it as it was answered.
+	Model     string          `json:"model"`
 	Answer    string          `json:"answer"`
 	Citations json.RawMessage `json:"citations"` // opaque here: db must not import rag
 	Hits      int             `json:"hits"`
@@ -50,35 +53,40 @@ func (s *Store) Sig() (string, error) {
 // are a different question: answering one from the other's row would cite documents
 // the asker deliberately left out.
 //
-// The scope belongs in the key and not in the corpus signature, even though both
-// invalidate. A signature is *pruned* when it changes — scoping it would make every
-// scope change wipe every other scope's answers, and the panel that exists to say
-// "this one is free" would empty on each click. An unscoped question keeps the bare
-// normalised form, so rows cached before scopes existed are still served.
-func cacheKey(scope, question string) string {
-	if scope == "" {
-		return normalise(question)
-	}
-	return scope + "\x1f" + normalise(question)
+// Neither the scope nor the model belongs in the corpus signature, even though all three
+// invalidate an answer. A signature is *pruned* when it changes — putting either in there
+// would make every scope change, or every model switch, wipe every other one's answers, and
+// the panel that exists to say "this one is free" would empty on each click. So the
+// signature is what the answer was produced *under* (the corpus and the prompt) and the key
+// is what it was produced *for*.
+//
+// Three fields, always, even when the scope is empty: a fixed shape is one SplitN to read
+// back, and the alternative — omitting empties — is a parser plus a rule to remember. Rows
+// written before the model joined the key simply stop matching and age out; one cold cache
+// is cheaper than a migration for a derived table.
+func cacheKey(model, scope, question string) string {
+	return model + "\x1f" + scope + "\x1f" + normalise(question)
 }
 
-// scopeOf reads the scope back out of a key. The stored answer is the only record of
-// what it was retrieved from, and a History row has to replay under the same scope or
-// the "free" it advertises is a different answer.
-func scopeOf(key string) string {
-	scope, _, found := strings.Cut(key, "\x1f")
-	if !found {
-		return ""
+// keyParts reads the model and scope back out of a key. The stored answer is the only record
+// of how it was produced, and a History row has to replay under the same two or the "free" it
+// advertises is a different answer. A key from before the model joined returns empties, which
+// reads as "unknown" everywhere it lands.
+func keyParts(key string) (model, scope string) {
+	f := strings.SplitN(key, "\x1f", 3)
+	if len(f) < 3 {
+		return "", ""
 	}
-	return scope
+	return f[0], f[1]
 }
 
 // Cached returns a stored answer for this question in this scope, and counts the hit.
 // A miss is (Cached{}, false, nil) — not an error, since most questions are new.
-func (s *Store) Cached(sig, scope, question string) (Cached, bool, error) {
-	norm := cacheKey(scope, question)
+func (s *Store) Cached(sig, model, scope, question string) (Cached, bool, error) {
+	norm := cacheKey(model, scope, question)
 	var c Cached
 	c.Scope = scope
+	c.Model = model
 	var cites []byte // database/sql won't scan into json.RawMessage directly
 	err := s.db.QueryRow(
 		`SELECT question, answer, citations, hits, used_at FROM answers
@@ -111,7 +119,7 @@ func (s *Store) Cache(sig string, c Cached) error {
 		 ON CONFLICT(q_norm) DO UPDATE SET answer=excluded.answer,
 		   citations=excluded.citations, corpus_sig=excluded.corpus_sig,
 		   used_at=datetime('now')`,
-		cacheKey(c.Scope, c.Question), c.Question, c.Answer, string(c.Citations), sig); err != nil {
+		cacheKey(c.Model, c.Scope, c.Question), c.Question, c.Answer, string(c.Citations), sig); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`DELETE FROM answers WHERE corpus_sig <> ?
@@ -142,7 +150,7 @@ func (s *Store) History(sig string, limit int) ([]Cached, error) {
 		if err := rows.Scan(&key, &c.Question, &c.Answer, &cites, &c.Hits, &c.At); err != nil {
 			return nil, err
 		}
-		c.Scope = scopeOf(key)
+		c.Model, c.Scope = keyParts(key)
 		c.Citations = cites
 		out = append(out, c)
 	}

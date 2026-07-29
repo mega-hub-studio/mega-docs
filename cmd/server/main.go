@@ -33,6 +33,17 @@ func main() {
 func run() error {
 	cfg := config.Load()
 
+	// One mapping, in the only layer that may know both shapes: config owns what the
+	// environment said, server owns what the HTTP surface publishes. cfg.Models is never
+	// empty — with CHAT_MODELS unset it is the single model the older knobs describe — so
+	// models[0] is always the default rather than a case to guard.
+	models := make([]server.Model, 0, len(cfg.Models))
+	for _, m := range cfg.Models {
+		models = append(models, server.Model{
+			Name: m.Name, Window: m.Window, PriceIn: m.PriceIn, PriceOut: m.PriceOut,
+		})
+	}
+
 	store, err := db.Open(cfg.DBPath, cfg.EmbedDim)
 	if err != nil {
 		return fmt.Errorf("db: %w", err)
@@ -51,11 +62,17 @@ func run() error {
 		return fmt.Errorf("frontend: %w", err)
 	}
 
+	// The engine gets the models for one reason — a thread is trimmed to the window of
+	// whichever model is about to read it — so it takes names and windows and not prices.
+	windows := make([]rag.Model, 0, len(cfg.Models))
+	for _, m := range cfg.Models {
+		windows = append(windows, rag.Model{Name: m.Name, Window: m.Window})
+	}
 	engine := rag.New(store, ai.New(ai.Config{
 		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
 		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
-		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
-	}), rag.Options{TopK: cfg.TopK})
+		EmbedModel: cfg.EmbedModel, ChatModel: models[0].Name,
+	}), rag.Options{TopK: cfg.TopK, Models: windows})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	// The release is embedded, so a parse failure is a broken build rather than a runtime
 	// condition — but it must not stop the server: the notes are the least important thing
@@ -81,8 +98,8 @@ func run() error {
 		// that defines them.
 		Settings: func() any { return cfg.Inventory() }, AdminPass: server.AdminPass(cfg.AdminPass),
 		Runtime: server.Runtime{
-			Model: cfg.ChatModel, Window: cfg.Window,
-			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
+			Model: models[0].Name, Window: models[0].Window,
+			PriceIn: models[0].PriceIn, PriceOut: models[0].PriceOut, Models: models,
 			Version: revision(), Release: release.Version,
 		},
 	})

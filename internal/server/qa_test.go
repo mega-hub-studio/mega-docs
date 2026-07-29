@@ -347,3 +347,54 @@ func TestChatReportsACacheHitToTheClient(t *testing.T) {
 		t.Errorf("a free answer looked identical to a paid one:\n%s", body)
 	}
 }
+
+// TestAnUnknownModelIsRefused is the trust boundary. The list of models is an allowlist and a
+// spending limit at the same time: a request naming something outside it is a request to bill
+// the operator for a model they never configured, and answering it with the default instead
+// would hand back the cheap model's text as if it were the one that was asked for.
+func TestAnUnknownModelIsRefused(t *testing.T) {
+	a := &fakeAnswers{tokens: []string{"x"}}
+	h := New(Deps{
+		Answers: a, Index: []byte("<html>"), Assets: fstest.MapFS{},
+		Runtime: Runtime{Models: []Model{
+			{Name: "cheap", Window: 8000},
+			{Name: "strong", Window: 128000},
+		}},
+	})
+
+	if got := do(t, h, "POST", "/api/chat", `{"question":"q","model":"expensive"}`, nil).Code; got != 400 {
+		t.Errorf("an unconfigured model was answered with %d, want 400 — the list is a\n"+
+			"spending limit, and the client only ever offers what /api/health published", got)
+	}
+	do(t, h, "POST", "/api/chat", `{"question":"q","model":"strong"}`, nil)
+	// No model named at all is the client that has not been told there is a choice: it gets
+	// the first entry, which is what every caller meant before the list existed.
+	do(t, h, "POST", "/api/chat", `{"question":"q"}`, nil)
+
+	if len(a.asked) != 2 {
+		t.Fatalf("engine saw %d asks, want 2 — the refused one must never reach it", len(a.asked))
+	}
+	if a.asked[0].Model != "strong" {
+		t.Errorf("the picked model reached the engine as %q, want \"strong\"", a.asked[0].Model)
+	}
+	if a.asked[1].Model != "cheap" {
+		t.Errorf("no model named resolved to %q, want the default \"cheap\"", a.asked[1].Model)
+	}
+}
+
+// The picker cannot exist without this: the front end is a static bundle and has no other way
+// to learn what this instance will answer with. Publishing the window and the price per model
+// is what lets the status line report a percentage and a cost for whichever one is picked,
+// rather than the default's numbers under every answer.
+func TestHealthPublishesTheModelList(t *testing.T) {
+	h := New(Deps{
+		Answers: &fakeAnswers{}, Index: []byte("<html>"), Assets: fstest.MapFS{},
+		Runtime: Runtime{Models: []Model{{Name: "cheap", Window: 8000, PriceIn: 0.15}}},
+	})
+	body := do(t, h, "GET", "/api/health", "", nil).Body.String()
+	for _, want := range []string{`"models":[`, `"name":"cheap"`, `"window":8000`, `"price_in":0.15`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("/api/health does not carry %s — the picker has nothing to offer:\n%s", want, body)
+		}
+	}
+}

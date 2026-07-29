@@ -27,15 +27,22 @@ defineProps({
   // absent renders nothing rather than a placeholder.
   release: { type: String, default: '' },
 })
-defineEmits(['showRelease'])
+defineEmits(['showRelease', 'showSettings'])
 </script>
 
 <template>
   <div class="statusline" :data-state="line.state" role="status" aria-live="polite">
     <span class="sl-state">{{ line.label }}</span>
-    <span v-if="model" class="sl-item" :title="`Chat model: ${model}`">
+    <!-- The model is the one field in this strip that is also a *choice*, so it is the door to
+         the panel that holds it rather than a second picker: one place to change it, one place
+         to read it. `.sl-ver` already removes the button chrome for the version item — same
+         class, same reason, and nothing in an ambient strip should look like the Send button. -->
+    <button
+      v-if="model" class="sl-item sl-ver" type="button"
+      :title="`Chat model: ${model} — click for settings`" @click="$emit('showSettings')"
+    >
       <nes-icon name="cpu" aria-hidden="true" />{{ model }}
-    </span>
+    </button>
     <span
       v-if="line.tokens" class="sl-item"
       title="Prompt + completion tokens the provider reported"
@@ -44,6 +51,18 @@ defineEmits(['showRelease'])
     </span>
     <span v-if="line.refs" class="sl-item" title="Sources this answer cited">
       <nes-icon name="link" aria-hidden="true" />{{ line.refs }}
+    </span>
+    <!-- Memory, as kept/offered. Absent until there is a thread, because a figure about
+         nothing is noise — and present the moment one turn was trimmed, because a silent trim
+         is indistinguishable from an assistant that forgot.
+         `chat` and not `history`: 0.13.0 ships no `history`, and a name the release does not
+         have renders an empty box and says nothing — checked in icons.d.ts, which is the only
+         place that answers it. -->
+    <span
+      v-if="line.recall" class="sl-item"
+      title="Earlier turns this answer read, of those offered — trimmed to the model's context window"
+    >
+      <nes-icon name="chat" aria-hidden="true" />{{ line.recall }}
     </span>
     <span class="sl-end">
       <span v-if="line.elapsed" class="sl-item">{{ line.elapsed }}</span>

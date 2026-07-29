@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -45,6 +46,20 @@ type Deps struct {
 	AdminPass AdminPass
 }
 
+// Model is one chat model this instance will answer with, as the front end needs to know it:
+// the name to send back, and the two numbers that let the status line report a percentage and
+// a price for it. Zero in either means "unknown", which prints nothing.
+//
+// The server's own shape rather than config's: cmd/server maps one to the other, the same way
+// it already does for every other field of Runtime, and this package stays free of the
+// environment it is configured from.
+type Model struct {
+	Name     string  `json:"name"`
+	Window   int     `json:"window"`
+	PriceIn  float64 `json:"price_in"`
+	PriceOut float64 `json:"price_out"`
+}
+
 // Runtime is what an answer costs and what produced it — everything the status line
 // shows that the engine cannot infer per request. Zero means "unknown", and the UI
 // prints nothing rather than a zero, because a cost of $0.00 and an unmeasured cost
@@ -54,6 +69,11 @@ type Runtime struct {
 	Window   int
 	PriceIn  float64
 	PriceOut float64
+	// Models is what a reader may pick between, first one the default — the same list the
+	// four fields above describe the head of. Both are published: the scalars are what an
+	// operator's `curl /api/health` has always answered, the list is what the front end
+	// needs to offer a choice and to price whichever one it is on.
+	Models []Model
 	// Version is the commit the binary was built from — the one field here that says
 	// nothing about an answer. It is reported so "which version is deployed?" has an
 	// answer on the screen and from `curl /api/health`, rather than requiring shell access
@@ -108,10 +128,18 @@ func New(d Deps) http.Handler {
 	// what the badge prints, so it has to arrive in the request the app already makes. Empty
 	// means no tag was ever cut, and the badge falls back to the commit instead of inventing
 	// a number.
+	// `models` is the picker's whole source of truth: the front end offers exactly these and
+	// POST /api/chat refuses anything else, so the two can never disagree about what this
+	// instance will answer with. Marshalled rather than formatted — a model name is operator
+	// input, and a quote in it would otherwise write broken JSON.
+	models, err := json.Marshal(d.Runtime.Models)
+	if err != nil {
+		models = []byte("[]")
+	}
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"version":%q,"release":%q}`,
+		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"models":%s,"version":%q,"release":%q}`,
 		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
-		d.Runtime.PriceIn, d.Runtime.PriceOut, d.Runtime.Version, d.Runtime.Release)
+		d.Runtime.PriceIn, d.Runtime.PriceOut, models, d.Runtime.Version, d.Runtime.Release)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its
@@ -130,7 +158,7 @@ func New(d Deps) http.Handler {
 		})
 	}
 
-	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers))
+	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers, d.Runtime.Models))
 	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))
 	if d.Know != nil {
 		tickets(mux, d.Know, d.BAPass)

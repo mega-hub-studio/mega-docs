@@ -3,6 +3,7 @@ package rag_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -733,5 +734,104 @@ func TestHistoryRemembersTheScopeItWasAnsweredIn(t *testing.T) {
 		if strings.ContainsRune(q, '\x1f') {
 			t.Errorf("history question leaked the key separator: %q", q)
 		}
+	}
+}
+
+// TestTheThreadIsTrimmedToTheModelsWindow is the budget. A thread is not free context: the
+// retrieved sections are why an answer is grounded and the completion has to fit after them,
+// so past turns are kept newest-first until they would crowd either one out.
+//
+// A tiny window is the readable way to assert it — 400 tokens leaves room for roughly one
+// exchange of this size, so the turn the follow-up actually points at survives and the older
+// ones do not. The count comes back on the reply because a silent trim and an assistant that
+// forgot look identical from the outside.
+func TestTheThreadIsTrimmedToTheModelsWindow(t *testing.T) {
+	e, _ := engineWithModels(t, &aitest.Provider{Reply: "rewritten"},
+		[]rag.Model{{Name: "chat-model", Window: 400}})
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Four turns of about 200 characters each: ~200 tokens of thread against a 140-token
+	// share of a 400-token window, so most of it cannot ride along.
+	long := strings.Repeat("ranking rules and reciprocal rank fusion. ", 5)
+	history := make([]rag.Turn, 0, 4)
+	for i := range 4 {
+		history = append(history, rag.Turn{Q: fmt.Sprintf("question %d?", i), A: long})
+	}
+
+	reply, err := e.Answer(ctx, rag.Ask{
+		Question: "còn bước 2 thì sao?",
+		History:  history,
+		Model:    "chat-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Recall.Offered != 4 {
+		t.Errorf("the reply says %d turns were offered, want 4 — the client sent four",
+			reply.Recall.Offered)
+	}
+	if reply.Recall.Kept == 0 || reply.Recall.Kept >= reply.Recall.Offered {
+		t.Errorf("kept %d of %d turns: a 400-token window must trim some of a four-turn\n"+
+			"thread and must never trim all of it — the newest turn is what a follow-up points at",
+			reply.Recall.Kept, reply.Recall.Offered)
+	}
+
+	// No window configured is not "no memory": an operator who never set CONTEXT_WINDOW still
+	// gets a thread, capped by what the client chose to send.
+	plain, _ := engineWithModels(t, &aitest.Provider{Reply: "rewritten"}, nil)
+	if _, err := plain.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	reply, err = plain.Answer(ctx, rag.Ask{Question: "and step 2?", History: history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Recall.Kept != 4 {
+		t.Errorf("with no window configured the engine kept %d of 4 turns — a missing display\n"+
+			"knob must not be what decides whether the assistant remembers", reply.Recall.Kept)
+	}
+}
+
+// TestAnotherModelIsAnotherAnswerAndBothSurvive is the cache-key half of the picker, and the
+// reason the model is not in the signature: a signature is pruned when it changes, so putting
+// the model there would make every switch throw the other model's answers away — the same trap
+// the scope avoided, for the same reason.
+func TestAnotherModelIsAnotherAnswerAndBothSurvive(t *testing.T) {
+	e, prov := engineWithModels(t, &aitest.Provider{Reply: "grounded [1]"},
+		[]rag.Model{{Name: "cheap"}, {Name: "strong"}})
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	const q = "How does hybrid search rank results?"
+
+	askWith := func(model string) rag.Reply {
+		t.Helper()
+		reply, err := e.Answer(ctx, rag.Ask{Question: q, Model: model, OnToken: func(string) {}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+
+	askWith("cheap")
+	if reply := askWith("cheap"); !reply.Cached {
+		t.Error("the same question on the same model was not served from the cache")
+	}
+	if reply := askWith("strong"); reply.Cached {
+		t.Error("another model served the first model's row — two models answer differently,\n" +
+			"so the model is part of the key")
+	}
+	// The point of the key over the signature: the first model's row is still there.
+	before := len(prov.Chats())
+	if reply := askWith("cheap"); !reply.Cached {
+		t.Error("switching models pruned the other model's answers — that is what a corpus\n" +
+			"signature does, and why the model belongs in the key instead")
+	}
+	if got := len(prov.Chats()) - before; got != 0 {
+		t.Errorf("a cached answer bought %d completions", got)
 	}
 }

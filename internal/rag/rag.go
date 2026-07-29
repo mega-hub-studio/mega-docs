@@ -18,15 +18,31 @@ import (
 // streams an answer, and runs the QA loop that turns a gap into a document. It knows
 // nothing about HTTP.
 type Engine struct {
-	store *db.Store
-	ai    *ai.Client
-	topK  int
+	store  *db.Store
+	ai     *ai.Client
+	topK   int
+	models []Model
+}
+
+// Model is one chat model this engine may answer with, and the one number it needs about it:
+// the context window, which is what decides how much of a thread fits in front of the
+// documents. Prices are the HTTP layer's business — nothing here bills anybody.
+//
+// Empty list is the single-model instance: `window` then returns 0 for every name, which
+// means "do not trim", and the client's own cap is what bounds the thread.
+type Model struct {
+	Name   string
+	Window int
 }
 
 // Options is everything the engine needs besides its store and provider. A struct,
 // so adding a knob doesn't rewrite every call site.
 type Options struct {
 	TopK int // chunks per answer; <=0 means 6
+	// Models is what a reader may pick between, and it reaches this layer for exactly one
+	// reason: a thread has to be trimmed to the window of whichever model is about to read
+	// it. Unset is legal and means no trimming.
+	Models []Model
 }
 
 // New builds the engine. A TopK of zero means the default.
@@ -39,7 +55,7 @@ func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 	if opt.TopK <= 0 {
 		opt.TopK = 6
 	}
-	return &Engine{store: store, ai: client, topK: opt.TopK}
+	return &Engine{store: store, ai: client, topK: opt.TopK, models: opt.Models}
 }
 
 // Ingest parses, chunks, embeds and stores one markdown document. The title is the file
@@ -186,6 +202,11 @@ type Ask struct {
 	// changes both what is retrieved and which cached answer applies.
 	Scope string
 	Fresh bool // ignore any cached answer — what Regenerate means
+	// Model is the chat model to answer with, already checked against the instance's list
+	// by whoever accepted the request — this layer never sees an unvetted one. Empty is the
+	// configured default, which is what every non-HTTP caller (ingest, the QA loop, a test)
+	// means by saying nothing.
+	Model string
 	// History is the thread this question continues, oldest first. It is what lets a
 	// follow-up refer to the answer above it — and it takes the question out of the
 	// cache in both directions, because four words mean something different in every
@@ -216,6 +237,17 @@ type Reply struct {
 	// Usage is what the provider charged for this answer. A cached reply leaves it
 	// zero, which is the truth: it cost nothing.
 	Usage ai.Usage `json:"usage"`
+	// Recall is how much of the thread the model actually read: kept of offered. The status
+	// line prints it, because a budget that trims silently is indistinguishable from an
+	// assistant that forgot.
+	Recall Recall `json:"recall"`
+}
+
+// Recall is the thread as the model saw it. Both numbers or neither: 0/0 is a first question,
+// and 3/8 says five turns did not fit the window.
+type Recall struct {
+	Kept    int `json:"kept"`
+	Offered int `json:"offered"`
 }
 
 // Answer retrieves context and streams a grounded reply. Citations come back after
@@ -238,10 +270,16 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		onToken = func(string) {}
 	}
 
-	// The thread this question continues, in the model's own message shape. It is also
-	// the answer to "is this a follow-up", which changes three things below: whether a
-	// bare "how?" is vague, what retrieval runs on, and whether any of it may be cached.
-	turns := replay(a.History)
+	// Which model answers, resolved before anything reads the thread: its window is what
+	// decides how much of that thread fits. The reader's choice, or the instance default.
+	chat := e.ai.For(a.Model)
+	model := chat.ChatModel
+
+	// The thread this question continues, in the model's own message shape, trimmed to what
+	// this model can hold. It is also the answer to "is this a follow-up", which changes
+	// three things below: whether a bare "how?" is vague, what retrieval runs on, and
+	// whether any of it may be cached.
+	turns, kept, offered := replay(a.History, e.window(model))
 
 	// A greeting is not a question about the documents, so the grounding rules never
 	// applied to it — see smalltalk.go. Answered before the cache as well as before the
@@ -255,7 +293,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 
 	// What retrieval runs on, which is not always what was typed: a follow-up is rewritten
 	// against the thread first, because a pronoun embeds to nothing. See memory.go.
-	query, spent := e.standalone(ctx, question, turns)
+	query, spent := e.standalone(ctx, chat, question, turns)
 
 	// A signature we can't read means "don't cache", never "fail the question". A
 	// follow-up means the same, and in both directions: served from a row it answers
@@ -266,7 +304,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// `Fresh` excludes only the read: Regenerate says the stored answer was wrong, not
 	// that the answer replacing it is not worth keeping.
 	if cacheable && !a.Fresh {
-		if reply, ok := e.serveCached(sig, scope, question, onToken); ok {
+		if reply, ok := e.serveCached(sig, model, scope, question, onToken); ok {
 			return reply, nil
 		}
 	}
@@ -302,7 +340,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// Accumulate what the user is already seeing: the cache stores the answer, and
 	// re-serialising it from the model would cost the tokens twice.
 	var full strings.Builder
-	usage, err := e.ai.ChatStream(ctx, msgs, func(tok string) {
+	usage, err := chat.ChatStream(ctx, msgs, func(tok string) {
 		full.WriteString(tok)
 		onToken(tok)
 	})
@@ -325,17 +363,20 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// one bad answer into a permanent one.
 	if cacheable && full.Len() > 0 && !isMiss(full.String()) {
 		raw, _ := json.Marshal(cites)
-		_ = e.store.Cache(sig, db.Cached{Question: question, Scope: scope, Answer: full.String(), Citations: raw})
+		_ = e.store.Cache(sig, db.Cached{
+			Question: question, Scope: scope, Model: model, Answer: full.String(), Citations: raw,
+		})
 	}
 	// A miss cites nothing. Retrieval did return chunks — that is why the model was
 	// asked at all — but printing six sources under "this is not in the documents"
 	// is a contradiction on screen: it invites the reader to go and look for an
 	// answer that the engine has just said does not exist. The cost still gets
 	// reported, because it was really spent.
+	recall := Recall{Kept: kept, Offered: offered}
 	if isMiss(full.String()) {
-		return Reply{Usage: usage}, nil
+		return Reply{Usage: usage, Recall: recall}, nil
 	}
-	return Reply{Citations: cites, Usage: usage}, nil
+	return Reply{Citations: cites, Usage: usage, Recall: recall}, nil
 }
 
 // serveCached replays a stored answer as if it had just been generated, so the client
@@ -345,8 +386,8 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 // A read error is a miss, not a failure: the answer is still available for the price of
 // a completion, and refusing the question because a cache could not be read would trade
 // a working answer for a saving.
-func (e *Engine) serveCached(sig, scope, question string, onToken func(string)) (Reply, bool) {
-	c, ok, err := e.store.Cached(sig, scope, question)
+func (e *Engine) serveCached(sig, model, scope, question string, onToken func(string)) (Reply, bool) {
+	c, ok, err := e.store.Cached(sig, model, scope, question)
 	if err != nil || !ok {
 		return Reply{}, false
 	}

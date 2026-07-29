@@ -87,6 +87,7 @@ it, so trust the table.
    |---|---|
    | `.palette-list` un-capped (`max-block-size: none`) | the library still sizes it for the modal its own docs describe — `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested* scroller which hid four of seven documents on a phone. Gone when a release ships an in-page `.palette` |
    | `.prose a.cite` restored to cyan with no underline | two of the library's own recipes collide: `.prose a` and `.cite` are both in the components layer and `.prose a` scores higher, so every citation marker rendered as a prose link — green, with a 2px underline through a digit already sitting in a cyan chip. Gone when a release scopes that rule away from `.cite` |
+   | `.drawer[open]` gets `inset-inline-start: auto` | the recipe anchors with `inset-inline-end: 0` and leaves the start inset alone, which is correct on a plain box and not on a `<dialog>`: the UA sheet sets `inset-inline: 0`, so with the recipe's `margin: 0` the box is over-constrained and the start wins. Measured — the panel opened flush against the **left** edge, and `.drawer.start` rendered identically. Gone when a release qualifies its own rule |
 
    **This app using a recipe outside the context it was written for.** Nothing upstream to
    fix; each is permanent until the app's own use changes:
@@ -99,7 +100,7 @@ it, so trust the table.
    | `.empty .palette > .palette-empty` — start-aligned, at the rows' inset | centring is right for a state filling a blank list, wrong for a truncation notice under nine left-aligned rows |
    | `::selection` softened to a 32% `--primary` tint | the solid fill is ~11:1 on this dark page — correct contrast, and a flare when a long-press selects a word on a phone |
 
-   The two upstream requests are in the changelog.
+   The three upstream requests are in the changelog.
 
    `.prose` used to be a fourth. Its `72ch` sat on the container and so capped the tables and
    diagrams inside an answer as well as its text; 0.8.0 moved that measure onto the children

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -27,9 +28,9 @@ var errBadRequest = errors.New("bad request")
 //
 // The error arrives *in the stream* because the status line is already sent by the
 // time generation can fail — the client shows it on the turn either way.
-func chatHandler(answers Answerer) http.HandlerFunc {
+func chatHandler(answers Answerer, models []Model) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ask, err := readQuestion(r)
+		ask, err := readQuestion(r, models)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -69,10 +70,20 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 			Cached bool `json:"cached"`
 			In     int  `json:"in,omitempty"`
 			Out    int  `json:"out,omitempty"`
-		}{Done: true, Cached: reply.Cached}
+			// Model is which one actually answered, and it is on the frame rather than
+			// assumed by the client for the case that matters: a stale tab, a replay, or a
+			// reader who switched mid-stream. The turn keeps it, so a thread read back
+			// tomorrow still says what produced each answer.
+			Model string `json:"model,omitempty"`
+			// Kept and Offered are the thread as the model read it — 3 of 8. Omitted for a
+			// first question, where 0 of 0 would print a memory figure about nothing.
+			Kept    int `json:"kept,omitempty"`
+			Offered int `json:"offered,omitempty"`
+		}{Done: true, Cached: reply.Cached, Model: ask.Model}
 		if reply.Usage.Reported() {
 			done.In, done.Out = reply.Usage.PromptTokens, reply.Usage.CompletionTokens
 		}
+		done.Kept, done.Offered = reply.Recall.Kept, reply.Recall.Offered
 		s.send("done", done)
 	}
 }
@@ -80,11 +91,17 @@ func chatHandler(answers Answerer) http.HandlerFunc {
 // readQuestion parses the request into the engine's own Ask, minus the callback the
 // handler owns. `fresh` is Regenerate: the one case where a cached answer is the
 // wrong answer, because the user just told us it was.
-func readQuestion(r *http.Request) (rag.Ask, error) {
+func readQuestion(r *http.Request, models []Model) (rag.Ask, error) {
 	var body struct {
 		Question string `json:"question"`
 		Scope    string `json:"scope"` // a document or folder to answer from; "" = all
 		Fresh    bool   `json:"fresh"`
+		// Model is the reader's pick. It is checked against the instance's list here and
+		// nowhere deeper, because this is the trust boundary: the list is also a spending
+		// limit, and a request naming a model an operator never configured is a request to
+		// bill them for it. Empty means the default, which is every client that has not
+		// been told there is a choice.
+		Model string `json:"model"`
 		// History is the thread this question continues, oldest first — decoded straight
 		// into the engine's own type, because a second spelling of a turn would be a
 		// second thing to keep in step with the wire.
@@ -101,5 +118,32 @@ func readQuestion(r *http.Request) (rag.Ask, error) {
 	// cache key, so exactly one place may decide what "booking/" means. The history is
 	// passed through untouched for the same reason: dropping an unanswered turn is a
 	// decision about what a model may read, and that belongs with the prompt.
-	return rag.Ask{Question: q, Scope: body.Scope, Fresh: body.Fresh, History: body.History}, nil
+	model, err := pick(body.Model, models)
+	if err != nil {
+		return rag.Ask{}, err
+	}
+	return rag.Ask{
+		Question: q, Scope: body.Scope, Fresh: body.Fresh, History: body.History, Model: model,
+	}, nil
+}
+
+// pick resolves the requested model against what this instance offers.
+//
+// Refusing rather than falling back to the default: a reader who picked the strong model and
+// silently got the cheap one reads the answer as that model's best effort. The 400 reaches the
+// UI, which only ever offers what /api/health published — so in practice it fires for a stale
+// tab or a hand-rolled request, and both deserve to be told.
+func pick(want string, models []Model) (string, error) {
+	if len(models) == 0 {
+		return "", nil // no list configured: the engine uses its own default
+	}
+	if want == "" {
+		return models[0].Name, nil
+	}
+	for _, m := range models {
+		if m.Name == want {
+			return want, nil
+		}
+	}
+	return "", fmt.Errorf("%w: this instance does not answer with %q", errBadRequest, want)
 }

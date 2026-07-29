@@ -51,18 +51,25 @@ function newTurn(q, scope) {
     cached: false,
     in: 0,
     out: 0,
+    // Which model answered, and how much of the thread it read: both arrive on the `done`
+    // frame. They stay with the turn because a conversation read back tomorrow has to say
+    // what produced each answer — a thread where two models spoke and neither is named is a
+    // thread nobody can compare.
+    model: '',
+    recall: { kept: 0, offered: 0 },
     ticket: null, // the gap filed from this answer, once there is one
   }
 }
 
 /**
- * @param {{ scope: import("vue").Ref<string>, prompt: import("vue").Ref<Element>,
+ * @param {{ scope: import("vue").Ref<string>, model: import("vue").Ref<string>,
+ *   prompt: import("vue").Ref<Element>,
  *   scroll: (opts?: object) => void, toast: Function,
  *   onSettled: (turn: object) => void }} deps
  *   onSettled runs after every answer, however it ended — the shell uses it to refresh
  *   what an answer can have changed (the corpus, the diagram renderer, health).
  */
-export function useConversation({ scope, prompt, scroll, toast, onSettled }) {
+export function useConversation({ scope, model, prompt, scroll, toast, onSettled }) {
   const turns = ref(session.load()) // a reload shouldn't lose the thread
   seq = turns.value.reduce((m, t) => Math.max(m, t.id || 0), 0)
   const busy = ref(false)
@@ -103,7 +110,17 @@ export function useConversation({ scope, prompt, scroll, toast, onSettled }) {
   async function regenerate(turn) {
     if (busy.value)
       return
-    Object.assign(turn, { a: '', citations: [], error: '', ms: 0, streaming: true, cached: false, in: 0, out: 0 })
+    Object.assign(turn, {
+      a: '',
+      citations: [],
+      error: '',
+      ms: 0,
+      streaming: true,
+      cached: false,
+      in: 0,
+      out: 0,
+      recall: { kept: 0, offered: 0 },
+    })
     await stream(turn, { fresh: true })
   }
 
@@ -145,12 +162,22 @@ export function useConversation({ scope, prompt, scroll, toast, onSettled }) {
       // Read here rather than at the call sites, so a regenerate re-asks the follow-up
       // against the same turns it was first asked against.
       history: threadBefore(turns.value, turn),
+      // The pick as it is *now*, deliberately, including on a regenerate: "answer that again
+      // with the stronger model" is the whole point of having a picker beside a thread.
+      model: model?.value ?? '',
       onToken: (tok) => {
         turn.a += tok
         scroll()
       },
       onCitations: c => (turn.citations = c),
-      onDone: ({ cached, in: tin, out }) => Object.assign(turn, { cached, in: tin, out }),
+      onDone: ({ cached, in: tin, out, model: answered, kept = 0, offered = 0 }) =>
+        Object.assign(turn, {
+          cached,
+          in: tin,
+          out,
+          model: answered || turn.model,
+          recall: { kept, offered },
+        }),
     })
     try {
       await run.done // a stop() resolves quietly; only real errors throw

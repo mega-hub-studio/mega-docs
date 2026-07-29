@@ -329,6 +329,55 @@ done: 8/8 files, 74 chunks</span></div>
     </div>
   </section>
 
+  <section id="models" data-feature="models" data-env="CHAT_MODELS"
+           data-test="TestAnotherModelIsAnotherAnswerAndBothSurvive,TestAnUnknownModelIsRefused">
+    <h2 lang="en">More than one model, and the reader picks</h2>
+    <h2 lang="vi">Nhiều hơn một model, và người đọc tự chọn</h2>
+    <p class="lede" lang="en">One knob lists what this instance will answer with, and each
+      entry carries the two numbers the status line cannot guess: the context window and the
+      price. The reader picks in the settings drawer; the server answers with that model or
+      refuses the request.</p>
+    <p class="lede" lang="vi">Một knob liệt kê những model instance này được phép trả lời
+      bằng, và mỗi entry mang hai con số mà thanh trạng thái không thể đoán: context window
+      và giá. Người đọc chọn trong drawer settings; server trả lời bằng đúng model đó hoặc
+      từ chối yêu cầu.</p>
+
+    <pre class="terminal"><code>CHAT_MODELS=gpt-4o-mini:128000:0.15:0.60,gpt-4o:128000:2.50:10.00
+#           └ model      └ window └ $/1M in └ $/1M out    (first = default)</code></pre>
+
+    <p lang="en">Leave it unset and nothing changes: the old <code>CHAT_MODEL</code>,
+      <code>CONTEXT_WINDOW</code>, <code>PRICE_IN</code> and <code>PRICE_OUT</code> become the
+      single entry, which is what an instance that never wanted a picker already has. A malformed
+      entry fails at <b>startup</b>, not in somebody's browser.</p>
+    <p lang="vi">Để trống thì không gì thay đổi: <code>CHAT_MODEL</code>,
+      <code>CONTEXT_WINDOW</code>, <code>PRICE_IN</code> và <code>PRICE_OUT</code> cũ trở thành
+      entry duy nhất — đúng những gì một instance không cần picker vốn đã có. Một entry sai cú
+      pháp làm <b>startup</b> thất bại, không phải trong browser của ai đó.</p>
+
+    <div class="callout gotcha">
+      <b lang="en">The model is part of the cache key, not the signature.</b>
+      <span lang="en">Two models answer the same question differently, so each keeps its own
+        row — and switching does not throw the other one away. A signature is <i>pruned</i>
+        when it changes, which is why the model sits beside the scope in the key instead: the
+        same reasoning, and the same trap avoided.</span>
+      <b lang="vi">Model là một phần của cache key, không phải signature.</b>
+      <span lang="vi">Hai model trả lời cùng một câu hỏi khác nhau, nên mỗi model giữ row
+        riêng — và đổi model không xoá row của model kia. Signature bị <i>prune</i> khi nó
+        đổi, nên model nằm cạnh scope trong key: cùng một lý lẽ, cùng một cái bẫy được tránh.</span>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">The client names a model; the server never trusts it.</b>
+      <span lang="en">A request naming anything outside the list is refused, because the list
+        is also a spending limit — the front end only ever offers what
+        <code>/api/health</code> published.</span>
+      <b lang="vi">Client nêu tên model; server không bao giờ tin.</b>
+      <span lang="vi">Request nêu tên ngoài danh sách bị từ chối, vì danh sách cũng là một
+        hạn mức chi tiêu — front end chỉ đưa ra đúng những gì <code>/api/health</code> công bố.</span>
+    </div>
+  </section>
+
+
   <!-- ══ upgrading ═════════════════════════════════════════════════════════════
        The UI is compiled in, so "replace the binary" is not optional — and the one
        upgrade that needs a re-index is stated with a *checkable condition* rather

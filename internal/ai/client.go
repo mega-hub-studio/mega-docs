@@ -51,6 +51,23 @@ type Client struct {
 	chatHTTP  *http.Client
 }
 
+// For returns a client that answers with `model`, leaving this one untouched. Empty means
+// "the configured default", so every existing call site keeps its meaning and only a caller
+// that has a reader's choice in hand has to say so — `e.ai.For(model).ChatStream(…)` reads as
+// the intent it is.
+//
+// A shallow copy rather than a parameter on ChatStream: the model is a property of *which
+// provider conversation this is*, not of one request, and threading it through every
+// signature would have put an empty string at fourteen call sites that do not care.
+func (c *Client) For(model string) *Client {
+	if model == "" || model == c.ChatModel {
+		return c
+	}
+	clone := *c
+	clone.ChatModel = model
+	return &clone
+}
+
 // Config names what a client needs. A struct rather than positional arguments
 // because the fields are all strings and two pairs of them are interchangeable at
 // the type level — swapping EmbedModel and ChatModel, or the two keys, would compile

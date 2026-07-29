@@ -207,6 +207,54 @@
        The one section that is about two roles at once, so it sits between "what the
        app can do" and the per-role advice. A table for the state machine, because
        a state whose label nobody can find is a state people work around. -->
+
+  <section id="memory" data-feature="memory"
+           data-test="TestAFollowUpIsRewrittenForRetrievalAndNeverCached,TestAVagueQuestionIsAskedBackNotRefused,TestTheThreadIsTrimmedToTheModelsWindow">
+    <h2 lang="en">Memory: it remembers, and it asks</h2>
+    <h2 lang="vi">Bộ nhớ: nhớ mạch, và biết hỏi lại</h2>
+    <p class="lede" lang="en">A follow-up is not a new question. "còn bước 2 thì sao?" embeds
+      to nothing and gives keyword search nothing to match, so before retrieval runs the
+      thread is used to rewrite it into a question that stands on its own — and the answer is
+      grounded in whatever <i>that</i> retrieved.</p>
+    <p class="lede" lang="vi">Một câu hỏi tiếp không phải câu hỏi mới. "còn bước 2 thì sao?"
+      embed ra vô nghĩa và không cho tìm kiếm từ khoá thứ gì để khớp, nên trước khi retrieval
+      chạy, mạch hội thoại được dùng để viết lại nó thành câu hỏi đứng một mình — và câu trả
+      lời được neo vào đúng những gì <i>câu đó</i> lấy về.</p>
+
+    <p lang="en">How much thread rides along is decided by the model, not by a constant: turns
+      are kept newest-first until they would crowd out the documents, measured against the
+      window of the model answering. The status line prints what survived —
+      <code>3/8 turns</code> — because memory you cannot see is memory you cannot trust.</p>
+    <p lang="vi">Bao nhiêu mạch được mang theo do model quyết định, không phải một hằng số:
+      các lượt được giữ từ mới nhất trở về trước cho tới khi chúng bắt đầu chiếm chỗ của tài
+      liệu, đo theo window của model đang trả lời. Thanh trạng thái in ra phần còn lại —
+      <code>3/8 turns</code> — vì bộ nhớ không nhìn thấy được là bộ nhớ không tin được.</p>
+
+    <div class="callout memo">
+      <b lang="en">A question in a thread is never cached, in either direction.</b>
+      <span lang="en">Four words mean something different in every conversation, so a
+        follow-up is neither served from a stored answer nor stored as one. The first question
+        of a thread still is.</span>
+      <b lang="vi">Câu hỏi trong một mạch hội thoại không bao giờ được cache, cả hai chiều.</b>
+      <span lang="vi">Bốn chữ có nghĩa khác nhau trong mỗi cuộc hội thoại, nên câu hỏi tiếp
+        không được lấy từ câu trả lời đã lưu, cũng không được lưu lại. Câu hỏi đầu tiên của
+        mạch thì vẫn có.</span>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">Unclear beats confidently wrong.</b>
+      <span lang="en">A question the documents cover two ways gets both readings, each with
+        its own citation, and a question of which one you meant. A question with nothing to
+        hold onto — <code>?</code>, <code>...</code> — is asked back using words this corpus
+        actually contains, rather than answered with "not in the documents".</span>
+      <b lang="vi">Hỏi lại tốt hơn trả lời sai một cách tự tin.</b>
+      <span lang="vi">Câu hỏi mà tài liệu bao phủ theo hai cách sẽ nhận cả hai cách hiểu, mỗi
+        cách kèm trích dẫn riêng, và một câu hỏi bạn muốn cách nào. Câu hỏi không có gì để
+        bám — <code>?</code>, <code>...</code> — được hỏi lại bằng chính từ ngữ corpus này
+        có, thay vì bị trả lời "không có trong tài liệu".</span>
+    </div>
+  </section>
+
   <section id="loop" data-feature="gap-states"
            data-api="GET /api/tickets"
            data-test="TestFilingAGapNeedsNoPassword,TestConfirmedAnswerBecomesADocumentAndThenACitation">

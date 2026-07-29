@@ -183,7 +183,11 @@ func (e *Engine) sig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return s + "|" + e.ai.ChatModel + "|" + promptSig, nil
+	// The model is deliberately absent: it is in the cache *key* now, beside the scope, so
+	// two models keep two rows instead of one switch pruning the other's. What is left is
+	// what an answer was produced *under* — the corpus it cited and the prompt that shaped
+	// it — and both of those really do invalidate every row at once. See db.cacheKey.
+	return s + "|" + promptSig, nil
 }
 
 // History lists the answers still free to replay. Empty rather than an error when

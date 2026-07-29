@@ -806,3 +806,41 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   margin-inline-start: var(--sp-2);
   font-size: var(--fs-label); color: var(--muted);
 }
+
+/* ── the settings drawer ──
+   `.drawer` is the library's: fixed to the inline end, min(90vw, 22rem), its own ::backdrop
+   and slide-in, with `.head`/`.title` inside. On a native <dialog>, so Escape, the focus trap
+   and the modal backdrop are the platform's rather than three things to reimplement.
+
+   Two rules are the app's, and both are about a panel that is taller than a phone:
+   the body scrolls inside the drawer so the head stays reachable, and the sections get one
+   rhythm from a single `gap` — the same "absolute vertical evenness is one property, set once,
+   on the parent" the .empty panel and the ticket cards already follow. */
+/* `display` is qualified by [open] for the reason the diagram viewer above already documents:
+   the cascade compares origin before specificity, so an unqualified `.drawer { display: flex }`
+   beats the UA's `dialog:not([open]) { display: none }` and the panel never hides — measured
+   here as a 351×844 box on screen with `open` false. Both declarations sit in the *same*
+   qualified rule and there is no unqualified `.drawer` rule at all, because the minifier folds
+   an adjacent pair — `.drawer[open]{display:flex}` beside `.drawer{flex-direction:column}` came
+   out of the build as one `.drawer{flex-direction:column;display:flex}`, which is the bug
+   again with the fix's name on it. */
+.drawer[open] {
+  display: flex; flex-direction: column;
+  /* LOCAL OVERRIDE (8bit-nes 0.13.0): the recipe anchors itself with `inset-inline-end: 0`
+     and leaves the start inset alone, which works on a plain box and not on a <dialog> — the
+     UA sheet already sets `inset-inline: 0`, so with `margin: 0` the box is over-constrained
+     and the start wins. Measured: the panel opened flush against the *left* edge, and
+     `.drawer.start` (`inset-inline: 0 auto`) rendered identically, which is the tell. `auto`
+     hands the anchoring back to the recipe. Delete when a release qualifies its own rule. */
+  inset-inline-start: auto;
+}
+.drawer > .head { flex: none; }
+.drawer-body {
+  flex: 1; min-block-size: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+}
+/* An .eyebrow starting a group, tighter to what it labels than to the group above it: the
+   library's own spacing scale, one step down. */
+.drawer-body > .eyebrow { margin-block-end: calc(-1 * var(--sp-2)); }
+/* The library's .switch is the control only; the label beside it is this app's line. */
+.switch-row { display: flex; align-items: center; gap: var(--sp-3); cursor: pointer; }

@@ -26,7 +26,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 |---|---|---|
 | 1 | **The Knowledge DB is the source of truth.** A document — imported, written or confirmed — is a row with its body, and the WebUI is the only way one enters. Nothing writes a corpus file | `TestConfirmedAnswerBecomesADocumentAndThenACitation`, `TestARemovedDocumentStopsAnsweringAndItsTextSurvives` |
 | 2 | Reads are open, writes are gated. An unset `BA_PASS` means **no write surface**, not open writes | `internal/server` tests (403 unset · 401 wrong) |
-| 3 | The cache signature covers everything an answer depends on — corpus, chat model, prompt hash — and the **scope** lives in the key, not the signature | `TestTheSameQuestionInAnotherScopeIsAnotherAnswer`, `TestIndexingInvalidatesTheCache` |
+| 3 | The cache signature covers everything an answer depends on — corpus and prompt hash — while the **scope and the chat model** live in the key, not the signature | `TestTheSameQuestionInAnotherScopeIsAnotherAnswer`, `TestAnotherModelIsAnotherAnswerAndBothSurvive`, `TestIndexingInvalidatesTheCache` |
 | 4 | A scope filters **both** retrievers before they rank, never after fusion | `TestScopedSearchRanksWithinTheScope` |
 | 5 | A miss is never cached; a partial answer always is | `TestOnlyAWholeMissSkipsTheCache` |
 | 6 | `cmd/ingest.docPath` and `rag.SafePath` agree: one document, one identity | `cmd/ingest` + `rag` path tests |
@@ -330,13 +330,15 @@ a `TextDecoder` or `visualViewport`.
    compare). An unset `BA_PASS` means **no write surface at all**, not open writes —
    forgetting to configure a secret must never be how you end up without one.
    `/api/health` reports `writes` so the UI can say so before an answer is typed.
-3. **The cache signature covers everything an answer depends on**: the corpus, the
-   chat model, and a hash of the system prompt (`Engine.sig`). Adding a dependency an
+3. **The cache signature covers everything an answer depends on**: the corpus and a hash
+   of the system prompt (`Engine.sig`). Adding a dependency an
    answer can change under — a retrieval parameter, a new prompt section — means
    adding it here, or the instance serves answers produced under rules it no longer
-   has. The **scope** is the exception, and belongs in the *key* instead
-   (`db.cacheKey`): a signature is pruned when it changes, so scoping it would wipe
-   every other folder's answers on each pick.
+   has. The **scope and the model** are the exceptions, and belong in the *key* instead
+   (`db.cacheKey`): a signature is pruned when it changes, so putting either there would wipe
+   every other folder's — or every other model's — answers on each pick. The chat model was in
+   the signature until the picker existed, where one instance had one model and the difference
+   could not show.
 4. **A scope is filtered before ranking.** `db.Search` constrains both retrievers —
    the vector KNN via `chunk_id IN (…)` and BM25 via the same subquery on `rowid` — to
    the chunks under the scope, so `TOP_K` counts matches inside it. Filtering after RRF

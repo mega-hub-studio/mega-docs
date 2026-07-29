@@ -18,16 +18,16 @@
  * @param {string} question
  * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
  *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean,
- *          scope?: string, history?: Turn[] }} handlers
+ *          scope?: string, history?: Turn[], model?: string }} handlers
  *   fresh skips the server's answer cache — what Regenerate means. scope narrows
  *   retrieval to one document or folder; "" is the whole corpus. history is the thread
  *   this question continues, oldest first — the server holds no session, so a follow-up
  *   that arrives without it is answered as a first question.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '', history = [] } = {}) {
+export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '', history = [], model = '' } = {}) {
   const ctrl = new AbortController()
-  const done = run(question, { onToken, onCitations, onDone, fresh, scope, history }, ctrl.signal)
+  const done = run(question, { onToken, onCitations, onDone, fresh, scope, history, model }, ctrl.signal)
   return { done, stop: () => ctrl.abort() }
 }
 
@@ -42,6 +42,9 @@ async function run(question, handlers, signal) {
         fresh: handlers.fresh,
         scope: handlers.scope,
         history: handlers.history,
+        // The reader's pick, and "" means the instance default — the server refuses anything
+        // it does not offer, so this is a request rather than an instruction.
+        model: handlers.model,
       }),
       signal,
     })
@@ -136,6 +139,10 @@ export async function health() {
       admin: !!body.admin,
       model: body.model || '',
       window: body.window || 0,
+      // Every model this instance will answer with, each with the two numbers the strip
+      // needs to price and measure whichever one is picked. An older server sends none,
+      // and then the four scalar fields above are the whole story — one model, no picker.
+      models: Array.isArray(body.models) ? body.models : [],
       priceIn: body.price_in || 0,
       priceOut: body.price_out || 0,
       // The commit this server was built from. Absent for a binary with no VCS stamp, and

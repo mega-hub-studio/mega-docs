@@ -23,7 +23,7 @@ export function useRuntime() {
   const online = ref(true) // optimistic: the first check has not answered yet
   const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
   const admin = ref(false) // same, and for the same reason: no surface until it is proven
-  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0, version: '', release: '' })
+  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0, models: [], version: '', release: '' })
 
   async function check() {
     const h = await health()
@@ -35,6 +35,9 @@ export function useRuntime() {
       window: h.window,
       priceIn: h.priceIn,
       priceOut: h.priceOut,
+      // What a reader may pick between. One entry (or none) is an instance with nothing to
+      // choose, and the settings drawer says so rather than offering a menu of one.
+      models: h.models ?? [],
       // Which commit is serving this page. It belongs with the runtime facts rather than in
       // a composable of its own: it arrives in the same request and answers the same kind of
       // question — what is this instance, right now.
