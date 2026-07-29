@@ -83,6 +83,53 @@ var migrations = []migration{
 			ALTER TABLE documents ADD COLUMN deleted_at  TEXT;
 		`,
 	},
+	{
+		id:  2,
+		why: "documents indexed before the inversion have no body: rebuild it from their chunks",
+		// The gap migration 1 left, found on a live instance rather than reasoned about: nine
+		// documents that answer questions and whose text the library could neither show nor
+		// edit, because they were indexed while the file was the source of truth and the file
+		// is gone.
+		//
+		// `ingest` cannot fix that — it needs the folder those files came from, and on the box
+		// where this was found CORPUS_DIR was already empty. The text is not lost, though: the
+		// chunks are the document, split. So this puts it back together in `ord` order.
+		//
+		// It is a reconstruction and says so: a heading line can be missing where an oversized
+		// section was split by paragraph, because that piece carries no heading of its own.
+		// That is the whole cost, and the alternative is a document nobody can read — so this
+		// is the cheaper wrong. Chunk-less documents keep a NULL body rather than an empty
+		// string: "we never had the text" and "the text is empty" are different facts, and the
+		// second one would make an edit form offer to save nothing over a live document.
+		//
+		// The document's own H1 is put back rather than left out, and that is not polish: the
+		// first chunk's breadcrumb starts with it ("Handoff — Booking List > 1. Purpose"), the
+		// first chunk's *content* does not, and without this the first thing a BA saves over a
+		// legacy document is one with its title deleted. Only when the text does not already
+		// start with a heading, so a document whose first chunk kept its own is left alone.
+		sql: `
+			UPDATE documents SET body = COALESCE(
+				(SELECT CASE
+				   WHEN substr(b.text, 1, 1) = '#' THEN b.text
+				   WHEN b.h1 = '' THEN b.text
+				   ELSE '# ' || b.h1 || char(10) || char(10) || b.text
+				 END
+				 FROM (
+				   SELECT
+				     (SELECT group_concat(c.content, char(10) || char(10))
+				      FROM (SELECT content FROM chunks
+				            WHERE document_id = documents.id ORDER BY ord) c) AS text,
+				     COALESCE((SELECT CASE
+				         WHEN instr(heading, ' > ') > 0 THEN substr(heading, 1, instr(heading, ' > ') - 1)
+				         ELSE heading
+				       END
+				       FROM chunks WHERE document_id = documents.id ORDER BY ord LIMIT 1), '') AS h1
+				 ) b
+				 WHERE b.text IS NOT NULL),
+				body)
+			WHERE body IS NULL;
+		`,
+	},
 }
 
 // migrateVersioned applies whatever has not run yet, and reports how many it applied.
