@@ -35,6 +35,7 @@ type Provider struct {
 	mu       sync.Mutex
 	embedded [][]string // every batch of inputs it was asked to embed
 	chats    []string   // every chat request's last user message
+	messages [][]string // every chat request's whole message list, "role: content"
 	tokens   []string   // the bearer token of every request, in order
 	server   *httptest.Server
 }
@@ -81,6 +82,15 @@ func (p *Provider) Chats() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.chats
+}
+
+// Messages reports each chat request's whole message list, one "role: content" entry per
+// message. Chats() answers what was asked; this answers what the model was given to read,
+// which is the only way to tell a remembered conversation from a forgotten one.
+func (p *Provider) Messages() [][]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.messages
 }
 
 // record notes the bearer token and reports whether one was present at all.
@@ -162,13 +172,16 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	last := ""
+	sent := make([]string, 0, len(body.Messages))
 	for _, m := range body.Messages {
 		if m.Role == "user" {
 			last = m.Content
 		}
+		sent = append(sent, m.Role+": "+m.Content)
 	}
 	p.mu.Lock()
 	p.chats = append(p.chats, last)
+	p.messages = append(p.messages, sent)
 	p.mu.Unlock()
 
 	w.Header().Set("Content-Type", "text/event-stream")

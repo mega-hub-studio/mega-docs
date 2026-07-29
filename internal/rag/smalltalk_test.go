@@ -8,7 +8,7 @@ import "testing"
 // after a full embed + retrieve + completion.
 func TestAGreetingIsNotAMissingDocument(t *testing.T) {
 	for _, q := range []string{"xin chào", "Xin chào!", "chào bạn", "hello", "Hi", "hey", "thanks", "cảm ơn"} {
-		got, ok := smallTalk(q)
+		got, ok := smallTalk(q, false)
 		if !ok {
 			t.Errorf("%q was not recognised as conversation — it would return NoAnswer", q)
 			continue
@@ -36,7 +36,7 @@ func TestARealQuestionIsNeverAnsweredAsConversation(t *testing.T) {
 		"what can you do with a cancelled booking",
 		"TOP_K mặc định là bao nhiêu",
 	} {
-		if got, ok := smallTalk(q); ok {
+		if got, ok := smallTalk(q, false); ok {
 			t.Errorf("%q was answered as conversation (%.40q) instead of being retrieved", q, got)
 		}
 	}
@@ -46,7 +46,7 @@ func TestARealQuestionIsNeverAnsweredAsConversation(t *testing.T) {
 // incoherent — and it cost a completion: 1414ms measured on the deployed instance.
 func TestTheModelQuestionIsAnsweredNotRefused(t *testing.T) {
 	for _, q := range []string{"model gì", "model nào", "dùng model gì", "bạn dùng model nào", "what model", "which model", "what model are you"} {
-		got, ok := smallTalk(q)
+		got, ok := smallTalk(q, false)
 		if !ok {
 			t.Errorf("%q was not recognised — it returns NoAnswer while the status line shows the answer", q)
 			continue
@@ -57,7 +57,7 @@ func TestTheModelQuestionIsAnsweredNotRefused(t *testing.T) {
 	}
 	// But a question about a model *in the documents* is a real question.
 	for _, q := range []string{"model dữ liệu booking gồm gì", "what model does the pricing service use"} {
-		if _, ok := smallTalk(q); ok {
+		if _, ok := smallTalk(q, false); ok {
 			t.Errorf("%q was swallowed as conversation instead of being retrieved", q)
 		}
 	}
@@ -66,14 +66,14 @@ func TestTheModelQuestionIsAnsweredNotRefused(t *testing.T) {
 // Answering in the language it was asked in, because the app is bilingual and a Vietnamese
 // greeting answered in English reads as the wrong product.
 func TestConversationAnswersInTheLanguageAsked(t *testing.T) {
-	vi, ok := smallTalk("xin chào")
+	vi, ok := smallTalk("xin chào", false)
 	if !ok {
 		t.Fatal("xin chào was not recognised")
 	}
 	if !strings.Contains(vi, "dẫn nguồn") {
 		t.Errorf("Vietnamese greeting answered in the wrong language: %.60q", vi)
 	}
-	en, ok := smallTalk("hello")
+	en, ok := smallTalk("hello", false)
 	if !ok {
 		t.Fatal("hello was not recognised")
 	}
@@ -90,12 +90,12 @@ func TestConversationAnswersInTheLanguageAsked(t *testing.T) {
 // come back as the no-answer sentence. They are asked back now.
 func TestBlankFallsThroughButPunctuationIsAskedBack(t *testing.T) {
 	for _, q := range []string{"", "   ", "\n", "\t "} {
-		if _, ok := smallTalk(q); ok {
+		if _, ok := smallTalk(q, false); ok {
 			t.Errorf("%q was treated as conversation", q)
 		}
 	}
 	for _, q := range []string{"?", "???", "...", "!?"} {
-		got, ok := smallTalk(q)
+		got, ok := smallTalk(q, false)
 		if !ok {
 			t.Errorf("%q fell through to retrieval and would return the no-answer sentence", q)
 			continue
@@ -113,7 +113,7 @@ func TestAVagueQuestionIsAskedBackNotRefused(t *testing.T) {
 		"làm sao", "làm thế nào", "thế nào", "cái đó", "cái gì", "gì", "sao",
 		"?", "???", "how", "what", "why", "huh", "help me", "tôi muốn biết",
 	} {
-		got, ok := smallTalk(q)
+		got, ok := smallTalk(q, false)
 		if !ok {
 			t.Errorf("%q was not recognised as vague — it returns NoAnswer instead of asking back", q)
 			continue
@@ -125,6 +125,23 @@ func TestAVagueQuestionIsAskedBackNotRefused(t *testing.T) {
 		// like — a bare "please clarify" spends a turn and teaches nothing.
 		if !strings.Contains(got, "?") {
 			t.Errorf("%q did not ask anything back: %.60q", q, got)
+		}
+	}
+
+	// The same words with a conversation behind them are not vague at all: the turn above
+	// carries the content word this one is missing, so asking back answers a question
+	// nobody asked. They fall through to the rewrite instead, which resolves them against
+	// that turn — that is the whole of what conversation memory changes here.
+	for _, q := range []string{"cái đó", "sao", "why", "?", "how"} {
+		if _, ok := smallTalk(q, true); ok {
+			t.Errorf("%q was asked back inside a thread; the rewrite never got to resolve it", q)
+		}
+	}
+	// And nothing else moved with it. A greeting on the tenth message is still a greeting,
+	// answered for free — routing these to retrieval would buy a completion to say hello.
+	for _, q := range []string{"cảm ơn", "hello", "model gì", "bạn là ai"} {
+		if _, ok := smallTalk(q, true); !ok {
+			t.Errorf("%q stopped being conversational inside a thread; it costs a completion now", q)
 		}
 	}
 }
@@ -147,7 +164,7 @@ func TestAShortRealQueryIsStillRetrieved(t *testing.T) {
 		"what is RRF",
 		"how do I cancel a paid booking",
 	} {
-		if got, ok := smallTalk(q); ok {
+		if got, ok := smallTalk(q, false); ok {
 			t.Errorf("%q was intercepted (%.40q) instead of being retrieved — a real lookup was swallowed", q, got)
 		}
 	}

@@ -250,6 +250,30 @@ func TestRegenerateAsksForAFreshAnswer(t *testing.T) {
 	}
 }
 
+// The server keeps no session, so a thread only exists if the client sends it and the
+// handler passes it down. A follow-up whose history is dropped here is answered as if it
+// were a first question: the engine sees a pronoun, retrieves on it, and reads as an
+// assistant that forgot the sentence above.
+func TestTheThreadReachesTheEngine(t *testing.T) {
+	a := &fakeAnswers{tokens: []string{"x"}}
+	h := newTestServer(a)
+
+	do(t, h, "POST", "/api/chat", `{"question":"q"}`, nil)
+	do(t, h, "POST", "/api/chat",
+		`{"question":"và bước 2?","history":[{"q":"how do I cancel?","a":"Cancel from the booking screen [1]."}]}`, nil)
+
+	if len(a.asked) != 2 {
+		t.Fatalf("engine saw %d asks", len(a.asked))
+	}
+	if len(a.asked[0].History) != 0 {
+		t.Error("a first question arrived with a thread behind it")
+	}
+	if got := a.asked[1].History; len(got) != 1 || got[0].Q != "how do I cancel?" ||
+		!strings.HasPrefix(got[0].A, "Cancel from the booking screen") {
+		t.Errorf("the thread did not survive the round trip: %+v", got)
+	}
+}
+
 func TestChatReportsACacheHitToTheClient(t *testing.T) {
 	h := newTestServer(&fakeAnswers{tokens: []string{"cheap"}, cached: true})
 	body := do(t, h, "POST", "/api/chat", `{"question":"q"}`, nil).Body.String()

@@ -13,6 +13,27 @@ import * as session from '../lib/session.js'
 
 let seq = 0
 
+// How many earlier exchanges ride along with a question. Three is what resolves what a
+// follow-up points at; the whole thread would grow the prompt on every turn and pay to
+// carry a conversation the reader has already moved on from.
+const RECALL_TURNS = 3
+
+/**
+ * The thread behind one turn, in the shape /api/chat takes: oldest first, and only turns
+ * that actually have an answer. A question whose answer errored or was stopped would tell
+ * the model that question went unanswered, which is not what happened.
+ * @param {object[]} list every turn in the conversation
+ * @param {object} turn the one being asked or regenerated — everything before it is history
+ * @returns {{ q: string, a: string }[]}
+ */
+function threadBefore(list, turn) {
+  return list
+    .slice(0, list.indexOf(turn))
+    .filter(t => t.a && !t.error)
+    .slice(-RECALL_TURNS)
+    .map(t => ({ q: t.q, a: t.a }))
+}
+
 /**
  * One turn. `scope` is the folder it was asked in, and stays with it: a regenerate
  *  must re-ask the question that was asked, even if the reader has moved on.
@@ -121,6 +142,9 @@ export function useConversation({ scope, prompt, scroll, toast, onSettled }) {
     run = askServer(turn.q, {
       fresh,
       scope: turn.scope || '',
+      // Read here rather than at the call sites, so a regenerate re-asks the follow-up
+      // against the same turns it was first asked against.
+      history: threadBefore(turns.value, turn),
       onToken: (tok) => {
         turn.a += tok
         scroll()

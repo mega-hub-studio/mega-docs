@@ -11,20 +11,23 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** @typedef {{ n: number, doc: string, heading: string }} Citation */
+/** @typedef {{ q: string, a: string }} Turn one exchange already on screen */
 
 /**
  * Ask one question and stream the answer.
  * @param {string} question
  * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
  *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean,
- *          scope?: string }} handlers
+ *          scope?: string, history?: Turn[] }} handlers
  *   fresh skips the server's answer cache — what Regenerate means. scope narrows
- *   retrieval to one document or folder; "" is the whole corpus.
+ *   retrieval to one document or folder; "" is the whole corpus. history is the thread
+ *   this question continues, oldest first — the server holds no session, so a follow-up
+ *   that arrives without it is answered as a first question.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '' } = {}) {
+export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '', history = [] } = {}) {
   const ctrl = new AbortController()
-  const done = run(question, { onToken, onCitations, onDone, fresh, scope }, ctrl.signal)
+  const done = run(question, { onToken, onCitations, onDone, fresh, scope, history }, ctrl.signal)
   return { done, stop: () => ctrl.abort() }
 }
 
@@ -34,7 +37,12 @@ async function run(question, handlers, signal) {
     res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, fresh: handlers.fresh, scope: handlers.scope }),
+      body: JSON.stringify({
+        question,
+        fresh: handlers.fresh,
+        scope: handlers.scope,
+        history: handlers.history,
+      }),
       signal,
     })
   }
