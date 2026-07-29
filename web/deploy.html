@@ -300,7 +300,7 @@ done: 8/8 files, 74 chunks</span></div>
           reports.</p>
         <p lang="vi">Binary <i>là</i> gì, không phải nó được cấu hình bằng gì: bản build
           front end đang phục vụ (Vue, 8bit-nes và hash của chính bundle — nếu không thì
-          phải giải nén binary mới trả lời được), nó đã chạy bao lâu, index dẫn xuất lớn cỡ
+          phải giải nén binary mới trả lời được), nó đã chạy bao lâu, database lớn cỡ
           nào, và số liệu corpus mà <code>/api/corpus</code> vốn đã trả về.</p>
       </section>
 
@@ -386,56 +386,44 @@ done: 8/8 files, 74 chunks</span></div>
       trên host không cần Node, không cần mạng. Setting mới thì thêm vào
       <code>.env</code>; bảng bên dưới liệt kê có những gì và đặt sai thì mất gì.</p>
 
-    <div class="callout gotcha">
-      <b lang="en">One upgrade needs a re-index: check your stored paths first.</b>
-      <span lang="en">Document paths are now stored relative to <code>CORPUS_DIR</code>.
-        An index built before that change stored them differently, and a re-ingest would
-        add a <i>second</i> document for every file — each one cited twice. Check, and
-        rebuild if the answer says so:</span>
-      <b lang="vi">Có một lần nâng cấp cần index lại: kiểm tra path đang lưu trước.</b>
-      <span lang="vi">Path tài liệu giờ được lưu tương đối theo <code>CORPUS_DIR</code>.
-        Index dựng trước thay đổi đó lưu kiểu khác, và một lần ingest lại sẽ thêm document
-        <i>thứ hai</i> cho mỗi file — mỗi file bị cite hai lần. Kiểm tra, và dựng lại nếu
-        cần:</span>
+    <!-- This block used to teach `rm knowledge.db && ingest docs` as a routine repair. After
+         the inversion that command deletes the corpus, so the warning replaces the recipe —
+         and it is a warning rather than a footnote because the old instruction is in
+         somebody's shell history. -->
+    <div class="callout crit">
+      <b lang="en">Never delete <code>knowledge.db</code>. It is the corpus, not an index.</b>
+      <span lang="en">Documents live in the database now — the text, not just the embeddings —
+        and a document written or edited in the BA screen exists nowhere else. So
+        <code>rm knowledge.db &amp;&amp; ./bin/ingest docs</code>, which used to be a safe
+        repair costing one provider bill, now destroys everything that did not arrive as a
+        file. There is <b>no backup</b>, by decision. If you need a copy before touching
+        anything, take one: <code>sqlite3 knowledge.db ".backup copy.db"</code> with the
+        service stopped.</span>
+      <b lang="vi">Đừng bao giờ xoá <code>knowledge.db</code>. Nó là corpus, không phải index.</b>
+      <span lang="vi">Tài liệu giờ nằm trong database — cả phần chữ, không chỉ embedding — và
+        một tài liệu được viết hay sửa trong màn hình BA thì không tồn tại ở đâu khác. Nên
+        <code>rm knowledge.db &amp;&amp; ./bin/ingest docs</code>, thứ từng là cách sửa an toàn
+        chỉ tốn một lần trả tiền provider, giờ phá sạch mọi thứ không vào bằng file. <b>Không
+        có backup</b>, đây là quyết định. Nếu cần bản sao trước khi làm gì, hãy tự lấy:
+        <code>sqlite3 knowledge.db ".backup copy.db"</code> khi service đã dừng.</span>
     </div>
-    <div class="terminal"><span class="cmd">sqlite3 knowledge.db 'select path from documents limit 3'</span><span class="out ok">spec.md</span><span class="out ok">qa/ticket-1.md</span><span class="err">docs/spec.md</span></div>
-    <p lang="en">A path like <code>spec.md</code> or <code>qa/ticket-1.md</code> is already
-      relative to <code>CORPUS_DIR</code> — nothing to do. One that still carries the folder
-      (<code>docs/spec.md</code>) or the full machine path predates the change, so rebuild:</p>
-    <p lang="vi">Path kiểu <code>spec.md</code> hay <code>qa/ticket-1.md</code> là đã tương
-      đối theo <code>CORPUS_DIR</code> — không phải làm gì. Path còn kèm tên thư mục
-      (<code>docs/spec.md</code>) hoặc còn nguyên đường dẫn máy là loại cũ, nên dựng lại:</p>
-    <div class="terminal"><span class="cmd">rm -f knowledge.db knowledge.db-wal knowledge.db-shm</span><span class="cmd">./bin/ingest docs</span></div>
-    <p lang="en">Deleting the index is safe, and cheap for a corpus this size: it is
-      <b>derived</b> — <code>CORPUS_DIR</code> is the source of truth, confirmed answers
-      included. The only cost is re-embedding, and the answer cache rebuilds itself on
-      demand.</p>
-    <p lang="vi">Xoá index là an toàn, và với corpus cỡ này thì rẻ: nó là thứ
-      <b>dựng lại được</b> — <code>CORPUS_DIR</code> mới là nguồn sự thật, gồm cả câu trả
-      lời đã confirm. Chi phí duy nhất là embed lại, còn cache câu trả lời tự dựng lại
-      khi có người hỏi.</p>
 
-    <div class="callout memo">
-      <b lang="en">Two kinds of change need that same rebuild.</b>
-      <span lang="en">A schema change does <i>not</i>: the server carries a forward-only
-        migration runner, so a new table or column reaches a database that already exists.
-        What a migration cannot do is re-derive rows that were written under an older rule,
-        and that is what the rebuild is for. (1) A change to how documents are
-        <i>split</i> into sections: the existing rows were split by the old rule and stay
-        that way until re-ingested. (2) A change to how a document path is stored — two
-        spellings of one file become two documents, each cited separately. Everything
-        else — a prompt edit, a new model, a retrieval parameter — invalidates the answer
-        cache on its own and needs nothing.</span>
-      <b lang="vi">Hai loại thay đổi cần dựng lại như trên.</b>
-      <span lang="vi">Thay đổi schema thì <i>không</i>: server có sẵn một migration runner
-        chạy một chiều, nên bảng mới hay column mới vẫn tới được database đang tồn tại. Thứ
-        migration không làm được là dựng lại những dòng đã ghi theo luật cũ — và đó mới là
-        việc của bước dựng lại. (1) Thay đổi cách <i>chia</i> tài liệu thành đoạn: các dòng
-        đang có vẫn theo luật cũ tới khi ingest lại. (2) Thay đổi cách lưu path tài liệu —
-        hai cách viết của cùng một file thành hai document, được dẫn nguồn riêng. Còn lại —
-        sửa prompt, đổi model, đổi tham số truy xuất — tự làm mất hiệu lực cache và không
-        cần gì thêm.</span>
-    </div>
+    <p lang="en">What a schema change needs: nothing. The server carries a forward-only
+      migration runner, so a new table or column reaches a database that already exists —
+      which is precisely why it shipped before the database became the source of truth.</p>
+    <p lang="vi">Thay đổi schema cần gì: không cần gì. Server có sẵn migration runner chạy một
+      chiều, nên bảng mới hay column mới vẫn tới được database đang tồn tại — và đó chính là
+      lý do nó ship trước khi database thành nguồn sự thật.</p>
+
+    <p lang="en">What a change to <i>chunking</i> needs: re-saving the documents it should
+      apply to, because the existing rows were split by the old rule. In the BA screen that is
+      opening a document and saving it again — a save re-embeds. There is no bulk re-index
+      command, and one has not been built because nothing has needed it twice.</p>
+    <p lang="vi">Thay đổi cách <i>chia đoạn</i> cần gì: lưu lại những tài liệu cần áp dụng, vì
+      các dòng đang có được chia theo luật cũ. Trong màn hình BA thì đó là mở tài liệu ra và
+      lưu lại — lưu là embed lại. Không có lệnh index lại hàng loạt, và chưa build vì chưa có
+      việc gì cần tới nó lần thứ hai.</p>
+
   </section>
 
   <!-- ══ settings ══════════════════════════════════════════════════════════ -->
@@ -466,8 +454,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>BA_PASS</code></th><td>trống (chỉ đọc)</td><td>đặt để BA confirm được câu trả lời vào tài liệu. Trống nghĩa là không có chỗ ghi nào — đọc và hàng đợi vẫn hoạt động. Nên khác <code>AUTH_PASS</code>: mật khẩu đó ai đọc cũng dùng chung.</td></tr>
           <tr lang="en"><th><code>ADMIN_PASS</code></th><td>empty (no admin screen)</td><td>set it to open <b>Admin</b> — the read-only window onto this instance: every setting with the value it resolved to and where that came from, what the binary is running, and what has been asked. Empty means the screen and its route do not exist, the same way an unset <code>BA_PASS</code> removes the write surface rather than opening it</td></tr>
           <tr lang="vi"><th><code>ADMIN_PASS</code></th><td>trống (không có màn Admin)</td><td>đặt để mở <b>Admin</b> — cửa sổ chỉ-đọc nhìn vào instance này: mọi setting kèm giá trị thực tế và nguồn của nó, binary đang chạy gì, và đã có những gì được hỏi. Trống nghĩa là màn hình và route đó không tồn tại, giống như <code>BA_PASS</code> trống thì không có mặt ghi chứ không phải mở toang</td></tr>
-          <tr lang="en"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>the folder <code>ingest</code> reads and where a confirmed answer is written. The service needs write access to it (<code>ReadWritePaths</code> below).</td></tr>
-          <tr lang="vi"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>thư mục <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm. Service cần quyền ghi vào đó (xem <code>ReadWritePaths</code> bên dưới).</td></tr>
+          <tr lang="en"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>the folder <code>ingest</code> reads, and nothing else — the server never writes there. <b>Read</b> access is enough now; a document arrives through the BA screen and lives in the database</td></tr>
+          <tr lang="vi"><th><code>CORPUS_DIR</code></th><td><code>docs</code></td><td>thư mục <code>ingest</code> đọc, và chỉ vậy — server không bao giờ ghi vào đó. Giờ chỉ cần quyền <b>đọc</b>; tài liệu vào qua màn hình BA và nằm trong database</td></tr>
           <tr lang="en"><th><code>EMBED_BASE_URL</code></th><td>same as chat</td><td>when the chat provider has no <code>/embeddings</code></td></tr>
           <tr lang="vi"><th><code>EMBED_BASE_URL</code></th><td>giống chat</td><td>khi provider chat không có <code>/embeddings</code></td></tr>
           <tr lang="en"><th><code>EMBED_API_KEY</code></th><td>same as <code>AI_API_KEY</code></td><td>only when embeddings are a different vendor — one key is not valid at two</td></tr>
@@ -484,8 +472,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>PORT</code></th><td><code>8080</code></td><td>chỉ khi 8080 đã bị chiếm — tunnel và reverse proxy đều trỏ vào đây</td></tr>
           <tr lang="en"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>the name in the browser's password box. Only matters with <code>AUTH_PASS</code> set — one shared login, not per-person accounts</td></tr>
           <tr lang="vi"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>tên hiện trong hộp mật khẩu của browser. Chỉ có tác dụng khi đã set <code>AUTH_PASS</code> — một tài khoản dùng chung, không phải mỗi người một tài khoản</td></tr>
-          <tr lang="en"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td>where the derived index lives. Put it on the same disk as the corpus; it is rebuildable, so it does not need a backup</td></tr>
-          <tr lang="vi"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td>nơi đặt index dẫn xuất. Để cùng ổ với corpus; nó dựng lại được nên không cần backup</td></tr>
+          <tr lang="en"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>where the corpus lives.</b> Not an index — the documents themselves. Losing this file loses the knowledge base, and there is no backup by decision, so put it on a disk you trust</td></tr>
+          <tr lang="vi"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>nơi corpus nằm.</b> Không phải index — là chính các tài liệu. Mất file này là mất kho tri thức, và không có backup (đây là quyết định), nên hãy để ở ổ đĩa bạn tin được</td></tr>
           <tr lang="en"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>any OpenAI-compatible provider — the URL up to and including <code>/v1</code></td></tr>
           <tr lang="vi"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>bất kỳ provider tương thích OpenAI — URL tính tới cả <code>/v1</code></td></tr>
           <tr lang="en"><th><code>AI_API_KEY</code></th><td>empty</td><td>required. Keep it in <code>.env</code> (mode 600), never on a command line — a shared terminal keeps history</td></tr>
@@ -602,16 +590,20 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
           rebase dở dang trên máy đang phục vụ cả nhóm.</p>
         <div class="terminal"><span class="cmd">git rebase --abort</span><span class="out"># only if status said "rebase in progress"</span><span class="cmd">git fetch origin &amp;&amp; git reset --hard origin/main</span><span class="cmd">git config pull.ff only</span><span class="out"># once per host: a plain `git pull` can no longer rebase</span></div>
         <div class="callout memo">
-          <b lang="en"><code>reset --hard</code> cannot reach the corpus. <code>git clean</code> can.</b>
-          <span lang="en">The two directories that are not rebuildable from
-            <code>origin</code> — <code>corpus/</code> and <code>state/</code> — are untracked
-            and listed in <code>.git/info/exclude</code>, so a hard reset does not see them.
+          <b lang="en"><code>reset --hard</code> cannot reach <code>state/</code>. <code>git clean</code> can.</b>
+          <span lang="en"><code>state/</code> is the one directory here that nothing can
+            rebuild — it holds <code>DB_PATH</code>, which is the corpus and not an index.
+            (<code>corpus/</code> is only what <code>ingest</code> reads, so it is staging,
+            not the source of truth.) Both are untracked and listed in
+            <code>.git/info/exclude</code>, so a hard reset does not see them — while
             <code>git clean</code> deletes exactly that: untracked files. Never run it
             here.</span>
-          <b lang="vi"><code>reset --hard</code> không chạm được vào corpus. <code>git clean</code> thì có.</b>
-          <span lang="vi">Hai thư mục không dựng lại được từ <code>origin</code> —
-            <code>corpus/</code> và <code>state/</code> — đều untracked và nằm trong
-            <code>.git/info/exclude</code>, nên hard reset không thấy chúng.
+          <b lang="vi"><code>reset --hard</code> không chạm được <code>state/</code>. <code>git clean</code> thì có.</b>
+          <span lang="vi"><code>state/</code> là thư mục duy nhất ở đây mà không gì dựng lại
+            được — nó chứa <code>DB_PATH</code>, tức là corpus, không phải index.
+            (<code>corpus/</code> chỉ là chỗ <code>ingest</code> đọc, nên đó là staging, không
+            phải nguồn sự thật.) Cả hai đều untracked và nằm trong
+            <code>.git/info/exclude</code>, nên hard reset không thấy chúng — còn
             <code>git clean</code> thì xoá đúng loại đó: file untracked. Đừng bao giờ chạy nó ở
             đây.</span>
         </div>
