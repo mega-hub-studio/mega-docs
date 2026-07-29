@@ -150,21 +150,24 @@
          title with textContent, so markup there is impossible anyway.) -->
     <div class="steps" id="hiw-steps">
       <div data-title="1 · ingest" data-title-vi="1 · ingest" data-focus=".md|ingest">
-        <p lang="en">You point <code>make ingest</code> at a folder. Every
-          <code>.md</code> / <code>.txt</code> file is read once — nothing leaves the
-          machine except the text sent for embedding.</p>
-        <p lang="vi">Bạn trỏ <code>make ingest</code> vào một thư mục. Mỗi file
-          <code>.md</code> / <code>.txt</code> được đọc một lần — không gì ra khỏi
-          máy ngoài đoạn text gửi đi embed.</p>
+        <p lang="en">A BA imports or writes a document in the app — that is the way in.
+          <code>make ingest</code> is the same step from a folder, for an operator loading
+          <code>.md</code> / <code>.txt</code> files in bulk. Either way the text is read once,
+          and nothing leaves the machine except what is sent for embedding.</p>
+        <p lang="vi">BA import hoặc viết tài liệu ngay trong app — đó là đường vào.
+          <code>make ingest</code> là đúng bước đó nhưng từ một thư mục, dành cho operator nạp
+          hàng loạt file <code>.md</code> / <code>.txt</code>. Cách nào thì text cũng chỉ được
+          đọc một lần, và không gì ra khỏi máy ngoài đoạn gửi đi embed.</p>
       </div>
       <div data-title="2 · SQLite" data-title-vi="2 · SQLite" data-focus="sqlite">
         <p lang="en">Each file is split into sections, each section becomes a vector,
-          and both land in <b>one SQLite file</b>. That file is the whole database — and it is
-          rebuilt from the folder above, which is why deleting it costs an index, not a
-          document.</p>
-        <p lang="vi">Mỗi file được cắt thành đoạn, mỗi đoạn thành một vector, và cả
-          hai nằm trong <b>một file SQLite</b>. File đó là toàn bộ database — và nó dựng lại
-          được từ thư mục ở trên, nên xoá nó chỉ mất index, không mất tài liệu.</p>
+          and both land in <b>one SQLite file</b> — together with the document's own text. That
+          file is the knowledge base, not a cache of one: a document written in the app exists
+          nowhere else, so deleting it costs the documents. There is no backup, by decision.</p>
+        <p lang="vi">Mỗi tài liệu được cắt thành đoạn, mỗi đoạn thành một vector, và cả hai nằm
+          trong <b>một file SQLite</b> — cùng với chính phần chữ của tài liệu. File đó
+          <i>là</i> kho tri thức, không phải bản cache: tài liệu viết trong app không tồn tại ở
+          đâu khác, nên xoá nó là mất tài liệu. Không có backup — đây là quyết định.</p>
       </div>
       <div data-title="3 · hybrid search" data-title-vi="3 · tìm kiểu hybrid" data-focus="your question|hybrid search">
         <p lang="en">Your question runs as <i>both</i> a meaning search and a keyword

@@ -452,12 +452,12 @@ EMBED_DIM=1536</span></div>
           and the database is the source of truth. Neither needs a re-index.</p>
         <p lang="vi"><code>BA_PASS</code> khoá hai hành động đổi câu trả lời của engine —
           confirm và dismiss. Để trống thì instance không có chỗ ghi nào, đó là cách an
-          toàn khi quên đặt secret. <code>CORPUS_DIR</code> là thư mục
-          <code>ingest</code> đọc và là nơi ghi câu trả lời đã confirm thành
-          <code>qa/ticket-N.md</code>; nhờ vậy database vẫn chỉ là thứ dựng lại được.
+          toàn khi quên đặt secret. <code>CORPUS_DIR</code> chỉ là thư mục
+          <code>ingest</code> đọc — không còn gì ghi vào đó. Câu trả lời đã confirm là một
+          dòng ở <code>qa/ticket-N.md</code>, và database chính là nguồn sự thật.
           Cả hai đều không cần index lại.</p>
         <div class="terminal"><span class="out">BA_PASS=…            # empty = read-only instance
-CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
+CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
         <div class="callout memo">
           <b lang="en">The answer cache is keyed on the corpus, not a clock.</b>
           <span lang="en">A repeat question skips both provider calls. Any ingest — a

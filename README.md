@@ -40,17 +40,20 @@ decisions in [`changelog/`](changelog/), and what an agent gets wrong in
 cp .env.example .env      # then set AI_API_KEY; everything else is already its default
 make deps                 # go mod tidy
 
-# 1) Put at least one document in docs/ — the folder ships EMPTY (a .gitkeep and
-#    nothing else), and `ingest` exits non-zero on "nothing was indexed" rather than
-#    reporting success over an empty index.
-cp README.md docs/        # or your own .md / .txt files
+# 1) Start the server. The knowledge base is the database, and the BA screen is where
+#    documents enter it — import files, or write one by hand with its attributes.
+make server               # http://localhost:8080 → BA tab (needs BA_PASS set)
 
-# 2) Index it (folder or files; .md/.txt only)
+# Or load a folder from the command line, which is the same step for an operator with
+# files already on disk (.md / .txt only). It exits non-zero on "nothing was indexed"
+# rather than reporting success over an empty index.
+cp README.md docs/
 make ingest DOCS=./docs
-
-# 3) Start the chat server
-make server               # http://localhost:8080
 ```
+
+> `knowledge.db` **is** the corpus, not a rebuildable index — a document written in the
+> app exists nowhere else, and there is no backup by decision. Copy it yourself before
+> anything risky: `sqlite3 knowledge.db ".backup copy.db"` with the service stopped.
 
 Ship it as a single binary instead — the binary *is* the web server, so there is no
 frontend to deploy separately:
