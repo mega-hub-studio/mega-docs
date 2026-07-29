@@ -50,6 +50,33 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; *Skills* below records the routing, the precedence and every place this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 | 25 | **The version is a git tag; the changelog is generated from `git log`.** `make release V=vX.Y.Z` is the only thing that changes either — never a `VERSION` file, never a hand-edited `web/release.json`, never a `CHANGELOG.md`. No tag means an **empty** version, which removes the badge rather than asserting a stale number | `TestReleaseNotesAreGenerated` (the do-not-edit marker · the tag shape · a sha behind every line) · `TestEveryRouteAndKnobIsSpecified` (`GET /api/release` must earn a documented section) · `TestRootDocsAreTheFourWeKnowAbout` (a root `CHANGELOG.md` is a fifth doc) |
+| 26 | **HARD: the official guide syncs in the same commit, and the claim it replaces is retired.** A behaviour change edits its `<section>`; the superseded passage is **deleted**, never parked beside its replacement, and its dead sentence is added to `retiredClaims` so it cannot return. Stale prose is context an agent loads and believes | `TestGuidePagesCarryNoRetiredClaim` (every published page, both languages) · `TestEverySpecNameExistsInTheCode` · `TestEveryRouteAndKnobIsSpecified` · `TestSpecJSONIsGeneratedFromThePages` · `make check-ui` |
+
+Rule 26 is the enforcer rule 24 was missing. "No stale doc" was already written down, and
+this repo still published a page telling operators that `rm knowledge.db` was safe — three
+commits after the database became the corpus — with `make check` green the whole time. Every
+machine-checked join is about *names*: `TestEveryRouteAndKnobIsSpecified` sees a route,
+`TestEverySpecNameExistsInTheCode` sees a test name, `make check-ui` measures pixels. None of
+them can tell that a correctly spelled paragraph describes last week's architecture.
+
+So the guide is part of the change, not the follow-up to it:
+
+1. **Same commit.** A change to behaviour edits the `<section>` that documents it. The guide
+   *is* the spec (rules 15–16) and it ships to a public domain on its own cadence, so a page
+   left behind is a lie with a URL.
+2. **Retire the claim you replaced.** Delete the superseded passage — never leave it beside
+   its replacement, which is how a page ends up teaching two architectures and a reader picks
+   the wrong one. Then add the dead sentence to `retiredClaims` in `web/embed_test.go`, one
+   line, so it can never come back: not by a revert, not by a copied paragraph, and not by an
+   agent that read an old page and helpfully restored it.
+3. **Cleanup is deletion, not accumulation.** Superseded prose, a `.env` key nothing reads, a
+   changelog paragraph restating `README.md` — all of it is context an agent loads and reasons
+   from. Rule 17 says a second copy of a fact is a bug; a *stale* copy is worse, because it
+   reads as current.
+
+The order that keeps it honest is rule 15's: edit the section, watch the join go red,
+implement. Point 2 is what makes point 1 checkable — and the cost of inverting a decision is
+one line in a list.
 
 Rule 25 is rule 17 aimed at the one fact this repo is most tempted to keep twice. Three
 places could hold "what changed" — a `VERSION` file, a `CHANGELOG.md`, and the git log — and

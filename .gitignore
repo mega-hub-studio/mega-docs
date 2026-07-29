@@ -3,11 +3,6 @@ knowledge.db
 knowledge.db-*
 .env
 
-# The corpus itself is NOT ignored: docs/ is the source of truth (knowledge.db is
-# derived from it), and a BA-confirmed answer lands in docs/qa/*.md precisely so it
-# is reviewable in a diff and backed up by git. Only the empty-checkout marker is
-# tracked here; add your own documents alongside it.
-
 # Vendored CDN assets — fetch with `make vendor`, never commit (the .gitkeep is tracked
 # so //go:embed always has a match).
 web/vendor/*
@@ -28,3 +23,10 @@ docs/*
 # web/dist is deliberately NOT ignored — the binary embeds it, which is what keeps
 # `go build` and a deploy free of Node (CLAUDE.md rule 14).
 web/ui/node_modules/
+
+# One package manager. CI installs with `npm ci`, so package-lock.json is the tree the
+# committed bundle is built from; a pnpm lockfile resolving anything differently makes rule
+# 14's rebuild-and-diff compare a bundle built from other dependencies. It also carries a
+# sha512 per entry, so `make secrets` reports it as a credential — which is how it announced
+# itself both times it was committed.
+web/ui/pnpm-lock.yaml

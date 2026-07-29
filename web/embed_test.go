@@ -63,6 +63,54 @@ func TestBuiltUIMatchesItsSources(t *testing.T) {
 	}
 }
 
+// retiredClaims is the enforcer for critical rule 26, and it is a *list* rather than a
+// clever check because the thing being caught cannot be derived: whether a sentence is still
+// true is a question about a decision, not about syntax.
+//
+// Every entry was on a published page and is now false. They are here because `make check`
+// was green while deploy.html taught that deleting knowledge.db was safe and that the corpus
+// directory was the source of truth — both inverted by then, and one of them a command that
+// destroys the corpus, on a public domain, with rules 15–16 saying the guide *is* the spec.
+// Nothing detected it. The route, knob and test joins are all machine-checked; the prose
+// around them was not checked at all.
+//
+// So the cost of inverting a decision is one line here, and what it buys is that the retired
+// sentence can never come back — not by a revert, not by a copied paragraph, not by an agent
+// reading an old page and helpfully restoring it. `why` is in the failure message, because a
+// phrase with no reason attached is the next person's mystery.
+var retiredClaims = []struct{ phrase, why string }{
+	{"CORPUS_DIR</code> is the source of truth", "inverted: the database is (rule 1)"},
+	{"corpus directory is the source of truth", "inverted: the database is (rule 1)"},
+	{"nguồn sự thật, gồm cả câu trả", "inverted: the database is (rule 1)"},
+	{"thư mục corpus là nguồn sự thật", "inverted: the database is (rule 1)"},
+	{"Deleting the index is safe", "the index IS the corpus now — this command loses it"},
+	{"does not need a backup", "DB_PATH is the one file that does; losing it loses everything"},
+	{"dựng lại được nên không cần backup", "DB_PATH is the one file that does"},
+	{"moves to <code>.trash", "removal is a deleted_at column, not a directory"},
+	{"written as a file", "a confirmed answer is a row; internal/rag touches no disk"},
+}
+
+// TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the
+// repo has retired. It is the check rule 24's "no stale doc" never had: `godox` catches a
+// deferred marker and `make check-ui` measures layout, but neither can tell that a correctly
+// spelled, well-formatted paragraph is describing last week's architecture.
+func TestGuidePagesCarryNoRetiredClaim(t *testing.T) {
+	for _, p := range Pages() {
+		out, err := p.Build("https://cdn.jsdelivr.net/npm", StaticNav)
+		if err != nil {
+			t.Fatalf("%s: %v", p.File, err)
+		}
+		page := string(out)
+		for _, c := range retiredClaims {
+			if strings.Contains(page, c.phrase) {
+				t.Errorf("%s still teaches a retired claim: %q — %s.\n"+
+					"Replace the passage, do not leave it beside its replacement (rule 26).",
+					p.File, c.phrase, c.why)
+			}
+		}
+	}
+}
+
 // TestReleaseNotesAreGenerated is the enforcer for critical rule 25: the release number
 // comes from an annotated tag and the notes come from `git log`, so release.json is a
 // generated file and never an edited one.
