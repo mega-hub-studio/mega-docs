@@ -47,12 +47,12 @@ func (e *Engine) Reject(id int64, note string) (db.Ticket, error) {
 	return e.store.Reject(id, note)
 }
 
-// Confirm publishes a BA's answer: write the file, index it, mark its chunks
-// approved, close the ticket.
+// Confirm publishes a BA's answer: store it as a document, mark its chunks approved,
+// close the ticket.
 //
-// Order matters. The file is written first because it is the source of truth — if
-// indexing then fails, `ingest docs` still picks it up. The ticket closes last, so
-// a failure anywhere leaves it in the queue instead of silently swallowing the work.
+// Order matters, and it is the ticket that closes last: the row and its chunks are written
+// together by one ingest, so a failure anywhere leaves the ticket in the queue rather than
+// silently swallowing the work a BA just typed.
 func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticket, error) {
 	answer = strings.TrimSpace(answer)
 	if answer == "" {

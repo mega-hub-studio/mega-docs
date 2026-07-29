@@ -24,9 +24,8 @@ docs/*
 # `go build` and a deploy free of Node (CLAUDE.md rule 14).
 web/ui/node_modules/
 
-# One package manager. CI installs with `npm ci`, so package-lock.json is the tree the
-# committed bundle is built from; a pnpm lockfile resolving anything differently makes rule
-# 14's rebuild-and-diff compare a bundle built from other dependencies. It also carries a
-# sha512 per entry, so `make secrets` reports it as a credential — which is how it announced
-# itself both times it was committed.
+# One package manager: CI installs with `npm ci`, so a pnpm tree resolving anything
+# differently makes rule 14's rebuild-and-diff compare a bundle built from other
+# dependencies. Ignored, not just deleted — it has been committed twice
+# (changelog/2026-07-29-conversation-memory.md).
 web/ui/pnpm-lock.yaml

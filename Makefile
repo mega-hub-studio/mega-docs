@@ -248,11 +248,9 @@ dead: dead-deps
 # output* is not a blind spot — a key can only reach the bundle from web/ui/src, which is
 # scanned.
 #
-# There was a third, web/ui/pnpm-lock.yaml, which failed the same way two minutes after it
-# was committed. It is *deleted* rather than excluded, which is the "pick one manager" this
-# comment used to defer: CI installs with `npm ci`, so package-lock.json is what the
-# committed bundle is built from, and a pnpm tree resolving anything differently makes rule
-# 14's rebuild-and-diff compare a bundle built from other dependencies.
+# A third, web/ui/pnpm-lock.yaml, fails the same way and is *deleted and gitignored* rather
+# than excluded — .gitignore says why. This scan is how it announced itself both times it was
+# committed, so leaving it unexcluded is the guard, not an oversight.
 #
 # git grep only sees TRACKED files, which is worth knowing before trusting a green run:
 # running this before `git add` scans a smaller tree than CI does. That is exactly how the

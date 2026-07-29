@@ -73,6 +73,14 @@ func (e *Engine) Upload(ctx context.Context, name, content string, a Attrs) (Upl
 	if err != nil {
 		return Uploaded{}, err
 	}
+	return e.save(ctx, rel, content, a)
+}
+
+// save is the write both doors share, and the only place that decides what a stored document
+// costs a caller: empty text is refused, one ingest writes the row and its chunks together,
+// and nothing is reported as saved that no chunk came out of. Upload and Update held a copy
+// each — two copies of "what saving means", one commit away from disagreeing.
+func (e *Engine) save(ctx context.Context, rel, content string, a Attrs) (Uploaded, error) {
 	if strings.TrimSpace(content) == "" {
 		return Uploaded{}, fmt.Errorf("%s is empty", rel)
 	}
@@ -141,25 +149,16 @@ func (e *Engine) Update(ctx context.Context, from, to, content string, a Attrs) 
 			return Uploaded{}, err
 		}
 	}
-	if strings.TrimSpace(content) == "" {
-		return Uploaded{}, fmt.Errorf("%s is empty", dst)
-	}
-
-	n, err := e.ingest(ctx, doc(dst, content, a))
-	if err != nil {
-		return Uploaded{Path: dst}, fmt.Errorf("%s was not saved (%w)", dst, err)
-	}
-	if n == 0 {
-		return Uploaded{Path: dst}, fmt.Errorf("%s has no indexable text", dst)
-	}
+	saved, err := e.save(ctx, dst, content, a)
 	// Only after the new address holds the document: a rename that dropped the old rows
 	// first and then failed to embed would lose the document outright.
-	if dst != src {
-		if _, err := e.store.RemoveDocument(src); err != nil {
-			return Uploaded{Path: dst}, fmt.Errorf("%s was saved as %s but %s still answers (%w)", src, dst, src, err)
-		}
+	if err != nil || dst == src {
+		return saved, err
 	}
-	return Uploaded{Path: dst, Chunks: n}, nil
+	if _, err := e.store.RemoveDocument(src); err != nil {
+		return saved, fmt.Errorf("%s was saved as %s but %s still answers (%w)", src, dst, src, err)
+	}
+	return saved, nil
 }
 
 // doc is where an empty title becomes the file name, in one place, so a document imported
