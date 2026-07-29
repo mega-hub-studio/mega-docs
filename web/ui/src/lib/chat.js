@@ -141,6 +141,9 @@ export async function health() {
       // The commit this server was built from. Absent for a binary with no VCS stamp, and
       // the strip prints nothing rather than a placeholder — same rule as the prices.
       version: body.version || '',
+      // The tag beside that commit, when one was cut. It is a label and not the notes: those
+      // are GET /api/release, fetched only if somebody opens the dialog.
+      release: body.release || '',
     }
   }
   catch {
@@ -153,6 +156,7 @@ export async function health() {
       priceIn: 0,
       priceOut: 0,
       version: '',
+      release: '',
     }
   }
 }

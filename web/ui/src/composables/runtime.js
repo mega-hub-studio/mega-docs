@@ -23,7 +23,7 @@ export function useRuntime() {
   const online = ref(true) // optimistic: the first check has not answered yet
   const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
   const admin = ref(false) // same, and for the same reason: no surface until it is proven
-  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0, version: '' })
+  const runtime = ref({ model: '', window: 0, priceIn: 0, priceOut: 0, version: '', release: '' })
 
   async function check() {
     const h = await health()
@@ -39,6 +39,11 @@ export function useRuntime() {
       // a composable of its own: it arrives in the same request and answers the same kind of
       // question — what is this instance, right now.
       version: h.version,
+      // The tag that commit was cut from, which is what the badge prints. It rides along here
+      // for the same reason the commit does: it arrives in this request and answers the same
+      // kind of question — what is this instance, right now. The notes behind it are a
+      // separate route and a separate composable, because they are fetched on a click.
+      release: h.release,
     }
   }
 

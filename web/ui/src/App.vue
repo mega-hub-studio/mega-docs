@@ -32,6 +32,7 @@
 import { toast } from '8bit-nes'
 import { onMounted, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import ReleaseModal from './components/ReleaseModal.vue'
 import ScopePicker from './components/ScopePicker.vue'
 import StatusLine from './components/StatusLine.vue'
 import { useConversation } from './composables/conversation.js'
@@ -39,6 +40,7 @@ import { useCorpus } from './composables/corpus.js'
 import { useDiagrams } from './composables/diagrams.js'
 import { useT } from './composables/lang.js'
 import { useQaLoop } from './composables/qaloop.js'
+import { useRelease } from './composables/release.js'
 import { useRuntime } from './composables/runtime.js'
 import { useScope } from './composables/scope.js'
 import { useStatusLine } from './composables/statusline.js'
@@ -50,6 +52,7 @@ const dock = useTemplateRef('dock') // the keyboard/scroll maths measures it
 const pick = useTemplateRef('pick') // the picker: closed after a scope is picked
 const zoom = useTemplateRef('zoom') // <dialog>: the diagram viewer
 const zoomBody = useTemplateRef('zoomBody')
+const rel = useTemplateRef('rel') // <dialog>: what changed in this release
 
 /* ── state, one concern per composable ── */
 const route = useRoute() // which screen: the header, the dock and the props below read it
@@ -60,6 +63,16 @@ const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
+// The notes are fetched on the first open and kept — they describe the binary that is
+// answering, so they cannot change until it restarts.
+const {
+  groups: relGroups,
+  meta: relMeta,
+  loading: relLoading,
+  error: relError,
+  open: openRelease,
+  close: closeRelease,
+} = useRelease({ dialog: rel })
 
 // viewport.js binds to a real element, so it can only exist after mount. The
 // conversation is given a function rather than the object, and a scroll before mount is
@@ -258,6 +271,29 @@ function replay(entry) {
     </nes-zoom>
   </dialog>
 
+  <!-- ══ What changed ════════════════════════════════════════════════════════
+       Opened from the version badge in the status line, which is only a button when a
+       release was actually cut — an untagged build leaves GET /api/release unregistered and
+       the badge unclickable, so this dialog cannot be reached with nothing to show.
+
+       The <dialog> is here rather than inside ReleaseModal for the same reason the diagram
+       viewer's is: the shell owns dialogs, so `useRelease` binds a real element instead of
+       reaching through a component instance for its root node. The component renders the
+       body. Backdrop click closes it — on a native dialog that click lands on the dialog
+       element itself, which is what .self matches.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <dialog ref="rel" class="modal release" @click.self="closeRelease" @close="closeRelease">
+    <div class="head">
+      <span class="title">{{ t('release.title') }}</span>
+      <button class="btn ghost icon sm" :aria-label="t('release.close')" @click="closeRelease">
+        <nes-icon name="close" />
+      </button>
+    </div>
+    <ReleaseModal
+      :groups="relGroups" :meta="relMeta" :loading="relLoading" :error="relError"
+    />
+  </dialog>
+
   <!-- The prompt belongs to asking. On the BA screen there is nothing to send, so it goes
        away rather than sitting there disabled. v-show, not v-if: the dock element is what
        the keyboard maths bound at mount, and it has to stay the same element. -->
@@ -278,6 +314,9 @@ function replay(entry) {
       @nes:submit="ask($event.detail.value)" @nes:stop="stop"
     />
 
-    <StatusLine :line="statusLine" :model="runtime.model" :version="runtime.version" />
+    <StatusLine
+      :line="statusLine" :model="runtime.model" :version="runtime.version"
+      :release="runtime.release" @show-release="openRelease"
+    />
   </div>
 </template>

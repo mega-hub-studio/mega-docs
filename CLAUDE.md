@@ -49,6 +49,28 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 22 | **Complexity hides behind one seam; the call site reads as intent.** Modern idiom, the plainest syntax that is correct, no ceremony, no comment that restates its code — and a name a *grep* resolves, because an agent infers from what it can find | `make lint` (`gocyclo` 16 · `nestif` · `funlen` · `gocritic` · `intrange` · `usestdlibvars` · `godot`) · `make lint-js` (`no-var`, `prefer-const`, `prefer-template`, 22 `unicorn/*`, 15 `jsdoc/*` — all at `--max-warnings 0`) |
 | 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; *Skills* below records the routing, the precedence and every place this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
+| 25 | **The version is a git tag; the changelog is generated from `git log`.** `make release V=vX.Y.Z` is the only thing that changes either — never a `VERSION` file, never a hand-edited `web/release.json`, never a `CHANGELOG.md`. No tag means an **empty** version, which removes the badge rather than asserting a stale number | `TestReleaseNotesAreGenerated` (the do-not-edit marker · the tag shape · a sha behind every line) · `TestEveryRouteAndKnobIsSpecified` (`GET /api/release` must earn a documented section) · `TestRootDocsAreTheFourWeKnowAbout` (a root `CHANGELOG.md` is a fifth doc) |
+
+Rule 25 is rule 17 aimed at the one fact this repo is most tempted to keep twice. Three
+places could hold "what changed" — a `VERSION` file, a `CHANGELOG.md`, and the git log — and
+two of them are copies with a delay on them. So the tag is the input and everything else is
+generated: `scripts/release.sh` reads `git log` between the previous tag and `HEAD`, writes
+`web/release.json`, commits it, then tags **that** commit (in that order, or every deploy
+reads one commit past its own release).
+
+Its two rejections are already recorded, and re-deriving them costs a day:
+`changelog/2026-07-28-deploy-and-version.md` rejected a `VERSION` file and `-ldflags -X`
+because *a version somebody has to remember to bump is a version that lies*, and
+`changelog/README.md` refuses release notes on the grounds that *the git log already is
+one*. A tag does not repeat the first mistake, it defeats it — forget to cut one and
+`ReleaseInfo().Version` is empty, so `GET /api/release` is never registered and the badge
+falls back to the commit sha. Nothing on screen claims a release that was not cut.
+
+What makes it enforceable rather than a wish: **every note names its short sha.** Prose a
+human types has no commit to point at, so `TestReleaseNotesAreGenerated` cannot be satisfied
+by a hand-written file — which is the check that turns "generated, not written" from a
+convention into a red test. The commit in `/api/health` stays beside the tag and neither
+replaces the other: the commit says which bytes are running, the tag says what changed.
 
 Rules 17 and 20 are the two to apply before the rest, because most of the others exist to
 stop a second copy of something or a part nobody needed. Rule 17 taken literally, in the
@@ -185,6 +207,9 @@ make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to 
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
 make deploy                # ON THE HOST: pull --ff-only → stale-bundle check → build → restart
 #                            → health. Never a rebase, never a push; UNIT/PORT override it
+make release V=v0.13.0     # cut a release: generate web/release.json from git log, commit
+#                            it, tag that commit. The tag is the only input (rule 25); push
+#                            with `git push origin main --follow-tags`
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
 

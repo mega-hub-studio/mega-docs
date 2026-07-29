@@ -70,9 +70,9 @@ func Load() Config {
 		BindAddr: env("BIND_ADDR", "127.0.0.1"),
 		Port:     env("PORT", "8080"),
 		DBPath:   env("DB_PATH", "knowledge.db"),
-		// The folder `ingest` reads, and where a BA-confirmed answer is written as
-		// a markdown file. Keeping both on one path is what makes the database
-		// derived: this directory is the source of truth, so put it in git.
+		// Only the folder `ingest` reads when an operator imports from disk. Nothing
+		// writes there, so read access is enough — the documents themselves live in
+		// DB_PATH, which is the source of truth (invariant 1).
 		CorpusDir: env("CORPUS_DIR", "docs"),
 		BaseURL:   env("AI_BASE_URL", "https://api.openai.com/v1"),
 		// Empty means "same as chat". Split it when a gateway serves
@@ -233,7 +233,13 @@ func loadDotEnv(path string) map[string]bool {
 			// worth saying, because the setting silently not applying is the symptom.
 			if err := os.Setenv(k, v); err != nil {
 				log.Printf(".env: skipping %q: %v", k, err)
+				continue
 			}
+			// Recorded *after* the Setenv succeeds and only in this branch: a key the
+			// shell already had did not come from the file. Forgetting this line is how
+			// the Admin screen reported every .env value as "env" — the one thing it
+			// exists to tell apart — while looking entirely healthy.
+			set[k] = true
 		}
 	}
 	return set

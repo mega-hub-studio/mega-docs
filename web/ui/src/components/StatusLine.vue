@@ -20,7 +20,14 @@ defineProps({
   // looking at the app rather than by reaching the host. Empty for a build with no VCS
   // stamp, and then nothing renders — the same rule as every other field here.
   version: { type: String, default: '' },
+  // The tag that commit was cut from, `v0.13.0`. When it is present the strip shows it
+  // instead of the sha and the item becomes a button onto the notes — a reader asking
+  // "what changed?" cannot get there from a hash. Empty means no tag was ever cut, and then
+  // the commit is still shown, as plain text: the same rule as every other field here, where
+  // absent renders nothing rather than a placeholder.
+  release: { type: String, default: '' },
 })
+defineEmits(['showRelease'])
 </script>
 
 <template>
@@ -46,8 +53,17 @@ defineProps({
            deliberately not a `nes-icon name="branch"`, which this version of the library
            does not define, so it would have rendered an empty box with no warning.
            A trailing `+` means the host built from a dirty tree. -->
+      <!-- With a tag: a real <button>, so it is reachable by keyboard and announced as
+           something that does anything. `.sl-ver` only removes the button chrome — this is
+           still an ambient strip, and a raised control in it would read as the primary
+           action next to the prompt. -->
+      <button
+        v-if="release" type="button" class="sl-item sl-ver"
+        :title="`Release ${release} — commit ${version}. Click for what changed.`"
+        @click="$emit('showRelease')"
+      >{{ release }}</button>
       <span
-        v-if="version" class="sl-item"
+        v-else-if="version" class="sl-item"
         :title="`Deployed revision: commit ${version} (a trailing + means the tree was dirty)`"
       >@{{ version }}</span>
     </span>

@@ -75,6 +75,33 @@ export const messages = {
       freeRepeats: '{n} free repeats so far',
       withBa: 'Questions with a BA ({n})',
     },
+    // The version badge and the dialog behind it. `kind` mirrors Conventional-Commit types,
+    // so the keys are the prefixes themselves rather than invented names — a translator sees
+    // the same word the commit used. `other` is the bucket for a subject that followed no
+    // convention, which is kept rather than dropped.
+    release: {
+      label: 'Version {v} — what changed',
+      title: 'What changed',
+      since: 'since {v}',
+      first: 'the first tagged release',
+      commits: '{n} commits',
+      loading: 'Reading the notes…',
+      failed: 'Could not read the release notes: {err}',
+      empty: 'This release carries no commits, which should be impossible — check {file}.',
+      close: 'Close',
+      kind: {
+        feat: 'Features',
+        fix: 'Fixes',
+        perf: 'Performance',
+        refactor: 'Refactoring',
+        docs: 'Documentation',
+        style: 'Style',
+        test: 'Tests',
+        build: 'Build',
+        chore: 'Chores',
+        other: 'Other',
+      },
+    },
   },
   vi: {
     app: {
@@ -106,6 +133,29 @@ export const messages = {
       wholeCorpus: 'toàn bộ corpus',
       freeRepeats: 'đã hỏi lại miễn phí {n} lần',
       withBa: 'Câu hỏi đang chờ BA ({n})',
+    },
+    release: {
+      label: 'Phiên bản {v} — có gì thay đổi',
+      title: 'Có gì thay đổi',
+      since: 'so với {v}',
+      first: 'bản tag đầu tiên',
+      commits: '{n} commit',
+      loading: 'Đang đọc ghi chú…',
+      failed: 'Không đọc được ghi chú phát hành: {err}',
+      empty: 'Bản này không có commit nào, lẽ ra không thể xảy ra — kiểm tra {file}.',
+      close: 'Đóng',
+      kind: {
+        feat: 'Tính năng',
+        fix: 'Sửa lỗi',
+        perf: 'Hiệu năng',
+        refactor: 'Tái cấu trúc',
+        docs: 'Tài liệu',
+        style: 'Trình bày',
+        test: 'Kiểm thử',
+        build: 'Build',
+        chore: 'Việc lặt vặt',
+        other: 'Khác',
+      },
     },
   },
 }

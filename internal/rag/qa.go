@@ -17,10 +17,10 @@ import (
 //	BA answers → Confirm into knowledge                   (ticket: confirmed)
 //	next DEV asks → retrieved, cited, free the second time
 //
-// A confirm writes a real markdown file into the corpus directory and indexes that
-// file — it does not stash prose in the database. That keeps one property worth
-// protecting: the database is derived. `ingest docs` rebuilds it, and the answers a
-// BA vouched for live in git with everything else, not in a blob nobody can review.
+// A confirm writes the answer straight into the database as a document row and indexes
+// it in the same call — nothing reaches disk. The path stays `qa/ticket-N.md` because
+// that is what a citation prints and what a scope matches, not because a file exists,
+// and the row *is* the document like every other one (invariant 1).
 
 // QADir is where confirmed answers land, relative to the corpus directory. A
 // separate folder because these are answers to questions, not authored documents —

@@ -41,7 +41,7 @@ endif
 # GOBIN wins when it is set, or `dead-deps` installs on every run and finds nothing.
 GOBIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
 
-.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy release
 
 deps:
 	go mod tidy
@@ -198,9 +198,15 @@ check-ui:
 #
 # Skipped, loudly, when node_modules is absent: a machine that only builds Go still has a
 # committed bundle and does not need a linter for it.
+#
+# CI=1 for the same reason `lint-deps` pins a version: local and CI have to agree by
+# construction. @antfu/eslint-config turns rules off when it sees an editor's environment
+# (VSCODE_PID and friends) unless CI is set, so a terminal *inside* the IDE ran a weaker
+# gate than the push did — and that is not theoretical, it hid a `jsdoc/*` warning that
+# --max-warnings 0 fails on.
 lint-js:
 	@[ -d web/ui/node_modules ] || { echo "  skipped lint-js (run \`make ui\` to install web/ui)"; exit 0; }
-	@cd web/ui && npm run --silent lint
+	@cd web/ui && CI=1 npm run --silent lint
 
 # Same linters, applying the fixes they know how to make. Read the diff: the formatters
 # are opinionated and one of them (gofumpt) is left off here for a reason .golangci.yml
@@ -294,6 +300,13 @@ build:
 # Deliberately not here: `make ui`, `make check-full` (Node, and a browser, neither of which
 # a deploy host has) and any `git push`. This target only moves this machine to what origin
 # already has.
+# Cut a release: the annotated tag is the only input, and web/release.json is generated
+# from git log in the commit the tag points at. Not part of `build` or `deploy` — cutting a
+# release is a decision somebody makes, and a tag is a side effect no automated target may
+# take. scripts/release.sh explains the write-commit-tag order.
+release:
+	@V="$(V)" scripts/release.sh
+
 deploy:
 	@git diff --quiet || { echo "  refusing: working tree is dirty — commit or stash first"; git status --short; exit 1; }
 	@echo "  before: $$(git rev-parse --short HEAD)"

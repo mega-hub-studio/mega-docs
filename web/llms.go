@@ -76,11 +76,12 @@ func LLMs(siteBase string) ([]byte, error) {
 		"answer, dismissing a question, and importing a document all need `BA_PASS`. " +
 		"An unset `BA_PASS` means the instance has no write surface at all, not open " +
 		"writes.\n")
-	b.WriteString("- The SQLite file is derived. `CORPUS_DIR` (default `docs`) is the " +
-		"source of truth, including the answers BAs confirm, which are written there as " +
-		"`qa/ticket-N.md` — so deleting the database costs an index, not a document. There " +
-		"is no backup story by design: documents enter through one controlled path, the BA " +
-		"WebUI import, and removal is a soft delete into `.trash/`.\n")
+	b.WriteString("- The SQLite database *is* the corpus, not an index of one: every " +
+		"document — imported, or confirmed by a BA as `qa/ticket-N.md` — is a row holding " +
+		"its own text, and the BA WebUI is the only way one enters. `CORPUS_DIR` (default " +
+		"`docs`) is just the folder `ingest` reads when an operator imports from disk. So " +
+		"deleting the database deletes the documents, and there is no backup story by " +
+		"design; removal is a soft delete that stops retrieval and keeps the text.\n")
 	b.WriteString("- A repeated question is answered from a local cache: no provider " +
 		"call, no cost. Any ingest invalidates the whole cache, so a cached answer " +
 		"never outlives the sources it cites.\n")

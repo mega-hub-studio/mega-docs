@@ -34,6 +34,7 @@ type Deps struct {
 	Docs    Importer  // document import; nil leaves that route unregistered
 	Index   []byte    // the built app's index.html, straight from web/dist
 	Assets  fs.FS     // the rest of that build: assets/… every name content-hashed
+	Release []byte    // web/release.json verbatim; empty leaves GET /api/release unregistered
 	Auth    Auth      // optional Basic credentials; zero value = open
 	BAPass  BAPass    // gates the write actions; empty = no write surface
 	Runtime Runtime   // what the status line reports; zero values simply hide fields
@@ -58,6 +59,12 @@ type Runtime struct {
 	// answer on the screen and from `curl /api/health`, rather than requiring shell access
 	// to the host that serves it. Empty means the build carried no VCS stamp.
 	Version string
+	// Release is the tag that commit was cut from — `v0.13.0`, or empty in a tree with no
+	// tags. Both are here because they answer different questions: the commit is which
+	// bytes, the release is what changed. Only the label travels in /api/health; the notes
+	// behind it are GET /api/release, so a payload that grows with every commit stays out
+	// of the endpoint every client re-polls on reconnect.
+	Release string
 }
 
 // New wires the routes and returns the whole app as one handler.
@@ -74,6 +81,8 @@ type Runtime struct {
 //	POST /api/documents  import .md/.txt into the corpus — same gate as a confirm
 //	DELETE /api/documents/{path…}  remove a document and its chunks — same gate
 //	GET  /api/history answers still free to replay
+//	GET  /api/release what changed since the previous tag — open, and unregistered when no
+//	                  tag has been cut, which is what leaves the version badge unclickable
 //	GET  /api/settings  every knob with the provenance of its value — needs X-Admin-Pass,
 //	                  and unregistered entirely when ADMIN_PASS is unset
 //	GET  /assets/…    the built bundle      immutable (every name has a content hash)
@@ -95,16 +104,31 @@ func New(d Deps) http.Handler {
 	// `version` is the deployed commit. It is disclosure of a public repository's revision,
 	// not a secret, and it is what makes a deploy verifiable from the UI: the alternative was
 	// reading journalctl on the host, which the person asking usually cannot reach.
+	// `release` is the tag beside the commit, and it is a label rather than the notes: it is
+	// what the badge prints, so it has to arrive in the request the app already makes. Empty
+	// means no tag was ever cut, and the badge falls back to the commit instead of inventing
+	// a number.
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"version":%q}`,
+		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"version":%q,"release":%q}`,
 		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
-		d.Runtime.PriceIn, d.Runtime.PriceOut, d.Runtime.Version)
+		d.Runtime.PriceIn, d.Runtime.PriceOut, d.Runtime.Version, d.Runtime.Release)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its
 		// business, not ours.
 		_, _ = w.Write([]byte(health))
 	})
+
+	// What changed, for the modal behind the badge. Registered only with a release to
+	// describe: an untagged build has no notes, and a route answering `{"notes":[]}` would
+	// have the app render an empty dialog rather than leave the badge unclickable — the same
+	// rule the write routes follow, where a missing capability removes its surface.
+	if len(d.Release) > 0 {
+		mux.HandleFunc("GET /api/release", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(d.Release)
+		})
+	}
 
 	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers))
 	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))

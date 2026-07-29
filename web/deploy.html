@@ -242,7 +242,7 @@ done: 8/8 files, 74 chunks</span></div>
        path would need persistence and a reload for a value nobody changes twice a year. -->
   <section id="admin" data-feature="admin"
            data-api="GET /api/settings" data-env="ADMIN_PASS"
-           data-test="TestSettingsNeedTheAdminPassword,TestSettingsRedactEverySecret">
+           data-test="TestSettingsNeedTheAdminPassword,TestSettingsRedactEverySecret,TestSettingsReportWhereEachValueCameFrom">
     <h2 lang="en">Admin: what this instance actually is</h2>
     <h2 lang="vi">Admin: instance này thực sự là gì</h2>
     <p class="lede" lang="en">One screen at <code>/#/admin</code>, three tabs, and nothing
@@ -424,6 +424,62 @@ done: 8/8 files, 74 chunks</span></div>
       lưu lại — lưu là embed lại. Không có lệnh index lại hàng loạt, và chưa build vì chưa có
       việc gì cần tới nó lần thứ hai.</p>
 
+  </section>
+
+  <!-- ══ releases ══════════════════════════════════════════════════════════════
+       The section that earns GET /api/release its place: spec_test.go fails the build
+       until an endpoint is documented, which is why this exists before the route did. -->
+  <section id="release" data-feature="release"
+           data-api="GET /api/release"
+           data-test="TestReleaseNotesAreGenerated">
+    <h2 lang="en">Which version, and what changed</h2>
+    <h2 lang="vi">Đang chạy bản nào, và có gì thay đổi</h2>
+    <p class="lede" lang="en">The status line's last item is the running version. With a tag
+      cut it reads <code>v0.13.0</code> and is a button: it opens what changed since the
+      previous tag, generated from the commits themselves.</p>
+    <p class="lede" lang="vi">Mục cuối cùng của status line là phiên bản đang chạy. Nếu đã cắt
+      tag thì nó hiện <code>v0.13.0</code> và là một nút bấm: mở ra những gì đã thay đổi so với
+      tag trước, sinh ra từ chính các commit.</p>
+
+    <p lang="en">Cut one with the tag as the only input. It generates
+      <code>web/release.json</code>, commits it, and tags <i>that</i> commit — in that order,
+      because a tag placed before the file it names leaves every deploy reading one commit
+      past its own release:</p>
+    <p lang="vi">Cắt một bản với tag là input duy nhất. Nó sinh
+      <code>web/release.json</code>, commit file đó, rồi tag <i>đúng</i> commit ấy — theo thứ
+      tự đó, vì tag đặt trước file mà nó gọi tên sẽ làm mọi lần deploy đọc ra một commit sau
+      release của chính nó:</p>
+    <div class="terminal"><span class="cmd">make release V=v0.13.0</span><span class="out ok">  tagged v0.13.0 at 03f1f89 — 14 commits since v0.12.0</span><span class="out">  push it:  git push origin main --follow-tags</span></div>
+    <p lang="en">Then deploy as usual. <code>--follow-tags</code> matters: the host reads the
+      file, not the tag, but a tag left behind on a laptop makes the <i>next</i> release
+      measure from the wrong place.</p>
+    <p lang="vi">Rồi deploy như bình thường. <code>--follow-tags</code> quan trọng: host đọc
+      file chứ không đọc tag, nhưng tag bị bỏ lại trên laptop sẽ làm lần release <i>sau</i> đo
+      từ sai mốc.</p>
+
+    <div class="callout memo">
+      <b lang="en">Nothing here is bumped by hand, and forgetting to tag cannot lie.</b>
+      <span lang="en">A <code>VERSION</code> file was rejected for the reason recorded in the
+        changelog: a version somebody has to remember to bump is a version that lies. A tag
+        defeats that instead of repeating it — cut none and the version is simply
+        <i>empty</i>, so <code>GET /api/release</code> is never registered, the badge falls
+        back to the commit sha and stays unclickable. The notes are read out of
+        <code>git log</code> for the same reason there is no <code>CHANGELOG.md</code>: the
+        git log already is the release notes, and a prose copy is a second truth with a delay
+        on it. Every line carries its short sha, which is what makes that checkable —
+        <code>TestReleaseNotesAreGenerated</code> fails on a note with no commit behind
+        it.</span>
+      <b lang="vi">Không có gì ở đây phải bump tay, và quên cắt tag thì cũng không nói dối.</b>
+      <span lang="vi">File <code>VERSION</code> đã bị loại vì lý do ghi trong changelog: một
+        version mà ai đó phải nhớ bump là một version nói dối. Tag thì đánh thắng lý do đó chứ
+        không lặp lại nó — không cắt tag nào thì version đơn giản là <i>trống</i>, nên
+        <code>GET /api/release</code> không được đăng ký, badge quay về hiện commit sha và
+        không bấm được. Ghi chú thì đọc từ <code>git log</code>, cùng lý do không có
+        <code>CHANGELOG.md</code>: git log vốn đã là release notes, còn một bản chép bằng văn
+        xuôi là sự thật thứ hai có kèm độ trễ. Mỗi dòng đều mang sha ngắn của nó, và đó là thứ
+        làm cho việc này kiểm được — <code>TestReleaseNotesAreGenerated</code> đỏ khi có một
+        dòng không có commit nào phía sau.</span>
+    </div>
   </section>
 
   <!-- ══ settings ══════════════════════════════════════════════════════════ -->

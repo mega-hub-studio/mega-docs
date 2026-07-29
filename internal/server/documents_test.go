@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -438,5 +440,43 @@ func TestSettingsRedactEverySecret(t *testing.T) {
 	}
 	if n := strings.Count(body, `"value":"set"`); n != 5 {
 		t.Errorf("got %d secrets reported as set, want 5: %s", n, body)
+	}
+}
+
+// Rule — the screen reports where each value came from, which is the one thing an operator
+// cannot work out by reading files: loadDotEnv copies .env into the environment, so from
+// then on a file value and a shell value are identical to os.Getenv. This asserts the two
+// that can be confused. It is here rather than in internal/config because the provenance
+// has to survive the JSON, and because config.Load() reads ./.env — hence t.Chdir.
+func TestSettingsReportWhereEachValueCameFrom(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("TOP_K=9\nADMIN_PASS=pw\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Setenv("CHAT_MODEL", "from-the-shell") // set before Load, so .env must not claim it
+
+	cfg := config.Load()
+	srv := adminServer(func() any { return cfg.Inventory() }, AdminPass(cfg.AdminPass))
+	res := do(t, srv, http.MethodGet, "/api/settings", "", map[string]string{"X-Admin-Pass": "pw"})
+	if res.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200: %s", res.Code, res.Body.String())
+	}
+
+	var inv []config.Setting
+	if err := json.Unmarshal(res.Body.Bytes(), &inv); err != nil {
+		t.Fatalf("the inventory does not decode: %v", err)
+	}
+	want := map[string]string{"TOP_K": ".env", "CHAT_MODEL": "env", "PRICE_IN": "default"}
+	for _, s := range inv {
+		if w, ok := want[s.Name]; ok {
+			if s.Source != w {
+				t.Errorf("%s reports source %q, want %q", s.Name, s.Source, w)
+			}
+			delete(want, s.Name)
+		}
+	}
+	for name := range want {
+		t.Errorf("%s is not in the inventory at all", name)
 	}
 }

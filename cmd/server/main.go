@@ -57,9 +57,25 @@ func run() error {
 		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
 	}), rag.Options{TopK: cfg.TopK})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
+	// The release is embedded, so a parse failure is a broken build rather than a runtime
+	// condition — but it must not stop the server: the notes are the least important thing
+	// here, and an instance that refuses to answer questions because its changelog is
+	// malformed has its priorities inverted. Log it and carry on with no badge.
+	release, err := web.ReleaseInfo()
+	if err != nil {
+		log.Printf("WARNING: %v — the version badge will show the commit only", err)
+	}
+	// Nil rather than the file's bytes when no tag has been cut: the route disappears, the
+	// badge stays unclickable, and nobody opens a dialog listing nothing. The file itself is
+	// always present — it has to be, `go:embed` fails to compile without it.
+	var releaseJSON []byte
+	if release.Version != "" {
+		releaseJSON = web.ReleaseJSON()
+	}
 	handler := server.New(server.Deps{
 		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
-		Auth: auth, BAPass: server.BAPass(cfg.BAPass),
+		Release: releaseJSON,
+		Auth:    auth, BAPass: server.BAPass(cfg.BAPass),
 		// The Admin screen reads the config it is describing, so the inventory is a closure
 		// over cfg rather than a snapshot: one source for what the knobs are, in the package
 		// that defines them.
@@ -67,7 +83,7 @@ func run() error {
 		Runtime: server.Runtime{
 			Model: cfg.ChatModel, Window: cfg.Window,
 			PriceIn: cfg.PriceIn, PriceOut: cfg.PriceOut,
-			Version: revision(),
+			Version: revision(), Release: release.Version,
 		},
 	})
 

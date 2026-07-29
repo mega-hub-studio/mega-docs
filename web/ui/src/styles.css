@@ -158,6 +158,34 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 }
 .prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
 
+/* ── citations: the marker, and the row it jumps to ──
+   The first rule is the SECOND LOCAL OVERRIDE of the design system (8bit-nes 0.8.0, and
+   AGENTS.md names it), and it is two of the library's own recipes disagreeing: `.prose a`
+   and `.cite` are both in the components layer, so specificity decides — (0,1,1) against
+   (0,1,0) — and every marker an answer renders came out as a prose link. Measured on the
+   built bundle: colour rgb(86,211,100) with a 2px underline in the same green, inside the
+   cyan chip `.cite` had already drawn. The chip *is* the affordance (superscript, slot
+   background, its own edge), so the underline was a second one struck through the digit,
+   in a colour that says "ordinary link" about the one thing on the line that is not.
+   Restores the recipe and nothing else. Delete it on the release that scopes the prose-link
+   rule away from `.cite`; the request is in the changelog.
+   The hover half is the same collision — `.prose a:hover` recolours to --ink and outscores
+   a bare `.cite:hover`, whose only job is the background lift. */
+.prose a.cite,
+.prose a.cite:hover { color: var(--cyan); text-decoration: none; }
+
+/* `.source-title` ships `&:hover { text-decoration: underline }`, which is right for the
+   <a> the recipe expects. This app renders the row as three <span>s — nothing here can open
+   a document — so the underline offered a link that does not exist, on every row of every
+   answer. Removed rather than made true. */
+.source .source-title:hover { text-decoration: none; }
+
+/* What a marker click did: scroll, and say nothing. On a short answer the sources are
+   already on screen, so the whole interaction was a scroll of zero pixels and no reply.
+   The outline is that reply — and it is an outline rather than a border or a background so
+   the row it lands on does not move. */
+.source:target { outline: var(--bw-1) solid var(--cyan-d); outline-offset: var(--sp-1); }
+
 /* ── inside .empty: one rhythm, and stretch what must not be centred ──
    .empty is `display: flex; align-items: center; text-align: center; gap: --sp-3`, which
    is right for the icon, the title and a sentence — and wrong for anything that is a
@@ -417,4 +445,76 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: var(--ls-chrome);
+}
+
+/* ── the version badge, and what changed behind it ──
+   The badge is a button in an ambient strip, so it removes the library's control chrome
+   rather than adding to it: `.btn` here would read as the primary action next to the prompt,
+   which is Send. What is left is the affordance — a dotted underline and a pointer — because
+   a clickable thing that looks like text is a thing nobody clicks.
+
+   `font: inherit` and the reset are needed on every property a UA sets on <button>: it
+   otherwise arrives with the platform's font and a 2px margin, and the strip's items stop
+   sitting on one baseline. */
+.statusline .sl-ver {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.statusline .sl-ver:hover,
+.statusline .sl-ver:focus-visible { color: var(--primary); }
+
+/* The dialog: a reading surface, so it is narrower than the diagram viewer and scrolls
+   inside itself. A release with sixty commits would otherwise grow a dialog taller than the
+   screen, and on a phone the close button is the part that leaves. */
+.release[open] { display: flex; }
+.release {
+  flex-direction: column;
+  inline-size: min(94vw, 34rem);
+  max-block-size: min(85dvh, 44rem);
+  padding: var(--sp-4);
+}
+.release > .head { flex: none; }
+.release .rel-body { flex: 1; min-block-size: 0; overflow-y: auto; }
+
+/* Tag · date · what it is measured from — one row, mono for the two machine facts. */
+.rel-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-block: var(--sp-2) var(--sp-4);
+}
+.rel-date, .rel-since {
+  font-family: var(--font-mono); font-size: var(--fs-chip); color: var(--muted);
+}
+.rel-state {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-chip); color: var(--muted);
+}
+.rel-state.err { color: var(--crit); }
+
+.rel-group + .rel-group { margin-block-start: var(--sp-5); }
+.rel-group > .eyebrow { margin-block-end: var(--sp-2); }
+.rel-list { list-style: none; margin: 0; padding: 0; }
+/* A note is one block, not a table row: the subject is prose and wraps, and the sha follows
+   it inline rather than in a column that would be four characters wide on a phone. */
+.rel-list > li {
+  padding-block: var(--sp-2);
+  border-block-start: 2px solid var(--line);
+  font-size: var(--fs-chip);
+}
+.rel-scope {
+  font-family: var(--font-mono); color: var(--primary);
+  margin-inline-end: var(--sp-2);
+}
+.rel-subject { overflow-wrap: anywhere; }
+.rel-commit {
+  margin-inline-start: var(--sp-2);
+  font-size: var(--fs-label); color: var(--muted);
 }
