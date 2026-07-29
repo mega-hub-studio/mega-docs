@@ -236,17 +236,17 @@ dead: dead-deps
 
 # Nothing key-shaped may be committed. .env is gitignored; this catches the case
 # where a key gets pasted into a tracked file by accident.
-# Three of the exclusions are generated files whose content is hashes by definition:
-# web/dist (Vite's bundle, where minified third-party code matches by accident) and BOTH
-# lockfiles (every entry carries a sha512 integrity string). Excluding the *build output* is
-# not a blind spot — a key can only reach the bundle from web/ui/src, which is scanned.
+# Two of the exclusions are generated files whose content is hashes by definition:
+# web/dist (Vite's bundle, where minified third-party code matches by accident) and
+# package-lock.json (every entry carries a sha512 integrity string). Excluding the *build
+# output* is not a blind spot — a key can only reach the bundle from web/ui/src, which is
+# scanned.
 #
-# pnpm-lock.yaml is here because it failed exactly the way package-lock.json did, two
-# minutes after it was committed: same integrity strings, same red gate. That two lockfiles
-# exist at all is a separate problem — CI installs with `npm ci`, so package-lock.json is
-# what it builds the committed bundle from, and a pnpm tree that resolves anything
-# differently makes the rule-14 diff compare a bundle built from other dependencies. Pick
-# one manager; until then this only stops the scan from crying wolf.
+# There was a third, web/ui/pnpm-lock.yaml, which failed the same way two minutes after it
+# was committed. It is *deleted* rather than excluded, which is the "pick one manager" this
+# comment used to defer: CI installs with `npm ci`, so package-lock.json is what the
+# committed bundle is built from, and a pnpm tree resolving anything differently makes rule
+# 14's rebuild-and-diff compare a bundle built from other dependencies.
 #
 # git grep only sees TRACKED files, which is worth knowing before trusting a green run:
 # running this before `git add` scans a smaller tree than CI does. That is exactly how the
@@ -254,7 +254,7 @@ dead: dead-deps
 secrets:
 	@! git grep -nIE '(sk|api|key|token)[-_]?[A-Za-z0-9]{24,}' -- . \
 		':!*.sha384' ':!scripts/*' ':!web/dist/*' \
-		':!web/ui/package-lock.json' ':!web/ui/pnpm-lock.yaml' \
+		':!web/ui/package-lock.json' \
 		|| { echo "^ that looks like a credential in a tracked file"; exit 1; }
 
 test:
