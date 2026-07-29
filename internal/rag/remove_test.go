@@ -1,67 +1,121 @@
-package rag
+package rag_test
 
 import (
-	"os"
-	"path/filepath"
+	"context"
+	"strings"
 	"testing"
+
+	"knowledge-engine/internal/rag"
 )
 
-// The property that makes this a *soft* delete, and the reason it is one: the corpus is the
-// source of truth, so a hard delete would be the only operation here that destroys an
-// original rather than something `ingest` can rebuild.
-func TestARemovedDocumentIsRecoverableAndStaysUnindexed(t *testing.T) {
-	dir := t.TempDir()
-	rel := "booking/pricing.md"
-	src := filepath.Join(dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(src), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	const body = "# Pricing\n\nthe rule a BA confirmed\n"
-	if err := os.WriteFile(src, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
+// The property that makes this a *soft* delete, and the reason it still is one after the
+// inversion: the database holds the documents now, so a hard delete would be the only
+// operation in this system that destroys an original — including a BA-confirmed answer,
+// which a person wrote and nothing can rebuild.
+//
+// What it asserts, in the order that matters: the document stops answering, its text
+// survives, and importing it again brings it back rather than leaving a row that is both
+// present and removed.
+func TestARemovedDocumentStopsAnsweringAndItsTextSurvives(t *testing.T) {
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+
+	const rel, body = "booking/pricing.md", "# Pricing\n\nthe rule a BA confirmed\n"
+	if _, err := e.Upload(ctx, rel, body, rag.Attrs{Title: "Pricing", Kind: "policy"}); err != nil {
+		t.Fatalf("upload: %v", err)
 	}
 
-	// The file half, on its own: the engine's store is not needed to prove where the
-	// bytes went, and a temp corpus with no database is the smallest thing that can.
-	trash := filepath.Join(dir, TrashDir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(trash), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Rename(src, trash); err != nil {
-		t.Fatal(err)
+	if _, err := e.Remove(ctx, rel); err != nil {
+		t.Fatalf("remove: %v", err)
 	}
 
-	if _, err := os.Stat(src); !os.IsNotExist(err) {
-		t.Error("the document is still where it was")
-	}
-	got, err := os.ReadFile(trash)
+	// 1. It is out of the library, so nothing lists it and no scope reaches it.
+	c, err := e.Corpus(0)
 	if err != nil {
-		t.Fatalf("the bytes were destroyed rather than moved: %v", err)
+		t.Fatal(err)
 	}
-	if string(got) != body {
-		t.Error("the trashed copy does not match what was removed")
+	for _, d := range c.Documents {
+		if d.Path == rel {
+			t.Error("a removed document is still listed in the corpus")
+		}
 	}
 
-	// And the part that needs no exclusion rule: the trash is unreachable as a document
-	// path, so a re-ingest can never pull the file back in. If SafePath ever stopped
-	// refusing a hidden segment, a delete would silently undo itself on the next ingest.
-	for _, p := range []string{
-		TrashDir + "/" + rel,
-		"./" + TrashDir + "/x.md",
-		TrashDir,
-	} {
-		if out, err := SafePath(p); err == nil {
-			t.Errorf("SafePath accepted %q as %q — the trash is indexable, so removal is not permanent", p, out)
+	// 2. Its text is still there — the trash, as a column. This is what recovery means now
+	//    that no directory holds a second copy.
+	doc, ok, err := e.Document(rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || !strings.Contains(doc.Body, "the rule a BA confirmed") {
+		t.Errorf("the bytes were destroyed rather than kept (ok=%v): %q", ok, doc.Body)
+	}
+
+	// 3. Removing it twice says so rather than reporting a second success: a client that
+	//    cannot tell "gone" from "was never here" shows the wrong thing to whoever clicked.
+	if _, err := e.Remove(ctx, rel); err == nil {
+		t.Error("removing an already-removed document was reported as a success")
+	}
+
+	// 4. Importing it again is the way back, and it leaves no row that is both present and
+	//    deleted — the state that would list a document retrieval cannot return.
+	if _, err := e.Upload(ctx, rel, body, rag.Attrs{Title: "Pricing"}); err != nil {
+		t.Fatalf("re-import after removal: %v", err)
+	}
+	c, err = e.Corpus(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back := false
+	for _, d := range c.Documents {
+		if d.Path == rel {
+			back = true
 		}
+	}
+	if !back {
+		t.Error("importing a removed document again did not bring it back")
 	}
 }
 
-// Removal is disabled rather than half-working when there is nowhere to move the file:
-// deleting the index rows while leaving the document on disk is a delete that the next
-// ingest undoes, which is worse than refusing.
-func TestRemovalIsRefusedWithoutACorpusDirectory(t *testing.T) {
-	e := &Engine{}
-	if _, err := e.Remove(nil, "a.md"); err == nil { //nolint:staticcheck // a nil ctx is never used on this path
-		t.Error("removal was allowed with no corpus directory configured")
+// A rename is the same document at another address, and it must be retrievable there and
+// nowhere else. The failure this guards is the half-move: the new path saved, the old one
+// still answering, so one document cites two sources and a scope matches both.
+func TestRenamingADocumentLeavesNothingBehind(t *testing.T) {
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+
+	const from, to = "drafts/spec.md", "specs/billing.md"
+	if _, err := e.Upload(ctx, from, "# Billing\n\ninvoices are void after 30 days\n", rag.Attrs{}); err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	saved, err := e.Update(ctx, from, to, "# Billing\n\ninvoices are void after 30 days\n",
+		rag.Attrs{Title: "Billing", Alias: "invoice rules", Kind: "spec", Description: "when an invoice expires"})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if saved.Path != to {
+		t.Errorf("saved as %q, want %q", saved.Path, to)
+	}
+
+	c, err := e.Corpus(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found *string
+	for i, d := range c.Documents {
+		if d.Path == from {
+			t.Error("the old path is still in the library — a rename that answers twice")
+		}
+		if d.Path == to {
+			found = &c.Documents[i].Alias
+		}
+	}
+	if found == nil {
+		t.Fatal("the renamed document is not in the library")
+	}
+	// The attributes travelled with it. A rename that drops what a BA typed is a rename
+	// nobody will use twice.
+	if *found != "invoice rules" {
+		t.Errorf("alias after rename = %q, want it carried over", *found)
 	}
 }

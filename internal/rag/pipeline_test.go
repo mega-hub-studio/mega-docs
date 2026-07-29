@@ -16,14 +16,11 @@ const dim = 16
 
 // engine wires the real store and the real ai.Client against a fake provider —
 // so this exercises every layer the product does, minus the model itself.
+//
+// There used to be an engineIn() beside this, taking a corpus directory, for the tests that
+// looked at what a confirm wrote to disk. Nothing writes to disk any more, so the parameter
+// and its variant are gone rather than accepted and ignored.
 func engine(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
-	t.Helper()
-	return engineIn(t, p, t.TempDir())
-}
-
-// engineIn is engine() with a caller-chosen corpus directory, for the tests that
-// need to look at what a confirm wrote to disk.
-func engineIn(t *testing.T, p *aitest.Provider, corpusDir string) (*rag.Engine, *aitest.Provider) {
 	t.Helper()
 	if p == nil {
 		p = &aitest.Provider{}
@@ -42,7 +39,7 @@ func engineIn(t *testing.T, p *aitest.Provider, corpusDir string) (*rag.Engine, 
 		ChatBaseURL: base, APIKey: "test-key",
 		EmbedModel: "embed-model", ChatModel: "chat-model",
 	})
-	return rag.New(store, client, rag.Options{TopK: 3, CorpusDir: corpusDir}), prov
+	return rag.New(store, client, rag.Options{TopK: 3}), prov
 }
 
 // ask is the common case: one question, the streamed text collected.

@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"knowledge-engine/internal/db"
@@ -68,11 +66,16 @@ func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticke
 		return t, fmt.Errorf("ticket %d is already in the knowledge base (%s)", id, t.DocPath)
 	}
 
-	rel := filepath.Join(QADir, fmt.Sprintf("ticket-%d.md", id))
-	if err := e.writeDoc(rel, qaMarkdown(t.Question, answer)); err != nil {
-		return t, err
-	}
-	if _, err := e.ingest(ctx, rel, t.Question, qaMarkdown(t.Question, answer)); err != nil {
+	rel := path.Join(QADir, fmt.Sprintf("ticket-%d.md", id))
+	body := qaMarkdown(t.Question, answer)
+	// The .md path is kept even though nothing writes a file: it is what a citation reads,
+	// what a scope matches, and what the ticket stores as its DocPath. A confirmed answer
+	// arriving at another kind of address would be a second identity for a document.
+	if _, err := e.ingest(ctx, db.Doc{
+		Path: rel, Title: t.Question, Kind: qaKind,
+		Description: "Confirmed answer to a question the documents did not cover.",
+		Body:        body,
+	}); err != nil {
 		return t, fmt.Errorf("indexing %s: %w", rel, err)
 	}
 	// Approved chunks win ties in retrieval. This is the one part of the corpus a
@@ -83,26 +86,12 @@ func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticke
 	return e.store.Confirm(id, answer, rel)
 }
 
-// writeDoc puts a file in the corpus directory, refusing to leave the tree.
-func (e *Engine) writeDoc(rel, content string) error {
-	if e.corpusDir == "" {
-		return errors.New("no corpus directory configured: set CORPUS_DIR to the folder ingest reads")
-	}
-	full := filepath.Join(e.corpusDir, rel)
-	// 0750/0600: a confirmed answer is a business document written by the service, and
-	// the service is the only thing that reads it back. Nothing else on the host needs
-	// to, so nothing else is given the chance.
-	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
-		return fmt.Errorf("%s: %w", filepath.Dir(full), err)
-	}
-	if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
-		return fmt.Errorf("writing %s: %w", full, err)
-	}
-	return nil
-}
+// qaKind is what a confirmed answer files itself under, so the library can show a BA which
+// of its documents the loop produced rather than a person importing.
+const qaKind = "answer"
 
-// qaMarkdown is the shape of a confirmed answer on disk: the question as the
-// heading, so retrieval's breadcrumb reads as the question it answers.
+// qaMarkdown is the shape of a confirmed answer: the question as the heading, so
+// retrieval's breadcrumb reads as the question it answers.
 func qaMarkdown(question, answer string) string {
 	return fmt.Sprintf("# %s\n\n%s\n", strings.TrimSpace(question), strings.TrimSpace(answer))
 }

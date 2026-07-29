@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -15,11 +16,19 @@ import (
 // of from the host's disk. Separate from Knowledge so the QA loop and the import
 // surface can be faked — and refused — independently.
 type Importer interface {
-	Upload(ctx context.Context, name, content string) (rag.Uploaded, error)
-	// Remove takes a document out of the index and moves its file to the corpus's
-	// trash. On the same interface as Upload because they are one capability — a BA
-	// who may add what everyone reads may also take it back — and nil-ing the seam
-	// must remove both or the surface half-works.
+	Upload(ctx context.Context, name, content string, a rag.Attrs) (rag.Uploaded, error)
+	// Update is the edit — new text, new attributes, or a new path. It is on this
+	// interface rather than a fourth seam because it is the same capability from the same
+	// person: a BA who may publish a document may correct the one they published.
+	Update(ctx context.Context, from, to, content string, a rag.Attrs) (rag.Uploaded, error)
+	// Document reads one back so an edit starts from what is there rather than from an
+	// empty box. Its route is *not* gated: reads are open (invariant 2), and a body the
+	// chat already quotes with a citation is not a secret.
+	Document(name string) (rag.Stored, bool, error)
+	// Remove takes a document out of retrieval and keeps its text. On the same interface
+	// as Upload because they are one capability — a BA who may add what everyone reads
+	// may also take it back — and nil-ing the seam must remove every write route or the
+	// surface half-works.
 	Remove(ctx context.Context, name string) (rag.Removed, error)
 }
 
@@ -59,6 +68,48 @@ func documents(mux *http.ServeMux, imp Importer, pass BAPass) {
 			return
 		}
 		writeJSON(w, removed)
+	}))
+
+	// GET /api/documents/{path...} — one document, attributes and body, for the edit form.
+	//
+	// Ungated on purpose: invariant 2 gates *writes*, and this is the same text the chat
+	// already returns in an answer with a citation pointing at it.
+	mux.HandleFunc("GET /api/documents/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		doc, ok, err := imp.Document(r.PathValue("path"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !ok {
+			http.Error(w, "no such document", http.StatusNotFound)
+			return
+		}
+		writeJSON(w, doc)
+	})
+
+	// PUT /api/documents/{path...} — write this document at this path.
+	//
+	// One route for "new" and for "edit", because PUT already means exactly that and two
+	// routes would be two things to keep in agreement about what a document is. The body
+	// carries the attributes and, when the BA renamed or moved it, the new path in `to` —
+	// which is why this cannot be a POST to a collection: the path in the URL is the
+	// document being replaced, not where it is going.
+	mux.HandleFunc("PUT /api/documents/{path...}", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			To   string `json:"to"`
+			Body string `json:"body"`
+			rag.Attrs
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxDoc)).Decode(&in); err != nil {
+			http.Error(w, "the document was too large or malformed", http.StatusBadRequest)
+			return
+		}
+		saved, err := imp.Update(r.Context(), r.PathValue("path"), in.To, in.Body, in.Attrs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, saved)
 	}))
 
 	mux.HandleFunc("POST /api/documents", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
@@ -135,5 +186,8 @@ func readUpload(ctx context.Context, imp Importer, dir string, fh *multipart.Fil
 	if err != nil {
 		return rag.Uploaded{}, fmt.Errorf("%s could not be read", fh.Filename)
 	}
-	return imp.Upload(ctx, name, string(body))
+	// No attributes here: a batch shares a folder, and one title or description for eight
+	// files would be a sentence pretending to describe all of them. The title defaults to
+	// the file name and the BA fills the rest in on the document itself.
+	return imp.Upload(ctx, name, string(body), rag.Attrs{})
 }

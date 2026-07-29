@@ -2,7 +2,6 @@ package rag_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -168,9 +167,8 @@ func TestHistoryCountsHitsSoTheSavingIsVisible(t *testing.T) {
    The claim under test is end-to-end: a question the documents cannot answer comes
    back, after one BA confirm, as a cited answer for the next person who asks. */
 
-func TestConfirmedAnswerBecomesAFileAndThenACitation(t *testing.T) {
-	corpus := t.TempDir()
-	e, prov := engineIn(t, &aitest.Provider{Reply: "Invoices are void after 30 days [1]."}, corpus)
+func TestConfirmedAnswerBecomesADocumentAndThenACitation(t *testing.T) {
+	e, prov := engine(t, &aitest.Provider{Reply: "Invoices are void after 30 days [1]."})
 	ctx := context.Background()
 	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
 		t.Fatal(err)
@@ -194,18 +192,19 @@ func TestConfirmedAnswerBecomesAFileAndThenACitation(t *testing.T) {
 		t.Errorf("status after confirm = %q", ticket.Status)
 	}
 
-	// 1. It is a file on disk, so `ingest` rebuilds it and git can review it. This
-	//    is what keeps the database derived rather than a second source of truth.
-	onDisk := filepath.Join(corpus, ticket.DocPath)
-	body, err := os.ReadFile(onDisk)
-	if err != nil {
-		t.Fatalf("the confirmed answer is not on disk: %v", err)
+	// 1. It is a document in the knowledge base, body and all — the inversion. This used to
+	//    assert a file in CORPUS_DIR, which was what kept the database derived; the database
+	//    is the source of truth now, so the row *is* the document and there is nothing else
+	//    to reconcile it with.
+	doc, ok, err := e.Document(ticket.DocPath)
+	if err != nil || !ok {
+		t.Fatalf("the confirmed answer is not in the knowledge base (ok=%v): %v", ok, err)
 	}
-	if !strings.Contains(string(body), answer) || !strings.Contains(string(body), q) {
-		t.Errorf("the file carries neither the question nor the answer:\n%s", body)
+	if !strings.Contains(doc.Body, answer) || !strings.Contains(doc.Body, q) {
+		t.Errorf("the stored document carries neither the question nor the answer:\n%s", doc.Body)
 	}
 
-	// 2. It is retrievable, and cited by the path the file actually has.
+	// 2. It is retrievable, and cited by the path the document is stored under.
 	text, reply, err := ask(t, e, "How long is an invoice valid?")
 	if err != nil {
 		t.Fatalf("ask after confirm: %v", err)
@@ -348,61 +347,22 @@ func TestConfirmRefusesAnEmptyAnswer(t *testing.T) {
 	}
 }
 
-func TestConfirmWithoutACorpusDirectoryFailsBeforeIndexing(t *testing.T) {
-	e, prov := engineIn(t, nil, "") // CORPUS_DIR unset
-	ticket, err := e.OpenTicket("Where do confirmed answers go?", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+// Two tests stood here and are deleted rather than adapted, because the properties they
+// enforced no longer exist:
+//
+//   TestConfirmWithoutACorpusDirectoryFailsBeforeIndexing — there is no corpus directory to
+//   be without. A confirm needed one because the file was the source of truth and an
+//   unreproducible index was the failure; the row is the document now.
+//
+//   TestConfirmedAnswerIsReproducibleByIngest — "a second engine, given only the directory,
+//   arrives at the same corpus" was what made knowledge.db disposable. It is not disposable
+//   any more, which is the whole inversion, and a test asserting otherwise would be a lie in
+//   the gate rather than a check.
+//
+// What replaces them: TestConfirmedAnswerBecomesADocumentAndThenACitation above (the answer
+// is a document, retrievable and cited) and TestARemovedDocumentStopsAnsweringAndItsTextSurvives
+// in remove_test.go (the only safety net there is now).
 
-	_, err = e.Confirm(context.Background(), ticket.ID, "Into docs/qa/.")
-	if err == nil {
-		t.Fatal("want a refusal: an answer indexed with no file behind it is unreproducible")
-	}
-	if !strings.Contains(err.Error(), "CORPUS_DIR") {
-		t.Errorf("the error should name the fix; got: %v", err)
-	}
-	if len(prov.Embedded()) != 0 {
-		t.Error("it spent an embeddings call before discovering it had nowhere to write")
-	}
-}
-
-func TestConfirmedAnswerIsReproducibleByIngest(t *testing.T) {
-	corpus := t.TempDir()
-	e, _ := engineIn(t, nil, corpus)
-	ctx := context.Background()
-
-	ticket, err := e.OpenTicket("What does the QA loop write?", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ticket, err = e.Confirm(ctx, ticket.ID, "A markdown file under docs/qa/.")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// The whole point of writing a file: a second engine, given only the directory,
-	// arrives at the same corpus. That is what makes knowledge.db disposable.
-	fresh, _ := engineIn(t, nil, corpus)
-	body, err := os.ReadFile(filepath.Join(corpus, ticket.DocPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fresh.Ingest(ctx, ticket.DocPath, string(body)); err != nil {
-		t.Fatalf("re-ingesting the confirmed file: %v", err)
-	}
-	c, err := fresh.Corpus(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Docs != 1 || c.Chunks == 0 {
-		t.Errorf("rebuilt corpus = %d docs / %d chunks", c.Docs, c.Chunks)
-	}
-}
-
-// The cache must not survive a model change. Reported from a real deployment: after
-// switching CHAT_MODEL the app kept answering from the old model, which reads as the
-// setting doing nothing.
 func TestChangingTheChatModelInvalidatesTheCache(t *testing.T) {
 	dir := t.TempDir()
 	store, err := db.Open(filepath.Join(dir, "models.db"), dim)
@@ -416,7 +376,7 @@ func TestChangingTheChatModelInvalidatesTheCache(t *testing.T) {
 	engineFor := func(model string) *rag.Engine {
 		return rag.New(store, ai.New(ai.Config{
 			ChatBaseURL: base, APIKey: "test-key", EmbedModel: "embed-model", ChatModel: model,
-		}), rag.Options{TopK: 3, CorpusDir: dir})
+		}), rag.Options{TopK: 3})
 	}
 	old, updated := engineFor("gpt-4o-mini"), engineFor("gpt-4.1")
 

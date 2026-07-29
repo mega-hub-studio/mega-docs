@@ -55,7 +55,7 @@ func run() error {
 		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
 		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
 		EmbedModel: cfg.EmbedModel, ChatModel: cfg.ChatModel,
-	}), rag.Options{TopK: cfg.TopK, CorpusDir: cfg.CorpusDir})
+	}), rag.Options{TopK: cfg.TopK})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	handler := server.New(server.Deps{
 		Answers: engine, Know: engine, Docs: engine, Index: index, Assets: web.FS,
@@ -160,7 +160,7 @@ func writes(cfg config.Config) string {
 	if cfg.BAPass == "" {
 		return "read-only (BA_PASS unset)"
 	}
-	return "BA into " + cfg.CorpusDir
+	return "BA into the knowledge base"
 }
 
 // admin says whether the read-only settings screen exists. One word in the startup line for

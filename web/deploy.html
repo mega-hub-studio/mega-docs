@@ -18,7 +18,7 @@
        who types them, not on the one a BA opens. -->
   <section id="install" data-feature="install"
            data-env="PORT,DB_PATH,CORPUS_DIR"
-           data-test="TestHealth,TestConfirmedAnswerIsReproducibleByIngest">
+           data-test="TestHealth,TestConfirmedAnswerBecomesADocumentAndThenACitation">
     <h2 lang="en">First install</h2>
     <h2 lang="vi">Cài đặt lần đầu</h2>
     <p class="lede" lang="en">Three commands on the machine that will hold the index.
@@ -334,7 +334,9 @@ done: 8/8 files, 74 chunks</span></div>
        upgrade that needs a re-index is stated with a *checkable condition* rather
        than a version number, so this section stops applying by itself once every
        index has been rebuilt. -->
-  <section>
+  <!-- id, so the WSL runbook can point at the mirror-not-a-branch argument rather than
+       restating it. Collection keys on data-feature, which this section has none of. -->
+  <section id="upgrading">
     <h2 lang="en">Upgrading</h2>
     <h2 lang="vi">Nâng cấp</h2>
     <p class="lede" lang="en">One command. The build step is not optional — the whole UI is
@@ -536,27 +538,120 @@ WantedBy=multi-user.target</span></div>
     <h3 lang="vi">WSL và macOS</h3>
     <p lang="en">The binary is the same on every platform — one file, no runtime, nothing
       fetched at start. Only the supervisor differs, so this is the whole of cross-OS
-      self-hosting.</p>
+      self-hosting. Pick your OS: everything in the other tab is inapplicable to it, which is
+      why they are tabs rather than two columns you read both of.</p>
     <p lang="vi">Binary giống nhau trên mọi nền tảng — một file, không runtime, không tải gì
       lúc khởi động. Chỉ khác nhau ở cái trông process, nên đây là toàn bộ chuyện self-host
-      đa hệ điều hành.</p>
+      đa hệ điều hành. Chọn OS của bạn: mọi thứ ở tab còn lại đều không áp dụng được, và đó là
+      lý do đây là tab chứ không phải hai cột phải đọc cả hai.</p>
 
-    <div class="grid two">
-      <div class="card">
-        <div class="head"><span class="title" lang="en">WSL2</span><span class="title" lang="vi">WSL2</span></div>
-        <p lang="en">The unit above works, but <b>systemd is off by default</b> — without
-          this, <code>systemctl</code> does not exist and nothing above can be installed.
-          Enable it once, then restart the VM from Windows:</p>
-        <p lang="vi">Unit ở trên chạy được, nhưng <b>systemd mặc định bị tắt</b> — không có
-          bước này thì <code>systemctl</code> không tồn tại và không cài được gì ở trên. Bật
-          một lần, rồi restart VM từ Windows:</p>
+    <!-- Tabs, not the two columns this was: every line in one of them is a lie on the other
+         OS, and a reader who scrolled past both had to work out which half was theirs. The
+         two macOS callouts below used to sit *outside* the grid, so a WSL reader read a
+         launchd note and a Mac-sleep note that could never apply — they live in the macOS
+         panel now, and the WSL panel gained the availability half the Mac note already
+         cross-referenced. Same element the Access and Admin sections use. -->
+    <nes-tabs>
+      <section data-label="WSL2" selected>
+        <p lang="en"><b>1 · Turn systemd on — nothing else here works without it.</b>
+          The unit above is correct, but WSL ships with <code>systemd</code> off, so
+          <code>systemctl</code> does not exist and none of it can be installed. Once per
+          distro, then restart the VM from Windows:</p>
+        <p lang="vi"><b>1 · Bật systemd — không có nó thì mọi thứ ở đây đều vô nghĩa.</b>
+          Unit ở trên là đúng, nhưng WSL mặc định tắt <code>systemd</code>, nên
+          <code>systemctl</code> không tồn tại và không cài được gì cả. Làm một lần cho mỗi
+          distro, rồi restart VM từ Windows:</p>
         <div class="terminal"><span class="out">
 # /etc/wsl.conf
 [boot]
 systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># run this in Windows, not in the shell</span></div>
-      </div>
-      <div class="card">
-        <div class="head"><span class="title" lang="en">macOS</span><span class="title" lang="vi">macOS</span></div>
+
+        <div class="callout gotcha">
+          <b lang="en">Keep the directory on the Linux disk, not under <code>/mnt/c</code>.</b>
+          <span lang="en"><code>/opt/knowledge</code> — ext4. A path under <code>/mnt/c</code>
+            reaches the Windows drive through a filesystem bridge, and the index is SQLite in
+            WAL mode: every query pays that crossing, and the file locking it relies on is not
+            the same primitive there. Nothing about the app changes, only which disk the
+            directory sits on — so it is free to get right and expensive to move later.</span>
+          <b lang="vi">Để thư mục trên đĩa Linux, đừng đặt dưới <code>/mnt/c</code>.</b>
+          <span lang="vi"><code>/opt/knowledge</code> — ext4. Path nằm dưới
+            <code>/mnt/c</code> phải đi qua một lớp cầu filesystem để tới ổ Windows, mà index
+            là SQLite chạy WAL: mỗi truy vấn đều trả phí cho lần băng qua đó, và cơ chế file
+            locking nó dựa vào ở bên kia không phải cùng một thứ. App không đổi gì hết, chỉ là
+            thư mục nằm ở ổ nào — nên làm đúng thì miễn phí, để sai rồi dời thì đắt.</span>
+        </div>
+
+        <p lang="en"><b>2 · Re-deploying: check the checkout is still a mirror first.</b>
+          <code>make deploy</code> refuses on a dirty tree, which is the guard working — but
+          it leaves you to repair it. An empty <code>status</code> means go straight to
+          step 3.</p>
+        <p lang="vi"><b>2 · Deploy lại: kiểm tra checkout còn là bản sao đúng không, trước
+          tiên.</b> <code>make deploy</code> từ chối chạy khi cây làm việc bẩn — đó là guard
+          đang làm việc — nhưng nó để bạn tự sửa. <code>status</code> trống thì nhảy thẳng
+          xuống bước 3.</p>
+        <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; git status --short</span><span class="out ok"># empty → it is a mirror. Go to step 3.</span><span class="err">UD web/ui/pnpm-lock.yaml    # anything at all → repair below</span></div>
+        <p lang="en">Repair is three lines, and it is the same three whatever the mess is,
+          because a deploy checkout has nothing of its own worth keeping — that is what
+          <a href="#upgrading">Upgrading</a> means by a mirror rather than a branch. The last
+          line is the one that stops it recurring: <code>pull.rebase</code> is what turns an
+          upgrade into a half-finished rebase on the machine serving the team.</p>
+        <p lang="vi">Sửa mất ba dòng, và là đúng ba dòng đó bất kể hỏng kiểu gì — vì một
+          checkout để deploy không có gì của riêng nó đáng giữ, đúng nghĩa "bản sao chứ không
+          phải một nhánh" mà <a href="#upgrading">Nâng cấp</a> nói tới. Dòng cuối là dòng chặn
+          nó tái diễn: <code>pull.rebase</code> chính là thứ biến một lần nâng cấp thành cuộc
+          rebase dở dang trên máy đang phục vụ cả nhóm.</p>
+        <div class="terminal"><span class="cmd">git rebase --abort</span><span class="out"># only if status said "rebase in progress"</span><span class="cmd">git fetch origin &amp;&amp; git reset --hard origin/main</span><span class="cmd">git config pull.ff only</span><span class="out"># once per host: a plain `git pull` can no longer rebase</span></div>
+        <div class="callout memo">
+          <b lang="en"><code>reset --hard</code> cannot reach the corpus. <code>git clean</code> can.</b>
+          <span lang="en">The two directories that are not rebuildable from
+            <code>origin</code> — <code>corpus/</code> and <code>state/</code> — are untracked
+            and listed in <code>.git/info/exclude</code>, so a hard reset does not see them.
+            <code>git clean</code> deletes exactly that: untracked files. Never run it
+            here.</span>
+          <b lang="vi"><code>reset --hard</code> không chạm được vào corpus. <code>git clean</code> thì có.</b>
+          <span lang="vi">Hai thư mục không dựng lại được từ <code>origin</code> —
+            <code>corpus/</code> và <code>state/</code> — đều untracked và nằm trong
+            <code>.git/info/exclude</code>, nên hard reset không thấy chúng.
+            <code>git clean</code> thì xoá đúng loại đó: file untracked. Đừng bao giờ chạy nó ở
+            đây.</span>
+        </div>
+
+        <p lang="en"><b>3 · Deploy, and read the two revisions.</b> Different before and
+          after means the pull moved this host; identical means origin had nothing new and the
+          change is still sitting unpushed on a laptop.</p>
+        <p lang="vi"><b>3 · Deploy, rồi đọc hai revision.</b> Trước và sau khác nhau là host
+          đã đi tới bản mới; giống nhau là origin không có gì mới, và thay đổi vẫn đang nằm
+          chưa push trên máy nào đó.</p>
+        <div class="terminal"><span class="cmd">make deploy</span><span class="out">  before: 9c4a34d</span><span class="out ok">  deployed: 711de34 — {"ok":true,"writes":true,…,"version":"711de34"}</span></div>
+        <p lang="en">If it stalls before the build with nothing on screen, it is downloading
+          modules: some networks cannot reach <code>proxy.golang.org</code> while GitHub is
+          fine. <code>GOPROXY=direct make deploy</code> is the whole workaround.</p>
+        <p lang="vi">Nếu nó treo trước bước build mà không in gì, thì nó đang tải module: có
+          mạng không ra được <code>proxy.golang.org</code> dù GitHub vẫn bình thường.
+          <code>GOPROXY=direct make deploy</code> là toàn bộ cách xử lý.</p>
+
+        <div class="callout gotcha">
+          <b lang="en">The distro stops, the URL dies, and the app is blameless.</b>
+          <span lang="en">This is the WSL half of the Mac-sleep note in the other tab, and it
+            reads identically to whoever is asking a question: the address stops answering and
+            nothing is wrong with the service. <code>systemd</code> only runs while the distro
+            does, and Windows stops the distro when its last process exits or the machine
+            sleeps — so <code>enable --now</code> is not enough to make this a 24/7 host.
+            The fix belongs on the Windows side (a task that starts the distro at logon, and
+            sleep turned off), never inside Linux: nothing in the distro can prevent its own
+            shutdown.</span>
+          <b lang="vi">Distro tắt là URL chết, mà app thì không có lỗi gì.</b>
+          <span lang="vi">Đây là nửa WSL của phần "Mac ngủ" ở tab bên kia, và với người đang
+            hỏi thì hai thứ giống nhau y hệt: địa chỉ không trả lời, mà service thì không sai
+            chỗ nào. <code>systemd</code> chỉ chạy khi distro còn chạy, và Windows tắt distro
+            khi process cuối cùng của nó kết thúc hoặc khi máy ngủ — nên
+            <code>enable --now</code> chưa đủ để đây thành một host 24/7. Chỗ để sửa là phía
+            Windows (một task khởi động distro lúc logon, và tắt sleep), không phải bên trong
+            Linux: không thứ gì trong distro ngăn được việc chính nó bị tắt.</span>
+        </div>
+      </section>
+
+      <section data-label="macOS">
         <p lang="en">No systemd. <code>launchd</code> is the equivalent, and a user agent
           needs no root — so the deploy directory is under <code>$HOME</code> here rather than
           <code>/opt</code>, which is what makes that true. Put this at
@@ -579,52 +674,54 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
 &lt;/dict&gt;&lt;/plist&gt;</span><span class="cmd">launchctl bootstrap gui/$UID ~/Library/LaunchAgents/dev.megadocs.knowledge.plist</span><span class="out"># launchctl load is deprecated; bootstrap is the verb
 # every path inside a plist is absolute — launchd does not expand ~
 # there is no journalctl: the two log keys are where output goes</span></div>
-      </div>
-    </div>
 
-    <div class="callout gotcha">
-      <b lang="en">launchd does not read <code>.env</code>.</b>
-      <span lang="en">systemd's <code>EnvironmentFile=</code> has no launchd equivalent, so
-        the plist has to carry the key in <code>EnvironmentVariables</code> — or the process
-        must start with <code>WorkingDirectory</code> set, because
-        <code>config.Load()</code> reads <code>./.env</code> relative to the working
-        directory. The <code>WorkingDirectory</code> line above is what makes the second
-        option work, and it is the one that keeps the key out of a plist.</span>
-      <b lang="vi">launchd không đọc <code>.env</code>.</b>
-      <span lang="vi"><code>EnvironmentFile=</code> của systemd không có thứ tương đương ở
-        launchd, nên hoặc plist phải mang key trong <code>EnvironmentVariables</code>, hoặc
-        process phải chạy với <code>WorkingDirectory</code> đúng chỗ — vì
-        <code>config.Load()</code> đọc <code>./.env</code> theo thư mục làm việc. Dòng
-        <code>WorkingDirectory</code> ở trên là thứ làm cách thứ hai chạy được, và đó là cách
-        không phải nhét key vào plist.</span>
-    </div>
+        <div class="callout gotcha">
+          <b lang="en">launchd does not read <code>.env</code>.</b>
+          <span lang="en">systemd's <code>EnvironmentFile=</code> has no launchd equivalent, so
+            the plist has to carry the key in <code>EnvironmentVariables</code> — or the process
+            must start with <code>WorkingDirectory</code> set, because
+            <code>config.Load()</code> reads <code>./.env</code> relative to the working
+            directory. The <code>WorkingDirectory</code> line above is what makes the second
+            option work, and it is the one that keeps the key out of a plist.</span>
+          <b lang="vi">launchd không đọc <code>.env</code>.</b>
+          <span lang="vi"><code>EnvironmentFile=</code> của systemd không có thứ tương đương ở
+            launchd, nên hoặc plist phải mang key trong <code>EnvironmentVariables</code>, hoặc
+            process phải chạy với <code>WorkingDirectory</code> đúng chỗ — vì
+            <code>config.Load()</code> đọc <code>./.env</code> theo thư mục làm việc. Dòng
+            <code>WorkingDirectory</code> ở trên là thứ làm cách thứ hai chạy được, và đó là cách
+            không phải nhét key vào plist.</span>
+        </div>
 
-    <div class="callout gotcha">
-      <b lang="en">A Mac that sleeps is a Mac that is offline.</b>
-      <span lang="en">This is the macOS half of the WSL note above, and it looks identical to
-        the reader: the URL stops answering and nothing is wrong with the app. A laptop sleeps
-        on idle by default, and neither a tunnel nor a tailnet reliably wakes it. A user agent
-        also runs only while somebody is logged in, so after a reboot nothing serves until
-        they are. Take the sleep away on mains power only — <code>sudo pmset -c sleep 0</code> —
-        so it is a server while plugged in and a laptop on battery. Wrapping the binary in
-        <code>caffeinate -s</code> does the same job but on battery too, which is a flat
-        tax on a machine somebody carries. If it must survive a reboot with nobody logged in,
-        that is a <code>LaunchDaemon</code> in <code>/Library/LaunchDaemons</code> with a
-        <code>UserName</code> key — root, and FileVault still holds it until the disk is
-        unlocked once.</span>
-      <b lang="vi">Mac ngủ là Mac offline.</b>
-      <span lang="vi">Đây là nửa macOS của phần WSL ở trên, và với người dùng thì hai thứ
-        giống nhau y hệt: URL không trả lời, mà app thì không có lỗi gì. Laptop mặc định ngủ
-        khi rảnh, và cả tunnel lẫn tailnet đều không đánh thức nó một cách đáng tin. User agent
-        cũng chỉ chạy khi có người đã login, nên sau reboot thì không có gì phục vụ cho tới khi
-        có người đăng nhập. Chỉ bỏ sleep khi cắm điện — <code>sudo pmset -c sleep 0</code> —
-        để cắm sạc là server, rút sạc là laptop bình thường. Bọc binary trong
-        <code>caffeinate -s</code> cũng được, nhưng nó chặn sleep cả khi dùng pin, tức thu thuế
-        đều đặn trên một cái máy người ta mang đi. Nếu bắt buộc phải sống qua reboot mà không
-        ai login, thì đó là <code>LaunchDaemon</code> ở <code>/Library/LaunchDaemons</code> kèm
-        key <code>UserName</code> — cần root, và FileVault vẫn giữ nó lại tới khi có người mở
-        khoá đĩa một lần.</span>
-    </div>
+        <div class="callout gotcha">
+          <b lang="en">A Mac that sleeps is a Mac that is offline.</b>
+          <span lang="en">This is the macOS half of the distro note in the WSL tab, and it looks
+            identical to the reader: the URL stops answering and nothing is wrong with the app.
+            A laptop sleeps
+            on idle by default, and neither a tunnel nor a tailnet reliably wakes it. A user agent
+            also runs only while somebody is logged in, so after a reboot nothing serves until
+            they are. Take the sleep away on mains power only — <code>sudo pmset -c sleep 0</code> —
+            so it is a server while plugged in and a laptop on battery. Wrapping the binary in
+            <code>caffeinate -s</code> does the same job but on battery too, which is a flat
+            tax on a machine somebody carries. If it must survive a reboot with nobody logged in,
+            that is a <code>LaunchDaemon</code> in <code>/Library/LaunchDaemons</code> with a
+            <code>UserName</code> key — root, and FileVault still holds it until the disk is
+            unlocked once.</span>
+          <b lang="vi">Mac ngủ là Mac offline.</b>
+          <span lang="vi">Đây là nửa macOS của phần distro ở tab WSL, và với người dùng thì hai
+            thứ giống nhau y hệt: URL không trả lời, mà app thì không có lỗi gì. Laptop mặc định
+            ngủ khi rảnh, và cả tunnel lẫn tailnet đều không đánh thức nó một cách đáng tin. User
+            agent cũng chỉ chạy khi có người đã login, nên sau reboot thì không có gì phục vụ cho
+            tới khi có người đăng nhập. Chỉ bỏ sleep khi cắm điện —
+            <code>sudo pmset -c sleep 0</code> —
+            để cắm sạc là server, rút sạc là laptop bình thường. Bọc binary trong
+            <code>caffeinate -s</code> cũng được, nhưng nó chặn sleep cả khi dùng pin, tức thu thuế
+            đều đặn trên một cái máy người ta mang đi. Nếu bắt buộc phải sống qua reboot mà không
+            ai login, thì đó là <code>LaunchDaemon</code> ở <code>/Library/LaunchDaemons</code> kèm
+            key <code>UserName</code> — cần root, và FileVault vẫn giữ nó lại tới khi có người mở
+            khoá đĩa một lần.</span>
+        </div>
+      </section>
+    </nes-tabs>
 
     <p lang="en">Re-index by hand, with the same one-liner, whenever the documents
       change. It exits non-zero if anything failed, so a failure is visible:</p>

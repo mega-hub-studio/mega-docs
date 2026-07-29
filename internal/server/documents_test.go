@@ -17,15 +17,31 @@ import (
 type fakeImporter struct {
 	got     []string // "name:content", in the order the handler called
 	removed []string // the paths DELETE asked for, in order
+	saved   []string // "from>to:content", what PUT asked for
+	attrs   rag.Attrs
 	err     error
 }
 
-func (f *fakeImporter) Upload(_ context.Context, name, content string) (rag.Uploaded, error) {
+func (f *fakeImporter) Upload(_ context.Context, name, content string, a rag.Attrs) (rag.Uploaded, error) {
 	f.got = append(f.got, name+":"+content)
+	f.attrs = a
 	if f.err != nil {
 		return rag.Uploaded{}, f.err
 	}
 	return rag.Uploaded{Path: name, Chunks: 3}, nil
+}
+
+func (f *fakeImporter) Update(_ context.Context, from, to, content string, a rag.Attrs) (rag.Uploaded, error) {
+	f.saved = append(f.saved, from+">"+to+":"+content)
+	f.attrs = a
+	if f.err != nil {
+		return rag.Uploaded{}, f.err
+	}
+	dst := to
+	if dst == "" {
+		dst = from
+	}
+	return rag.Uploaded{Path: dst, Chunks: 2}, nil
 }
 
 func (f *fakeImporter) Remove(_ context.Context, name string) (rag.Removed, error) {
@@ -33,7 +49,83 @@ func (f *fakeImporter) Remove(_ context.Context, name string) (rag.Removed, erro
 	if f.err != nil {
 		return rag.Removed{}, f.err
 	}
-	return rag.Removed{Path: name, Trash: rag.TrashDir + "/" + name}, nil
+	return rag.Removed{Path: name}, nil
+}
+
+func (f *fakeImporter) Document(name string) (rag.Stored, bool, error) {
+	if f.err != nil {
+		return rag.Stored{}, false, f.err
+	}
+	if name != "booking/pricing.md" {
+		return rag.Stored{}, false, nil
+	}
+	return rag.Stored{
+		Path:  name,
+		Attrs: rag.Attrs{Title: "Pricing", Alias: "rates", Kind: "policy", Description: "what things cost"},
+		Body:  "# Pricing\n\nthe rule\n",
+	}, true, nil
+}
+
+// PUT is the whole edit surface: new text, new attributes, and a new path when the BA moved
+// it. The failure this guards is the one that makes a form feel broken — the attributes a
+// person typed reaching the handler and stopping there, so the save "worked" and the table
+// still shows the old kind.
+//
+// GET is here too, because an edit form that cannot load what is there starts every
+// correction from an empty box.
+func TestWritingADocumentCarriesItsAttributes(t *testing.T) {
+	t.Run("PUT sends path, body and attributes through", func(t *testing.T) {
+		imp := &fakeImporter{}
+		srv := importServer(imp, "pw")
+		body := `{"to":"specs/billing.md","body":"# Billing\n\nrules\n",` +
+			`"title":"Billing","alias":"invoice rules","kind":"spec","description":"when an invoice expires"}`
+		res := do(t, srv, http.MethodPut, "/api/documents/drafts/spec.md", body,
+			map[string]string{"X-BA-Pass": "pw"})
+		if res.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", res.Code, res.Body.String())
+		}
+		if len(imp.saved) != 1 || imp.saved[0] != "drafts/spec.md>specs/billing.md:# Billing\n\nrules\n" {
+			t.Errorf("the engine got %v, want the old path, the new path and the body", imp.saved)
+		}
+		want := rag.Attrs{Title: "Billing", Alias: "invoice rules", Kind: "spec", Description: "when an invoice expires"}
+		if imp.attrs != want {
+			t.Errorf("attributes = %+v, want %+v", imp.attrs, want)
+		}
+	})
+
+	// Same gate as import and remove. A writable library behind a read-only password is the
+	// one mistake this whole surface exists to make impossible.
+	t.Run("PUT needs the password", func(t *testing.T) {
+		imp := &fakeImporter{}
+		res := do(t, importServer(imp, "pw"), http.MethodPut, "/api/documents/a.md", `{"body":"x"}`, nil)
+		if res.Code != http.StatusUnauthorized {
+			t.Errorf("want 401, got %d", res.Code)
+		}
+		if len(imp.saved) != 0 {
+			t.Error("it reached the engine without the password")
+		}
+	})
+
+	// Reads are open (invariant 2), and the body is text the chat already returns with a
+	// citation — so the edit form loads without a secret.
+	t.Run("GET returns the document with no password", func(t *testing.T) {
+		res := do(t, importServer(&fakeImporter{}, "pw"), http.MethodGet, "/api/documents/booking/pricing.md", "", nil)
+		if res.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", res.Code, res.Body.String())
+		}
+		for _, want := range []string{`"title":"Pricing"`, `"alias":"rates"`, `"kind":"policy"`, `"body":`} {
+			if !strings.Contains(res.Body.String(), want) {
+				t.Errorf("the reply is missing %s: %s", want, res.Body.String())
+			}
+		}
+	})
+
+	t.Run("GET says 404 for a document that is not there", func(t *testing.T) {
+		res := do(t, importServer(&fakeImporter{}, "pw"), http.MethodGet, "/api/documents/nope.md", "", nil)
+		if res.Code != http.StatusNotFound {
+			t.Errorf("want 404, got %d", res.Code)
+		}
+	})
 }
 
 func importServer(imp Importer, pass BAPass) http.Handler {
@@ -230,8 +322,8 @@ func TestRemovingADocumentIsGated(t *testing.T) {
 		if len(imp.removed) != 1 || imp.removed[0] != "business/pricing/2026.md" {
 			t.Errorf("the engine got %v, want the full nested path", imp.removed)
 		}
-		if !strings.Contains(res.Body.String(), rag.TrashDir) {
-			t.Errorf("the reply does not say where the file went: %s", res.Body.String())
+		if !strings.Contains(res.Body.String(), "business/pricing/2026.md") {
+			t.Errorf("the reply does not name what was removed: %s", res.Body.String())
 		}
 	})
 

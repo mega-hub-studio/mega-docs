@@ -114,10 +114,9 @@ export async function send(files, dir = '', onProgress = () => {}) {
  *   file was already gone and only the index row was cleaned
  */
 export async function remove(path) {
-  const url = `/api/documents/${String(path).split('/').map(encodeURIComponent).join('/')}`
   let res
   try {
-    res = await fetch(url, { method: 'DELETE', headers: { 'X-BA-Pass': pass() } })
+    res = await fetch(docURL(path), { method: 'DELETE', headers: { 'X-BA-Pass': pass() } })
   }
   catch {
     throw new Error('Can\'t reach the server')
@@ -161,4 +160,75 @@ async function sendOne(file, dir) {
     return res.json()
   }
   throw new Error((await res.text()).trim() || `Server error ${res.status}`)
+}
+
+/**
+ * The route for one document. Each segment is encoded separately: the route is `{path...}`,
+ * so `/` has to survive as a separator while a space or a `#` in a name must not.
+ *
+ * @param {string} path the document's identity
+ * @returns {string} the URL for GET · PUT · DELETE on it
+ */
+function docURL(path) {
+  return `/api/documents/${String(path).split('/').map(encodeURIComponent).join('/')}`
+}
+
+/**
+ * Read one document back, attributes and body — what an edit starts from.
+ *
+ * Ungated, like every other read: this is the same text an answer quotes with a citation
+ * pointing at it.
+ *
+ * @param {string} path the document's identity
+ * @returns {Promise<{path: string, title: string, alias: string, kind: string,
+ *   description: string, body: string}>} the document as stored
+ */
+export async function read(path) {
+  let res
+  try {
+    res = await fetch(docURL(path))
+  }
+  catch {
+    throw new Error('Can\'t reach the server')
+  }
+  if (res.status === 404)
+    throw new Error('That document is not in the knowledge base any more')
+  if (!res.ok)
+    throw new Error((await res.text()).trim() || `Server error ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Write one document: its text, its attributes, and where it lives.
+ *
+ * One call for "new" and for "edit", because the server has one route for both — PUT means
+ * "this document, at this path", and a rename is that same sentence with a different path in
+ * `to`. Saving is what re-indexes it, so the answer a reader gets next is the text saved here.
+ *
+ * @param {string} path the document being written; for a new one, where it should land
+ * @param {{to?: string, body: string, title?: string, alias?: string, kind?: string,
+ *   description?: string}} doc `to` moves it — leave it out to keep the path
+ * @throws {WrongPass} when the password is missing, wrong, or writes are off
+ * @returns {Promise<{path: string, chunks: number}>} where it ended up, and how much of it
+ *   reached the index
+ */
+export async function write(path, doc) {
+  let res
+  try {
+    res = await fetch(docURL(path), {
+      method: 'PUT',
+      headers: { 'X-BA-Pass': pass(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
+    })
+  }
+  catch {
+    throw new Error('Can\'t reach the server')
+  }
+  if (res.status === 401 || res.status === 403) {
+    setPass('')
+    throw new WrongPass((await res.text()).trim() || 'Not allowed')
+  }
+  if (!res.ok)
+    throw new Error((await res.text()).trim() || `Server error ${res.status}`)
+  return res.json()
 }

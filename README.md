@@ -80,27 +80,26 @@ is a backlog item to find and start.
 | Reuse NES before creating components | app CSS owns exactly one override, named in `AGENTS.md` | ✅ **shipped** |
 | PDF / DOCX upload | **out of scope** — `.md · .markdown · .txt`, and the refusal names the converter | ✅ **decided** |
 | One pipeline, no hybrid retrieval | **BM25 stays** — vector KNN + BM25, fused with RRF | ✅ **decided** |
-| WebUI is the single entry point | `Upload` is the only *BA* path in; `ingest` is an operator recovery tool | 🟡 **partial** |
+| WebUI is the single entry point | **shipped.** Import, write, edit, rename and remove are all in the BA screen (`PUT /api/documents/{path…}`); `ingest` is an operator recovery client with no privileged path | ✅ **shipped** |
 | Three roles (Admin · BA · DEV) | all three exist as capabilities: DEV reads (open), BA writes (`BA_PASS`), Admin inspects (`ADMIN_PASS` → `/#/admin`, `GET /api/settings`). Not accounts — a password is a permission boundary, not an identity, and per-user anything is the SaaS phase | 🟡 **partial** |
-| BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | create, update and delete ship — import, re-import the same path to replace, and remove behind the library's `.perm` confirmation in `ImportPanel.vue` (the file goes to `docs/.trash/`). Preview · Version · Publish · Archive · Reindex: not built | 🟡 **partial** |
+| BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | **full CRUD ships** — `LibraryPanel.vue` writes a document by hand, edits one, renames or moves it, and removes it behind the library's `.perm` confirmation, with title · alias · kind · description on each. Reindex is implicit: a save re-embeds. Preview · Version · Publish · Archive: not built, and each needs one sentence saying what it means first | 🟡 **partial** |
 | Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two are **not being built on a name**: "Suggested Actions" could be model follow-ups, presets or ticket shortcuts. Trigger: one sentence saying what they contain | ✅ **decided** |
 | Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist. The other five are new *tables*, so they cost no re-ingest whenever they land — which is why there is no hurry and no schema for them yet. Trigger: a BA screen that filters by one | ✅ **decided** |
 | Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **There is no backup story at all**, by decision, not by omission | ✅ **decided** |
 | Cross-OS self-host (WSL2 · macOS) | one binary, no runtime; the tooling was already portable (`openssl dgst`, not `sha384sum`). Both supervisors are documented on the Deploy page, `make deploy` picks between them from `uname -s`, and CI builds and tests the cgo layer on **both** platforms. The row used to mean the docs only — the deploy itself died on `systemctl` half way through | ✅ **shipped** |
-| Knowledge DB is the source of truth | `CORPUS_DIR` is; the DB is derived (invariant 1). **Nothing blocks the switch any more** — the migration runner shipped and the backup precondition was dropped | 🟡 **next** |
+| Knowledge DB is the source of truth | **shipped.** `documents.body` holds the text and four attribute columns hold what a BA files it under; `internal/rag` touches no disk. `ingest` reads files as an operator client, and `CORPUS_DIR` is only the folder it reads | ✅ **shipped** |
 
 The rows worth reading the reasoning for:
 
-- **Inverting the source of truth** is unblocked, and both preconditions are settled rather
-  than pending. The **migration runner** shipped (`internal/db/migrate.go` — forward only,
-  one transaction per migration, `schema_version` as a table), landing *before* the corpus
-  directory stops being written to because the other order removes the way back. The
-  **backup precondition was dropped**: the WebUI import is the one controlled way a document
-  enters, so it is the control point the brief asked for, and a second copy of the corpus is
-  not what makes that true. What is left is the work itself — stop writing files, let
-  `Upload` write to the DB — and nothing gates it.
-  → [`changelog/2026-07-28-no-backup.md`](changelog/2026-07-28-no-backup.md)
-  · [`sot-decision`](changelog/2026-07-28-sot-decision.md)
+- **The source of truth is inverted, and it is done.** `documents.body` holds the document,
+  four attribute columns hold what a BA files it under (title · alias · kind · description),
+  and `internal/rag` no longer opens a file: `writeDoc`, the `.trash/` directory and
+  `rag.Options.CorpusDir` are all deleted. A BA-confirmed answer is a row at `qa/ticket-N.md`
+  — still a `.md` path, because that is what a citation prints and a scope matches, not
+  because a file exists. `Remove` is soft (chunks gone, text kept with `deleted_at`), which
+  is the only net there is: **losing the database loses the corpus**, by decision.
+  → [`changelog/2026-07-29-db-is-the-source-of-truth.md`](changelog/2026-07-29-db-is-the-source-of-truth.md)
+  · [`no-backup`](changelog/2026-07-28-no-backup.md) · [`sot-decision`](changelog/2026-07-28-sot-decision.md)
 - **PDF/DOCX is out of scope**, not pending. A Go parser puts a binary-format parser's CVE
   surface inside a service with a write gate and no accounts; an external converter run at
   upload is a per-file failure a BA cannot fix. Converting stays a one-time step *outside*
@@ -185,6 +184,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                   src/App.vue       wiring: composables in, components placed
                   src/router.js     the two screens, as addresses: /#/ask and /#/ba
                   src/components/   AskScreen · BaScreen   the two screens the router picks
+                                    LibraryPanel     the documents, and the form that writes one
                                     ChatTurn · EmptyScreen · ScopePicker · StatusLine
                                     ImportPanel · TicketCard · CorpusTree
                   src/lib/          plumbing — no Vue import anywhere in here
@@ -195,6 +195,7 @@ web/ui/           the app's front end — Vue 3.5 SFCs, JavaScript, built by Vit
                                     i18n.js        the EN/VI catalogues + the stored choice
                   src/styles.css    layout only; 8bit-nes owns the components
                   src/composables/  one concern each, and nothing else in them
+                                    library.js       the BA's documents, and the form that writes them
                                     conversation.js  turns, ask/regenerate/stop/reset, persistence
                                     corpus.js        what is indexed
                                     scope.js         which folder answers

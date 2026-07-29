@@ -17,7 +17,7 @@ func TestHybridSearch(t *testing.T) {
 	}
 	defer s.Close()
 
-	docID, err := s.UpsertDocument("docs/auth.md", "auth")
+	docID, err := s.UpsertDocument(Doc{Path: "docs/auth.md", Title: "auth"})
 	if err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
@@ -68,11 +68,11 @@ func TestCorpus(t *testing.T) {
 		t.Fatalf("empty corpus = %+v; want zeroes and a non-nil slice", empty)
 	}
 
-	authID, err := s.UpsertDocument("docs/auth.md", "auth")
+	authID, err := s.UpsertDocument(Doc{Path: "docs/auth.md", Title: "auth"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rateID, err := s.UpsertDocument("docs/rate.md", "rate limits")
+	rateID, err := s.UpsertDocument(Doc{Path: "docs/rate.md", Title: "rate limits"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,11 +131,11 @@ func TestScopedSearchRanksWithinTheScope(t *testing.T) {
 	}
 	defer s.Close()
 
-	loud, err := s.UpsertDocument("support/faq.md", "faq")
+	loud, err := s.UpsertDocument(Doc{Path: "support/faq.md", Title: "faq"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	quiet, err := s.UpsertDocument("booking/calendar/rules.md", "rules")
+	quiet, err := s.UpsertDocument(Doc{Path: "booking/calendar/rules.md", Title: "rules"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,8 +188,8 @@ func TestScopeTreatsWildcardsAsCharacters(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	defer s.Close()
-	underscore, _ := s.UpsertDocument("q_1/spec.md", "underscore")
-	other, _ := s.UpsertDocument("qa1/spec.md", "other")
+	underscore, _ := s.UpsertDocument(Doc{Path: "q_1/spec.md", Title: "underscore"})
+	other, _ := s.UpsertDocument(Doc{Path: "qa1/spec.md", Title: "other"})
 	if err := s.InsertChunk(underscore, "H", "the escaped one", 0, vec(1, 0, 0, 0)); err != nil {
 		t.Fatal(err)
 	}

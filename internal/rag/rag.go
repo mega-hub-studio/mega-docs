@@ -18,37 +18,42 @@ import (
 // streams an answer, and runs the QA loop that turns a gap into a document. It knows
 // nothing about HTTP.
 type Engine struct {
-	store     *db.Store
-	ai        *ai.Client
-	topK      int
-	corpusDir string
+	store *db.Store
+	ai    *ai.Client
+	topK  int
 }
 
 // Options is everything the engine needs besides its store and provider. A struct,
 // so adding a knob doesn't rewrite every call site.
 type Options struct {
-	TopK      int    // chunks per answer; <=0 means 6
-	CorpusDir string // where documents live on disk; "" disables writes (Confirm)
+	TopK int // chunks per answer; <=0 means 6
 }
 
-// New builds the engine. A TopK of zero means the default; an empty CorpusDir means the
-// instance cannot write, so Confirm and Import fail loudly instead of half-working.
+// New builds the engine. A TopK of zero means the default.
+//
+// There is no corpus directory here any more. The database holds the documents, so an
+// import needs no folder to be configured and a write cannot half-succeed across two
+// places — which is the entire point of the inversion. `ingest` still reads files, but it
+// reads them into this engine like any other client.
 func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 	if opt.TopK <= 0 {
 		opt.TopK = 6
 	}
-	return &Engine{store: store, ai: client, topK: opt.TopK, corpusDir: opt.CorpusDir}
+	return &Engine{store: store, ai: client, topK: opt.TopK}
 }
 
-// Ingest parses, chunks, embeds and stores one markdown document. The title is the
-// file name — the only thing a path reliably tells you about a document.
+// Ingest parses, chunks, embeds and stores one markdown document. The title is the file
+// name — the only thing a path reliably tells you about a document, and all `ingest` on the
+// command line has to go on. A BA importing through the WebUI says what it is instead.
 func (e *Engine) Ingest(ctx context.Context, path, content string) (int, error) {
 	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	return e.ingest(ctx, path, title, content)
+	return e.ingest(ctx, db.Doc{Path: path, Title: title, Body: content})
 }
 
-func (e *Engine) ingest(ctx context.Context, path, title, content string) (int, error) {
-	chunks := SplitMarkdown(content)
+// ingest takes the whole document rather than three of its fields, so the attributes a BA
+// typed travel to the row instead of being dropped somewhere in the middle.
+func (e *Engine) ingest(ctx context.Context, doc db.Doc) (int, error) {
+	chunks := SplitMarkdown(doc.Body)
 	if len(chunks) == 0 {
 		return 0, nil
 	}
@@ -74,7 +79,7 @@ func (e *Engine) ingest(ctx context.Context, path, title, content string) (int, 
 		vectors = append(vectors, vecs...)
 	}
 
-	docID, err := e.store.UpsertDocument(path, title)
+	docID, err := e.store.UpsertDocument(doc)
 	if err != nil {
 		return 0, err
 	}

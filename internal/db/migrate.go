@@ -51,13 +51,39 @@ type migration struct {
 
 // migrations is the whole history, in order.
 //
-// It is empty on purpose. Every column the current schema needs is already in schema.sql,
-// and adding a no-op migration to prove the runner works would be exactly the kind of
-// ceremony this repo argues against — the runner is proven by its test, which creates a
-// database from an older schema and watches a column arrive.
-//
 // To add one: append, never insert. The next id is the highest here plus one.
-var migrations = []migration{}
+var migrations = []migration{
+	{
+		id:  1,
+		why: "the document body and its attributes live here now: the DB is the source of truth",
+		// This is the inversion, in five columns.
+		//
+		// `body` is the one that changes what this database *is*. Until now a document row
+		// was derived — the text lived in CORPUS_DIR and `ingest` rebuilt everything — so
+		// losing the database cost one provider bill. The body being here is what makes the
+		// WebUI import the only way in: there is no file to reconcile with, and no second
+		// spelling of a document to drift.
+		//
+		// The other four are what a BA needs to find a document again six months later, and
+		// they are attributes rather than structure: `folder` is deliberately NOT among them
+		// because it is already inside `path`, which is the scope prefix (invariant 4) and
+		// the citation identity (invariant 6). A folder column would be the same fact twice,
+		// disagreeing the first time somebody renames one.
+		//
+		// `deleted_at` replaces the .trash/ directory. Remove drops the chunks — the document
+		// leaves retrieval immediately, which is the whole request — and keeps the row, so
+		// the text is still recoverable by whoever has the database. That is the same deal
+		// .trash/ offered (recovery by whoever has the disk), for the price of one column
+		// instead of a directory the path rules had to be taught to avoid.
+		sql: `
+			ALTER TABLE documents ADD COLUMN body        TEXT;
+			ALTER TABLE documents ADD COLUMN alias       TEXT;
+			ALTER TABLE documents ADD COLUMN kind        TEXT;
+			ALTER TABLE documents ADD COLUMN description TEXT;
+			ALTER TABLE documents ADD COLUMN deleted_at  TEXT;
+		`,
+	},
+}
 
 // migrateVersioned applies whatever has not run yet, and reports how many it applied.
 func (s *Store) migrateVersioned() (int, error) {

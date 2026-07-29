@@ -24,7 +24,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 
 | # | Rule | Enforced by |
 |---|---|---|
-| 1 | `CORPUS_DIR` is the source of truth; `knowledge.db` is derived. A confirmed answer is written as a **file** first, then indexed | `TestConfirmedAnswerBecomesAFileAndThenACitation` |
+| 1 | **The Knowledge DB is the source of truth.** A document — imported, written or confirmed — is a row with its body, and the WebUI is the only way one enters. Nothing writes a corpus file | `TestConfirmedAnswerBecomesADocumentAndThenACitation`, `TestARemovedDocumentStopsAnsweringAndItsTextSurvives` |
 | 2 | Reads are open, writes are gated. An unset `BA_PASS` means **no write surface**, not open writes | `internal/server` tests (403 unset · 401 wrong) |
 | 3 | The cache signature covers everything an answer depends on — corpus, chat model, prompt hash — and the **scope** lives in the key, not the signature | `TestTheSameQuestionInAnotherScopeIsAnotherAnswer`, `TestIndexingInvalidatesTheCache` |
 | 4 | A scope filters **both** retrievers before they rank, never after fusion | `TestScopedSearchRanksWithinTheScope` |
@@ -47,7 +47,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 20 | **No overhead, no over-engineering.** No abstraction with one caller, no knob nobody turns, no layer for a future that has not arrived. The cheapest correct thing wins | `make dead` · `make lint` (`unused`) · `npx knip` · `TestEveryRouteAndKnobIsSpecified` (a new knob must earn a documented section) · the rest is `prose only` |
 | 21 | **No new test file, no unit/E2E scaffold for a change.** Extend the test that already owns the rule; verify against the running product | `prose only` — `make smoke` and `make live` are the verification of record |
 | 22 | **Complexity hides behind one seam; the call site reads as intent.** Modern idiom, the plainest syntax that is correct, no ceremony, no comment that restates its code — and a name a *grep* resolves, because an agent infers from what it can find | `make lint` (`gocyclo` 16 · `nestif` · `funlen` · `gocritic` · `intrange` · `usestdlibvars` · `godot`) · `make lint-js` (`no-var`, `prefer-const`, `prefer-template`, 22 `unicorn/*`, 15 `jsdoc/*` — all at `--max-warnings 0`) |
-| 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; this file records only where this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
+| 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; *Skills* below records the routing, the precedence and every place this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 
 Rules 17 and 20 are the two to apply before the rest, because most of the others exist to
@@ -259,11 +259,18 @@ a `TextDecoder` or `visualViewport`.
 
 ### Five invariants worth not breaking
 
-1. **`CORPUS_DIR` is the source of truth; `knowledge.db` is derived.** `ingest docs`
-   rebuilds the database. A BA-confirmed answer is *written as a file* into
-   `CORPUS_DIR/qa/ticket-N.md` and then indexed, precisely so this stays true. There is
-   deliberately **no backup story** — see *Now vs vNext* in `README.md`: the WebUI import
-   is the one controlled way in, and `Remove` is a soft delete into `.trash/`.
+1. **The Knowledge DB is the source of truth, and the WebUI is the only way in.** A
+   document is a row: `documents.body` holds its text and four attributes hold what a BA
+   files it under (title · alias · kind · description). A BA-confirmed answer is the same
+   thing — written straight to a row at `qa/ticket-N.md`, which stays a `.md` path because
+   that is what a citation prints and a scope matches, not because a file exists.
+   Nothing writes to a corpus directory; `internal/rag` touches no disk at all. `ingest`
+   still reads files, but as an operator's import client, and `CORPUS_DIR` is only the
+   folder it reads.
+   There is deliberately **no backup story**: losing the database loses the corpus. The one
+   net is that `Remove` is soft — the chunks go, so the document stops answering
+   immediately, and the row keeps its text with a `deleted_at`. That is `.trash/` as a
+   column, recoverable by whoever has the database.
 2. **Reads are open; writes are gated.** `BA_PASS` guards confirming an answer,
    dismissing a ticket, and importing a document (`X-BA-Pass` header, constant-time
    compare). An unset `BA_PASS` means **no write surface at all**, not open writes —
@@ -281,9 +288,14 @@ a `TextDecoder` or `visualViewport`.
    the chunks under the scope, so `TOP_K` counts matches inside it. Filtering after RRF
    fusion returns fewer sections and thins the answer without saying so. `rag.Scope`
    canonicalises the string, once, because it is half the cache key.
-5. **The document path is one identity.** `cmd/ingest.docPath` and `rag.SafePath`
-   must agree: relative to `CORPUS_DIR`, folders kept, `..`/absolute/hidden/`qa/`
-   refused. Two spellings of one file become two documents, each cited separately.
+5. **The document path is one identity, and it carries the folder.** `cmd/ingest.docPath`
+   and `rag.SafePath` must agree: folders kept, `..`/absolute/hidden refused, and `qa/`
+   refused for anything being *created* there. Two spellings of one document become two
+   documents, each cited separately. This is also why no `folder` column exists — the path
+   is the scope prefix (invariant 4) and the citation name, so a second home for the folder
+   would disagree with it the first time somebody renamed one. `SafePath` is the create
+   rule; `readPath` is the same rules minus the `qa/` refusal, because correcting a
+   confirmed answer where it already lives is an edit, not a fabrication.
 
 ### New tables come from schema.sql; new columns need a migration
 
@@ -292,11 +304,11 @@ column never reaches a database that already has the table**: the statement find
 table and does nothing, and every query naming the column fails at runtime on the
 deployed instance while passing locally against a fresh file.
 
-That was survivable for exactly as long as invariant 1 held alone — the upgrade path was
-`rm knowledge.db && ingest corpus`, one provider bill. vNext inverts the source of truth,
-and with nothing to rebuild from, a change that cannot reach an existing database cannot
-ship. So `internal/db/migrate.go` exists now, deliberately built *before* the corpus
-directory stops being written to: doing it in the other order removes the way back.
+That was survivable for exactly as long as the database was *derived* — the upgrade path
+was `rm knowledge.db && ingest corpus`, one provider bill. **It is not derived any more.**
+The documents live here, so a change that cannot reach an existing database is a change
+that cannot ship, and `internal/db/migrate.go` is what makes one able to. It shipped
+*before* the inversion, deliberately: doing it the other way round removes the way back.
 
 It is small on purpose — forward only, one transaction per migration, and a
 `schema_version` **table** rather than `user_version`, because the first question anyone
@@ -306,20 +318,12 @@ the SQL of a migration that has shipped.
 
 Still worth trying before paying for a column at all: derive the value at query time, or
 encode it in an existing one (the scope lives inside `answers.q_norm` for exactly this
-reason). And while the DB is still derived, the rebuild remains the cheaper fix for a
-mistake:
+reason).
 
-```bash
-sudo systemctl stop knowledge
-rm -f state/knowledge.db state/knowledge.db-wal state/knowledge.db-shm
-./bin/ingest corpus            # re-embeds everything: costs one provider bill
-sudo systemctl start knowledge
-```
-
-**Nothing blocks the inversion any more.** Migrations were one of its two preconditions; the
-other was an off-box backup, and that requirement was dropped — the WebUI import is the
-controlled entry point the brief asks for, and a second copy of the corpus is not what makes
-that true. What is left is the work itself. See *Now vs vNext* in `README.md`.
+**The rebuild is gone as an escape hatch.** `rm knowledge.db && ingest corpus` used to fix
+any schema mistake for the price of one provider bill; there is nothing to rebuild from now,
+so a bad migration is a bad day. That is the cost the inversion bought, and it is why the
+runner is forward-only, one transaction per step, and boring.
 
 ### Traps that have already cost time
 
@@ -377,7 +381,8 @@ can hold it:
 | **wiring** | `src/App.vue`, `src/main.js`, `src/router.js` | who gets what, which screen, and what the template binds | logic of its own, or a reach into `src/lib/` (except `viewport.js`: it binds the dock element the shell owns) |
 
 One composable per concern: `conversation` (turns, streaming, persistence), `corpus`,
-`scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, plus `gate` (the BA password),
+`scope`, `qaloop`, `runtime`, `statusline`, `diagrams`, `library` (the BA's documents and
+the form that writes them), plus `gate` (the BA password),
 `importer`, `tickets`, `nestree`, `finder`, `lang` (i18n — the only door to vue-i18n).
 
 Three rules keep the layers from leaking:
@@ -476,24 +481,86 @@ address held by a running server is a second home for a fact that already has on
   the reference. Fifteen `jsdoc/*` rules run at `--max-warnings 0`, so a tag naming a
   parameter that no longer exists fails `make check`, not review; in Go the same job is the
   doc comment — identifier first, full stop last (`godot`).
-- **Seventeen skills are vendored and hash-pinned in `skills-lock.json` — read them, don't
-  re-add them.** `.claude/skills/*` symlink `.agents/skills/*`, so neither agent's set can
-  drift from the other. Rule 23 is this table: the row for what you are touching, and
-  `ponytail` (laziest thing that works, YAGNI, stdlib before code — rules 17 and 20 written
-  by somebody else) before any of them.
+- **The vendored skills are the style source, and *Skills* below is the only routing table.**
+  Read the row for what you are touching, `ponytail` before any of them, and nothing else —
+  a skill never outranks a rule above.
 
-  | touching | read first | from |
-  |---|---|---|
-  | any code at all | `ponytail` | `dietrichgebert/ponytail` |
-  | `internal/*`, `cmd/*` | `golang-code-style`, `golang-naming`, `golang-error-handling`, then whichever matches: `golang-context`, `golang-concurrency`, `golang-data-structures`, `golang-design-patterns` | `samber/cc-skills-golang` |
-  | a doc comment, a README | `golang-documentation` | same |
-  | [`.golangci.yml`](.golangci.yml) | `golang-lint` — this repo's config started from it | same |
-  | `web/ui/**/*.js` | `modern-javascript-patterns` | `wshobson/agents` |
-  | `web/ui/**/*.vue` | `vue`, then `building-components` | `antfu/skills`, `vercel/components.build` |
-  | `vite.config.js`, the bundle | `vite` | `antfu/skills` |
-  | `eslint.config.js`, tooling | `antfu` | `antfu/skills` |
+## Skills
 
-  Two are vendored and do **not** apply, worth knowing before an agent "fits" one: `pnpm`
-  (this repo is npm, with a committed `package-lock.json`) and `antfu-design` (UnoCSS-first,
-  while layout here is `web/ui/src/styles.css` over 8bit-nes). A skill never outranks a rule
-  above — where they disagree the rule wins, and the disagreement goes in `changelog/`.
+**Nineteen skills are vendored and hash-pinned in [`skills-lock.json`](skills-lock.json) —
+read them, don't re-add them.** `.claude/skills/*` are symlinks to `.agents/skills/*`, so
+neither agent's set can drift from the other. This section is rule 23 in full: the routing,
+the precedence, and every place a skill is wrong *about this repo*. A skill with no row here
+is a skill an agent will apply everywhere.
+
+**Precedence, top wins. A disagreement is not a judgement call:**
+
+1. A **rule** in *Critical rules*, and the invariants under *Architecture*.
+2. A **machine-checked config in this tree** — [`.golangci.yml`](.golangci.yml),
+   [`web/ui/eslint.config.js`](web/ui/eslint.config.js), the `spec.json` join, the
+   [`Makefile`](Makefile) pins.
+3. The **vendored skill**, at its pinned hash.
+4. Nothing else. Recalled style, an upstream README, a newer release note: not a source here.
+
+When a skill loses, the loss goes in `changelog/`, dated, naming the rule it lost to — that is
+what stops the next agent re-deriving it. And on its own authority a skill may never add a
+dependency (rule 20), a root document (rule 18), a test file (rule 21), or a deferred marker
+(rule 24): those are rules, and the skill is tier 3.
+
+**Read lazily.** `SKILL.md` is the contract; a `references/*.md` is opened only when a line in
+that SKILL.md points at the case in front of you. Vendoring is not permission to load
+`.agents/skills/` into context — the nine Go skills' references are a longer read than the
+packages they describe, and an agent that spends its context on style has none left for the
+code.
+
+### Which skill, in which order
+
+| touching | read, in this order | from |
+|---|---|---|
+| any code at all | `ponytail` — laziest thing that works, YAGNI, stdlib before code: rules 17 and 20 written by somebody else | `dietrichgebert/ponytail` |
+| `internal/*`, `cmd/*` | `golang-code-style`, `golang-naming`, `golang-error-handling`, then whichever matches: `golang-context`, `golang-concurrency`, `golang-data-structures`, `golang-design-patterns` | `samber/cc-skills-golang` |
+| a doc comment, a README | `golang-documentation` | same |
+| [`.golangci.yml`](.golangci.yml) | `golang-lint` — this repo's config started from it | same |
+| `web/ui/src/lib/*.js`, `web/ui/src/composables/*.js` | `modern-javascript-patterns` | `wshobson/agents` |
+| `web/ui/**/*.vue` | `vue`, then `building-components` | `antfu/skills`, `vercel/components.build` |
+| [`web/ui/src/router.js`](web/ui/src/router.js), a screen behind a route | `vue-router-best-practices` — after that file's own header | `hyf0/vue-skills` |
+| `vite.config.js`, the bundle | `vite` | `antfu/skills` |
+| `eslint.config.js`, `package.json`, tooling | `antfu` | `antfu/skills` |
+
+`vue`, `modern-javascript-patterns`, `golang-code-style`, `golang-naming`, `golang-context`,
+`golang-concurrency` and `golang-data-structures` apply as written — but inside the four-layer
+table under *Front end* and rules 9–12. A `<script setup>` holding a branch is a composable
+nobody wrote yet, however the skill's example is shaped.
+
+### Where a skill is wrong about this repo
+
+| skill | what it assumes | what this repo does |
+|---|---|---|
+| `ponytail` | marks a deliberate corner with a `ponytail:` comment naming its ceiling and upgrade path | **Rule 24: no deferred marker.** `godox` runs on its default keywords and `no-warning-comments` lists `todo`/`fixme`/`xxx`/`hack`, so a `ponytail:` note would pass the gate while being exactly the lie rule 24 is aimed at. The ceiling goes in `changelog/`, dated. Every other line of the skill is rules 17 and 20 |
+| `golang-error-handling` | `samber/oops` and `slog`, and cross-refs `golang-samber-oops`, `golang-samber-slog`, `golang-observability`, `golang-safety` | `go.mod` has two dependencies and neither is a logger: stdlib `errors`, `%w`, `errors.Is`, and `log.Printf`. Those four cross-referenced skills are **not vendored** — a pointer to one is a dead end, not an errand |
+| `golang-documentation` | generates README, CONTRIBUTING, CHANGELOG and `llms.txt` from templates | Rule 18 — a `CONTRIBUTING.md` is the fifth root document; `changelog/` is dated session handoffs, not a release changelog; `llms.txt` is generated by `cmd/rendocs` (rule 16). Its *writing principles* are the half that applies |
+| `golang-design-patterns` | `ddd`, `clean-architecture`, `hexagonal-architecture`, DI containers | Rule 20 — `cmd` → `internal` → nothing is the architecture, and the three narrow interfaces in `internal/server` are the whole DI story. The constructor, enum, `//go:embed`, compile-time-check and `resource-management` parts apply; the architecture references need a `changelog/` decision first |
+| `golang-lint` | its recommended `.golangci.yml` | This repo's started there, then set `linters.default: none`, so `enable:` is the complete set and a rejected linter is a **comment with its reason**, never a `disable:` key. The file is the truth; the skill is where it came from |
+| `vue-router-best-practices` | Vue Router 4 | `web/ui/package.json` pins **vue-router 5.2.0**. Check a claim against the installed version before acting on it — the same trap as the unversioned design-system docs site in [`AGENTS.md`](AGENTS.md) |
+| `building-components` | TypeScript types, `as-child`/polymorphism, publishing to npm or a registry | JavaScript, nothing published, and 8bit-nes owns components. `principles`, `accessibility`, `composition` and `state` apply; `types`, `npm`, `registry`, `marketplaces`, `as-child` and `polymorphism` do not, and `design-tokens`/`styling` are the library's job (`AGENTS.md`) |
+| `vite` | `vite.config.ts`, TypeScript | `web/ui/vite.config.js` — JavaScript by decision (see *Front end*). `package.json` pins Vite 8, so the Rolldown half is the present, not a migration to plan |
+| `antfu` | scaffolds a project: pnpm, monorepos, library publishing | One npm app with a committed `package-lock.json`, not published. `references/antfu-eslint-config.md` is the useful half; `eslint.config.js` already exists and every rule in it is annotated |
+| the `golang-*` audit modes | `ultracode` and up to five parallel sub-agents per audit | Opt-in only, never the default for a change. `make check-full` is the audit of record, and its *skipped* lines are part of the reading |
+
+### Vendored and not applicable
+
+Worth knowing before an agent "fits" one to a surface it was not written for:
+
+- **`pnpm`** — this repo is npm, with a committed `package-lock.json`.
+- **`antfu-design`** — UnoCSS-first, while layout here is `web/ui/src/styles.css` over 8bit-nes.
+- **`code-documenter`** — asks which docstring format to use, then targets Python docstrings,
+  OpenAPI/Swagger, FastAPI/Django/NestJS and doc portals. None of that exists here, and the
+  question is already answered: JSDoc as *Conventions* describes it, `godoc` in Go.
+
+They stay vendored so nobody re-adds them.
+
+Adding or bumping a skill: symlink it under `.claude/skills`, record source and hash in
+`skills-lock.json`, and add its row above — plus a row in *deltas* or in *not applicable*.
+This section is `prose only`; the join it wants (`.claude/skills/*` ↔ `skills-lock.json` ↔
+these rows) belongs beside `TestRootDocsAreTheFourWeKnowAbout` in
+[`web/embed_test.go`](web/embed_test.go), not in a new test file (rule 21).

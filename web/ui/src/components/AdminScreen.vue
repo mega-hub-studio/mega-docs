@@ -24,7 +24,7 @@ import { useAdmin } from '../composables/admin.js'
 defineProps({
   online: Boolean,
   writes: Boolean,
-  runtime: { type: Object, required: true }, // model + window + prices, from /api/health
+  runtime: { type: Object, required: true }, // model + window + prices + revision, from /api/health
   corpus: { type: Object, required: true }, // docs · chunks · approved, from /api/corpus
   history: { type: Array, default: () => [] }, // answers still free to replay
 })
@@ -120,6 +120,21 @@ onMounted(fetchSettings)
           <dt>Context window</dt><dd>{{ runtime.window }} tokens</dd>
           <dt>Price in / out</dt>
           <dd>{{ runtime.priceIn }} / {{ runtime.priceOut }} per 1M tokens</dd>
+          <!-- Which commit is serving this page, so "is the deploy live?" is answered by
+               reading the app rather than by reaching the host. The status line carries it
+               too, but that strip lives in the dock and the dock belongs to asking — on this
+               screen and on BA it is not rendered at all, and this is the screen whose job is
+               that question. A trailing `+` means the host built from a dirty tree.
+               Absent means the binary carries no VCS stamp (`go install` from a proxy), and
+               here that is named rather than hidden: the strip prints nothing because a field
+               cannot say "unknown" without reading as noise, while a row an operator went
+               looking for has to answer. Same reason cmd/server's describeRev names it in the
+               startup line. -->
+          <dt>Revision</dt>
+          <dd>
+            <template v-if="runtime.version"><code>@{{ runtime.version }}</code></template>
+            <span v-else class="badge todo">no vcs stamp</span>
+          </dd>
           <dt>Server</dt>
           <dd>
             <span class="badge" :class="online ? 'good' : 'crit'">

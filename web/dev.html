@@ -275,7 +275,7 @@ view.scrollToEnd();                            // viewport.js</span></div>
 
   <!-- ══ http surface ══════════════════════════════════════════════════════════ -->
   <section id="http" data-feature="http-surface"
-           data-api="GET /api/health,POST /api/chat,GET /api/corpus,GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action},GET /api/history,POST /api/documents"
+           data-api="GET /api/health,POST /api/chat,GET /api/corpus,GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action},GET /api/history,POST /api/documents,PUT /api/documents/{path...},GET /api/documents/{path...}"
            data-test="TestChatRejectsBadRequests,TestABadTicketIdIs400,TestGuideRoutesAreNotServed">
     <h2 lang="en">The whole HTTP surface</h2>
     <h2 lang="vi">Toàn bộ mặt HTTP</h2>
@@ -301,7 +301,11 @@ view.scrollToEnd();                            // viewport.js</span></div>
           <tr lang="en"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 wrong, 403 writes off</td></tr>
           <tr lang="vi"><th><code>POST /api/tickets/{id}/{action}</code></th><td><code>draft</code> · <code>confirm</code> · <code>reject</code></td><td><code>X-BA-Pass</code> — 401 sai, 403 tắt ghi</td></tr>
           <tr lang="en"><th><code>POST /api/documents</code></th><td>multipart import: <code>files</code> (repeatable) + optional <code>dir</code>. Partial success is reported — 200 if anything landed, 400 if nothing did, and both bodies list every file</td><td><code>X-BA-Pass</code></td></tr>
+          <tr lang="en"><th><code>PUT /api/documents/{path…}</code></th><td>write one document: <code>{to, body, title, alias, kind, description}</code>. One route for new and for edit, because that is what PUT means; <code>to</code> is where it should end up, so a rename moves its chunks with it. Saving re-indexes</td><td><code>X-BA-Pass</code></td></tr>
+          <tr lang="en"><th><code>GET /api/documents/{path…}</code></th><td>one document back, attributes and body — what the edit form loads. Ungated: reads are open, and this is text an answer already quotes with a citation</td><td>never</td></tr>
           <tr lang="vi"><th><code>POST /api/documents</code></th><td>import multipart: <code>files</code> (lặp được) + <code>dir</code> tuỳ chọn. Thành công một phần vẫn được báo — 200 nếu có file nào vào, 400 nếu không file nào, và cả hai body đều liệt kê từng file</td><td><code>X-BA-Pass</code></td></tr>
+          <tr lang="vi"><th><code>PUT /api/documents/{path…}</code></th><td>ghi một tài liệu: <code>{to, body, title, alias, kind, description}</code>. Một route cho cả tạo mới và sửa, vì đó đúng nghĩa PUT; <code>to</code> là chỗ nó sẽ nằm, nên đổi tên là mang cả chunks theo. Lưu là index lại</td><td><code>X-BA-Pass</code></td></tr>
+          <tr lang="vi"><th><code>GET /api/documents/{path…}</code></th><td>đọc lại một tài liệu, cả attribute và nội dung — thứ form sửa nạp vào. Không cần mật khẩu: đọc là mở, và đây là chữ mà câu trả lời vẫn trích kèm dẫn nguồn</td><td>không bao giờ</td></tr>
           <tr lang="en"><th><code>GET /api/history</code></th><td>answers still free to replay, with hit counts and the <code>scope</code> each was answered in — replaying under a different scope is a different question, and costs</td><td>—</td></tr>
           <tr lang="vi"><th><code>GET /api/history</code></th><td>các câu trả lời còn lặp lại miễn phí, kèm số lần dùng và <code>scope</code> lúc trả lời — lặp lại ở scope khác là câu hỏi khác, và có tính phí</td><td>—</td></tr>
         </tbody>
@@ -443,9 +447,9 @@ EMBED_DIM=1536</span></div>
         <p lang="en"><code>BA_PASS</code> gates the two actions that change what the
           engine says — confirm and dismiss. Empty means the instance has no write
           surface at all, which is the safe way to forget a secret.
-          <code>CORPUS_DIR</code> is the folder <code>ingest</code> reads and where a
-          confirmed answer is written as <code>qa/ticket-N.md</code>; it is why the
-          database stays derived. Neither needs a re-index.</p>
+          <code>CORPUS_DIR</code> is only the folder <code>ingest</code> reads — nothing
+          writes there any more. A confirmed answer is a row at <code>qa/ticket-N.md</code>,
+          and the database is the source of truth. Neither needs a re-index.</p>
         <p lang="vi"><code>BA_PASS</code> khoá hai hành động đổi câu trả lời của engine —
           confirm và dismiss. Để trống thì instance không có chỗ ghi nào, đó là cách an
           toàn khi quên đặt secret. <code>CORPUS_DIR</code> là thư mục
@@ -704,10 +708,10 @@ CORPUS_DIR=docs      # ingest reads it; confirms write into it</span></div>
         <tbody>
           <tr lang="en"><th>plumbing</th><td><code>src/lib/</code> — chat · qa · upload · answer · diagram · library · session · viewport</td><td>fetch, SSE, storage, markdown, DOM maths</td><td>any Vue import — these run in a bare console</td></tr>
           <tr lang="vi"><th>plumbing</th><td><code>src/lib/</code> — chat · qa · upload · answer · diagram · library · session · viewport</td><td>fetch, SSE, storage, markdown, toán DOM</td><td>bất kỳ import Vue nào — chúng chạy được trong console trần</td></tr>
-          <tr lang="en"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · finder</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
-          <tr lang="vi"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · tickets · nestree · finder</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
-          <tr lang="en"><th>components</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>branches in <code>&lt;script setup&gt;</code> — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
-          <tr lang="vi"><th>component</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>nhánh trong <code>&lt;script setup&gt;</code> — component có <code>if</code> là composable chưa ai viết</td></tr>
+          <tr lang="en"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · library · tickets · nestree · finder</td><td>reactive state and every branch</td><td>another composable's state, or markup</td></tr>
+          <tr lang="vi"><th>logic</th><td><code>src/composables/</code> — conversation · corpus · scope · qaloop · runtime · statusline · diagrams · gate · importer · library · tickets · nestree · finder</td><td>reactive state và mọi nhánh</td><td>state của composable khác, hoặc markup</td></tr>
+          <tr lang="en"><th>components</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · LibraryPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>branches in <code>&lt;script setup&gt;</code> — a component with an <code>if</code> is a composable nobody wrote yet</td></tr>
+          <tr lang="vi"><th>component</th><td><code>src/components/*.vue</code> — AskScreen · BaScreen (the two screens) · ChatTurn · EmptyScreen · ScopePicker · StatusLine · ImportPanel · LibraryPanel · TicketCard · CorpusTree</td><td>props, emits, compose, template</td><td>nhánh trong <code>&lt;script setup&gt;</code> — component có <code>if</code> là composable chưa ai viết</td></tr>
           <tr lang="en"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code> · <code>src/router.js</code></td><td>who gets what, which screen, and what the template binds</td><td>logic of its own, or a reach into <code>src/lib/</code> (one exception: <code>viewport.js</code>, which binds the dock element the shell owns)</td></tr>
           <tr lang="vi"><th>wiring</th><td><code>src/App.vue</code> · <code>src/main.js</code> · <code>src/router.js</code></td><td>ai nhận gì, màn nào, và template bind gì</td><td>logic của riêng nó, hoặc chạm vào <code>src/lib/</code> (một ngoại lệ: <code>viewport.js</code>, nó bind vào phần tử dock mà shell sở hữu)</td></tr>
         </tbody>

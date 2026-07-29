@@ -209,7 +209,7 @@
   <section id="gap" data-feature="qa-loop"
            data-api="GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action}"
            data-env="BA_PASS"
-           data-test="TestConfirmedAnswerBecomesAFileAndThenACitation,TestTheSameGapFiledTwiceIsOneTicket,TestConfirmAndRejectRequireThePassword,TestADraftSurvivesAndStaysOutOfRetrieval">
+           data-test="TestConfirmedAnswerBecomesADocumentAndThenACitation,TestTheSameGapFiledTwiceIsOneTicket,TestConfirmAndRejectRequireThePassword,TestADraftSurvivesAndStaysOutOfRetrieval">
     <h2 lang="en">4 · File a gap, and answer one</h2>
     <h2 lang="vi">4 · Báo phần thiếu, và trả lời phần thiếu</h2>
     <p class="lede" lang="en">This is the loop that makes the thing get better instead of
@@ -352,16 +352,64 @@
 
   <!-- ══ 5 · import ════════════════════════════════════════════════════════ -->
   <section id="import" data-feature="import"
-           data-api="POST /api/documents,DELETE /api/documents/{path...}" data-env="BA_PASS,CORPUS_DIR"
-           data-test="TestImportIndexesEachFile,TestImportNeedsThePassword,TestImportReportsPartialFailure,TestOnlyTextDocumentsAreIngested,TestRemovingADocumentIsGated,TestARemovedDocumentIsRecoverableAndStaysUnindexed">
-    <h2 lang="en">5 · Import and remove documents</h2>
-    <h2 lang="vi">5 · Import và xoá tài liệu</h2>
-    <p class="lede" lang="en">The other way a document enters the corpus: drop
-      <code>.md</code> or <code>.txt</code> files on the BA tab, optionally into a folder.
-      Each one is indexed on arrival, and you can ask about it immediately.</p>
-    <p class="lede" lang="vi">Cách còn lại để tài liệu vào corpus: kéo file
-      <code>.md</code> hoặc <code>.txt</code> vào tab BA, có thể chọn thư mục. Mỗi file
-      được index ngay khi tới, và hỏi được luôn.</p>
+           data-api="POST /api/documents,PUT /api/documents/{path...},GET /api/documents/{path...},DELETE /api/documents/{path...}" data-env="BA_PASS"
+           data-test="TestImportIndexesEachFile,TestImportNeedsThePassword,TestImportReportsPartialFailure,TestOnlyTextDocumentsAreIngested,TestRemovingADocumentIsGated,TestARemovedDocumentStopsAnsweringAndItsTextSurvives,TestRenamingADocumentLeavesNothingBehind,TestWritingADocumentCarriesItsAttributes">
+    <h2 lang="en">5 · The library: import, edit, remove</h2>
+    <h2 lang="vi">5 · Thư viện: import, sửa, xoá</h2>
+    <p class="lede" lang="en">This screen <em>is</em> the knowledge base. Nothing else writes
+      to it and there is no folder on a server to keep in step: a document is what you saved
+      here, indexed the moment you save it, and askable immediately.</p>
+    <p class="lede" lang="vi">Màn hình này <em>chính là</em> kho tri thức. Không có gì khác
+      ghi vào nó, và không còn thư mục nào trên server phải giữ cho khớp: tài liệu là thứ bạn
+      vừa lưu ở đây, được index ngay lúc lưu, và hỏi được luôn.</p>
+
+    <p lang="en">Two doors, and they do different jobs. <b>Import</b> takes a batch of
+      <code>.md</code> / <code>.txt</code> files at once — for bulk, where the file name is
+      the only thing anyone can say about eight documents. <b>New document</b> writes one by
+      hand, with every field filled in. After that both live in the same list, and
+      <b>Edit</b> is the same form again.</p>
+    <p lang="vi">Hai cửa vào, hai việc khác nhau. <b>Import</b> nhận một loạt file
+      <code>.md</code> / <code>.txt</code> — dùng khi vào hàng loạt, vì với tám file thì tên
+      file là thứ duy nhất nói được. <b>New document</b> viết tay một tài liệu, điền đủ
+      trường. Sau đó cả hai nằm chung một danh sách, và <b>Edit</b> vẫn là form đó.</p>
+
+    <!-- The attribute table is the point of the CRUD screen: retrieval reads the text, and
+         these are what a person searches by six months later. -->
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Field</th><th>What it is for</th></tr>
+          <tr lang="vi"><th>Trường</th><th>Dùng để làm gì</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>Folder</th><td>Where it lives, and what a reader can scope a question to. It is part of the document's address, so changing it moves the document</td></tr>
+          <tr lang="vi"><th>Folder</th><td>Nó nằm ở đâu, và người đọc thu hẹp câu hỏi vào đâu. Đây là một phần địa chỉ tài liệu, nên đổi folder là di chuyển tài liệu</td></tr>
+          <tr lang="en"><th>File name</th><td>Ends in <code>.md</code>, <code>.markdown</code> or <code>.txt</code>. This is what a citation prints, so name it the way you would want to see it quoted</td></tr>
+          <tr lang="vi"><th>File name</th><td>Kết thúc bằng <code>.md</code>, <code>.markdown</code> hoặc <code>.txt</code>. Đây là thứ dẫn nguồn in ra, nên đặt tên như bạn muốn thấy nó được trích</td></tr>
+          <tr lang="en"><th>Title</th><td>What it is called on screen. The file name is used when you leave it blank</td></tr>
+          <tr lang="vi"><th>Title</th><td>Tên hiển thị trên màn hình. Để trống thì dùng tên file</td></tr>
+          <tr lang="en"><th>Alias</th><td>The other names people ask for it by — "rate card", "giá 2026". The library's search reads this together with everything else, which is what makes a half-remembered name find the document</td></tr>
+          <tr lang="vi"><th>Alias</th><td>Những tên khác mà người ta hay gọi — "rate card", "giá 2026". Ô tìm kiếm của thư viện đọc trường này cùng mọi trường khác, nên nhớ lơ mơ vẫn tìm ra</td></tr>
+          <tr lang="en"><th>Kind</th><td>Your own vocabulary — spec, policy, runbook, faq. Confirmed answers file themselves as <code>answer</code>, so you can tell what the loop produced from what a person imported</td></tr>
+          <tr lang="vi"><th>Kind</th><td>Từ vựng của riêng bạn — spec, policy, runbook, faq. Câu trả lời đã xác nhận tự ghi là <code>answer</code>, nên phân biệt được cái do vòng lặp tạo ra và cái người import</td></tr>
+          <tr lang="en"><th>Description</th><td>One line: what is in it, and when to reach for it. Shown under the name in the list</td></tr>
+          <tr lang="vi"><th>Description</th><td>Một dòng: trong đó có gì, và khi nào cần tới. Hiện dưới tên trong danh sách</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout gotcha">
+      <b lang="en">Remove stops a document answering; it does not shred it.</b>
+      <span lang="en">The retrievable pieces are deleted, so the document leaves every answer
+        immediately — that is what the button is for. Its text stays in the database with a
+        removal date, which is the only way back: nothing on disk holds a second copy any
+        more. Importing the same path again brings it back.</span>
+      <b lang="vi">Remove làm tài liệu ngừng trả lời, chứ không nghiền nó.</b>
+      <span lang="vi">Các mảnh dùng để truy xuất bị xoá, nên tài liệu rời khỏi mọi câu trả lời
+        ngay lập tức — đó là việc của nút này. Phần chữ vẫn nằm trong database kèm ngày xoá,
+        và đó là đường về duy nhất: không còn bản sao nào trên đĩa nữa. Import lại đúng đường
+        dẫn đó là nó trở lại.</span>
+    </div>
 
     <div class="step">
       <span class="num">1</span>

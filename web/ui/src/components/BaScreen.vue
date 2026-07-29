@@ -20,6 +20,7 @@ import { toast } from '8bit-nes'
 import { useGate } from '../composables/gate.js'
 import { useTickets } from '../composables/tickets.js'
 import ImportPanel from './ImportPanel.vue'
+import LibraryPanel from './LibraryPanel.vue'
 import TicketCard from './TicketCard.vue'
 
 const props = defineProps({
@@ -115,6 +116,14 @@ const importRefused = e => gate.fail(e, 'The server refused the password: ')
     <ImportPanel
       v-if="online && writes && unlocked" :documents="documents"
       @indexed="$emit('changed', null)" @locked="importRefused"
+    />
+
+    <!-- The library is shown to a locked screen too, because reading what is indexed needs
+         no password (invariant 2) — `writes` is what decides whether it offers a way to
+         change anything, so a read-only instance lists the documents and no buttons. -->
+    <LibraryPanel
+      v-if="online" :documents="documents" :writes="writes && unlocked"
+      @changed="$emit('changed', null)" @locked="importRefused"
     />
 
     <div v-if="!queue.tickets.length" class="empty">

@@ -81,8 +81,29 @@ func (s *Store) migrate() error {
 // Close releases the underlying database handle.
 func (s *Store) Close() error { return s.db.Close() }
 
+// Doc is one document as it is written: its identity, its text, and the attributes a BA
+// files it under. One struct rather than six positional arguments, because the call site is
+// where a swapped alias and description would go unnoticed.
+//
+// Path carries the folder — it is the scope prefix and the citation identity, so there is
+// deliberately no separate folder field. Body is the document itself: it lives here, and
+// nowhere else.
+type Doc struct {
+	Path        string
+	Title       string
+	Alias       string
+	Kind        string
+	Description string
+	Body        string
+}
+
 // UpsertDocument replaces a document and all its chunks (idempotent re-ingest).
-func (s *Store) UpsertDocument(path, title string) (int64, error) {
+//
+// Writing the same path again resurrects a removed document rather than leaving a row that
+// is both present and deleted: `deleted_at` is cleared, which is what "import it again"
+// means to whoever does it.
+func (s *Store) UpsertDocument(d Doc) (int64, error) {
+	path := d.Path
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
@@ -97,11 +118,12 @@ func (s *Store) UpsertDocument(path, title string) (int64, error) {
 		_, _ = tx.Exec(`DELETE FROM chunks WHERE document_id=?`, oldID.Int64)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO documents(path,title,updated_at)
-		 VALUES(?,?,datetime('now'))
+		`INSERT INTO documents(path,title,alias,kind,description,body,updated_at,deleted_at)
+		 VALUES(?,?,?,?,?,?,datetime('now'),NULL)
 		 ON CONFLICT(path) DO UPDATE SET title=excluded.title,
-		   updated_at=datetime('now')`,
-		path, title); err != nil {
+		   alias=excluded.alias, kind=excluded.kind, description=excluded.description,
+		   body=excluded.body, updated_at=datetime('now'), deleted_at=NULL`,
+		path, d.Title, d.Alias, d.Kind, d.Description, d.Body); err != nil {
 		return 0, err
 	}
 	var docID int64
@@ -333,13 +355,20 @@ func toFTSQuery(text string) string {
 	return strings.Join(quoted, " OR ")
 }
 
-// Document is one indexed source file, with how much of it is retrievable.
+// Document is one document in the library, with how much of it is retrievable.
+//
+// The body is deliberately absent: this is the list, and a library of two hundred documents
+// would otherwise send two hundred bodies to a phone to render a table. `Document(path)`
+// fetches the one being edited.
 type Document struct {
-	Path      string `json:"path"`
-	Title     string `json:"title"`
-	Chunks    int    `json:"chunks"`
-	Approved  int    `json:"approved"`
-	UpdatedAt string `json:"updated_at"`
+	Path        string `json:"path"`
+	Title       string `json:"title"`
+	Alias       string `json:"alias"`
+	Kind        string `json:"kind"`
+	Description string `json:"description"`
+	Chunks      int    `json:"chunks"`
+	Approved    int    `json:"approved"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 // Corpus is what the engine actually knows — the answer to "is anything indexed,
@@ -358,7 +387,7 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	}
 	var c Corpus
 	if err := s.db.QueryRow(`
-		SELECT (SELECT COUNT(*) FROM documents),
+		SELECT (SELECT COUNT(*) FROM documents WHERE deleted_at IS NULL),
 		       (SELECT COUNT(*) FROM chunks),
 		       (SELECT COUNT(*) FROM chunks WHERE status = 'approved')`,
 	).Scan(&c.Docs, &c.Chunks, &c.Approved); err != nil {
@@ -366,11 +395,13 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	}
 
 	rows, err := s.db.Query(`
-		SELECT d.path, COALESCE(d.title, ''), d.updated_at,
+		SELECT d.path, COALESCE(d.title, ''), COALESCE(d.alias, ''),
+		       COALESCE(d.kind, ''), COALESCE(d.description, ''), d.updated_at,
 		       COUNT(c.id),
 		       COALESCE(SUM(c.status = 'approved'), 0)
 		FROM documents d
 		LEFT JOIN chunks c ON c.document_id = d.id
+		WHERE d.deleted_at IS NULL
 		GROUP BY d.id
 		ORDER BY d.updated_at DESC, d.path
 		LIMIT ?`, limit)
@@ -382,7 +413,8 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	c.Documents = []Document{} // never nil: this is serialised straight to JSON
 	for rows.Next() {
 		var d Document
-		if err := rows.Scan(&d.Path, &d.Title, &d.UpdatedAt, &d.Chunks, &d.Approved); err != nil {
+		if err := rows.Scan(&d.Path, &d.Title, &d.Alias, &d.Kind, &d.Description,
+			&d.UpdatedAt, &d.Chunks, &d.Approved); err != nil {
 			return c, err
 		}
 		c.Documents = append(c.Documents, d)
@@ -390,18 +422,38 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	return c, rows.Err()
 }
 
-// DeleteDocument removes one document and everything derived from it: its vectors, its
-// chunks, and its row. Reports whether it was there.
+// Document reads one document whole, body included — what the edit form needs and the list
+// deliberately does not carry. A removed document still reads, because that is the only way
+// back for one: the trash is a column now, not a directory.
+func (s *Store) Document(path string) (Doc, bool, error) {
+	var d Doc
+	err := s.db.QueryRow(`
+		SELECT path, COALESCE(title,''), COALESCE(alias,''), COALESCE(kind,''),
+		       COALESCE(description,''), COALESCE(body,'')
+		FROM documents WHERE path=?`, path,
+	).Scan(&d.Path, &d.Title, &d.Alias, &d.Kind, &d.Description, &d.Body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Doc{}, false, nil
+	}
+	if err != nil {
+		return Doc{}, false, fmt.Errorf("reading %s: %w", path, err)
+	}
+	return d, true, nil
+}
+
+// RemoveDocument takes one document out of retrieval and keeps its text. Reports whether it
+// was there.
 //
-// The three deletes are one transaction because a half-removed document is worse than
-// either state: chunks with no document row are retrievable text that can never be cited
-// (Search joins documents for the path), and vectors with no chunk are a KNN candidate that
-// resolves to nothing. UpsertDocument already does the first two on re-ingest — this is the
-// same removal without the insert that follows it.
+// The vectors and chunks go, which is the whole request: a removed document must stop
+// answering questions the moment it is removed. The row stays with `deleted_at` set, so the
+// body is still there for whoever has the database — the same deal the .trash/ directory
+// offered before the database became the source of truth, and the only way back that exists
+// now that nothing on disk holds a second copy.
 //
-// It does not touch the file. The corpus directory is the source of truth (invariant 1), so
-// the caller decides what happens on disk and this only keeps the derived copy in step.
-func (s *Store) DeleteDocument(path string) (bool, error) {
+// The three writes are one transaction because a half-removed document is worse than either
+// state: chunks with no vectors are a retriever that ranks nothing, and vectors with no
+// chunk are a KNN candidate that resolves to nothing.
+func (s *Store) RemoveDocument(path string) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return false, err
@@ -409,7 +461,8 @@ func (s *Store) DeleteDocument(path string) (bool, error) {
 	defer func() { _ = tx.Rollback() }()
 
 	var id sql.NullInt64
-	if err := tx.QueryRow(`SELECT id FROM documents WHERE path=?`, path).Scan(&id); err != nil {
+	if err := tx.QueryRow(
+		`SELECT id FROM documents WHERE path=? AND deleted_at IS NULL`, path).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
@@ -421,10 +474,10 @@ func (s *Store) DeleteDocument(path string) (bool, error) {
 	for _, q := range []string{
 		`DELETE FROM vec_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id=?)`,
 		`DELETE FROM chunks WHERE document_id=?`,
-		`DELETE FROM documents WHERE id=?`,
+		`UPDATE documents SET deleted_at=datetime('now') WHERE id=?`,
 	} {
 		if _, err := tx.Exec(q, id.Int64); err != nil {
-			return false, fmt.Errorf("deleting %s: %w", path, err)
+			return false, fmt.Errorf("removing %s: %w", path, err)
 		}
 	}
 	return true, tx.Commit()
