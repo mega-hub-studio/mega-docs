@@ -404,9 +404,11 @@ spends — see **Now vs vNext**.
 
 ## Frontend assets: two manifests, one design system
 
-Both front ends use [8-BIT NES](https://github.com/TuTranMVP/8bit-components) (**0.8.0**),
-and each gets it a different way — which is the whole reason there are two manifests and
-neither knows the other's versions:
+Both front ends use [8-BIT NES](https://github.com/TuTranMVP/8bit-components), and each gets
+it a different way — which is the whole reason there are two manifests and neither knows the
+other's versions. The version is **not repeated here**: this paragraph carried `0.8.0` for as
+long as it took the pin to reach 0.13.0 with nothing going red, because the test that guards a
+quoted version only reads `AGENTS.md`. The two manifests below are where it is true:
 
 | | the app (`web/ui`) | the guide (`web/*.html`) |
 |---|---|---|
