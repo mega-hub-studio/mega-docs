@@ -1,7 +1,7 @@
 <script setup>
 import { useTemplateRef } from 'vue'
 
-/* ══ SettingsDrawer.vue — one gear, one panel, everything a reader decides ═══════
+/* ══ SettingsDrawer.vue — one gear, one panel, almost no words ═══════════════════
    A contract, like every other screen part: what comes in, what goes out, and a template
    over nothing at all — the state belongs to the shell, because the model rides on every
    question `useConversation` sends.
@@ -9,21 +9,26 @@ import { useTemplateRef } from 'vue'
      props   models · picked · current · muted · lang · langs · admin · recall
      emit    pick(name) · mute(bool) · setLang(code) · close
 
-   Every control is a library recipe: `.drawer` on a native <dialog> (so Escape, the focus
-   trap and the backdrop are the platform's, not ours), `.eyebrow` for the three section
-   labels, `.field`/`.select` for the model, `.segment` for the language, `.switch` for the
-   sound, `.datalist` for the read-only rows, `.callout` for the one sentence about /#/admin.
-   This file adds no styling of its own beyond the two layout rules `styles.css` names.
+   ── why it is icons and not sentences ──
+   The first version read as three paragraphs: "Rides on every question. This instance refuses
+   any other." · "Chưa cấu hình giá" · "Bắt đầu từ câu hỏi đầu tiên của bạn". In Vietnamese
+   those wrapped to three lines each against a mono uppercase label as wide as the value
+   column, so a panel of six facts was a wall of prose with a ragged right edge — and every
+   line of it had to be *read* to find the one control anybody came for.
+   Now each row is an icon and a value on one grid: one column for the glyph, one for the
+   number, so the eye reads down two straight edges and the words are in `title` for whoever
+   wants them. Unknown is `—`, not a sentence about being unknown.
 
-   Why a drawer rather than a screen: settings are read *against* what you were doing — you
-   pick a stronger model because the answer behind the panel was thin. A route would take that
-   away, which is the same reason the BA library's form is not a modal.
+   Every part is the library's: `.drawer` on a native <dialog> (Escape, focus trap and the
+   backdrop are the platform's), `.select`, `.segment`, `.switch`, `.meter` — 0.14.0's cell bar,
+   which is how the thread's depth became something to glance at rather than parse — plus
+   `nes-icon` for every label. `styles.css` adds the two-column grid and nothing else.
    ═══════════════════════════════════════════════════════════════════════════ */
 defineProps({
   models: { type: Array, default: () => [] },
   picked: { type: String, default: '' },
   // The picked model's own window and price, already resolved by the composable — zero in
-  // either means the operator never said, and then nothing is printed rather than a zero.
+  // either means the operator never said, and then the row shows a dash rather than a zero.
   current: { type: Object, default: () => ({}) },
   muted: Boolean,
   lang: { type: String, required: true },
@@ -32,7 +37,7 @@ defineProps({
   // link that answers 404 teaches a reader the app is broken.
   admin: Boolean,
   // The thread as the last answer's model read it: { kept, offered }. Zeros mean the
-  // conversation has not started, which is a sentence rather than a figure.
+  // conversation has not started, and then the meter has nothing to draw.
   recall: { type: Object, default: () => ({ kept: 0, offered: 0 }) },
   t: { type: Function, required: true },
 })
@@ -52,8 +57,6 @@ defineExpose({
 </script>
 
 <template>
-  <!-- `ref` is bound by the shell, which owns showModal()/close(): the gear that opens this
-       lives in the bar, so the element has to be reachable from there. -->
   <dialog ref="dialog" class="drawer" @close="$emit('close')">
     <div class="head">
       <span class="title">{{ t('settings.title') }}</span>
@@ -66,86 +69,98 @@ defineExpose({
     </div>
 
     <div class="drawer-body">
-      <!-- ── what answers ── -->
-      <span class="eyebrow">{{ t('settings.answering') }}</span>
-
-      <label v-if="models.length > 1" class="field">
-        <span class="label">{{ t('settings.model') }}</span>
-        <!-- A <select>, not a .segment: a model name is 12–20 characters, so three of them
-             side by side in a 22rem drawer would each be four characters and an ellipsis. -->
-        <select
-          class="select" :value="picked"
-          @change="$emit('pick', $event.target.value)"
-        >
-          <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }}</option>
-        </select>
-        <span class="hint">{{ t('settings.modelHint') }}</span>
-      </label>
-
-      <!-- One model is not a menu of one. Say which it is and move on. -->
-      <dl v-else class="datalist">
-        <dt>{{ t('settings.model') }}</dt>
-        <dd>{{ picked || t('settings.oneModel') }}</dd>
-      </dl>
-
-      <!-- The two numbers that decide what the strip may claim. Absent, not zero, when the
-           operator never configured them — an unmeasured cost and a cost of nothing are
-           different facts, and that rule is older than this panel. -->
-      <dl class="datalist">
-        <template v-if="current.window">
-          <dt>{{ t('settings.window') }}</dt>
-          <dd>{{ current.window.toLocaleString() }}</dd>
-        </template>
-        <dt>{{ t('settings.price') }}</dt>
-        <dd v-if="current.price_in || current.price_out">
-          {{ current.price_in || 0 }} / {{ current.price_out || 0 }}
-        </dd>
-        <dd v-else>{{ t('settings.unpriced') }}</dd>
-        <dt>{{ t('settings.memory') }}</dt>
-        <dd v-if="recall.offered">{{ t('settings.recall', recall) }}</dd>
-        <dd v-else>{{ t('settings.recallNone') }}</dd>
-      </dl>
-
-      <!-- ── how it reads ── -->
-      <span class="eyebrow">{{ t('settings.reading') }}</span>
-
-      <!-- .segment is the library's single-choice control and two locale codes fit it
-           exactly, which is why the language moved here from the bar: the bar was carrying a
-           control that is used twice a year. -->
-      <div class="field">
-        <span class="label">{{ t('settings.language') }}</span>
-        <div class="segment" role="group" :aria-label="t('settings.language')">
-          <button
-            v-for="code in langs" :key="code" type="button"
-            :aria-pressed="String(code === lang)" @click="$emit('setLang', code)"
+      <!-- ── what answers ──
+           `cpu` for the model, `layers` for the window, `bolt` for the price: three glyphs
+           that are all in the pinned icons.d.ts, which is the only thing that answers whether
+           a name exists — one the release does not have renders an empty box in silence. -->
+      <div class="set-group">
+        <div class="set-row">
+          <nes-icon name="cpu" :title="t('settings.model')" />
+          <!-- A <select> only when there is a choice. One model is not a menu of one, so it
+               reads as what it is: a name. -->
+          <select
+            v-if="models.length > 1" class="select" :value="picked"
+            :aria-label="t('settings.model')" @change="$emit('pick', $event.target.value)"
           >
-            {{ code.toUpperCase() }}
-          </button>
+            <option v-for="m in models" :key="m.name" :value="m.name">{{ m.name }}</option>
+          </select>
+          <b v-else>{{ picked || '—' }}</b>
+        </div>
+
+        <div class="set-row">
+          <nes-icon name="layers" :title="t('settings.window')" />
+          <!-- `128k`, not `128,000`: one character of unit says "a magnitude of tokens" where a
+               label would have said it in three words, and it can never wrap. -->
+          <span>{{ current.window ? `${Math.round(current.window / 1000)}k` : '—' }}</span>
+        </div>
+
+        <div class="set-row">
+          <nes-icon name="bolt" :title="t('settings.price')" />
+          <!-- The `$` is what tells this row apart from the one above it at a glance, which is
+               the whole job a label used to do here. -->
+          <span v-if="current.price_in || current.price_out">
+            ${{ current.price_in || 0 }} / ${{ current.price_out || 0 }}
+          </span>
+          <span v-else>—</span>
+        </div>
+
+        <!-- The thread, as depth rather than as a sentence: `.meter` is 0.14.0's cell bar, so
+             "three of eight turns survived the window" is eight boxes with three lit. The
+             figure stays beside it for anyone who wants the number, and both are absent before
+             a conversation has any turns to trim. -->
+        <div class="set-row">
+          <nes-icon name="chat" :title="t('settings.memory')" />
+          <span v-if="recall.offered" class="set-meter">
+            <span class="meter" :aria-label="t('settings.recall', recall)">
+              <span
+                v-for="i in Math.min(recall.offered, 8)" :key="i"
+                class="cell" :class="{ on: i <= recall.kept }"
+              />
+            </span>
+            <small>{{ recall.kept }}/{{ recall.offered }}</small>
+          </span>
+          <span v-else>—</span>
         </div>
       </div>
 
-      <label class="switch-row">
-        <input
-          class="switch" type="checkbox" :checked="!muted"
-          @change="$emit('mute', !$event.target.checked)"
-        >
-        <span>{{ t('settings.sound') }}</span>
-      </label>
-
-      <!-- ── what the operator decided ── -->
-      <template v-if="admin">
-        <span class="eyebrow">{{ t('settings.instance') }}</span>
-        <div class="callout memo">
-          <span>{{ t('settings.instanceHint') }}</span>
+      <!-- ── how it reads ── -->
+      <div class="set-group">
+        <div class="set-row">
+          <nes-icon name="globe" :title="t('settings.language')" />
+          <div class="segment" role="group" :aria-label="t('settings.language')">
+            <button
+              v-for="code in langs" :key="code" type="button"
+              :aria-pressed="String(code === lang)" @click="$emit('setLang', code)"
+            >
+              {{ code.toUpperCase() }}
+            </button>
+          </div>
         </div>
-        <!-- A link, not a copy: those values live in .env and are read at startup, so
-             restating them here would be a second home for a fact that already has one. -->
+
+        <!-- The icon is the state as well as the label: a muted instance shows the muted
+             glyph, so the row says which way the switch is without a word beside it. -->
+        <label class="set-row">
+          <nes-icon :name="muted ? 'mute' : 'volume'" :title="t('settings.sound')" />
+          <input
+            class="switch" type="checkbox" :checked="!muted"
+            :aria-label="t('settings.sound')" @change="$emit('mute', !$event.target.checked)"
+          >
+        </label>
+      </div>
+
+      <!-- ── what the operator decided ──
+           A link, not a copy: those values live in .env and are read at startup, so restating
+           them here would be a second home for a fact that already has one. -->
+      <div v-if="admin" class="set-group">
         <router-link v-slot="{ navigate }" to="/admin" custom>
-          <button class="btn ghost sm" type="button" @click="$emit('close'); navigate()">
-            <nes-icon name="gear" /> {{ t('settings.openAdmin') }}
+          <button
+            class="btn ghost sm set-wide" type="button" :title="t('settings.instanceHint')"
+            @click="$emit('close'); navigate()"
+          >
+            <nes-icon name="sliders" /> {{ t('settings.instance') }}
           </button>
         </router-link>
-      </template>
+      </div>
     </div>
   </dialog>
 </template>

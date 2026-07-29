@@ -51,15 +51,15 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.13.0
+    8bit-nes@0.14.0
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -77,9 +77,10 @@ it, so trust the table.
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
 2. **Every local override of the design system is named, and there are two kinds.** All of
-   them are in `web/ui/src/styles.css`, against **8bit-nes 0.13.0**, and each was re-verified
+   them are in `web/ui/src/styles.css`, against **8bit-nes 0.14.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a
-   claim about bytes.
+   claim about bytes — on the 0.13.0 → 0.14.0 bump all eight were still needed, and only
+   `all.min.css` changed at all (the JS and the three fonts came back with identical digests).
 
    **Waiting on a release. Re-measure on the next bump, and delete what has landed:**
 
