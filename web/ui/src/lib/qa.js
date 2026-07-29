@@ -49,11 +49,26 @@ export async function file(question, miss) {
 }
 
 /**
- * Move a ticket: draft | confirm | reject. Requires the BA password.
+ * Move a ticket: draft | confirm | retract | reject. Requires the BA password.
+ *
+ * `confirm` on an already-confirmed ticket republishes it, which is how an answer is
+ * corrected: the document path comes from the id, so the fix lands where the citation
+ * already points.
  * @throws {WrongPass} when the password is missing, wrong, or writes are off
  */
 export async function act(id, action, body = {}) {
   return json(`/api/tickets/${id}/${action}`, { method: 'POST', body, auth: true })
+}
+
+/**
+ * Drop the ticket itself. The answer's text survives as a document row — removal is a
+ * `deleted_at` column — so this costs the question and its history, never the words.
+ * @param {number} id the ticket to remove
+ * @returns {Promise<{id: number}>} the id that was removed
+ * @throws {WrongPass} when the password is missing, wrong, or writes are off
+ */
+export async function drop(id) {
+  return json(`/api/tickets/${id}`, { method: 'DELETE', auth: true })
 }
 
 /** Answers still free to replay, most recently used first. */

@@ -21,6 +21,7 @@ type fakeKnow struct {
 	err      error
 	confirms []string // the answers a confirm was called with, in order
 	opened   [][2]string
+	deleted  []int64 // the ids a delete was called with, in order
 }
 
 func (f *fakeKnow) Queue(int) (db.Queue, error) { return f.queue, f.err }
@@ -41,9 +42,19 @@ func (f *fakeKnow) Confirm(_ context.Context, _ int64, a string) (db.Ticket, err
 	return f.ticket, f.err
 }
 
+func (f *fakeKnow) Retract(_ context.Context, _ int64) (db.Ticket, error) {
+	f.ticket.DocPath, f.ticket.Status = "", db.StatusAnswered
+	return f.ticket, f.err
+}
+
 func (f *fakeKnow) Reject(_ int64, note string) (db.Ticket, error) {
 	f.ticket.Note, f.ticket.Status = note, db.StatusRejected
 	return f.ticket, f.err
+}
+
+func (f *fakeKnow) Delete(_ context.Context, id int64) error {
+	f.deleted = append(f.deleted, id)
+	return f.err
 }
 
 func (f *fakeKnow) History(int) ([]db.Cached, error) { return f.history, f.err }
@@ -101,7 +112,9 @@ func TestReadingTheQueueAndHistoryNeedsNoPassword(t *testing.T) {
 }
 
 func TestConfirmAndRejectRequireThePassword(t *testing.T) {
-	for _, action := range []string{"confirm", "reject", "draft"} {
+	// Every way out of a state, not only the ways in: retract and delete undo what a
+	// confirm published, so an ungated one is an open door to un-answering the corpus.
+	for _, action := range []string{"confirm", "reject", "draft", "retract"} {
 		k := &fakeKnow{ticket: db.Ticket{ID: 3}}
 		h := qaServer(k, baPass)
 		path := "/api/tickets/3/" + action
@@ -115,6 +128,59 @@ func TestConfirmAndRejectRequireThePassword(t *testing.T) {
 		if w := do(t, h, "POST", path, `{"answer":"x"}`, withPass(baPass)); w.Code != 200 {
 			t.Errorf("%s with the password = %d, want 200 (%s)", action, w.Code, w.Body.String())
 		}
+	}
+
+	k := &fakeKnow{ticket: db.Ticket{ID: 3}}
+	h := qaServer(k, baPass)
+	if w := do(t, h, "DELETE", "/api/tickets/3", "", nil); w.Code != http.StatusUnauthorized {
+		t.Errorf("delete with no password = %d, want 401", w.Code)
+	}
+	if len(k.deleted) != 0 {
+		t.Error("an unauthenticated delete reached the engine")
+	}
+	if w := do(t, h, "DELETE", "/api/tickets/3", "", withPass(baPass)); w.Code != 200 {
+		t.Errorf("delete with the password = %d, want 200 (%s)", w.Code, w.Body.String())
+	}
+	if len(k.deleted) != 1 || k.deleted[0] != 3 {
+		t.Errorf("the id reached the engine as %v, want [3]", k.deleted)
+	}
+}
+
+func TestAConfirmedTicketCanBeTakenBackOut(t *testing.T) {
+	// `confirmed` used to be terminal: draft, confirm and reject all refused it, and no
+	// route deleted a ticket at all. So a wrong answer stayed in the knowledge base, and
+	// removing its document left the ticket still claiming to be in there. These are the
+	// three edges out — each returns the ticket, or in delete's case the id it removed.
+	k := &fakeKnow{ticket: db.Ticket{ID: 5, Status: db.StatusConfirmed, DocPath: "qa/ticket-5.md"}}
+	h := qaServer(k, baPass)
+
+	w := do(t, h, "POST", "/api/tickets/5/retract", "", withPass(baPass))
+	if w.Code != 200 {
+		t.Fatalf("retract = %d %s", w.Code, w.Body.String())
+	}
+	var got db.Ticket
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	if got.Status != db.StatusAnswered || got.DocPath != "" {
+		t.Errorf("retract returned %+v; want the draft back, naming no document", got)
+	}
+
+	w = do(t, h, "DELETE", "/api/tickets/5", "", withPass(baPass))
+	if w.Code != 200 {
+		t.Fatalf("delete = %d %s", w.Code, w.Body.String())
+	}
+	if body := strings.TrimSpace(w.Body.String()); body != `{"id":5}` {
+		t.Errorf("delete returned %s; the id is all there is left to say", body)
+	}
+}
+
+func TestDeletingATicketThatIsNotThereIs404(t *testing.T) {
+	// The client's stale list, not a server fault — and distinguishable from the 409 a
+	// transition that no longer applies returns.
+	k := &fakeKnow{err: db.ErrNoTicket}
+	if w := do(t, qaServer(k, baPass), "DELETE", "/api/tickets/99", "", withPass(baPass)); w.Code != http.StatusNotFound {
+		t.Errorf("deleting a missing ticket = %d, want 404", w.Code)
 	}
 }
 

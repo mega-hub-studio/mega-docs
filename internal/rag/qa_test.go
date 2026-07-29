@@ -2,6 +2,7 @@ package rag_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -320,7 +321,13 @@ func TestADraftSurvivesAndStaysOutOfRetrieval(t *testing.T) {
 	}
 }
 
-func TestConfirmingTwiceIsRefused(t *testing.T) {
+func TestConfirmingTwiceCorrectsTheAnswerInPlace(t *testing.T) {
+	// This used to assert the opposite, on the theory that the first answer was already
+	// cited elsewhere. What that bought was a published mistake nobody could fix: `confirmed`
+	// refused every transition, so the only remedy was to go and find the document in the
+	// library — and removing it there left the ticket still claiming to be in the knowledge
+	// base. Correcting in place is the cheaper honesty: the path comes from the id, so the
+	// fix lands exactly where the citation already points.
 	e, _ := engine(t, nil)
 	ctx := context.Background()
 
@@ -331,9 +338,139 @@ func TestConfirmingTwiceIsRefused(t *testing.T) {
 	if _, err := e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.Confirm(ctx, ticket.ID, "Actually five."); err == nil {
-		t.Error("a second confirm was accepted; the first answer is already cited elsewhere")
+	corrected, err := e.Confirm(ctx, ticket.ID, "Actually five.")
+	if err != nil {
+		t.Fatalf("a correction was refused: %v", err)
 	}
+	if corrected.Answer != "Actually five." || corrected.Status != db.StatusConfirmed {
+		t.Errorf("ticket after the correction = %+v", corrected)
+	}
+
+	doc, ok, err := e.Document(corrected.DocPath)
+	if err != nil || !ok {
+		t.Fatalf("the corrected answer is not in the knowledge base (ok=%v): %v", ok, err)
+	}
+	if !strings.Contains(doc.Body, "Actually five.") {
+		t.Errorf("the document still holds the old answer:\n%s", doc.Body)
+	}
+	if strings.Contains(doc.Body, "Seven years.") {
+		t.Errorf("both answers are in one document — a correction must replace, not append:\n%s", doc.Body)
+	}
+}
+
+func TestTakingAConfirmedAnswerBackOutStopsItAnswering(t *testing.T) {
+	// The three edges out of `confirmed`, and the obligation they share: the document leaves
+	// retrieval before the ticket moves, so the queue and the corpus can never disagree about
+	// whether an answer is live. Retract keeps the words so the BA edits rather than retypes.
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+
+	ticket, err := e.OpenTicket("Retention period?", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+		t.Fatal(err)
+	}
+	path := ticket.DocPath
+
+	retracted, err := e.Retract(ctx, ticket.ID)
+	if err != nil {
+		t.Fatalf("retract: %v", err)
+	}
+	if retracted.Status != db.StatusAnswered {
+		t.Errorf("status after retract = %q, want the draft back", retracted.Status)
+	}
+	if retracted.DocPath != "" {
+		t.Errorf("the ticket still names %q — a retracted answer documents nothing", retracted.DocPath)
+	}
+	if retracted.Answer != "Seven years." {
+		t.Errorf("retract lost the answer (%q); the BA edits it, they do not retype it", retracted.Answer)
+	}
+	if inCorpus(t, e, path) {
+		t.Errorf("%s is still retrievable after a retract", path)
+	}
+	// The text survives: removal is a deleted_at column, and that is the only way back.
+	if _, ok, _ := e.Document(path); !ok {
+		t.Errorf("%s lost its text — a retract must not destroy what a BA wrote", path)
+	}
+
+	// Retracting what was never published is the client's stale view, not a state change.
+	if _, err := e.Retract(ctx, retracted.ID); err == nil {
+		t.Error("retracting a draft was accepted")
+	}
+}
+
+func TestDeletingATicketDropsTheQuestionAndKeepsTheWords(t *testing.T) {
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+
+	ticket, err := e.OpenTicket("Retention period?", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+		t.Fatal(err)
+	}
+	path := ticket.DocPath
+
+	if err := e.Delete(ctx, ticket.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	q, err := e.Queue(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q.Tickets) != 0 || q.Confirmed != 0 {
+		t.Errorf("the queue still holds %d tickets (confirmed=%d) after a delete", len(q.Tickets), q.Confirmed)
+	}
+	if inCorpus(t, e, path) {
+		t.Errorf("%s goes on answering questions its ticket no longer exists to explain", path)
+	}
+	if _, ok, _ := e.Document(path); !ok {
+		t.Errorf("%s lost its text; deleting a ticket costs the question, never the answer", path)
+	}
+	if err := e.Delete(ctx, ticket.ID); !errors.Is(err, db.ErrNoTicket) {
+		t.Errorf("deleting it twice = %v, want ErrNoTicket", err)
+	}
+}
+
+func TestDismissingAConfirmedTicketUnpublishesIt(t *testing.T) {
+	// A dismissal that left the answer answering would be a dismissal in the queue only —
+	// the reader would still be cited a document the BA had just judged wrong.
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+
+	ticket, err := e.OpenTicket("Retention period?", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+		t.Fatal(err)
+	}
+	path := ticket.DocPath
+
+	dismissed, err := e.Reject(ticket.ID, "Legal owns this, not us.")
+	if err != nil {
+		t.Fatalf("dismissing a confirmed ticket: %v", err)
+	}
+	if dismissed.Status != db.StatusRejected {
+		t.Errorf("status = %q, want rejected", dismissed.Status)
+	}
+	if inCorpus(t, e, path) {
+		t.Errorf("%s is dismissed and still retrievable", path)
+	}
+}
+
+// inCorpus reports whether a path is still one of the documents retrieval can reach. The
+// corpus listing is the honest question to ask: Document() reads a removed row on purpose.
+func inCorpus(t *testing.T, e *rag.Engine, path string) bool {
+	t.Helper()
+	c, err := e.Corpus(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return slices.ContainsFunc(c.Documents, func(d db.Document) bool { return d.Path == path })
 }
 
 func TestConfirmRefusesAnEmptyAnswer(t *testing.T) {

@@ -317,6 +317,30 @@ main.ba {
    stayed flush, so a 160px card had two left edges. One edge, and the gap does the spacing. */
 .ticket .q { margin-block-end: 0; border-inline-start: 0; padding-inline-start: 0; }
 
+/* ── the way back out of `confirmed` ──
+   Three verbs that un-answer a question, on a card a BA scrolls past on a phone. The
+   disclosure is the whole affordance: one deliberate tap to see them, and until then no
+   target a thumb can reach by accident. Two presses guard the two that destroy something,
+   which is the composable's job; this only makes the group read as an aside rather than as
+   the card's main business.
+
+   Set apart by a rule and the muted colour, not by an accent: the card already carries the
+   status accent on its border, and a second colour inside it competes with the first.
+
+   The paragraph is a bare `.hint`, and the library defines that as `.field > .hint` — so
+   outside a field it arrives at body weight, which is the same trap the document list hit.
+   The two properties it was reaching for are spelled out here. */
+.ticket-undo {
+  border-block-start: var(--bw-2) solid var(--line);
+  padding-block-start: var(--sp-3);
+}
+.ticket-undo > summary { color: var(--muted); }
+.ticket-undo .control-group { flex-wrap: wrap; margin-block-start: var(--sp-3); }
+.ticket-undo > .hint {
+  display: block; margin-block-start: var(--sp-3);
+  font-size: var(--fs-chip); color: var(--muted);
+}
+
 /* ── BA mode: the import card ──
    The card, the badge and the datalist are library recipes. Two things are not,
    because a drop target is not a component the design system has:
@@ -398,6 +422,29 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    this says at what width a pair stops being a pair: one field per line under ~30rem, two
    above it, with no media query of its own. */
 .doc-form .control-group.row > .field { flex: 1 1 14rem; min-inline-size: 0; }
+
+/* ── the form's head, which sticks ──
+   Six fields and a fourteen-row textarea are several screens tall on a phone, and the one
+   fact a person must not lose while scrolling them is *which document they are about to
+   overwrite*. Writing a new one and correcting an existing one are the same form, and only
+   one of them destroys something.
+
+   `.head` already brings the flex row, the alignment and the gap; this adds the four things
+   it does not: the stickiness, an opaque backing (a sticky head over scrolling fields reads
+   as a rendering fault without one), and which of the three children absorbs the slack — the
+   path does, because it is the long one, and it breaks anywhere rather than widening the card
+   the way an unbreakable path already did to the document list.
+
+   z-index 1 and nothing larger: it has to clear the fields it scrolls over, and the local
+   scale above starts at 10 for the shell's own chrome. */
+.doc-form-head {
+  position: sticky; inset-block-start: 0; z-index: 1;
+  padding-block: var(--sp-2);
+  background: var(--bg);
+}
+.doc-form-head > .eyebrow,
+.doc-form-head > .btn { flex: none; }
+.doc-form-head > .title { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
 
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
@@ -554,6 +601,11 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .dock .statusline .sl-end { margin-inline-start: auto; }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
+  /* The form head stops sticking: `.bar` becomes sticky at the top of the viewport just
+     above, and a second sticky element with no knowledge of the bar's height slides
+     underneath it — visible, wrong, and no error anywhere. There is no bar-height token to
+     offset by, and a laptop has the vertical budget that made the phone need this at all. */
+  .doc-form-head { position: static; }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
   /* The viewer stops being the screen and becomes a dialog again: a pointer has a window
      manager behind it, the page around the modal is context worth keeping, and the

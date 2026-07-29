@@ -207,9 +207,9 @@
 
   <!-- ══ 4 · gap ═══════════════════════════════════════════════════════════ -->
   <section id="gap" data-feature="qa-loop"
-           data-api="GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action}"
+           data-api="GET /api/tickets,POST /api/tickets,POST /api/tickets/{id}/{action},DELETE /api/tickets/{id}"
            data-env="BA_PASS"
-           data-test="TestConfirmedAnswerBecomesADocumentAndThenACitation,TestTheSameGapFiledTwiceIsOneTicket,TestConfirmAndRejectRequireThePassword,TestADraftSurvivesAndStaysOutOfRetrieval">
+           data-test="TestConfirmedAnswerBecomesADocumentAndThenACitation,TestTheSameGapFiledTwiceIsOneTicket,TestConfirmAndRejectRequireThePassword,TestADraftSurvivesAndStaysOutOfRetrieval,TestConfirmingTwiceCorrectsTheAnswerInPlace,TestTakingAConfirmedAnswerBackOutStopsItAnswering,TestDeletingATicketDropsTheQuestionAndKeepsTheWords,TestDismissingAConfirmedTicketUnpublishesIt,TestAConfirmedTicketCanBeTakenBackOut">
     <h2 lang="en">4 · File a gap, and answer one</h2>
     <h2 lang="vi">4 · Báo phần thiếu, và trả lời phần thiếu</h2>
     <p class="lede" lang="en">This is the loop that makes the thing get better instead of
@@ -270,12 +270,15 @@
           và nó cần đúng những từ người ta thật sự tìm.</p>
       </div>
       <div data-title="4 · it becomes a document" data-title-vi="4 · thành một tài liệu" data-focus="file in qa/|indexed + approved">
-        <p lang="en">Your answer is written into <code>docs/qa/</code> as a real file, then
-          indexed. Not a database row: a file, so it is visible in a diff, goes into git
-          with everything else, and survives a rebuild of the index.</p>
-        <p lang="vi">Câu trả lời của bạn được ghi vào <code>docs/qa/</code> thành một file
-          thật, rồi mới index. Không phải một dòng trong database: một file — nên nó thấy
-          được trong diff, đi vào git cùng mọi thứ khác, và sống sót khi index dựng lại.</p>
+        <p lang="en">Your answer becomes a document at <code>qa/ticket-N.md</code>, indexed
+          in the same call. That name is what a citation prints and what a scope matches —
+          it is an address, not a file on a disk somewhere, because the knowledge base
+          <em>is</em> the database. Nothing to keep in step, and nothing to rebuild from.</p>
+        <p lang="vi">Câu trả lời của bạn thành một tài liệu ở <code>qa/ticket-N.md</code>, và
+          được index ngay trong cùng lệnh đó. Cái tên ấy là thứ dẫn nguồn in ra và là thứ
+          phạm vi khớp vào — nó là một địa chỉ, không phải file nằm trên đĩa, vì kho tri thức
+          <em>chính là</em> database. Không có gì phải giữ cho khớp, cũng không có gì để dựng
+          lại từ đó.</p>
       </div>
       <div data-title="5 · and then it is free" data-title-vi="5 · và sau đó là miễn phí" data-focus="next answer cites it|and then it is free">
         <p lang="en">The next person who asks gets it with a citation to that file. The one
@@ -308,6 +311,47 @@
           <tr lang="vi"><th><span class="badge todo">DISMISSED</span></th><td>không phải phần thiếu tài liệu. Vẫn nằm trong danh sách <i>kèm lý do của bạn</i>, người báo đọc được</td><td>BA (cần mật khẩu)</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <h3 lang="en">Changing your mind after you published</h3>
+    <h3 lang="vi">Đổi ý sau khi đã publish</h3>
+    <p lang="en">A BA who publishes is a BA who will eventually publish something wrong. Open
+      the confirmed ticket and there is one button in front of you — <b>EDIT ANSWER</b>,
+      because a published answer is usually almost right. The three that undo it live behind
+      <b>Take this out of the knowledge base</b>, closed until you ask for it: a control that
+      un-answers a question should not be something a thumb can reach while scrolling.</p>
+    <p lang="vi">BA nào publish rồi cũng sẽ có lúc publish nhầm. Mở ticket đã confirmed thì
+      chỉ có một nút trước mặt — <b>EDIT ANSWER</b>, vì câu trả lời đã đăng thường chỉ sai
+      một chút. Ba thao tác gỡ nằm sau <b>Take this out of the knowledge base</b>, mặc định
+      đóng: một nút có thể huỷ câu trả lời thì không nên là thứ ngón tay chạm trúng lúc đang
+      cuộn trang.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr lang="en"><th>Button</th><th>What happens</th><th>Reach for it when</th></tr>
+          <tr lang="vi"><th>Nút</th><th>Chuyện gì xảy ra</th><th>Dùng khi</th></tr>
+        </thead>
+        <tbody>
+          <tr lang="en"><th>EDIT ANSWER</th><td>your correction replaces the document and it is re-indexed. The citation keeps pointing at the same name, so nothing that already quoted it breaks</td><td>the answer is wrong, incomplete, or has gone out of date. Almost always this one</td></tr>
+          <tr lang="vi"><th>EDIT ANSWER</th><td>bản sửa của bạn ghi đè lên tài liệu và index lại. Dẫn nguồn vẫn trỏ vào đúng cái tên cũ, nên chỗ nào đã trích thì không gãy</td><td>câu trả lời sai, thiếu, hoặc đã lỗi thời. Gần như luôn là nút này</td></tr>
+          <tr lang="en"><th>BACK TO DRAFT</th><td>the answer stops being retrieved immediately and the ticket is a draft again, with your words still in the box</td><td>it needs real rework and should not be answering anyone in the meantime</td></tr>
+          <tr lang="vi"><th>BACK TO DRAFT</th><td>câu trả lời ngừng được truy xuất ngay lập tức và ticket quay về nháp, chữ của bạn vẫn còn trong ô</td><td>cần viết lại hẳn, và trong lúc đó thì không nên trả lời ai cả</td></tr>
+          <tr lang="en"><th>DISMISS</th><td>the answer stops being retrieved and the question closes with your reason on it</td><td>it turned out not to be a documentation gap after all</td></tr>
+          <tr lang="vi"><th>DISMISS</th><td>câu trả lời ngừng được truy xuất và câu hỏi đóng lại kèm lý do của bạn</td><td>hoá ra đây không phải phần thiếu tài liệu</td></tr>
+          <tr lang="en"><th>DELETE</th><td>the question and its history are gone from the queue. The answer's <em>text</em> stays in the library, because removing a document sets a date on it rather than destroying it</td><td>the ticket was filed by mistake, or is a duplicate phrased differently enough to dodge the dedupe</td></tr>
+          <tr lang="vi"><th>DELETE</th><td>câu hỏi và lịch sử của nó biến khỏi hàng đợi. <em>Nội dung</em> câu trả lời vẫn nằm trong thư viện, vì xoá một tài liệu là đặt ngày lên nó chứ không phải huỷ nó</td><td>ticket báo nhầm, hoặc trùng nhưng viết khác đủ để lọt qua bộ khử trùng lặp</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout tip">
+      <b lang="en">DISMISS and DELETE ask twice.</b>
+      <span lang="en">The first press arms the button and the label changes to say so; the
+        second one acts. Nothing else in the app does anything on one press that you cannot
+        undo, and these two are the exceptions — so they are the two that ask.</span>
+      <b lang="vi">DISMISS và DELETE hỏi lại hai lần.</b>
+      <span lang="vi">Bấm lần đầu chỉ là "lên nòng" và nhãn nút đổi để nói rõ điều đó; lần
+        thứ hai mới thật sự chạy. Trong app không có gì khác chỉ một cú bấm là không hoàn
+        tác được, hai nút này là ngoại lệ — nên chúng là hai nút phải hỏi.</span>
     </div>
 
     <h3 lang="en">Writing an answer that stays answered</h3>

@@ -20,7 +20,14 @@ type Knowledge interface {
 	OpenTicket(question, miss string) (db.Ticket, error)
 	Draft(id int64, answer string) (db.Ticket, error)
 	Confirm(ctx context.Context, id int64, answer string) (db.Ticket, error)
+	// Retract is the way back out of `confirmed`: the document leaves retrieval and the
+	// ticket becomes the draft it was, answer kept. On this interface rather than a fourth
+	// seam because publishing and unpublishing are one capability held by one person.
+	Retract(ctx context.Context, id int64) (db.Ticket, error)
 	Reject(id int64, note string) (db.Ticket, error)
+	// Delete drops the ticket row. The answer's text is a document row and documents are
+	// removed softly, so this loses the question, never the words.
+	Delete(ctx context.Context, id int64) error
 	History(limit int) ([]db.Cached, error)
 }
 
@@ -33,10 +40,11 @@ const maxTicket = 64 << 10 // 64 KiB
 // tickets wires the whole loop onto one mux. Reads and filing a gap are open —
 // a DEV who cannot report a gap will simply stop reporting them.
 //
-//	GET  /api/tickets                {"tickets":[…],"open":n,…}
-//	POST /api/tickets                {"question":"…","miss":"…"} → the ticket
-//	POST /api/tickets/{id}/{action}  draft | confirm | reject    → the ticket
-//	GET  /api/history                [{"question":"…","hits":n,…}]
+//	GET    /api/tickets                {"tickets":[…],"open":n,…}
+//	POST   /api/tickets                {"question":"…","miss":"…"} → the ticket
+//	POST   /api/tickets/{id}/{action}  draft | confirm | retract | reject → the ticket
+//	DELETE /api/tickets/{id}           → {"id":n}
+//	GET    /api/history                [{"question":"…","hits":n,…}]
 func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 	mux.HandleFunc("GET /api/tickets", func(w http.ResponseWriter, r *http.Request) {
 		q, err := k.Queue(limitOf(r))
@@ -62,9 +70,8 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 	})
 
 	mux.HandleFunc("POST /api/tickets/{id}/{action}", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			http.Error(w, "bad ticket id", http.StatusBadRequest)
+		id, ok := ticketID(w, r)
+		if !ok {
 			return
 		}
 		body, err := readTicket(r)
@@ -79,6 +86,8 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 			t, err = k.Draft(id, body.Answer)
 		case "confirm":
 			t, err = k.Confirm(r.Context(), id, body.Answer)
+		case "retract":
+			t, err = k.Retract(r.Context(), id)
 		case "reject":
 			t, err = k.Reject(id, body.Note)
 		default:
@@ -89,11 +98,34 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 		case errors.Is(err, db.ErrNoTicket):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		case err != nil:
-			// A transition that no longer applies (already confirmed, already
-			// dismissed) is the client's stale view, not a server fault.
+			// A transition that no longer applies (retracting what was never published,
+			// dismissing what is already dismissed) is the client's stale view, not a
+			// server fault.
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:
 			writeJSON(w, t)
+		}
+	}))
+
+	// DELETE /api/tickets/{id} — drop the question itself.
+	//
+	// Separate from the {action} route rather than a fifth verb on it, because it is the one
+	// move that returns no ticket: there is nothing left to render. Gated like every other
+	// write, and it takes the answer's document out of retrieval on the way — a deleted
+	// ticket whose answer went on being cited would be the same disagreement between the
+	// queue and the corpus that made `confirmed` a trap.
+	mux.HandleFunc("DELETE /api/tickets/{id}", pass.gate().wrap(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := ticketID(w, r)
+		if !ok {
+			return
+		}
+		switch err := k.Delete(r.Context(), id); {
+		case errors.Is(err, db.ErrNoTicket):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case err != nil:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		default:
+			writeJSON(w, deleted{ID: id})
 		}
 	}))
 
@@ -105,6 +137,24 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 		}
 		writeJSON(w, h)
 	})
+}
+
+// deleted is all a delete has left to say. The id is echoed rather than answered with 204
+// so a client can match the response to the row it removed from a list it may have
+// re-fetched in between.
+type deleted struct {
+	ID int64 `json:"id"`
+}
+
+// ticketID parses the id both write routes share and answers the client itself when it is
+// not a number, so neither handler carries a copy of that decision.
+func ticketID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad ticket id", http.StatusBadRequest)
+		return 0, false
+	}
+	return id, true
 }
 
 type ticketBody struct {

@@ -25,8 +25,18 @@ type Ticket struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-// The four states. Every one of them is reached by exactly one action, so the UI
-// can render the state machine without inventing labels for states nobody enters.
+// The four states, and every edge between them:
+//
+//	open ──draft──▶ answered ──confirm──▶ confirmed ──confirm──▶ confirmed  (republish)
+//	                    ▲                     │
+//	                    └────── retract ──────┘
+//	open · answered · confirmed ──reject──▶ rejected
+//	any state ──delete──▶ gone
+//
+// The reverse edges are the half that was missing: `confirmed` used to be terminal, so a
+// published mistake could not be corrected, dismissed or removed by anything the product
+// offered. No new state was needed to fix that — only the edges out of the one that had
+// none.
 const (
 	StatusOpen      = "open"      // a DEV filed it
 	StatusAnswered  = "answered"  // a BA saved a draft; not yet retrievable
@@ -91,17 +101,59 @@ func (s *Store) Draft(id int64, answer string) (Ticket, error) {
 
 // Confirm records that this answer is now part of the corpus at docPath. The
 // indexing itself belongs to the engine; this is only the bookkeeping.
+//
+// `confirmed` is in the allowed set so that re-confirming republishes: correcting a
+// published answer is one action, not a retract followed by a remembered re-confirm.
+// The engine re-ingests the same path, so the correction lands where the citation
+// already points.
 func (s *Store) Confirm(id int64, answer, docPath string) (Ticket, error) {
 	return s.update(id, `UPDATE tickets SET answer=?, doc_path=?, status=?, note='',
-		updated_at=datetime('now') WHERE id=? AND status IN ('open','answered')`,
+		updated_at=datetime('now') WHERE id=? AND status IN ('open','answered','confirmed')`,
 		answer, docPath, StatusConfirmed, id)
+}
+
+// Retract takes a published answer back out: the ticket returns to the draft it was,
+// keeping the answer so the BA edits rather than retypes. Removing the document is the
+// engine's half — this is the bookkeeping, and it clears doc_path because the ticket
+// must stop naming a document that no longer answers.
+//
+// Without this, `confirmed` was a state with no way out: every other transition refused
+// it, so a wrong answer was in the knowledge base permanently and removing the document
+// left the ticket still claiming it.
+func (s *Store) Retract(id int64) (Ticket, error) {
+	return s.update(id, `UPDATE tickets SET doc_path='', status=?, updated_at=datetime('now')
+		WHERE id=? AND status=?`, StatusAnswered, id, StatusConfirmed)
 }
 
 // Reject closes a ticket that isn't a documentation gap. The note is why — an
 // unexplained dismissal is indistinguishable from the queue eating the question.
+//
+// A confirmed ticket may be dismissed too: "this was answered and should not have been"
+// is the same judgement, and refusing it was what left a published mistake with nowhere
+// to go. The caller removes the document first; `rejected` is the resting state.
 func (s *Store) Reject(id int64, note string) (Ticket, error) {
-	return s.update(id, `UPDATE tickets SET note=?, status=?, updated_at=datetime('now')
-		WHERE id=? AND status IN ('open','answered')`, strings.TrimSpace(note), StatusRejected, id)
+	return s.update(id, `UPDATE tickets SET note=?, doc_path='', status=?,
+		updated_at=datetime('now') WHERE id=? AND status IN ('open','answered','confirmed')`,
+		strings.TrimSpace(note), StatusRejected, id)
+}
+
+// DeleteTicket removes the row outright — the one destructive verb in the loop, and the
+// only one that is not a status change.
+//
+// It is safe in the way that matters: a confirmed answer's *text* is a document row, and
+// documents are removed softly, so deleting the ticket loses the question and its history,
+// never the words a BA wrote. That is what makes a queue clearable — a ticket filed by
+// mistake, or a duplicate phrased differently enough to dodge the dedupe, would otherwise
+// sit in the list for as long as the instance runs.
+func (s *Store) DeleteTicket(id int64) error {
+	res, err := s.db.Exec(`DELETE FROM tickets WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNoTicket
+	}
+	return nil
 }
 
 // update applies one transition and reports the ticket as it now stands. A zero

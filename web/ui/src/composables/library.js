@@ -16,8 +16,22 @@
       citation prints and a scope matches.
    2. **A save is one call.** Text, attributes and a move go together, so a BA fixing a typo
       while renaming cannot end up with one of the two applied.
+
+   ── the form has to come to the person who opened it ──
+   Opening it used to be `open.value = true` and nothing else. The form renders *below* the
+   list, and the list sits below the import panel on a screen that also carries the queue —
+   so on a phone, with nine documents indexed, pressing EDIT scrolled nothing, focused
+   nothing, and looked exactly like a button that does not work. The BA's next move is to
+   press it again, which reloads the document they had already loaded.
+
+   `reveal` is the fix, and it is two separate failures: the form is scrolled to, and focus
+   lands in its first field so a keyboard user is already typing. The form stays in the page
+   rather than becoming a dialog — a BA writes a document while reading the list of what
+   already exists, and that is what a modal takes away. Which is also why nothing here dims
+   the list: the reason the form is not a modal is the reason it must not behave like one.
+   What tells you where you are instead is the form's own head, which sticks.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { read, remove, write } from '../lib/upload.js'
 
 /** The empty form: a new document, in no folder, of no stated kind. */
@@ -49,6 +63,31 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     armed.value = path
   }
 
+  // The <form> element, so opening it can bring it to the person who pressed the button.
+  // Bound by the template as `ref="formEl"` — the same shape App.vue uses for the prompt.
+  const formEl = ref(null)
+
+  /**
+   * Scroll the form into view and put the caret in it.
+   *
+   * `nextTick` because the caller set `open` in this same tick and `v-if` has not rendered
+   * the element yet — without it this reads `null` and silently does nothing, which is the
+   * bug it exists to fix wearing a different hat.
+   *
+   * No `behavior` argument: the design system sets `html { scroll-behavior: smooth }` and
+   * turns it off under `prefers-reduced-motion`, so saying "smooth" here would be a second
+   * opinion that ignores the reader's. `preventScroll` on the focus stops the browser
+   * jumping to the field before that scroll has run.
+   */
+  async function reveal() {
+    await nextTick()
+    const el = formEl.value
+    if (!el)
+      return
+    el.scrollIntoView({ block: 'start' })
+    el.querySelector('.input')?.focus({ preventScroll: true })
+  }
+
   // Search across everything a person might remember about a document — its path, what it
   // is called, the other names it goes by, and what it is for. A library is searched by
   // half-remembered words, which is exactly what an alias is for.
@@ -72,6 +111,7 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     editing.value = ''
     error.value = ''
     open.value = true
+    reveal()
   }
 
   /**
@@ -97,6 +137,7 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
       }
       editing.value = path
       open.value = true
+      reveal()
     }
     catch (e) {
       error.value = e.message
@@ -198,5 +239,5 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     }
   }
 
-  return { query, shown, kinds, folders, form, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop }
+  return { query, shown, kinds, folders, form, formEl, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop }
 }

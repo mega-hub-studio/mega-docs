@@ -37,6 +37,7 @@ const {
   kinds,
   folders,
   form,
+  formEl,
   editing,
   open,
   busy,
@@ -146,9 +147,30 @@ const {
          Six fields and the text. Everything above the body is what makes a document
          findable by a person six months later; the body is what answers questions.
          ═══════════════════════════════════════════════════════════════════ -->
-    <form v-if="open" class="card doc-form" data-accent="blue" @submit.prevent="save">
-      <div class="head">
+    <!-- `ref="formEl"` is how the composable brings this to whoever pressed EDIT: the panel
+         sits below the import card on a screen that also carries the queue, so opening a form
+         at the bottom of it used to look exactly like a button that does nothing.
+         Escape cancels. The listener is on the form rather than the window because focus is
+         already inside it — a global key handler would also fire while a BA is reading the
+         queue, which is a different screen's business. -->
+    <form
+      v-if="open" ref="formEl" class="card doc-form" data-accent="blue"
+      @submit.prevent="save" @keydown.esc="cancel"
+    >
+      <!-- Sticky, because the six fields and a 14-row textarea are taller than a phone: the
+           one thing a person must not lose track of while scrolling a form is which document
+           they are changing. The eyebrow says which of the two jobs this is — writing a new
+           document and correcting an existing one look identical otherwise, and only one of
+           them overwrites something. -->
+      <div class="head doc-form-head">
+        <span class="eyebrow">{{ editing ? 'Editing' : 'New' }}</span>
         <span class="title">{{ editing || 'New document' }}</span>
+        <button
+          class="btn ghost xs icon" type="button" :disabled="busy"
+          aria-label="Close this form without saving" @click="cancel"
+        >
+          <nes-icon name="close" />
+        </button>
       </div>
 
       <div class="control-group row">
