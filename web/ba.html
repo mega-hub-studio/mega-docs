@@ -493,28 +493,6 @@
         thì đừng import.</span>
     </div>
 
-    <div class="callout memo">
-      <p lang="en"><b>Removing a document is a soft delete.</b> The file moves to
-        <code>.trash/</code> inside the corpus and its rows leave the index, so it stops
-        being retrievable and stops being citable — but the bytes are still there. Recovery
-        is one <code>mv</code>, by whoever has the disk rather than whoever has the password.
-        <br>The reason it works that way: the corpus directory is the source of truth and the
-        database is derived from it, so a hard delete would be the only action in this system
-        that destroys an original instead of something <code>ingest</code> can rebuild —
-        including a confirmed answer in <code>qa/</code>, which a person wrote.
-        <br><code>.trash/</code> needs no exclusion rule: a path with a hidden segment is
-        already refused, so a re-ingest cannot pull a removed document back in.</p>
-      <p lang="vi"><b>Xoá tài liệu là xoá mềm.</b> File được chuyển vào <code>.trash/</code>
-        trong corpus và các dòng của nó rời khỏi index, nên nó thôi được truy xuất và thôi
-        được dẫn nguồn — nhưng bytes vẫn còn. Phục hồi chỉ là một lệnh <code>mv</code>, bởi
-        người có quyền trên đĩa chứ không phải người có mật khẩu.
-        <br>Lý do làm vậy: thư mục corpus là nguồn sự thật và database dẫn xuất từ nó, nên xoá
-        cứng sẽ là hành động duy nhất trong hệ thống phá huỷ bản gốc thay vì thứ
-        <code>ingest</code> dựng lại được — kể cả một câu trả lời đã confirm trong
-        <code>qa/</code>, do một người viết ra.
-        <br><code>.trash/</code> không cần luật loại trừ nào: một path có đoạn ẩn vốn đã bị từ
-        chối, nên re-ingest không thể kéo tài liệu đã xoá trở lại.</p>
-    </div>
   </section>
 
   <!-- ══ 6 · cost ══════════════════════════════════════════════════════════ -->

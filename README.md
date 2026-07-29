@@ -115,7 +115,8 @@ The rows worth reading the reasoning for:
   and carrying automation the brief deletes in order to protect a backup the brief does not
   ask for is the redundancy this cleanup exists to remove. **Nothing replaces it**: the
   backup story is gone rather than pending, because every document enters through one
-  controlled path (the BA WebUI import) and `Remove` is a soft delete into `docs/.trash/`.
+  controlled path (the BA WebUI import) and `Remove` is soft: the chunks go, the row keeps
+  its text with a `deleted_at`.
   → [`changelog/2026-07-28-drop-corpus-sync.md`](changelog/2026-07-28-drop-corpus-sync.md)
   · [`scope-decisions`](changelog/2026-07-28-scope-decisions.md)
   · [`vnext-collisions`](changelog/2026-07-28-vnext-collisions.md)
