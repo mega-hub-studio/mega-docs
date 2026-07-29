@@ -835,3 +835,50 @@ func TestAnotherModelIsAnotherAnswerAndBothSurvive(t *testing.T) {
 		t.Errorf("a cached answer bought %d completions", got)
 	}
 }
+
+// TestChangingTopKInvalidatesTheCache closes a hole rather than describing a feature: TOP_K
+// decides how many sections an answer was built from, and it was not in the cache signature. So
+// a cache filled at six and read at twelve served the narrower answer under the wider setting,
+// with nothing on screen saying which one the reader got.
+//
+// It belongs in the signature and not the key — unlike a scope or a model, there is no other
+// TOP_K whose rows are still worth keeping, so invalidating all of them at once is the correct
+// behaviour and pruning is what a signature already does.
+func TestChangingTopKInvalidatesTheCache(t *testing.T) {
+	ctx := context.Background()
+	const q = "How does hybrid search rank results?"
+
+	// Same store, same corpus, same provider: only the retrieval breadth differs.
+	dir := t.TempDir()
+	askAt := func(topK int) rag.Reply {
+		t.Helper()
+		prov, base := aitest.New(&aitest.Provider{Dim: dim, Reply: "grounded [1]"})
+		t.Cleanup(prov.Close)
+		store, err := db.Open(filepath.Join(dir, "topk.db"), dim)
+		if err != nil {
+			t.Fatalf("open: %v", err)
+		}
+		t.Cleanup(func() { store.Close() })
+		e := rag.New(store, ai.New(ai.Config{
+			ChatBaseURL: base, APIKey: "test-key",
+			EmbedModel: "embed-model", ChatModel: "chat-model",
+		}), rag.Options{TopK: topK})
+		if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := e.Answer(ctx, rag.Ask{Question: q, OnToken: func(string) {}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+
+	askAt(3)
+	if reply := askAt(3); !reply.Cached {
+		t.Error("the same question at the same TOP_K was not served from the cache")
+	}
+	if reply := askAt(6); reply.Cached {
+		t.Error("a wider TOP_K served the narrow answer's row — the number of sections an\n" +
+			"answer was built from is part of what produced it, so it belongs in the signature")
+	}
+}

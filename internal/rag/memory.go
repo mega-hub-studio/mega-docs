@@ -19,14 +19,15 @@ type Turn struct {
 	A string `json:"a"`
 }
 
-// threadShare is how much of a model's context window the conversation may take.
+// defaultThreadShare is how much of a model's context window the conversation may take when
+// THREAD_SHARE says nothing.
 //
 // The other two thirds are not spare: the retrieved sections are the reason an answer is
 // grounded, and the completion has to fit after them. A thread that crowds either one out
 // buys memory by making the answer worse, which is the trade nobody asks for — an assistant
 // that recalls message four and cites nothing is not remembering, it is guessing with
 // context.
-const threadShare = 0.35
+const defaultThreadShare = 0.35
 
 // perToken is the crudest useful estimate of a token in characters, and it is deliberate.
 // A real tokenizer is a dependency and a per-model table for a number that only decides
@@ -42,14 +43,18 @@ const perToken = 4
 // tells the model that question went unanswered, which is not what happened — it is a
 // turn that errored, was stopped, or is the one being asked right now.
 //
-// `window` is the picked model's context window, and 0 means the operator never said. Then
+// `share` is the fraction of that window the thread may occupy, and `window` is the picked
+// model's context window, where 0 means the operator never said. Then
 // nothing is trimmed: refusing to remember because a number is missing would make a working
 // thread depend on an optional display knob, and the client already caps what it sends.
 //
 // Returns the messages and how many turns arrived, so the caller can report "3 of 8" — memory
 // you cannot see is memory you cannot trust, and a silent drop is exactly how an assistant
 // appears to forget for no reason.
-func replay(history []Turn, window int) (msgs []ai.Msg, kept, offered int) {
+func replay(history []Turn, window int, share float64) (msgs []ai.Msg, kept, offered int) {
+	if share <= 0 {
+		share = defaultThreadShare
+	}
 	whole := make([]Turn, 0, len(history))
 	for _, t := range history {
 		if strings.TrimSpace(t.Q) == "" || strings.TrimSpace(t.A) == "" {
@@ -61,7 +66,7 @@ func replay(history []Turn, window int) (msgs []ai.Msg, kept, offered int) {
 
 	budget := len(whole) * maxTurnChars // no window given: keep everything the client sent
 	if window > 0 {
-		budget = int(float64(window)*threadShare) * perToken
+		budget = int(float64(window)*share) * perToken
 	}
 	// Newest first, because the turn a follow-up points at is the one just above it. The
 	// slice is then flipped back, since a model reads a conversation forwards.

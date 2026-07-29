@@ -74,6 +74,13 @@ type Runtime struct {
 	// operator's `curl /api/health` has always answered, the list is what the front end
 	// needs to offer a choice and to price whichever one it is on.
 	Models []Model
+	// The three numbers the engine works to, published so the settings panel can show what
+	// this instance is actually tuned like without a password: how many sections an answer is
+	// built from, how much of the window a thread may take, and how many answers the cache
+	// holds. None of them is a secret and all three change what a reader gets.
+	TopK        int
+	ThreadShare float64
+	CacheKeep   int
 	// Version is the commit the binary was built from — the one field here that says
 	// nothing about an answer. It is reported so "which version is deployed?" has an
 	// answer on the screen and from `curl /api/health`, rather than requiring shell access
@@ -137,9 +144,12 @@ func New(d Deps) http.Handler {
 		models = []byte("[]")
 	}
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,"models":%s,"version":%q,"release":%q}`,
+		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,`+
+			`"models":%s,"top_k":%d,"thread_share":%g,"cache_keep":%d,"version":%q,"release":%q}`,
 		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
-		d.Runtime.PriceIn, d.Runtime.PriceOut, models, d.Runtime.Version, d.Runtime.Release)
+		d.Runtime.PriceIn, d.Runtime.PriceOut, models,
+		d.Runtime.TopK, d.Runtime.ThreadShare, d.Runtime.CacheKeep,
+		d.Runtime.Version, d.Runtime.Release)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// The body is a constant; a failed write means the probe hung up, which is its

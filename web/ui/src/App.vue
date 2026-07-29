@@ -209,7 +209,7 @@ function replay(entry) {
          a control used twice a year was taking a quarter of a 390px bar, and settings that
          are spread across three corners are settings nobody finds. -->
     <button
-      class="btn ghost icon sm" type="button" :aria-label="t('app.settings')"
+      class="btn ghost icon" type="button" :aria-label="t('app.settings')"
       @click="openSettings"
     >
       <nes-icon name="gear" />
@@ -219,7 +219,7 @@ function replay(entry) {
          focusing one that is hidden puts the caret somewhere the reader cannot see. Asking
          for a new question is the one moment the box must be on screen. -->
     <button
-      v-if="turns.length && route.name === 'ask'" class="btn ghost icon sm"
+      v-if="turns.length && route.name === 'ask'" class="btn ghost icon"
       :aria-label="t('app.newQuestion')" @click="showDock(); reset()"
     >
       <nes-icon name="plus" />
@@ -269,7 +269,7 @@ function replay(entry) {
   <SettingsDrawer
     ref="settingsEl" :models="runtime.models" :picked="picked" :current="pickedModel"
     :muted="muted" :lang="lang" :langs="langs" :admin="admin"
-    :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :t="t"
+    :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :engine="runtime.engine" :t="t"
     @pick="pickModel" @mute="mute" @set-lang="setLang" @close="closeSettings"
   />
 

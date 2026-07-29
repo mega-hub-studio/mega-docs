@@ -22,6 +22,10 @@ type Engine struct {
 	ai     *ai.Client
 	topK   int
 	models []Model
+	// share is how much of a model's window the thread may take. It is a field rather than a
+	// constant because the trade it makes — memory against grounding — is one an operator
+	// watching their own corpus is better placed to settle than this file is.
+	share float64
 }
 
 // Model is one chat model this engine may answer with, and the one number it needs about it:
@@ -43,6 +47,9 @@ type Options struct {
 	// reason: a thread has to be trimmed to the window of whichever model is about to read
 	// it. Unset is legal and means no trimming.
 	Models []Model
+	// ThreadShare is the fraction of the window a conversation may occupy; <=0 means the
+	// engine's own default. The other two thirds are the retrieved sections and the answer.
+	ThreadShare float64
 }
 
 // New builds the engine. A TopK of zero means the default.
@@ -55,7 +62,7 @@ func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 	if opt.TopK <= 0 {
 		opt.TopK = 6
 	}
-	return &Engine{store: store, ai: client, topK: opt.TopK, models: opt.Models}
+	return &Engine{store: store, ai: client, topK: opt.TopK, models: opt.Models, share: opt.ThreadShare}
 }
 
 // Ingest parses, chunks, embeds and stores one markdown document. The title is the file
@@ -279,7 +286,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// this model can hold. It is also the answer to "is this a follow-up", which changes
 	// three things below: whether a bare "how?" is vague, what retrieval runs on, and
 	// whether any of it may be cached.
-	turns, kept, offered := replay(a.History, e.window(model))
+	turns, kept, offered := replay(a.History, e.window(model), e.share)
 
 	// A greeting is not a question about the documents, so the grounding rules never
 	// applied to it — see smalltalk.go. Answered before the cache as well as before the

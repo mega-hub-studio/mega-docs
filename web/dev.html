@@ -133,10 +133,33 @@ view.scrollToEnd();                            // viewport.js</span></div>
        Rendered from web/retrieval.mmd at build time — mermaid never reaches this page. -->
   <section id="pipeline" data-feature="retrieval"
            data-api="POST /api/chat"
-           data-env="TOP_K,CHAT_MODEL,EMBED_MODEL,EMBED_DIM"
-           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
+           data-env="TOP_K,CHAT_MODEL,EMBED_MODEL,EMBED_DIM,THREAD_SHARE,CACHE_KEEP"
+           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestChangingTopKInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
     <h2 lang="en">How an answer is built</h2>
     <h2 lang="vi">Một câu trả lời được dựng thế nào</h2>
+    <div class="callout memo">
+      <b lang="en">Three numbers, and the cache knows about one of them.</b>
+      <span lang="en"><code>TOP_K</code> is how many sections an answer is built from,
+        <code>THREAD_SHARE</code> how much of a model's window a conversation may occupy (0.35:
+        the other two thirds are the sections and the answer), and <code>CACHE_KEEP</code> how
+        many answers survive a prune. Only the first is in the cache signature, and it had to
+        be: a cache filled at six and read at twelve served the narrower answer under the wider
+        setting. The other two cannot serve a stale answer —
+        <code>THREAD_SHARE</code> only shapes follow-ups, which are never cached, and
+        <code>CACHE_KEEP</code> is a row count. All three are on
+        <code>/api/health</code>, so the settings panel shows what this instance is tuned like
+        without a password.</span>
+      <b lang="vi">Ba con số, và cache biết về một trong ba.</b>
+      <span lang="vi"><code>TOP_K</code> là số section một câu trả lời được dựng từ,
+        <code>THREAD_SHARE</code> là phần context window một hội thoại được chiếm (0.35: hai
+        phần ba còn lại là các section và câu trả lời), và <code>CACHE_KEEP</code> là số câu trả
+        lời sống sót sau mỗi lần prune. Chỉ cái đầu nằm trong cache signature, và buộc phải
+        nằm: cache lấp ở sáu rồi đọc ở mười hai sẽ trả lời bằng bản hẹp hơn dưới thiết lập rộng
+        hơn. Hai cái còn lại không thể trả về câu cũ — <code>THREAD_SHARE</code> chỉ định hình
+        câu hỏi tiếp, mà câu hỏi tiếp không bao giờ được cache, còn <code>CACHE_KEEP</code> chỉ
+        là số dòng. Cả ba đều có trên <code>/api/health</code>, nên settings panel hiện được
+        instance này đang được tune thế nào mà không cần mật khẩu.</span>
+    </div>
     <p class="lede" lang="en">One question, eight stages, and two of them can return early.
       A question continuing a thread runs one more, ahead of all of them — see
       <i>rewrite</i> below. Everything below in this page is a knob on one of these boxes.</p>

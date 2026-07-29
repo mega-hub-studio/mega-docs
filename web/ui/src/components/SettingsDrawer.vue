@@ -39,6 +39,10 @@ defineProps({
   // The thread as the last answer's model read it: { kept, offered }. Zeros mean the
   // conversation has not started, and then the meter has nothing to draw.
   recall: { type: Object, default: () => ({ kept: 0, offered: 0 }) },
+  // What the engine is tuned to: sections per answer, the window share a thread may take, and
+  // how many answers the cache holds. Read-only here on purpose — all three are read at startup
+  // from .env, and a panel that let you type into a value it cannot change would be lying.
+  engine: { type: Object, default: () => ({}) },
   t: { type: Function, required: true },
 })
 
@@ -146,6 +150,27 @@ defineExpose({
             :aria-label="t('settings.sound')" @change="$emit('mute', !$event.target.checked)"
           >
         </label>
+      </div>
+
+      <!-- ── what the engine is tuned to ──
+           `grid` for sections per answer, `chat` again for the thread's share — the same glyph
+           as the memory row above because it is the same subject, one measured and one
+           configured — and `database` for the cached rows. Three numbers, no labels: the panel
+           is where you check what this instance is, and /#/admin is where the other sixteen
+           knobs and their provenance live. -->
+      <div v-if="engine.topK" class="set-group">
+        <div class="set-row">
+          <nes-icon name="grid" :title="t('settings.topK')" />
+          <span>{{ engine.topK }}</span>
+        </div>
+        <div class="set-row">
+          <nes-icon name="chat" :title="t('settings.threadShare')" />
+          <span>{{ Math.round(engine.threadShare * 100) }}%</span>
+        </div>
+        <div class="set-row">
+          <nes-icon name="database" :title="t('settings.cacheKeep')" />
+          <span>{{ engine.cacheKeep }}</span>
+        </div>
       </div>
 
       <!-- ── what the operator decided ──

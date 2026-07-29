@@ -143,6 +143,13 @@ export async function health() {
       // needs to price and measure whichever one is picked. An older server sends none,
       // and then the four scalar fields above are the whole story — one model, no picker.
       models: Array.isArray(body.models) ? body.models : [],
+      // The engine's own three numbers. Absent on an older server, and then the panel's engine
+      // group is simply not there — the same rule as every other unknown here.
+      engine: {
+        topK: body.top_k || 0,
+        threadShare: body.thread_share || 0,
+        cacheKeep: body.cache_keep || 0,
+      },
       priceIn: body.price_in || 0,
       priceOut: body.price_out || 0,
       // The commit this server was built from. Absent for a binary with no VCS stamp, and

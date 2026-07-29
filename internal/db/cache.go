@@ -26,10 +26,22 @@ type Cached struct {
 	At        string          `json:"at"`
 }
 
-// keep caps the cache. 200 answers is more than a team asks between re-indexes, and it keeps
-// the one-file story honest: a database small enough to copy in a second is a database nobody
-// has to plan around.
-const keep = 200
+// defaultKeep caps the cache when nobody said otherwise. 200 answers is more than a team asks
+// between re-indexes, and it keeps the one-file story honest: a database small enough to copy in
+// a second is a database nobody has to plan around. `Store.Keep` overrides it — the number moved
+// out of this file because an operator watching their own corpus is better placed to pick it
+// than a constant is.
+const defaultKeep = 200
+
+// keep is the cap in force: the configured one, or the default. A zero Keep is "not set" rather
+// than "hold nothing", because a cache of zero rows is a cache that costs money on every repeat
+// and no configuration mistake should be able to ask for that by accident.
+func (s *Store) keep() int {
+	if s.Keep > 0 {
+		return s.Keep
+	}
+	return defaultKeep
+}
 
 // Sig identifies the current state of the corpus. Any ingest changes the document
 // count or its timestamp, and any confirm ingests — so a cached answer can never
@@ -123,7 +135,7 @@ func (s *Store) Cache(sig string, c Cached) error {
 		return err
 	}
 	_, err := s.db.Exec(`DELETE FROM answers WHERE corpus_sig <> ?
-		OR q_norm NOT IN (SELECT q_norm FROM answers ORDER BY used_at DESC LIMIT ?)`, sig, keep)
+		OR q_norm NOT IN (SELECT q_norm FROM answers ORDER BY used_at DESC LIMIT ?)`, sig, s.keep())
 	return err
 }
 

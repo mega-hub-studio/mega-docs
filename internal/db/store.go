@@ -25,6 +25,11 @@ var schema string
 type Store struct {
 	db  *sql.DB
 	dim int
+	// Keep caps how many cached answers survive a prune. Zero means the package default —
+	// exported and settable rather than a constructor argument, because it is the one field
+	// here an operator tunes and Open() already takes the two that decide whether the file
+	// can be opened at all.
+	Keep int
 }
 
 // statusApproved is the chunk status a BA confirm produces. The SQL statements spell it

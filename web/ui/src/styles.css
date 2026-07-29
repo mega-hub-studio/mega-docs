@@ -98,6 +98,25 @@ html {
   border-block-end: var(--bw-2) solid var(--line);
 }
 .bar .grow { margin-inline-start: auto; }
+
+/* ── one control height in the bar ──
+   Two sizing systems met here and disagreed by 8px, which is the kind of gap an eye catches
+   without being able to name it: the segment stood 39.8px because that is what `--sp-2` of
+   block padding plus a 12px mono line-height plus two 2px borders happens to add up to, and
+   the icon buttons stood 32px because `.sm` puts them on the `--ctrl-h-sm` rung. One height
+   was an accident and the other was a decision, so they were never going to agree — and in a
+   centred flex row the shorter control floats with 4px of nothing above and below it.
+
+   Both are on `--ctrl-h` now: the library's middle rung, which is what a `.btn` with no size
+   class already uses. So the buttons dropped `sm` rather than gaining a rule, and the only
+   thing written here is the segment coming down to meet them.
+
+   The block padding has to go with it. `min-block-size` on the group would otherwise be the
+   floor and the buttons' own padding the actual height, putting the group straight back past
+   36px; with the padding gone, `inline-flex`'s default `stretch` sizes each button to the
+   group instead — so the height is stated once, on the parent, and the children follow. */
+.bar .segment { min-block-size: var(--ctrl-h); }
+.bar .segment > button { padding-block: 0; }
 /* the mark and the words are one unit, so they never wrap apart */
 .brand { display: inline-flex; align-items: center; gap: var(--sp-2); }
 /* No width rule for the brand: measured at 320 · 360 · 390px with a conversation

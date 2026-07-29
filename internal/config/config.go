@@ -28,9 +28,15 @@ type Config struct {
 	ChatModel  string
 	EmbedDim   int
 	TopK       int
-	Window     int     // context window of ChatModel, in tokens; 0 = unknown
-	PriceIn    float64 // USD per 1M prompt tokens; 0 = don't price answers
-	PriceOut   float64 // USD per 1M completion tokens
+	// ThreadShare is how much of a model's context window a conversation may take, and
+	// CacheKeep how many answers the cache holds. Both were constants inside the engine, and
+	// both are here for the same reason: a number an operator would want to move after
+	// watching their own corpus behave has no business being a recompile.
+	ThreadShare float64
+	CacheKeep   int
+	Window      int     // context window of ChatModel, in tokens; 0 = unknown
+	PriceIn     float64 // USD per 1M prompt tokens; 0 = don't price answers
+	PriceOut    float64 // USD per 1M completion tokens
 	// Models is what a reader may pick between, first one the default. It is always at
 	// least one entry: with CHAT_MODELS unset it is the single model the four knobs above
 	// describe, which is exactly the instance that never wanted a picker.
@@ -159,6 +165,13 @@ func Load() Config {
 		ChatModel:  env("CHAT_MODEL", "gpt-4o-mini"),
 		EmbedDim:   envInt("EMBED_DIM", 1536),
 		TopK:       envInt("TOP_K", 6),
+		// 0.35 leaves two thirds of the window for the retrieved sections and the completion.
+		// Raising it buys memory by making answers less grounded, which is why it is a knob
+		// rather than a preference: the trade has to be made on purpose.
+		ThreadShare: envFloat("THREAD_SHARE", 0.35),
+		// 200 answers is more than a team asks between re-indexes, and it keeps the one-file
+		// story honest — a database small enough to copy in a second is one nobody plans around.
+		CacheKeep: envInt("CACHE_KEEP", 200),
 		// The status line shows what an answer cost. None of it is guessed: a
 		// window of 0 hides the percentage, and prices of 0 hide the money — an
 		// invented number in either place is worse than a blank.
@@ -198,6 +211,8 @@ func (c Config) Inventory() []Setting {
 		c.set("models", "EMBED_MODEL", c.EmbedModel),
 		c.set("models", "EMBED_DIM", num(c.EmbedDim)),
 		c.set("models", "TOP_K", num(c.TopK)),
+		c.set("models", "THREAD_SHARE", strconv.FormatFloat(c.ThreadShare, 'g', -1, 64)),
+		c.set("models", "CACHE_KEEP", num(c.CacheKeep)),
 		c.set("hosting", "BIND_ADDR", c.BindAddr),
 		c.set("hosting", "PORT", c.Port),
 		c.set("hosting", "AUTH_USER", c.AuthUser),
