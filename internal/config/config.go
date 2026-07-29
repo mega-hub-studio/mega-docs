@@ -107,9 +107,11 @@ func Load() Config {
 	}
 }
 
-// Inventory is every knob, in the order and grouping .env.example uses, for the Admin
-// screen to render. One list, next to the definitions it describes — a second copy of "what
-// the knobs are" is how a new one ends up invisible.
+// Inventory is every knob, grouped, for the Admin screen to render. One list, next to the
+// definitions it describes — a second copy of "what the knobs are" is how a new one ends up
+// invisible. This is also the order .env.example follows, and the direction matters: that
+// file names the keys worth a decision and points here for the rest, because a default
+// written down twice is a default that goes stale in the copy nobody compiles.
 func (c Config) Inventory() []Setting {
 	num := strconv.Itoa
 	return []Setting{

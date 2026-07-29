@@ -41,13 +41,13 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 14 | `go build`, `go install` and `git pull && make build` need **no Node**: `web/dist` is built by `make ui` and committed | `TestBuiltUIMatchesItsSources` (stale bundle), plus CI rebuilds from the lockfile and diffs |
 | 15 | Every feature a section documents names its routes, knobs and tests — and every `/api/` route and every variable `internal/config` reads is named by some section | `TestEverySpecNameExistsInTheCode`, `TestEveryRouteAndKnobIsSpecified` |
 | 16 | `spec.json` and `llms.txt` are generated from the pages, never written by hand | `TestSpecJSONIsGeneratedFromThePages`, `TestLLMsIndexListsEveryPage` |
-| 17 | **KISS, taken to the extreme: the smallest correct change, and a second copy of a fact is a bug.** Delete before you add | `make dead` (unreachable from any binary) · `make lint` (`unused`, `goconst`) · `npx knip` in `web/ui` (unused files, exports, deps) · the rest is `prose only` |
+| 17 | **KISS, taken to the extreme: the smallest correct change, and a second copy of a fact is a bug.** Delete before you add | `make dead` (unreachable from any binary) · `make lint` (`unused`, `goconst`) · the rest is `prose only` |
 | 18 | **Four root documents, one job each.** A fifth is a parallel truth | `TestRootDocsAreTheFourWeKnowAbout` |
 | 19 | `README-MEGA-DOCS.md` is the **vNext brief, not the spec.** Code disagreeing with it is a gap with a recorded decision, never a bug to fix on sight | `TestRootDocsAreTheFourWeKnowAbout` (the join must stay in README.md) |
-| 20 | **No overhead, no over-engineering.** No abstraction with one caller, no knob nobody turns, no layer for a future that has not arrived. The cheapest correct thing wins | `make dead` · `make lint` (`unused`) · `npx knip` · `TestEveryRouteAndKnobIsSpecified` (a new knob must earn a documented section) · the rest is `prose only` |
+| 20 | **No overhead, no over-engineering.** No abstraction with one caller, no knob nobody turns, no layer for a future that has not arrived. The cheapest correct thing wins | `make dead` · `make lint` (`unused`) · `TestEveryRouteAndKnobIsSpecified` (a new knob must earn a documented section) · the rest is `prose only` |
 | 21 | **No new test file, no unit/E2E scaffold for a change.** Extend the test that already owns the rule; verify against the running product | `prose only` — `make smoke` and `make live` are the verification of record |
 | 22 | **Complexity hides behind one seam; the call site reads as intent.** Modern idiom, the plainest syntax that is correct, no ceremony, no comment that restates its code — and a name a *grep* resolves, because an agent infers from what it can find | `make lint` (`gocyclo` 16 · `nestif` · `funlen` · `gocritic` · `intrange` · `usestdlibvars` · `godot`) · `make lint-js` (`no-var`, `prefer-const`, `prefer-template`, 22 `unicorn/*`, 15 `jsdoc/*` — all at `--max-warnings 0`) |
-| 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; *Skills* below records the routing, the precedence and every place this repo differs | `prose only` — `skills-lock.json` hash-pins every skill; `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked |
+| 23 | **Read the layer's vendored skill before writing in it**, `ponytail` first on any coding task. They are the style source; *Skills* below records the routing, the precedence and every place this repo differs | `TestVendoredSkillsMatchTheirRouting` (vendored ⇔ symlinked ⇔ recorded ⇔ routed); `.golangci.yml` and `web/ui/eslint.config.js` are the parts already machine-checked. What a skill *says* is `prose only` |
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 | 25 | **The version is a git tag; the changelog is generated from `git log`.** `make release V=vX.Y.Z` is the only thing that changes either — never a `VERSION` file, never a hand-edited `web/release.json`, never a `CHANGELOG.md`. No tag means an **empty** version, which removes the badge rather than asserting a stale number | `TestReleaseNotesAreGenerated` (the do-not-edit marker · the tag shape · a sha behind every line) · `TestEveryRouteAndKnobIsSpecified` (`GET /api/release` must earn a documented section) · `TestRootDocsAreTheFourWeKnowAbout` (a root `CHANGELOG.md` is a fifth doc) |
 | 26 | **HARD: the official guide syncs in the same commit, and the claim it replaces is retired.** A behaviour change edits its `<section>`; the superseded passage is **deleted**, never parked beside its replacement, and its dead sentence is added to `retiredClaims` so it cannot return. Stale prose is context an agent loads and believes | `TestGuidePagesCarryNoRetiredClaim` (every published page, both languages) · `TestEverySpecNameExistsInTheCode` · `TestEveryRouteAndKnobIsSpecified` · `TestSpecJSONIsGeneratedFromThePages` · `make check-ui` |
@@ -543,9 +543,11 @@ address held by a running server is a second home for a fact that already has on
 
 ## Skills
 
-**Nineteen skills are vendored and hash-pinned in [`skills-lock.json`](skills-lock.json) —
-read them, don't re-add them.** `.claude/skills/*` are symlinks to `.agents/skills/*`, so
-neither agent's set can drift from the other. This section is rule 23 in full: the routing,
+**Sixteen skills are vendored, each with its source recorded in
+[`skills-lock.json`](skills-lock.json) — read them, don't re-add them.** `.claude/skills/*` are
+symlinks to `.agents/skills/*`, so neither agent's set can drift from the other. The lock
+records where each one came from; its `computedHash` is written by the tool that fetched them
+and **nothing in this tree can recompute it**, so treat it as provenance, not a seal. This section is rule 23 in full: the routing,
 the precedence, and every place a skill is wrong *about this repo*. A skill with no row here
 is a skill an agent will apply everywhere.
 
@@ -555,7 +557,7 @@ is a skill an agent will apply everywhere.
 2. A **machine-checked config in this tree** — [`.golangci.yml`](.golangci.yml),
    [`web/ui/eslint.config.js`](web/ui/eslint.config.js), the `spec.json` join, the
    [`Makefile`](Makefile) pins.
-3. The **vendored skill**, at its pinned hash.
+3. The **vendored skill**, as the bytes in this tree read.
 4. Nothing else. Recalled style, an upstream README, a newer release note: not a source here.
 
 When a skill loses, the loss goes in `changelog/`, dated, naming the rule it lost to — that is
@@ -603,20 +605,27 @@ nobody wrote yet, however the skill's example is shaped.
 | `antfu` | scaffolds a project: pnpm, monorepos, library publishing | One npm app with a committed `package-lock.json`, not published. `references/antfu-eslint-config.md` is the useful half; `eslint.config.js` already exists and every rule in it is annotated |
 | the `golang-*` audit modes | `ultracode` and up to five parallel sub-agents per audit | Opt-in only, never the default for a change. `make check-full` is the audit of record, and its *skipped* lines are part of the reading |
 
-### Vendored and not applicable
+### Deliberately not vendored
 
-Worth knowing before an agent "fits" one to a surface it was not written for:
+Three were vendored and are now deleted — 189 KB and 37 reference files for surfaces this
+repo does not have. The **line is what stops them coming back**, and it costs no bytes:
 
-- **`pnpm`** — this repo is npm, with a committed `package-lock.json`.
-- **`antfu-design`** — UnoCSS-first, while layout here is `web/ui/src/styles.css` over 8bit-nes.
-- **`code-documenter`** — asks which docstring format to use, then targets Python docstrings,
-  OpenAPI/Swagger, FastAPI/Django/NestJS and doc portals. None of that exists here, and the
-  question is already answered: JSDoc as *Conventions* describes it, `godoc` in Go.
+- **`pnpm`** (`antfu/skills`) — this repo is npm, with a committed `package-lock.json`.
+- **`antfu-design`** (`antfu/skills`) — UnoCSS-first, while layout here is
+  `web/ui/src/styles.css` over 8bit-nes.
+- **`code-documenter`** (`jeffallan/claude-skills`) — Python docstrings, OpenAPI/Swagger,
+  FastAPI/Django/NestJS, doc portals. None of that exists here, and the question is already
+  answered: JSDoc as *Conventions* describes it, `godoc` in Go.
 
-They stay vendored so nobody re-adds them.
+Each names its upstream, so re-vendoring one is a fetch rather than an archaeology dig — that
+is the part a deletion has to leave behind.
 
-Adding or bumping a skill: symlink it under `.claude/skills`, record source and hash in
-`skills-lock.json`, and add its row above — plus a row in *deltas* or in *not applicable*.
-This section is `prose only`; the join it wants (`.claude/skills/*` ↔ `skills-lock.json` ↔
-these rows) belongs beside `TestRootDocsAreTheFourWeKnowAbout` in
-[`web/embed_test.go`](web/embed_test.go), not in a new test file (rule 21).
+Keeping the files was the older answer, on the theory that a deleted skill is a re-added
+skill. It is not: a name with its reason does that job, and 189 KB of advice about the wrong
+package manager is 189 KB an agent can read by accident.
+
+Adding or bumping a skill: symlink it under `.claude/skills`, record source in
+`skills-lock.json`, and add its row above — plus a row in *deltas* or in *not vendored*.
+`TestVendoredSkillsMatchTheirRouting` holds the join (`.agents/skills/*` ↔ `.claude/skills/*`
+↔ `skills-lock.json` ↔ these rows), so a skill that is vendored without being routed, or
+routed without being vendored, fails `make check`.

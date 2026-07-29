@@ -7,23 +7,11 @@
       "skillPath": "skills/antfu/SKILL.md",
       "computedHash": "0aada58e7385bcc85abfd1d184ed7cf3757e1eb9e23d018e44ee6022093c5726"
     },
-    "antfu-design": {
-      "source": "antfu/skills",
-      "sourceType": "github",
-      "skillPath": "skills/antfu-design/SKILL.md",
-      "computedHash": "3fb42ec43179f38f60106e1ba20f46d660d54e916f9362e4c89ba0abaeaa3dfc"
-    },
     "building-components": {
       "source": "vercel/components.build",
       "sourceType": "github",
       "skillPath": "skills/building-components/SKILL.md",
       "computedHash": "20889af7cb9b3abca1e38824f7fffaa873eb0cc4d45187967b97bd85462cf934"
-    },
-    "code-documenter": {
-      "source": "jeffallan/claude-skills",
-      "sourceType": "github",
-      "skillPath": "skills/code-documenter/SKILL.md",
-      "computedHash": "49709db09641a9ab4196459835bfcbe565eb0581c23cb4eeb50ff80d2af88272"
     },
     "golang-code-style": {
       "source": "samber/cc-skills-golang",
@@ -84,12 +72,6 @@
       "sourceType": "github",
       "skillPath": "plugins/javascript-typescript/skills/modern-javascript-patterns/SKILL.md",
       "computedHash": "ef81ef5b5b70287b3962dd0fce50c90b27c636e940ec4e80f9a0b216587be549"
-    },
-    "pnpm": {
-      "source": "antfu/skills",
-      "sourceType": "github",
-      "skillPath": "skills/pnpm/SKILL.md",
-      "computedHash": "2ec08c851c6f901d4ed72c21b826416ed074a487db65662b36249418afd728bf"
     },
     "ponytail": {
       "source": "dietrichgebert/ponytail",

@@ -112,9 +112,21 @@ Both would delete a local rule, and neither blocks anything here:
 2. `.source-title`'s hover underline belongs on `a.source-title`, so a read-only list does not
    advertise a link.
 
-And one for this repo, unresolved rather than pending: **a class that matches nothing fails
-silently.** `vue/no-undef-properties` covers bindings, not classes, and four dead classes in
-one component is what this session was mostly about. A check would be a join between the class
-names in `web/ui/src/**/*.vue` and the selectors in the built CSS — cheap to write, noisy to
-tune (state classes, `data-accent`, library sub-classes), so it is written down here rather
-than half-built.
+And one for this repo — **decided against, so nobody spends a day on it.** A class that matches
+nothing fails silently, `vue/no-undef-properties` covers bindings and not classes, and the
+obvious answer is a join between the class names in `web/ui/src/**/*.vue` and the selectors in
+the built CSS. It was drafted, then dropped on the arithmetic: of the five classes that broke
+this screen it would have caught **two**.
+
+| class | a name-existence check sees |
+|---|---|
+| `.row`, `.grow` | **caught** — no selector anywhere |
+| `.hint` | passes: it exists, as `.field > .hint`, which is not where it was used |
+| `.datalist` | passes: it exists, and is a grid for `dt`/`dd` |
+| `.perm` | passes: it exists, as a confirmation *block* recipe on a button |
+
+Three of five are "defined, and wrong for this context" — invisible to any name match, and the
+check would still need an allowlist for `data-accent`, runtime state classes and the classes
+`<nes-*>` builds in `connectedCallback`. A gate that catches 40% and can go red on a false
+positive is worse than the habit it replaces, which is now in AGENTS.md: **grep the class in
+the built CSS and read the rule you find.**

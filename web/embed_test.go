@@ -614,3 +614,105 @@ func TestRootDocsAreTheFourWeKnowAbout(t *testing.T) {
 		}
 	}
 }
+
+// ── the vendored skills ───────────────────────────────────────────────────────
+// Rule 23 leans on three places agreeing about one set: the files in `.agents/skills`, the
+// symlinks in `.claude/skills` that make them visible to both agents, and the entries in
+// `skills-lock.json` that say where each came from. CLAUDE.md's *Skills* section is the
+// fourth, and the one that matters most — "a skill with no row here is a skill an agent will
+// apply everywhere".
+//
+// This was `prose only` and drifted the moment it was tested: three skills the section
+// itself listed as not applicable were still on disk, 189 KB of advice about pnpm and UnoCSS
+// that an agent could read by accident. The `computedHash` in the lock is deliberately not
+// checked — it is written by the tool that fetched the skills and nothing here can recompute
+// it, so asserting it would be a check that can only ever fail (measured: all 16 disagree
+// with every plain digest of the file).
+func TestVendoredSkillsMatchTheirRouting(t *testing.T) {
+	t.Parallel()
+
+	vendored := dirNames(t, "../.agents/skills")
+	symlinked := dirNames(t, "../.claude/skills")
+	if strings.Join(vendored, " ") != strings.Join(symlinked, " ") {
+		t.Errorf(".agents/skills has %v but .claude/skills has %v — the symlinks are what\n"+
+			"keep Claude's set and the other agent's from drifting; add or remove both.",
+			vendored, symlinked)
+	}
+
+	lock, err := os.ReadFile("../skills-lock.json")
+	if err != nil {
+		t.Fatalf("skills-lock.json records where every skill came from: %v", err)
+	}
+	recorded := regexp.MustCompile(`(?m)^\s{4}"([\w-]+)":`).FindAllStringSubmatch(string(lock), -1)
+	var inLock []string
+	for _, m := range recorded {
+		inLock = append(inLock, m[1])
+	}
+	sort.Strings(inLock)
+	if strings.Join(vendored, " ") != strings.Join(inLock, " ") {
+		t.Errorf("vendored %v, recorded in skills-lock.json %v — a skill with no entry has\n"+
+			"no recorded source, and an entry with no skill is a fetch nobody completed.",
+			vendored, inLock)
+	}
+
+	rules, err := os.ReadFile("../CLAUDE.md")
+	if err != nil {
+		t.Fatalf("CLAUDE.md holds the routing table: %v", err)
+	}
+	skills := section(string(rules), "\n## Skills\n")
+	for _, name := range vendored {
+		if !strings.Contains(skills, "`"+name+"`") {
+			t.Errorf("%q is vendored but named nowhere in CLAUDE.md's Skills section — an\n"+
+				"unrouted skill is one an agent applies to every surface. Give it a row in\n"+
+				"\"Which skill, in which order\", plus one in *deltas* if it is wrong here.", name)
+		}
+	}
+
+	// The other direction, and the reason the three deletions hold: the list of skills this
+	// repo refuses is a *name with its reason*, which costs nothing and does the whole job of
+	// stopping a re-add. A file on disk beside that line makes the line a lie.
+	refused := regexp.MustCompile("(?m)^- \\*\\*`([\\w-]+)`\\*\\*").FindAllStringSubmatch(
+		section(skills, "### Deliberately not vendored"), -1)
+	if len(refused) == 0 {
+		t.Error("CLAUDE.md's \"Deliberately not vendored\" list is empty — it is what stops a\n" +
+			"deleted skill coming back. Keep the names and their reasons.")
+	}
+	for _, m := range refused {
+		for _, have := range vendored {
+			if have == m[1] {
+				t.Errorf("%q is listed as deliberately not vendored and is vendored anyway —\n"+
+					"delete one of the two, in this commit.", m[1])
+			}
+		}
+	}
+}
+
+// The directory names directly under dir, sorted. Skills are one directory each, so a stray
+// file in there is a mistake worth surfacing rather than skipping.
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading %s: %v", dir, err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	sort.Strings(names)
+	return names
+}
+
+// Everything from the first line matching head to the next heading at the same level, or the
+// end. Used to hold an assertion to one section of a document that has many.
+func section(doc, head string) string {
+	_, rest, found := strings.Cut(doc, head)
+	if !found {
+		return ""
+	}
+	level := strings.Repeat("#", strings.Count(strings.TrimSpace(head), "#"))
+	if body, _, cut := strings.Cut(rest, "\n"+level+" "); cut {
+		return body
+	}
+	return rest
+}
