@@ -61,7 +61,7 @@ const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
 const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
-const { ready: diagramsReady, loadFor, drawn, open: openZoom, close: closeZoom }
+const { ready: diagramsReady, loadFor, drawn, stepped, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
 // The notes are fetched on the first open and kept — they describe the binary that is
 // answering, so they cannot change until it restarts.
@@ -226,7 +226,7 @@ function replay(entry) {
       :turns="turns" :corpus="corpus" :history="history" :queue="queue"
       :diagrams-ready="diagramsReady"
       @ask="ask" @replay="replay" @copy="copy" @regenerate="regenerate" @ask-ba="askBA"
-      @diagram-drawn="drawn" @zoom-diagram="openZoom"
+      @diagram-drawn="drawn" @diagram-stepped="stepped" @zoom-diagram="openZoom"
     />
     <component
       :is="Component" v-else-if="route.name === 'ba'"

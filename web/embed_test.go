@@ -86,8 +86,19 @@ var retiredClaims = []struct{ phrase, why string }{
 	{"Deleting the index is safe", "the index IS the corpus now — this command loses it"},
 	{"does not need a backup", "DB_PATH is the one file that does; losing it loses everything"},
 	{"dựng lại được nên không cần backup", "DB_PATH is the one file that does"},
+	// Broader than the sentences they replace, on purpose: "no backup" was published in four
+	// spellings across two pages, and the claim is dead in every one of them — there is a
+	// nightly copy now (scripts/backup.sh, the Deploy page's Back up the database).
+	{"no backup", "there is one now: scripts/backup.sh, nightly — say what it does, not that it is missing"},
+	{"không có backup", "there is one now: scripts/backup.sh, nightly"},
 	{"moves to <code>.trash", "removal is a deleted_at column, not a directory"},
 	{"written as a file", "a confirmed answer is a row; internal/rag touches no disk"},
+	// The Dev page described the zoom viewer that `diagram.fit`/`zoomInto` used to be —
+	// reading the viewBox and pinning a width in JS — for as long as it took <nes-zoom> to
+	// replace both. The surviving code says the opposite in its own header ("nothing here
+	// sizes the copy"), which is the drift rule 26 exists for.
+	{"pinned in JS because an SVG", "<nes-zoom> owns the sizing now; nothing in this app pins a width"},
+	{"set bằng JS vì SVG có viewBox", "<nes-zoom> owns the sizing now"},
 }
 
 // TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the

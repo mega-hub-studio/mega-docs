@@ -37,10 +37,11 @@ is the chat app and nothing else. Do not add doc routes to it.
    its text — and the BA WebUI is the only way one enters; nothing writes a corpus file, and
    `CORPUS_DIR` is only the folder `ingest` reads when an operator imports from disk. A
    BA-confirmed answer is a row at `qa/ticket-N.md`, which stays a `.md` path because that is
-   what a citation prints, not because a file exists. When asked about backups: there is
-   **no backup story, by decision**, and losing the database loses the corpus. The one net is
-   that `Remove` is soft — the chunks go, the row keeps its text with a `deleted_at`. Do not
-   invent a backup, and do not reintroduce a corpus directory.
+   what a citation prints, not because a file exists. When asked about backups: **it is
+   `scripts/backup.sh`** — a verified `sqlite3 .backup` of `DB_PATH`, nightly by systemd timer
+   or `make backup` by hand, landing outside this machine's disk. Do not design a second one,
+   and do not reintroduce a corpus directory. The other net is that `Remove` is soft — the
+   chunks go, the row keeps its text with a `deleted_at`.
 2. **Reads are open; the three writes are gated.** `BA_PASS` guards confirming an
    answer, dismissing a ticket, and importing a document (`POST /api/documents`). An
    unset `BA_PASS` means the instance has *no* write surface — not open writes. Asking,
@@ -50,15 +51,15 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.8.0
+    8bit-nes@0.13.0
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.8.0/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.13.0/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -75,17 +76,30 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
-2. **There are exactly three local overrides of the design system, and each names its
-   version.** All three are in `web/ui/src/styles.css`, against **8bit-nes 0.8.0**, and two
-   of them are waiting on a release:
+2. **Every local override of the design system is named, and there are two kinds.** All of
+   them are in `web/ui/src/styles.css`, against **8bit-nes 0.13.0**, and each was re-verified
+   against that release's own CSS rather than its changelog, because "fixed upstream" is a
+   claim about bytes.
 
-   | override | why | delete when |
-   |---|---|---|
-   | `.palette-list` un-capped (`max-block-size: none`) | the library still sizes it for the modal its own docs describe — `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested* scroller which hid four of seven documents on a phone | a release ships an in-page variant of `.palette` |
-   | `.prose a.cite` restored to cyan with no underline | two of the library's own recipes collide: `.prose a` and `.cite` are both in the components layer and `.prose a` scores higher, so every citation marker rendered as a prose link — green, with a 2px underline through a digit already sitting in a cyan chip | a release scopes that prose-link rule away from `.cite` |
-   | `.source .source-title:hover` un-underlined | nothing upstream to fix: the recipe expects an `<a>`, and this app renders the row as spans because it cannot open a document, so the hover underline offered a link that does not exist | the row becomes something you can click |
+   **Waiting on a release. Re-measure on the next bump, and delete what has landed:**
 
-   The two requests are in the changelog.
+   | override | why |
+   |---|---|
+   | `.palette-list` un-capped (`max-block-size: none`) | the library still sizes it for the modal its own docs describe — `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested* scroller which hid four of seven documents on a phone. Gone when a release ships an in-page `.palette` |
+   | `.prose a.cite` restored to cyan with no underline | two of the library's own recipes collide: `.prose a` and `.cite` are both in the components layer and `.prose a` scores higher, so every citation marker rendered as a prose link — green, with a 2px underline through a digit already sitting in a cyan chip. Gone when a release scopes that rule away from `.cite` |
+
+   **This app using a recipe outside the context it was written for.** Nothing upstream to
+   fix; each is permanent until the app's own use changes:
+
+   | adjustment | the mismatch |
+   |---|---|
+   | `.source .source-title:hover` un-underlined | the recipe expects an `<a>`; the row is spans, because nothing in the ASK screen can open a document, so the hover underline offered a link that does not exist |
+   | `.lib-row > .result` — `cursor: default`, no hover edge, `padding-inline: 0` | `.result` is written as a control; in the BA library it is a record, and its inset would miss the card edge the panel's head, Find field and buttons all share |
+   | `.dock .statusline` — `inline-size: auto`, and `.sl-end` un-pushed below 640px | `inline-size: 100%` fights the dock's negative margins (12px short on the right, measured), and `margin-inline-start: auto` gives a *wrapped* strip two different left edges |
+   | `.empty .palette > .palette-empty` — start-aligned, at the rows' inset | centring is right for a state filling a blank list, wrong for a truncation notice under nine left-aligned rows |
+   | `::selection` softened to a 32% `--primary` tint | the solid fill is ~11:1 on this dark page — correct contrast, and a flare when a long-press selects a word on a phone |
+
+   The two upstream requests are in the changelog.
 
    `.prose` used to be a fourth. Its `72ch` sat on the container and so capped the tables and
    diagrams inside an answer as well as its text; 0.8.0 moved that measure onto the children
@@ -99,9 +113,18 @@ it, so trust the table.
    The other app rules on library classes are *placement* or a state the library has no
    recipe for, not overrides, and the difference is worth keeping straight:
    `align-self`/`text-align` on `.empty`'s children decide where a child sits inside its
-   parent (the app's job), and `.source:target` gives a citation jump the one thing it lacked
-   — a visible reply — the way `.drop`'s dashed edge does for a drop target; `max-block-size`
-   on `.palette-list` overrules how the component sizes itself (the library's job).
+   parent (the app's job), `.source:target` gives a citation jump the one thing it lacked
+   — a visible reply — the way `.drop`'s dashed edge does for a drop target, and the `.lib-*`
+   rules decide where a `.result` row sits and how wide its two number columns are;
+   `max-block-size` on `.palette-list` overrules how the component sizes itself (the
+   library's job).
+
+   Four classes in a template are worth knowing about, because a class that matches nothing
+   fails **silently**: `.row` and `.grow` do not exist on their own (the library has
+   `.tree .row` and `.control-group.row`; `.grow` is this app's `.bar .grow`), `.hint` exists
+   only as `.field > .hint`, and `.perm` is a confirmation *block*, not a button modifier. The
+   BA library's list carried all four at once, which is what turned it into two ragged columns
+   of shattered paths. There is no linter for this — `grep` the class in the built CSS.
 
    Adding an override is allowed; leaving it anonymous is not. Say in a comment which
    upstream version lacks the fix, and if you bump the pin, re-measure rather than trusting

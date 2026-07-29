@@ -4,11 +4,14 @@
    the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
    value comes from a token in tokens.css.
 
-   One rule overrules how a component sizes *itself*, which is the library's job and so
-   has to be named: `.palette-list`, which 8bit-nes 0.8.0 still does not fix — delete it
-   on the release that does. A second one un-capped `.prose` until 0.8.0 moved that
-   measure onto the children, which is what this app had been patching around; reporting
-   it and then deleting the local rule is the shape to aim for. AGENTS.md keeps the count.
+   Where it does overrule a component, the rule says so in its own comment and AGENTS.md
+   keeps the count, split the way it matters: two are waiting on an 8bit-nes release
+   (`.palette-list`, `.prose a.cite`) and the rest are this app using a recipe outside the
+   context it was written for — a `.result` that is a record rather than a control, a
+   `.statusline` bleeding out of a padded dock, a `.palette` in the page instead of a modal.
+   Only the first kind is deletable on a bump. `.prose` was one of those until 0.8.0 moved its
+   measure onto the children; reporting it and then deleting the local rule is the shape to
+   aim for.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.
@@ -63,14 +66,31 @@ html {
   scroll-padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-4));
 }
 
+/* The library paints a selection as a solid --primary fill with near-black text: about
+   11:1 against the page, which is right for a light theme and a flare on a dark one — a
+   long-press on a phone lit up the whole word. A 32% tint marks the range with the same
+   colour and a fraction of the light, and keeps --ink on top so the text stays readable
+   (the point of a selection is finding it again, not being unable to look at it). */
+::selection {
+  background: color-mix(in srgb, var(--primary) 32%, transparent);
+  color: var(--ink);
+}
+
 /* No touch overrides live here any more. 8bit-nes 0.6.1 carries both fixes this
    file used to patch — .chat-submit on the --ctrl-h-lg rung, and the bare textarea
    inside .chat-prompt / .composer floored at 16px so iOS never zooms on focus — so
    the app owns no coarse-pointer CSS at all. */
 
-/* ── top bar ── */
+/* ── top bar ──
+   NOT sticky on a phone, and that is the one deliberate choice in this rule. Measured on an
+   iPhone 14: the bar is 60px and the dock 150px of an 884px window, so a quarter of the
+   screen was chrome and an answer read through a 500px slot. The bar holds navigation —
+   which screen, which language, start over — and none of it is needed *while reading*,
+   while the thing that is (the prompt) is in the dock and stays. So it scrolls away with
+   the page and one flick back to the top returns it.
+   Sticky comes back at 640px, where the vertical budget is not the constraint. */
 .bar {
-  position: sticky; inset-block-start: 0; z-index: var(--z-bar);
+  z-index: var(--z-bar);
   display: flex; align-items: center; gap: var(--sp-3);
   padding: var(--sp-3);
   padding-block-start: max(var(--sp-3), env(safe-area-inset-top));
@@ -222,15 +242,31 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    rows themselves stay the library's `.result`. */
 .empty .results { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-2); }
 
-/* .result-hint is a slot the library leaves unstyled (its own example puts a .kbd there).
-   Ours holds a figure, so: mono, dim, and tabular — the counts sit in a column, and
-   proportional digits make a column of numbers ragged at the decimal. Scoped, because a
-   bare library class is exactly the ambiguity `.row` already taught this repo about. */
-.empty .result-hint {
+/* .result-hint is a slot the library leaves unstyled (its own example puts a .kbd there),
+   so what goes in it is this app's decision — and it is the same decision on both screens
+   that use a `.result` row: a figure, so mono, dim, and tabular, because proportional digits
+   make a column of numbers ragged. One rule rather than one per screen: it was scoped to
+   `.empty` while `.empty` was the only caller, and the BA library's rows are the second. */
+.result-hint {
   font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-variant-numeric: tabular-nums;
   color: var(--dim);
+}
+
+/* The two sentences the document menu can end with — "N more match, type to narrow" and
+   "nothing matches X" — are both `.palette-empty`, which the library centres because its own
+   case is a *state* filling an otherwise blank list. The first one sits under nine
+   left-aligned rows: centred, it hung off both of their edges and broke mid-sentence with a
+   single word on the second line. Both get the rows' own inset instead, so every line in the
+   panel starts on one edge and the notice reads as the list's last line rather than a
+   floating label. The inset is every one a row carries — `.palette-list`'s --sp-2, the
+   transparent --bw-2 that is `.result`'s hover edge, and its --sp-3 — because matching the box
+   is not the point, matching where the text above it starts is. Measured inside the palette:
+   the row's first character is at 22px, and so is this one. */
+.empty .palette > .palette-empty {
+  text-align: start;
+  padding: var(--sp-2) calc(var(--sp-2) + var(--bw-2) + var(--sp-3));
 }
 
 /* base.css gives <summary> its focus ring but never a pointer — `cursor` appears nowhere in
@@ -307,6 +343,61 @@ main.ba {
    screen rather than repeated per card: it is one fact about paths in this mode. */
 main.ba .datalist code { overflow-wrap: anywhere; }
 
+/* ── BA mode: the document library ──
+   This list rendered as two ragged columns on a phone, with paths broken every six
+   characters ("booking / calenda / r/sideba / r/calend / ar-"), and the cause was not
+   spacing: it was four classes that do not do what the markup assumed.
+
+     .datalist   is the library's *description* list — `display: grid` with
+                 `grid-template-columns: auto 1fr` and rules for `> dt` / `> dd`. Given nine
+                 sibling <div>s it placed them as grid *cells*, so document 1 went in column
+                 one, document 2 in column two, and every path was laid out in half a phone.
+                 Its `@container (width<=320px)` single-column fallback never fired either —
+                 nothing in this app declares `container-type`.
+     .row        matches nothing on its own. 8bit-nes 0.8.0 defines `.tree .row` and
+                 `.control-group.row`, and neither is a bare row.
+     .grow       is this file's own `.bar .grow`, so outside the bar it is inert.
+     .hint       is defined as `.field > .hint`, so the path, the description and the date
+                 lost their secondary size and colour and arrived at body weight — the whole
+                 row at one level, which is what made it read as noise.
+
+   What replaces it is the recipe the ASK screen's document menu already uses: `.result`, with
+   `.result-title` and `.result-path` (both ellipsised, so a long path can never re-shape a
+   row) and `.result-hint` at the end. Same content, same geometry, both screens — a document
+   looks like a document wherever it is listed.
+   Nine documents are nine rows of one height: the actions are icon buttons on the same line
+   (32px each, so both fit beside a 12rem text column at 390px), which is what keeps a page of
+   the library readable without scrolling past 78px rows. */
+.lib-rows { display: flex; flex-direction: column; }
+.lib-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  border-block-start: var(--bw-2) solid var(--line);
+}
+/* Three things about `.result` are wrong for a record and right for the control it was
+   written as, and this is all three: the pointer and the hover edge offer an interaction that
+   does not exist here, and its inline padding would inset the row 12px from the card's own
+   content box — so the title, the date and the buttons would each miss the edge that the
+   panel's head, its Find field and its NEW DOCUMENT button all share. Everything else it
+   brings — the touch height, two ellipsised lines, the trailing slot — is exactly right. */
+.lib-row > .result { flex: 1 1 12rem; min-inline-size: 0; padding-inline: 0; cursor: default; }
+.lib-row > .result:hover { background: none; border-color: transparent; }
+/* One x for every number. The text block takes the slack (`flex: 1`) so the count and the date
+   are packed against the row's end, and each gets a floor width so they hold a column rather
+   than starting wherever the title above them happened to stop — a list is read down, not
+   along. The `flex` is also what makes the truncation honest: without it the two lines sized
+   to their content and a long title ellipsised while there was still space beside it.
+   The kind badge is left out of that: it stays beside the title, where a label belongs. */
+.lib-row .result-body { flex: 1; }
+.lib-row .badge[data-accent] { min-inline-size: 2.25rem; text-align: center; }
+.lib-row .result-hint { min-inline-size: 3.25rem; text-align: end; }
+.lib-acts { display: flex; gap: var(--sp-2); }
+
+/* The form's two-up field rows. `.control-group.row` is the library's wrapper for controls
+   side by side (`flex-flow: wrap`, --sp-4 column gap), but it gives the children no basis, so
+   this says at what width a pair stops being a pair: one field per line under ~30rem, two
+   above it, with no media query of its own. */
+.doc-form .control-group.row > .field { flex: 1 1 14rem; min-inline-size: 0; }
+
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
   position: fixed; inset-block-end: 0; inset-inline: 0; z-index: var(--z-dock);
@@ -351,11 +442,25 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    measuring one height and the conversation still clears everything fixed. The
    strip, its light and its items are all .statusline — this only undoes the dock's
    own inline padding so the strip spans the full width the way an ambient bar
-   should, and widens it back out to the reading column. */
+   should, and widens it back out to the reading column.
+   `inline-size: auto` is what makes the negative margins actually bleed. The recipe sets
+   `inline-size: 100%`, which resolves against the dock's *content* box — so the strip was
+   the width of the padded column while starting --sp-3 to the left of it, and ended --sp-3
+   short of the screen. Measured: a 12px gap on the right edge and none on the left, which is
+   the misalignment you see before you can name it. `auto` lets a block-level flex box fill
+   its container plus both negative margins, which is the whole trick. */
 .dock .statusline {
+  inline-size: auto;
   margin: var(--sp-3) calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
   padding-block-end: max(var(--sp-1), env(safe-area-inset-bottom));
 }
+/* The strip wraps on a phone, and `.sl-end`'s `margin-inline-start: auto` is what made the
+   wrap ugly: the first line stopped early and the leftovers sat flush right on the second,
+   so two lines shared no edge. With the auto margin off, the items pack in reading order and
+   fill the line before breaking — usually into one line, and when they do break both start on
+   the same edge. The push-right is restored at 640px, where nothing wraps and the strip is a
+   bar with two ends again. */
+.dock .statusline .sl-end { margin-inline-start: 0; }
 
 /* A diagram scaled to fit a phone is a picture of unreadable text: one arrived 1083px
    wide, was squeezed into 289, and its 16px labels rendered at about 4px. Here it stays
@@ -367,6 +472,28 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    push the answer's citations off screen, and the sources are the point. */
 .prose nes-mermaid { display: block; cursor: zoom-in; }
 .prose nes-mermaid .mermaid-view { max-block-size: 70vh; }
+
+/* ── a diagram that walks itself ──
+   `<nes-walkthrough>` is prev/next + dots + one step's prose, and the library styles the
+   `.walkthrough` box it builds rather than the host — an unknown element is
+   `display: inline`, so the stepper would sit on the diagram's last line. docsbase.html
+   carries the same line for the guide's five static diagrams; both are one declaration
+   against the same gap, and it is reported upstream.
+
+   The cap is tighter than the 70vh above, and only for a diagram that has a walk under it
+   (`data-walk`, set by lib/answer.js when it folds the list in). At 70vh the spotlit node
+   and the sentence explaining it cannot both be on a phone screen — which is the entire
+   point of stepping through it. .mermaid-view scrolls inside itself, and what brings the
+   lit node back is `diagram.onStep` on the library's `nes:step`, NOT the library: measured
+   at 390×844, `_reapplyFocus` toggles the classes and scrolls nothing, so the last two
+   steps of a seven-node graph lit a node 150px below the fold. Released at 640px, where
+   the vertical budget is not the constraint. 48svh is the guide's measured value for the
+   same pairing, not a fresh guess. */
+.prose nes-walkthrough { display: block; }
+.prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 48svh; }
+@media (min-width: 640px) {
+  .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 70vh; }
+}
 /* The affordance has to be visible: a diagram that opens on tap and does not say so
    is a diagram nobody taps. Mono and muted, like every other piece of chrome here. */
 .prose nes-mermaid .zoom-hint {
@@ -416,11 +543,15 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
-  .bar { padding-inline: var(--sp-4); }
+  /* Sticky again: a laptop has the vertical budget a phone does not, and a pointer expects
+     the navigation to stay where it was left. See the base rule for why it scrolls away
+     below this width. */
+  .bar { position: sticky; inset-block-start: 0; padding-inline: var(--sp-4); }
   main { padding: var(--sp-5) var(--sp-4) calc(var(--dock-h, 5rem) + var(--sp-6)); }
   .empty { margin-block-start: 12vh; }
   .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
+  .dock .statusline .sl-end { margin-inline-start: auto; }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
   .prose pre { padding: var(--sp-3) var(--sp-4); }
   /* The viewer stops being the screen and becomes a dialog again: a pointer has a window

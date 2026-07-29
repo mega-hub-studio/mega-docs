@@ -93,6 +93,27 @@ export function onRender(host) {
 }
 
 /**
+ * A walkthrough moved: bring the node it just lit inside the diagram's own scroller.
+ *
+ * The library highlights but does not scroll — `_reapplyFocus` toggles the classes and
+ * stops there — so on a phone this is the difference between a walkthrough and a stepper
+ * attached to an unchanging picture. Measured at 390×844: the box is capped at 48svh
+ * (405px) and a seven-node graph draws 554px, so the last two steps lit a node below the
+ * fold and the reader saw the sentence change and the diagram not.
+ *
+ * `nearest` scrolls the diagram box and nothing else. The page must not move on NEXT: the
+ * answer, its citations and the prompt are all in the same column, and a jump there costs
+ * the reader their place to save a scroll they did not ask for.
+ *
+ * @param {Event} e the library's bubbling `nes:step`, fired after the highlight lands
+ */
+export function onStep(e) {
+  const id = e.target?.getAttribute?.('for')
+  const lit = id && document.getElementById(id)?.querySelector('.nes-focus')
+  lit?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
+/**
  * Put a copy of a diagram into the viewer, and hand the panner back to 1:1.
  *
  * A copy, not the original: moving the node out of the answer would leave a hole in it

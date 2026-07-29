@@ -7,7 +7,7 @@
 
    The diagram listeners live on the answer element rather than on each diagram: a
    diagram arrives inside v-html, so Vue never sees it as a component, and `nes:render`
-   is the library's own event and bubbles to here.
+   and `nes:step` are the library's own events and bubble to here.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { fileName, section, turnHtml } from '../lib/answer.js'
 import { STATUS } from '../lib/qa.js'
@@ -19,7 +19,7 @@ const props = defineProps({
   diagramsReady: Boolean,
 })
 
-defineEmits(['copy', 'regenerate', 'askBA', 'diagramDrawn', 'zoomDiagram'])
+defineEmits(['copy', 'regenerate', 'askBA', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 
 const srcId = n => `s${props.turn.id}-${n}`
 
@@ -42,7 +42,8 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
         <!-- A free answer must not look identical to a paid one, or nobody learns that
              repeating a question is cheap. -->
         <span
-          v-if="turn.cached" class="badge todo"
+          v-if="turn.cached"
+          class="badge todo"
           title="Served from this server's cache — no provider call, no cost"
         >CACHED</span>
         <!-- Asked inside a folder: the answer is only as complete as that folder, so the
@@ -55,7 +56,9 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
       <!-- eslint-disable-next-line vue/no-v-html — answer.js sanitises with DOMPurify,
            which is the whole reason that module exists; see its header. -->
       <div
-        class="prose" @nes:render="$emit('diagramDrawn', $event)"
+        class="prose"
+        @nes:render="$emit('diagramDrawn', $event)"
+        @nes:step="$emit('diagramStepped', $event)"
         @click="$emit('zoomDiagram', $event)"
         @keydown="$emit('zoomDiagram', $event)"
         v-html="html()"
@@ -70,7 +73,9 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
         <li v-for="c in turn.citations" :id="srcId(c.n)" :key="c.n" class="source">
           <span class="source-n">{{ c.n }}</span>
           <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
-          <span v-if="c.heading" class="source-host" :title="c.heading">{{ section(c.heading) }}</span>
+          <span v-if="c.heading" class="source-host" :title="c.heading">{{
+            section(c.heading)
+          }}</span>
         </li>
       </ol>
 
@@ -80,7 +85,8 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
             <nes-icon name="copy" />
           </button>
           <button
-            class="btn ghost xs icon" aria-label="Regenerate answer"
+            class="btn ghost xs icon"
+            aria-label="Regenerate answer"
             @click="$emit('regenerate', turn)"
           >
             <nes-icon name="refresh" />
@@ -88,7 +94,8 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
           <!-- The whole loop starts here: one tap turns a bad answer into a question a
                BA can answer, with this answer attached as evidence. -->
           <button
-            v-if="!turn.ticket" class="btn ghost xs"
+            v-if="!turn.ticket"
+            class="btn ghost xs"
             title="Send this question to a BA — their answer joins the documents"
             @click="$emit('askBA', turn)"
           >
@@ -104,7 +111,8 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
       <!-- Where that gap got to. The badge is the ticket's real state, refreshed when a
            BA acts, so nobody has to ask whether it was picked up. -->
       <div
-        v-if="turn.ticket" class="callout"
+        v-if="turn.ticket"
+        class="callout"
         :class="turn.ticket.status === 'confirmed' ? 'tip' : 'memo'"
       >
         <span class="badge" :class="STATUS[turn.ticket.status].badge">

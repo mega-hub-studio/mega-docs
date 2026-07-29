@@ -7,17 +7,20 @@
      emit    changed               something moved: the shell reloads the corpus and the queue
      emit    locked(err)           the server refused the password — the gate handles it
 
-   The layout is two blocks, and the order is the job: the table answers "what do we have?",
+   The layout is two blocks, and the order is the job: the list answers "what do we have?",
    and the form answers "make this one right". The form is below rather than in a dialog on
    purpose — a BA writes a document while reading the list of what already exists, and a modal
    is exactly what takes that away.
 
-   Every control is a library recipe (.card · .field · .input · .textarea · .datalist ·
-   .segment · .btn · .badge), so this file contributes placement and nothing else.
+   Every control is a library recipe (.card · .field · .input · .textarea · .result ·
+   .control-group · .btn · .badge), so this file contributes placement and nothing else. The
+   list is `.result` rows because that is the recipe the ASK screen lists documents with, and
+   one document should not have two appearances; `styles.css` says what the four `.lib-*`
+   classes around them do.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { toast } from '8bit-nes'
 import { useLibrary } from '../composables/library.js'
-import { docTitle, shortDate } from '../lib/library.js'
+import { docTip, docTitle, shortDate } from '../lib/library.js'
 
 const props = defineProps({
   documents: { type: Array, default: () => [] },
@@ -38,6 +41,8 @@ const {
   open,
   busy,
   error,
+  armed,
+  arm,
   create,
   edit,
   cancel,
@@ -52,10 +57,10 @@ const {
 </script>
 
 <template>
-  <section class="card lib">
+  <section class="card">
     <div class="head">
       <span class="title">Library</span>
-      <span class="badge clear">{{ documents.length }}</span>
+      <span class="badge">{{ documents.length }}</span>
       <button
         v-if="writes" class="btn sm" type="button" :disabled="busy"
         @click="create(form.folder)"
@@ -81,38 +86,59 @@ const {
       <p>Import files above, or write the first document here.</p>
     </div>
 
-    <!-- .datalist is the library's row list. The columns are what a BA scans for: what it is
-         called, where it lives, what kind it is, and whether retrieval can use it. -->
-    <div v-else class="datalist">
-      <div v-for="d in shown" :key="d.path" class="row">
-        <div class="grow">
-          <b>{{ d.title || docTitle(d.path) }}</b>
-          <span v-if="d.alias" class="hint"> · {{ d.alias }}</span>
-          <div class="hint">
-            <code>{{ d.path }}</code>
-            <template v-if="d.description"> — {{ d.description }}</template>
-          </div>
+    <!-- One document, one `.result` — the same row the ASK screen's document menu is built
+         from, so a document looks the same wherever it is listed. Its two lines ellipsise, so
+         a 90-character path can never re-shape a row; the alias and the description are in
+         the row's `title` because their job is being *searched* (the Find field reads them),
+         not being scanned. -->
+    <div v-else class="lib-rows">
+      <div v-for="d in shown" :key="d.path" class="lib-row">
+        <div class="result" :title="docTip(d)">
+          <nes-icon class="result-icon" name="file" />
+          <span class="result-body">
+            <!-- `docTitle` takes the document, not its path: given a string it read
+                 `.title` off it, found nothing, and returned "" — so a document with no title
+                 of its own had an empty row. It already falls back to the file name. -->
+            <span class="result-title">{{ docTitle(d) }}</span>
+            <span class="result-path">{{ d.path }}</span>
+          </span>
+          <!-- Plain .badge, not .clear: in this design system `clear` is the *good/green*
+               status fill, so a kind and a section count were claiming a pass state — and on
+               the count it also outscored the data-accent beside it. -->
+          <span v-if="d.kind" class="badge">{{ d.kind }}</span>
+          <span
+            class="badge" :data-accent="d.approved ? 'good' : 'blue'"
+            :title="`${d.chunks} retrievable sections, ${d.approved} confirmed by a BA`"
+          >{{ d.chunks }}</span>
+          <span class="result-hint">{{ shortDate(d.updated_at) }}</span>
         </div>
-        <span v-if="d.kind" class="badge clear">{{ d.kind }}</span>
-        <span
-          class="badge clear" :data-accent="d.approved ? 'good' : 'blue'"
-          :title="`${d.chunks} retrievable sections, ${d.approved} confirmed by a BA`"
-        >{{ d.chunks }}</span>
-        <span class="hint">{{ shortDate(d.updated_at) }}</span>
-        <button
-          v-if="writes" class="btn ghost sm" type="button" :disabled="busy"
-          @click="edit(d.path)"
-        >
-          EDIT
-        </button>
-        <!-- .perm is the library's destructive confirmation: the second press is the one
-             that acts, so a mis-tap costs nothing. -->
-        <button
-          v-if="writes" class="btn ghost sm perm" type="button" :disabled="busy"
-          @click="drop(d.path)"
-        >
-          REMOVE
-        </button>
+        <!-- Icons, so both actions fit on the row instead of adding a second line to every
+             document — `edit` and `trash` are both in the pinned icons.d.ts, which is the only
+             way to know: a name the release does not have renders an empty box and says
+             nothing. The label a screen reader gets is on the button. -->
+        <div v-if="writes" class="lib-acts">
+          <button
+            class="btn ghost xs icon" type="button" :disabled="busy"
+            aria-label="Edit this document" @click="edit(d.path)"
+          >
+            <nes-icon name="edit" />
+          </button>
+          <!-- Two presses, and the label is what says so. `drop` removes on the press it
+               receives, so the arming has to be in front of it or a mis-tap on a phone takes
+               a document out of the knowledge base — this button used to carry the library's
+               `.perm` class, which is a confirmation *block* recipe (a bordered card with its
+               own actions), not a modifier: it made the button a full-width panel and confirmed
+               nothing. -->
+          <button
+            class="btn xs" :class="armed === d.path ? '' : 'ghost icon'" type="button"
+            :disabled="busy" :data-accent="armed === d.path ? 'crit' : null"
+            :aria-label="armed === d.path ? 'Confirm: remove this document' : 'Remove this document'"
+            @click="armed === d.path ? drop(d.path) : arm(d.path)"
+          >
+            <nes-icon v-if="armed !== d.path" name="trash" />
+            <template v-else>SURE?</template>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -125,8 +151,8 @@ const {
         <span class="title">{{ editing || 'New document' }}</span>
       </div>
 
-      <div class="row">
-        <label class="field grow">
+      <div class="control-group row">
+        <label class="field">
           <span class="label">Folder</span>
           <input
             v-model="form.folder" class="input" list="lib-folders"
@@ -134,7 +160,7 @@ const {
           >
           <span class="hint">What a reader scopes a question to. Blank means the top level.</span>
         </label>
-        <label class="field grow">
+        <label class="field">
           <span class="label">File name</span>
           <input v-model="form.name" class="input" placeholder="2026.md" required>
           <span class="hint">Ends in .md, .markdown or .txt — it is what a citation prints.</span>
@@ -144,13 +170,13 @@ const {
         <option v-for="f in folders" :key="f" :value="f" />
       </datalist>
 
-      <div class="row">
-        <label class="field grow">
+      <div class="control-group row">
+        <label class="field">
           <span class="label">Title</span>
           <input v-model="form.title" class="input" placeholder="2026 pricing">
           <span class="hint">Shown on screen. The file name is used when this is blank.</span>
         </label>
-        <label class="field grow">
+        <label class="field">
           <span class="label">Kind</span>
           <input v-model="form.kind" class="input" list="lib-kinds" placeholder="spec · policy · runbook">
           <span class="hint">Your own vocabulary — whatever you sort by.</span>
@@ -183,7 +209,7 @@ const {
 
       <div v-if="error" class="callout crit" role="alert">{{ error }}</div>
 
-      <div class="row">
+      <div class="control-group row">
         <button class="btn" type="submit" :disabled="busy">
           {{ busy ? 'SAVING…' : 'SAVE' }}
         </button>

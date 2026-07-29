@@ -40,6 +40,14 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
   const open = ref(false) // is the form showing at all
   const busy = ref(false)
   const error = ref('')
+  // The path whose REMOVE has been pressed once. `drop` removes on the press it receives —
+  // soft, so the text survives, but the document stops answering immediately — and the row it
+  // sits in is a 40px target on a phone, beside EDIT. So the first press only arms, and the
+  // button says SURE? until it acts. Arming another row moves it; a drop clears it.
+  const armed = ref('')
+  const arm = (path) => {
+    armed.value = path
+  }
 
   // Search across everything a person might remember about a document — its path, what it
   // is called, the other names it goes by, and what it is for. A library is searched by
@@ -170,6 +178,7 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
   async function drop(path) {
     busy.value = true
     error.value = ''
+    armed.value = '' // it is acting now: the armed label must not survive the press
     try {
       const res = await remove(path)
       toast(`${res.path} no longer answers questions`, 'gold')
@@ -189,5 +198,5 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     }
   }
 
-  return { query, shown, kinds, folders, form, editing, open, busy, error, create, edit, cancel, save, drop }
+  return { query, shown, kinds, folders, form, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop }
 }

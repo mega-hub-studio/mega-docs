@@ -79,6 +79,21 @@ export function coverQuestion(doc) {
   return `What does ${docTitle(doc)} cover?`
 }
 
+/**
+ * The whole document on one line, for the `title` of a row that cannot show it all.
+ *
+ * A library row shows the name and the path, both ellipsised, because a row whose height
+ * depends on its content is a list with nine different geometries. The alias and the
+ * description are what the Find field searches — that is their job — so they belong where
+ * they can be read on demand rather than in a third and fourth line on every row.
+ *
+ * @param {{ path?: string, alias?: string, description?: string }} doc
+ * @returns {string} path · alias · description, skipping whatever is not set
+ */
+export function docTip(doc) {
+  return [doc.path, doc.alias, doc.description].filter(Boolean).join(' · ')
+}
+
 /** A file name is not a sentence: "booking-list_v2.md" → "booking list v2". */
 export function docTitle(doc) {
   const name = doc.title || (doc.path || '').split('/').pop() || ''

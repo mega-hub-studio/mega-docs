@@ -80,8 +80,9 @@ func LLMs(siteBase string) ([]byte, error) {
 		"document — imported, or confirmed by a BA as `qa/ticket-N.md` — is a row holding " +
 		"its own text, and the BA WebUI is the only way one enters. `CORPUS_DIR` (default " +
 		"`docs`) is just the folder `ingest` reads when an operator imports from disk. So " +
-		"deleting the database deletes the documents, and there is no backup story by " +
-		"design; removal is a soft delete that stops retrieval and keeps the text.\n")
+		"deleting the database deletes the documents; `scripts/backup.sh` (nightly, or " +
+		"`make backup`) takes a verified copy off the machine's disk, and removal is a soft " +
+		"delete that stops retrieval and keeps the text.\n")
 	b.WriteString("- A repeated question is answered from a local cache: no provider " +
 		"call, no cost. Any ingest invalidates the whole cache, so a cached answer " +
 		"never outlives the sources it cites.\n")

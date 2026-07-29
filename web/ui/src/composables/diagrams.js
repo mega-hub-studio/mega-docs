@@ -16,7 +16,8 @@ import * as diagram from '../lib/diagram.js'
 /**
  * @param {{ zoom: import("vue").Ref<HTMLDialogElement>, zoomBody: import("vue").Ref<Element> }} refs
  * @returns {{ ready: import("vue").Ref<boolean>, loadFor: (text: string) => void,
- *   drawn: (e: Event) => void, open: (e: Event) => void, close: () => void }}
+ *   drawn: (e: Event) => void, stepped: (e: Event) => void, open: (e: Event) => void,
+ *   close: () => void }}
  */
 export function useDiagrams({ zoom, zoomBody }) {
   const ready = ref(false)
@@ -37,6 +38,14 @@ export function useDiagrams({ zoom, zoomBody }) {
     diagram.onRender(e.target)
   }
 
+  /**
+   * A walkthrough advanced. Same reason this is here rather than on each walkthrough: the
+   * element arrives inside v-html, so one listener on the answer catches every one of them.
+   */
+  function stepped(e) {
+    diagram.onStep(e)
+  }
+
   function open(e) {
     if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')
       return
@@ -53,5 +62,5 @@ export function useDiagrams({ zoom, zoomBody }) {
     zoomBody.value?.replaceChildren() // a 1000-node SVG is not worth keeping around
   }
 
-  return { ready, loadFor, drawn, open, close }
+  return { ready, loadFor, drawn, stepped, open, close }
 }

@@ -180,9 +180,89 @@ function asDiagrams(html) {
       continue
     const el = document.createElement('nes-mermaid')
     el.textContent = code.textContent
-    code.parentElement.replaceWith(el)
+    const pre = code.parentElement
+    const walk = walkAfter(pre)
+    pre.replaceWith(el)
+    if (walk)
+      walk.attach(el)
   }
   return tpl.innerHTML
+}
+
+/* ── the walk: a diagram that explains itself, one node at a time ───────────────
+   A picture shows the shape and says nothing about what any box means, so the prompt
+   asks for the explanation as a numbered list under the diagram — one item per node,
+   opening with that node's label in bold. This turns that list into
+   <nes-walkthrough>, which is prev/next + arrow keys + progress dots, and which calls
+   `highlight(focus)` on whatever `for` names.
+
+   Nothing here highlights anything: <nes-mermaid> ships `highlight()` and re-applies
+   the focus after every draw, so the only work is naming the node. That is the whole
+   reason this is short — the same reason the guide's five diagrams are twenty lines in
+   docsbase.html rather than a component each.
+
+   It is a *fold*, not an addition: the list becomes the stepper and the original is
+   removed, or the same prose would sit on the page twice. So it happens only when the
+   diagram really became a drawing — while the renderer is still loading the fence stays
+   a fence, and its list has to stay with it or the answer loses the explanation and
+   keeps nothing that shows it. */
+let nWalks = 0
+
+/**
+ * Read the walk that belongs to a diagram, without touching the document yet.
+ *
+ * Two passes, because the decision comes before the mutation: a list where one item has
+ * no bold lead is not a node walk — a model listing something else entirely — and half a
+ * fold would leave the answer holding a stepper with a hole in it.
+ *
+ * @param {Element} pre the diagram's own <pre>
+ * @returns {{ attach: (host: Element) => void } | null} null when there is no walk to make
+ */
+function walkAfter(pre) {
+  const ol = pre.nextElementSibling
+  if (ol?.tagName !== 'OL')
+    return null
+  const steps = []
+  for (const li of ol.children) {
+    if (li.tagName !== 'LI')
+      continue
+    const copy = li.cloneNode(true)
+    const lead = copy.querySelector(':scope > strong')
+    const label = lead?.textContent?.trim()
+    if (!label)
+      return null
+    lead.remove()
+    steps.push({
+      title: label,
+      // What the library matches against the text of every .node / .cluster it drew.
+      focus: [label],
+      // Already sanitized — this is a slice of the DOMPurify output above, and the
+      // component sets it with innerHTML.
+      body: copy.innerHTML.replace(/^\s*(?:[—–:-]\s*)?/, ''),
+    })
+  }
+  // One step is not a walk: both buttons would be disabled and the dots would be a dot.
+  if (steps.length < 2)
+    return null
+
+  return { attach: host => fold(host, ol, steps) }
+}
+
+function fold(host, ol, steps) {
+  host.id = `nes-walk-${++nWalks}`
+  // Only a diagram with a walk under it gets the height cap — see styles.css.
+  host.dataset.walk = '1'
+  const wt = document.createElement('nes-walkthrough')
+  wt.setAttribute('for', host.id)
+  const json = document.createElement('script')
+  json.type = 'application/json'
+  // `<script>` is a raw-text element, so the serializer does not escape what is inside
+  // it: a "</script" anywhere in this JSON would end the block early and spill the rest
+  // as markup. DOMPurify cannot leave one behind (it escapes text and drops scripts),
+  // and this closes the class rather than relying on that.
+  json.textContent = JSON.stringify(steps).replaceAll('<', '\\u003c')
+  wt.append(json)
+  ol.replaceWith(wt)
 }
 
 function cite(n, href) {

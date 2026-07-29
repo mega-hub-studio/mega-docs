@@ -52,8 +52,8 @@ make ingest DOCS=./docs
 ```
 
 > `knowledge.db` **is** the corpus, not a rebuildable index — a document written in the
-> app exists nowhere else, and there is no backup by decision. Copy it yourself before
-> anything risky: `sqlite3 knowledge.db ".backup copy.db"` with the service stopped.
+> app exists nowhere else. `make backup` takes a verified copy off this machine's disk, and
+> a systemd timer runs the same script nightly (Deploy page). Run it before anything risky.
 
 Ship it as a single binary instead — the binary *is* the web server, so there is no
 frontend to deploy separately:
@@ -88,7 +88,7 @@ is a backlog item to find and start.
 | BA verbs: Upload · CRUD · Preview · Version · Publish · Archive · Reindex | **full CRUD ships** — `LibraryPanel.vue` writes a document by hand, edits one, renames or moves it, and removes it behind the library's `.perm` confirmation, with title · alias · kind · description on each. Reindex is implicit: a save re-embeds. Preview · Version · Publish · Archive: not built, and each needs one sentence saying what it means first | 🟡 **partial** |
 | Response Format: Answer · Visual Components · References · Related Documents · Suggested Actions | the first three ship — `rag.Reply{Citations,…}`, and `lib/answer.js` renders tables, task lists and diagrams from NES recipes. The last two are **not being built on a name**: "Suggested Actions" could be model follow-ups, presets or ticket shortcuts. Trigger: one sentence saying what they contain | ✅ **decided** |
 | Knowledge Model: Document · Sections · Chunks · Embeddings · References · Tags · Categories · Relations · Version | `documents`, `chunks`, embeddings and citations exist. The other five are new *tables*, so they cost no re-ingest whenever they land — which is why there is no hurry and no schema for them yet. Trigger: a BA screen that filters by one | ✅ **decided** |
-| Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. **There is no backup story at all**, by decision, not by omission | ✅ **decided** |
+| Removed: Git sync · Folder watch | both gone — `scripts/corpus-sync.sh` deleted with its `.path` and `.timer` units. What protects the corpus is not a second copy of the documents but one verified snapshot of the database, nightly, off this machine's disk (`scripts/backup.sh`) | ✅ **decided** |
 | Cross-OS self-host (WSL2 · macOS) | one binary, no runtime; the tooling was already portable (`openssl dgst`, not `sha384sum`). Both supervisors are documented on the Deploy page, `make deploy` picks between them from `uname -s`, and CI builds and tests the cgo layer on **both** platforms. The row used to mean the docs only — the deploy itself died on `systemctl` half way through | ✅ **shipped** |
 | Knowledge DB is the source of truth | **shipped.** `documents.body` holds the text and four attribute columns hold what a BA files it under; `internal/rag` touches no disk. `ingest` reads files as an operator client, and `CORPUS_DIR` is only the folder it reads | ✅ **shipped** |
 
@@ -113,14 +113,15 @@ The rows worth reading the reasoning for:
   guide's own advice is that an error code beats a paraphrase. "One pipeline" is already
   true in the sense that matters — one path a question travels, one `Answer`. Invariant 4
   and `TestScopedSearchRanksWithinTheScope` stay with it.
-- **Git sync and folder watch are gone**, and with them the only thing that backed the
-  corpus up. That was raised as a risk and accepted deliberately: the brief removes both,
-  and carrying automation the brief deletes in order to protect a backup the brief does not
-  ask for is the redundancy this cleanup exists to remove. **Nothing replaces it**: the
-  backup story is gone rather than pending, because every document enters through one
-  controlled path (the BA WebUI import) and `Remove` is soft: the chunks go, the row keeps
-  its text with a `deleted_at`.
-  → [`changelog/2026-07-28-drop-corpus-sync.md`](changelog/2026-07-28-drop-corpus-sync.md)
+- **Git sync and folder watch are gone**, and the brief removes both: carrying automation it
+  deletes, in order to keep a second copy of the *documents*, is the redundancy that cleanup
+  existed to remove. What replaced them is one level down and one file wide —
+  `scripts/backup.sh` snapshots `DB_PATH` itself, verifies it, and writes it outside this
+  machine's disk, nightly. That is the reversal of the earlier "no backup" decision, and it
+  reversed because the database stopped being derived: `Remove` being soft protects a
+  document somebody deleted, and nothing protected the file all nine of them live in.
+  → [`changelog/2026-07-29-backup.md`](changelog/2026-07-29-backup.md)
+  · [`drop-corpus-sync`](changelog/2026-07-28-drop-corpus-sync.md)
   · [`scope-decisions`](changelog/2026-07-28-scope-decisions.md)
   · [`vnext-collisions`](changelog/2026-07-28-vnext-collisions.md)
 

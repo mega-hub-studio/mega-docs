@@ -319,8 +319,10 @@ a `TextDecoder` or `visualViewport`.
    Nothing writes to a corpus directory; `internal/rag` touches no disk at all. `ingest`
    still reads files, but as an operator's import client, and `CORPUS_DIR` is only the
    folder it reads.
-   There is deliberately **no backup story**: losing the database loses the corpus. The one
-   net is that `Remove` is soft — the chunks go, so the document stops answering
+   Losing the database loses the corpus, so **one thing protects it**:
+   `scripts/backup.sh` — a `sqlite3 .backup` of `DB_PATH`, integrity-checked before it is
+   published, written outside this machine's disk, nightly by timer or `make backup` by hand.
+   The other net is that `Remove` is soft — the chunks go, so the document stops answering
    immediately, and the row keeps its text with a `deleted_at`. That is `.trash/` as a
    column, recoverable by whoever has the database.
 2. **Reads are open; writes are gated.** `BA_PASS` guards confirming an answer,
@@ -373,9 +375,11 @@ encode it in an existing one (the scope lives inside `answers.q_norm` for exactl
 reason).
 
 **The rebuild is gone as an escape hatch.** `rm knowledge.db && ingest corpus` used to fix
-any schema mistake for the price of one provider bill; there is nothing to rebuild from now,
-so a bad migration is a bad day. That is the cost the inversion bought, and it is why the
-runner is forward-only, one transaction per step, and boring.
+any schema mistake for the price of one provider bill; there is nothing to rebuild *from*
+now. What there is instead is last night's copy — so a bad migration costs the writes since
+it, not the corpus, and `make backup` before one is the whole drill. That is why the runner
+is still forward-only, one transaction per step, and boring: a restore is a recovery, not a
+plan.
 
 ### Traps that have already cost time
 

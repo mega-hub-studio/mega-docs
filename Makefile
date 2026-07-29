@@ -41,7 +41,7 @@ endif
 # GOBIN wins when it is set, or `dead-deps` installs on every run and finds nothing.
 GOBIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
 
-.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy release
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy release backup
 
 deps:
 	go mod tidy
@@ -320,6 +320,13 @@ deploy:
 		|| { echo "  FAILED: $(UNIT) did not answer $(HEALTH) after the restart"; \
 		     $(STATUS); exit 1; }
 	@echo "  deployed: $$(git rev-parse --short HEAD) — $$(curl -s $(HEALTH))"
+
+# One snapshot of DB_PATH, verified, outside this machine's disk. The same script the nightly
+# timer runs (Deploy page), so the hand-run path and the scheduled one cannot drift — and
+# `make backup DEST=…` is what you type before a migration or anything else irreversible.
+# It does not stop the service: read scripts/backup.sh for why that is safe.
+backup:
+	@scripts/backup.sh
 
 # Probe a real provider: does it have both endpoints, what embedding width, does
 # chat stream? Skipped unless AI_API_KEY is set (read from .env).

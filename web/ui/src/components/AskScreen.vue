@@ -6,7 +6,8 @@
      props   turns · corpus · history · queue · diagramsReady
      emit    ask · replay                 nothing asked yet — the empty screen's two doors
      emit    copy · regenerate · askBA    what one answer offers
-     emit    diagramDrawn · zoomDiagram   a diagram inside an answer, drawn or opened
+     emit    diagramDrawn · diagramStepped · zoomDiagram   a diagram inside an answer:
+                                          drawn, walked one step, or opened full screen
 
    The thread itself stays in the shell rather than moving in here with the markup, and
    that is the whole reason this file is props-and-events instead of a composable: an
@@ -25,7 +26,7 @@ defineProps({
   diagramsReady: Boolean,
 })
 
-defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBA', 'diagramDrawn', 'zoomDiagram'])
+defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBA', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 </script>
 
 <template>
@@ -41,6 +42,7 @@ defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBA', 'diagramDrawn', 'zo
       :turn="turn" :diagrams-ready="diagramsReady"
       @copy="$emit('copy', $event)" @regenerate="$emit('regenerate', $event)"
       @ask-ba="$emit('askBA', $event)" @diagram-drawn="$emit('diagramDrawn', $event)"
+      @diagram-stepped="$emit('diagramStepped', $event)"
       @zoom-diagram="$emit('zoomDiagram', $event)"
     />
   </main>

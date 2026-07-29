@@ -396,16 +396,17 @@ done: 8/8 files, 74 chunks</span></div>
         and a document written or edited in the BA screen exists nowhere else. So
         <code>rm knowledge.db &amp;&amp; ./bin/ingest docs</code>, which used to be a safe
         repair costing one provider bill, now destroys everything that did not arrive as a
-        file. There is <b>no backup</b>, by decision. If you need a copy before touching
-        anything, take one: <code>sqlite3 knowledge.db ".backup copy.db"</code> with the
-        service stopped.</span>
+        file. A nightly copy lands outside this machine's disk — <a href="#backup">Back up the
+        database</a> below — and <code>make backup</code> takes one right now, which is what to
+        run before anything irreversible.</span>
       <b lang="vi">Đừng bao giờ xoá <code>knowledge.db</code>. Nó là corpus, không phải index.</b>
       <span lang="vi">Tài liệu giờ nằm trong database — cả phần chữ, không chỉ embedding — và
         một tài liệu được viết hay sửa trong màn hình BA thì không tồn tại ở đâu khác. Nên
         <code>rm knowledge.db &amp;&amp; ./bin/ingest docs</code>, thứ từng là cách sửa an toàn
-        chỉ tốn một lần trả tiền provider, giờ phá sạch mọi thứ không vào bằng file. <b>Không
-        có backup</b>, đây là quyết định. Nếu cần bản sao trước khi làm gì, hãy tự lấy:
-        <code>sqlite3 knowledge.db ".backup copy.db"</code> khi service đã dừng.</span>
+        chỉ tốn một lần trả tiền provider, giờ phá sạch mọi thứ không vào bằng file. Mỗi đêm có
+        một bản sao nằm ngoài ổ đĩa của máy này — xem <a href="#backup">Backup database</a> ở
+        dưới — và <code>make backup</code> lấy một bản ngay lúc này, đó là thứ nên chạy trước
+        mọi việc không thể hoàn lại.</span>
     </div>
 
     <p lang="en">What a schema change needs: nothing. The server carries a forward-only
@@ -528,8 +529,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>PORT</code></th><td><code>8080</code></td><td>chỉ khi 8080 đã bị chiếm — tunnel và reverse proxy đều trỏ vào đây</td></tr>
           <tr lang="en"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>the name in the browser's password box. Only matters with <code>AUTH_PASS</code> set — one shared login, not per-person accounts</td></tr>
           <tr lang="vi"><th><code>AUTH_USER</code></th><td><code>team</code></td><td>tên hiện trong hộp mật khẩu của browser. Chỉ có tác dụng khi đã set <code>AUTH_PASS</code> — một tài khoản dùng chung, không phải mỗi người một tài khoản</td></tr>
-          <tr lang="en"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>where the corpus lives.</b> Not an index — the documents themselves. Losing this file loses the knowledge base, and there is no backup by decision, so put it on a disk you trust</td></tr>
-          <tr lang="vi"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>nơi corpus nằm.</b> Không phải index — là chính các tài liệu. Mất file này là mất kho tri thức, và không có backup (đây là quyết định), nên hãy để ở ổ đĩa bạn tin được</td></tr>
+          <tr lang="en"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>where the corpus lives.</b> Not an index — the documents themselves. Losing this file loses the knowledge base, so put it on a disk you trust and let the nightly timer copy it off (<a href="#backup">below</a>). It is also the path <code>make backup</code> reads, so the two cannot disagree</td></tr>
+          <tr lang="vi"><th><code>DB_PATH</code></th><td><code>knowledge.db</code></td><td><b>nơi corpus nằm.</b> Không phải index — là chính các tài liệu. Mất file này là mất kho tri thức, nên hãy để ở ổ đĩa bạn tin được và để timer hằng đêm sao nó ra ngoài (<a href="#backup">bên dưới</a>). Đây cũng là đường dẫn <code>make backup</code> đọc, nên hai chỗ không thể lệch nhau</td></tr>
           <tr lang="en"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>any OpenAI-compatible provider — the URL up to and including <code>/v1</code></td></tr>
           <tr lang="vi"><th><code>AI_BASE_URL</code></th><td>OpenAI</td><td>bất kỳ provider tương thích OpenAI — URL tính tới cả <code>/v1</code></td></tr>
           <tr lang="en"><th><code>AI_API_KEY</code></th><td>empty</td><td>required. Keep it in <code>.env</code> (mode 600), never on a command line — a shared terminal keeps history</td></tr>
@@ -788,6 +789,126 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
         việc đó. Đến lúc cần, vẫn là đúng dòng lệnh này trong timer
         <code>systemd</code> hoặc một dòng cron, không đổi gì thêm.</span>
     </div>
+  </section>
+
+  <!-- ══ back up the database ═══════════════════════════════════════════════ -->
+  <!-- No data-feature, like the service section above it: this is an operator procedure, not
+       a feature of the binary. The server reads no variable for it and serves no route, so
+       there is nothing for spec.json to join — and adding a knob to internal/config for a
+       path only a shell script reads is rule 20 exactly. -->
+  <section id="backup">
+    <h2 lang="en">Back up the database</h2>
+    <h2 lang="vi">Backup database</h2>
+    <p class="lede" lang="en">One file holds every document, so one file is the whole backup.
+      This takes a verified copy of it — outside this machine's disk, while the service keeps
+      answering.</p>
+    <p class="lede" lang="vi">Một file chứa toàn bộ tài liệu, nên backup cũng chỉ là một file.
+      Lệnh này lấy một bản sao đã được kiểm tra — để ra ngoài ổ đĩa của máy này, trong lúc
+      service vẫn trả lời bình thường.</p>
+
+    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; make backup</span><span class="out">  backed up state/knowledge.db → /mnt/c/Users/Public/knowledge-backups/knowledge-2026-07-29.db (6.9M), keeping 7</span></div>
+
+    <p lang="en">It reads <code>DB_PATH</code> out of <code>.env</code> — the same line the
+      server reads, so a backup cannot verify a file nothing serves. Two things are
+      overridable and neither is a setting the binary knows about:
+      <code>make backup DEST=/mnt/d/backups KEEP=14</code>. The default <code>DEST</code> is
+      <code>/mnt/c/Users/Public/knowledge-backups</code>, and that is the point of the whole
+      section — on WSL2 the Linux filesystem <i>is</i> a <code>.vhdx</code> file inside
+      Windows, so a copy beside the database shares its single point of failure. On macOS
+      there is no <code>/mnt/c</code> and the script says so instead of inventing a
+      directory.</p>
+    <p lang="vi">Nó đọc <code>DB_PATH</code> từ <code>.env</code> — đúng dòng mà server đọc, nên
+      backup không thể đi kiểm tra một file không ai phục vụ. Có hai thứ đổi được và cả hai đều
+      không phải setting của binary: <code>make backup DEST=/mnt/d/backups KEEP=14</code>.
+      Mặc định <code>DEST</code> là <code>/mnt/c/Users/Public/knowledge-backups</code>, và đó là
+      toàn bộ lý do của phần này — trên WSL2 thì filesystem Linux <i>chính là</i> một file
+      <code>.vhdx</code> nằm trong Windows, nên bản sao đặt cạnh database dùng chung đúng một
+      điểm chết với nó. Trên macOS không có <code>/mnt/c</code> và script sẽ nói vậy chứ không
+      tự tạo thư mục.</p>
+
+    <div class="callout memo">
+      <b lang="en">Why not <code>cp</code>.</b>
+      <span lang="en">With WAL on, the file on disk is missing whatever is still in
+        <code>knowledge.db-wal</code>, so a <code>cp</code> taken under load opens cleanly and
+        is quietly short of the last writes. <code>sqlite3 .backup</code> is SQLite's online
+        backup API: a consistent snapshot with the server still running, which is why nothing
+        here stops the unit. The copy is then checked with
+        <code>PRAGMA integrity_check</code> <i>before</i> it is published under today's name —
+        a truncated file at <code>DEST</code> is worse than none, because it reads like
+        one.</span>
+      <b lang="vi">Vì sao không dùng <code>cp</code>.</b>
+      <span lang="vi">Khi WAL đang bật, file trên đĩa còn thiếu phần nằm trong
+        <code>knowledge.db-wal</code>, nên <code>cp</code> lấy lúc đang chạy vẫn mở được nhưng
+        thiếu những lượt ghi cuối — im lặng. <code>sqlite3 .backup</code> là online backup API
+        của SQLite: một snapshot nhất quán trong khi server vẫn chạy, và đó là lý do không cần
+        dừng service. Bản sao sau đó được kiểm tra bằng
+        <code>PRAGMA integrity_check</code> <i>trước khi</i> được đặt vào tên của ngày hôm nay —
+        một file bị cắt dở ở <code>DEST</code> còn tệ hơn là không có, vì nó trông y như
+        thật.</span>
+    </div>
+
+    <h3 lang="en">Nightly, so nobody has to remember</h3>
+    <h3 lang="vi">Chạy hằng đêm, để không ai phải nhớ</h3>
+    <p lang="en">Two units beside the service one. Same script as
+      <code>make backup</code>, so the scheduled path and the hand-run path cannot drift.</p>
+    <p lang="vi">Hai unit nằm cạnh unit của service. Cùng một script với
+      <code>make backup</code>, nên đường chạy theo lịch và đường chạy bằng tay không thể lệch
+      nhau.</p>
+
+    <div class="terminal"><span class="out"># /etc/systemd/system/knowledge-backup.service
+[Unit]
+Description=Knowledge Engine backup
+
+[Service]
+Type=oneshot
+User=knowledge
+WorkingDirectory=/opt/knowledge
+ExecStart=/opt/knowledge/scripts/backup.sh
+
+<span class="ok"># none of the service unit's confinement: this one has to write to a
+# Windows path outside /opt/knowledge, and ProtectSystem=strict would refuse it</span>
+
+# /etc/systemd/system/knowledge-backup.timer
+[Unit]
+Description=Nightly Knowledge Engine backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target</span></div>
+
+    <div class="terminal"><span class="cmd">sudo systemctl enable --now knowledge-backup.timer</span><span class="cmd">systemctl list-timers knowledge-backup</span><span class="out"># when it last ran and when it runs next</span><span class="cmd">journalctl -u knowledge-backup -n 20</span></div>
+
+    <div class="callout gotcha">
+      <b lang="en"><code>Persistent=true</code> is the line that makes this work on WSL.</b>
+      <span lang="en">The distro only runs while Windows keeps it running, so a machine that
+        was off at midnight never sees <code>OnCalendar=daily</code> fire — the timer simply
+        misses, silently, for as long as the pattern is missed. <code>Persistent=true</code>
+        runs the missed one on the next start instead. Without it, this is a backup that works
+        on a server and quietly does nothing on the laptop it was written for.</span>
+      <b lang="vi"><code>Persistent=true</code> là dòng làm nó chạy được trên WSL.</b>
+      <span lang="vi">Distro chỉ chạy khi Windows còn cho nó chạy, nên máy tắt lúc nửa đêm sẽ
+        không bao giờ thấy <code>OnCalendar=daily</code> nổ — timer chỉ đơn giản là trượt, im
+        lặng, trượt bao lâu cũng được. <code>Persistent=true</code> chạy lượt bị trượt vào lần
+        khởi động kế tiếp. Không có nó thì đây là cái backup chạy tốt trên server và im lặng
+        không làm gì trên đúng cái laptop nó được viết cho.</span>
+    </div>
+
+    <h3 lang="en">Restoring</h3>
+    <h3 lang="vi">Phục hồi</h3>
+    <p lang="en">The backup is a plain database, not an archive — nothing compresses it, so
+      restoring is a copy back and a restart. Stop the service first: this is the one
+      operation that must not race the writer.</p>
+    <p lang="vi">Bản backup là một database bình thường, không phải file nén — không có gì nén
+      nó, nên phục hồi là copy trả lại rồi restart. Dừng service trước: đây là thao tác duy
+      nhất không được phép chạy đua với tiến trình đang ghi.</p>
+    <div class="terminal"><span class="cmd">sudo systemctl stop knowledge</span><span class="cmd">cd /opt/knowledge &amp;&amp; rm -f state/knowledge.db-wal state/knowledge.db-shm</span><span class="out"># a stale WAL belongs to the database you are replacing</span><span class="cmd">cp /mnt/c/Users/Public/knowledge-backups/knowledge-2026-07-29.db state/knowledge.db</span><span class="cmd">sudo systemctl start knowledge &amp;&amp; curl -s localhost:8080/api/health</span></div>
+    <p lang="en">Read the copy before trusting it, which costs one command and no downtime:
+      <code>sqlite3 &lt;file&gt; "select count(*) from documents"</code>.</p>
+    <p lang="vi">Hãy đọc bản sao trước khi tin nó, chỉ một lệnh và không phải dừng gì:
+      <code>sqlite3 &lt;file&gt; "select count(*) from documents"</code>.</p>
   </section>
 
   <p class="separator"></p>

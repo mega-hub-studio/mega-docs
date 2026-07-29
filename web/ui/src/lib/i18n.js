@@ -79,6 +79,12 @@ export const messages = {
     // so the keys are the prefixes themselves rather than invented names — a translator sees
     // the same word the commit used. `other` is the bucket for a subject that followed no
     // convention, which is kept rather than dropped.
+    //
+    // This block is the *complete* set of kinds the app knows, and the order it groups them
+    // in — composables/release.js reads its keys rather than keeping a second list. The
+    // generator accepts any `word:` prefix a commit happens to carry (`init:`, `wip:`), so a
+    // prefix absent here lands under `other`; adding a label here is what promotes one to a
+    // group of its own.
     release: {
       label: 'Version {v} — what changed',
       title: 'What changed',
@@ -98,7 +104,9 @@ export const messages = {
         style: 'Style',
         test: 'Tests',
         build: 'Build',
+        ci: 'CI',
         chore: 'Chores',
+        revert: 'Reverts',
         other: 'Other',
       },
     },
@@ -153,7 +161,9 @@ export const messages = {
         style: 'Trình bày',
         test: 'Kiểm thử',
         build: 'Build',
+        ci: 'CI',
         chore: 'Việc lặt vặt',
+        revert: 'Hoàn tác',
         other: 'Khác',
       },
     },

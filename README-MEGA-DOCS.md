@@ -5,8 +5,8 @@
 > from here, read **Now vs vNext** in [`README.md`](README.md) — it marks each line
 > shipped, next, or blocked-and-on-what. Two do not simply await work: hybrid retrieval
 > **stays** and PDF/DOCX is **out of scope** — both settled decisions against this brief. The
-> source-of-truth inversion is no longer blocked: the migration runner shipped and the backup
-> precondition was dropped. The reasoning is in [`changelog/`](changelog/); re-deriving it
+> source-of-truth inversion is no longer blocked: the migration runner shipped, and the backup
+> precondition was dropped and then met anyway. The reasoning is in [`changelog/`](changelog/); re-deriving it
 > costs a day and lands on the wrong answer.
 >
 > Keep this file a statement of intent. A claim about what the code does today goes in

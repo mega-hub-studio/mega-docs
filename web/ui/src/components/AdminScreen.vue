@@ -29,16 +29,8 @@ defineProps({
   history: { type: Array, default: () => [] }, // answers still free to replay
 })
 
-const {
-  unlocked,
-  passInput,
-  unlocking,
-  unlockError,
-  absent,
-  grouped,
-  fetchSettings,
-  unlock,
-} = useAdmin({ toast })
+const { unlocked, passInput, unlocking, unlockError, absent, grouped, fetchSettings, unlock }
+  = useAdmin({ toast })
 
 // A stored password from an earlier tab load means the list can be fetched without asking
 // again — and the same call is what discovers an instance with no admin surface at all.
@@ -50,9 +42,9 @@ onMounted(fetchSettings)
     <!-- No ADMIN_PASS on this instance. Not a locked door — there is no password that
          would open it, so offering a form would be inviting a retry that cannot work. -->
     <div v-if="absent" class="callout gotcha" role="alert">
-      <b>This instance has no admin screen.</b> Set <code>ADMIN_PASS</code> in
-      <code>.env</code> and restart. Until then the route is not registered, the same way an
-      unset <code>BA_PASS</code> removes the write surface instead of opening it.
+      <b>This instance has no admin screen.</b> Set <code>ADMIN_PASS</code> in <code>.env</code> and
+      restart. Until then the route is not registered, the same way an unset
+      <code>BA_PASS</code> removes the write surface instead of opening it.
     </div>
 
     <form v-else-if="!unlocked" class="card" data-accent="purple" @submit.prevent="unlock">
@@ -60,17 +52,20 @@ onMounted(fetchSettings)
       <label class="field">
         <span class="label">Admin password</span>
         <input
-          v-model="passInput" class="input" type="password"
-          autocomplete="current-password" placeholder="ADMIN_PASS"
+          v-model="passInput"
+          class="input"
+          type="password"
+          autocomplete="current-password"
+          placeholder="ADMIN_PASS"
         >
         <span class="hint">
-          Its own password, not the BA one: this screen reports which secrets exist.
-          Kept for this tab only.
+          Its own password, not the BA one: this screen reports which secrets exist. Kept for this
+          tab only.
         </span>
       </label>
       <div v-if="unlockError" class="callout crit" role="alert">{{ unlockError }}</div>
       <button class="btn" type="submit" :disabled="unlocking">
-        {{ unlocking ? 'CHECKING…' : 'UNLOCK' }}
+        {{ unlocking ? "CHECKING…" : "UNLOCK" }}
       </button>
     </form>
 
@@ -81,15 +76,17 @@ onMounted(fetchSettings)
              row. EMBED_DIM is the one that costs more than a restart. -->
         <div class="callout memo">
           <b>Everything here is read at startup.</b> Changing one means editing
-          <code>.env</code> and restarting. <code>EMBED_DIM</code> costs more than that —
-          a different width means re-embedding the whole corpus.
+          <code>.env</code> and restarting. <code>EMBED_DIM</code> costs more than that — a
+          different width means re-embedding the whole corpus.
         </div>
 
         <section v-for="g in grouped" :key="g.name">
           <h2 class="eyebrow">{{ g.name }}</h2>
           <dl class="datalist">
             <template v-for="s in g.rows" :key="s.name">
-              <dt><code>{{ s.name }}</code></dt>
+              <dt>
+                <code>{{ s.name }}</code>
+              </dt>
               <dd>
                 <span :class="s.secret ? 'badge clear' : 'val'">{{ s.value }}</span>
                 <!-- The column this screen exists for. `.env` and the shell are
@@ -106,18 +103,23 @@ onMounted(fetchSettings)
       <section data-label="Runtime">
         <div class="stats">
           <div class="stat" data-accent="blue">
-            <div class="n">{{ corpus.docs }}</div><div class="l">Documents</div>
+            <div class="n">{{ corpus.docs }}</div>
+            <div class="l">Documents</div>
           </div>
           <div class="stat" data-accent="blue">
-            <div class="n">{{ corpus.chunks }}</div><div class="l">Sections</div>
+            <div class="n">{{ corpus.chunks }}</div>
+            <div class="l">Sections</div>
           </div>
           <div class="stat" data-accent="good">
-            <div class="n">{{ corpus.approved }}</div><div class="l">BA-confirmed</div>
+            <div class="n">{{ corpus.approved }}</div>
+            <div class="l">BA-confirmed</div>
           </div>
         </div>
         <dl class="datalist">
-          <dt>Chat model</dt><dd>{{ runtime.model }}</dd>
-          <dt>Context window</dt><dd>{{ runtime.window }} tokens</dd>
+          <dt>Chat model</dt>
+          <dd>{{ runtime.model }}</dd>
+          <dt>Context window</dt>
+          <dd>{{ runtime.window }} tokens</dd>
           <dt>Price in / out</dt>
           <dd>{{ runtime.priceIn }} / {{ runtime.priceOut }} per 1M tokens</dd>
           <!-- Which commit is serving this page, so "is the deploy live?" is answered by
@@ -132,38 +134,45 @@ onMounted(fetchSettings)
                startup line. -->
           <dt>Revision</dt>
           <dd>
-            <template v-if="runtime.version"><code>@{{ runtime.version }}</code></template>
+            <template v-if="runtime.version">
+              <code>@{{ runtime.version }}</code>
+            </template>
             <span v-else class="badge todo">no vcs stamp</span>
           </dd>
           <dt>Server</dt>
           <dd>
             <span class="badge" :class="online ? 'good' : 'crit'">
-              {{ online ? 'reachable' : 'unreachable' }}</span>
+              {{ online ? "reachable" : "unreachable" }}</span>
           </dd>
           <dt>Writes</dt>
           <dd>
             <span class="badge" :class="writes ? 'good' : 'todo'">
-              {{ writes ? 'BA can publish' : 'read-only' }}</span>
+              {{ writes ? "BA can publish" : "read-only" }}</span>
           </dd>
         </dl>
       </section>
 
       <section data-label="Usage">
         <p>
-          What has been asked and is still free to replay — usage of the corpus, not of
-          people. An instance with no accounts cannot report the second and should not
-          pretend to.
+          What has been asked and is still free to replay — usage of the corpus, not of people. An
+          instance with no accounts cannot report the second and should not pretend to.
         </p>
         <div v-if="history.length" class="table-wrap">
           <table class="table">
             <thead>
-              <tr><th>Question</th><th>Hits</th><th>Scope</th></tr>
+              <tr>
+                <th>Question</th>
+                <th>Hits</th>
+                <th>Scope</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="h in history" :key="h.question + h.scope">
                 <td>{{ h.question }}</td>
                 <td>{{ h.hits }}</td>
-                <td><code>{{ h.scope || 'whole corpus' }}</code></td>
+                <td>
+                  <code>{{ h.scope || "whole corpus" }}</code>
+                </td>
               </tr>
             </tbody>
           </table>

@@ -13,13 +13,14 @@
    a composable may not reach for another one's state.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { ref } from 'vue'
+import { messages } from '../lib/i18n.js'
 import { release } from '../lib/release.js'
 
-// The order a reader wants, not the order git produced: what was added, what was repaired,
-// then the rest. A kind absent from this list still renders — it sorts last, in the order it
-// arrived — because a release that hides commits under an unrecognised prefix is exactly the
-// silent omission the generator refuses to make.
-const ORDER = ['feat', 'fix', 'perf', 'refactor', 'docs', 'style', 'test', 'build', 'chore', 'other']
+// The kinds the app knows, in the order a reader wants them: what was added, what was
+// repaired, then the rest. This is the catalogue's own key order rather than a second list —
+// the two disagreed once and the dialog rendered `release.kind.ci` as a heading, because the
+// generator's idea of a Conventional-Commit type is any `word:` prefix a commit carried.
+const ORDER = Object.keys(messages.en.release.kind)
 
 /**
  * @param {{ dialog: import("vue").Ref<HTMLDialogElement | null> }} deps the <dialog> the
@@ -73,15 +74,16 @@ export function useRelease({ dialog }) {
 function group(notes) {
   const byKind = new Map()
   for (const n of notes) {
-    const kind = n.kind || 'other'
+    // A prefix with no label joins `other` rather than becoming a group nothing can name:
+    // every kind reaching the component is one the catalogue translates, so the heading is a
+    // word in the reader's language and never a key path. The note itself is untouched — its
+    // scope and subject still render, which is what the generator refuses to drop.
+    const kind = ORDER.includes(n.kind) ? n.kind : 'other'
     if (!byKind.has(kind))
       byKind.set(kind, [])
     byKind.get(kind).push(n)
   }
-  // Known kinds in ORDER, then anything unrecognised in arrival order — `indexOf` returning
-  // -1 for both sides of a comparison leaves them where they were.
-  const rank = k => (ORDER.includes(k) ? ORDER.indexOf(k) : ORDER.length)
   return [...byKind.entries()]
     .map(([kind, list]) => ({ kind, notes: list }))
-    .sort((a, b) => rank(a.kind) - rank(b.kind))
+    .sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind))
 }
