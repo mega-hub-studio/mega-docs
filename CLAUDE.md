@@ -183,6 +183,8 @@ make check-wt              # optional: drives every diagram walkthrough (prev/ne
 make ui                    # build the app's front end (Vite) into web/dist — commit the output
 make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
+make deploy                # ON THE HOST: pull --ff-only → stale-bundle check → build → restart
+#                            → health. Never a rebase, never a push; UNIT/PORT override it
 make server                # run on :8080
 make ingest DOCS=./docs    # index a folder (.md / .txt only)
 
