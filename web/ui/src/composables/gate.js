@@ -56,10 +56,10 @@ export function useGate({ toast }) {
       unlocked.value = false
       if (prefix)
         unlockError.value = prefix + e.message
-      toast(`<b>Locked.</b> ${e.message}`, { accent: 'crit' })
+      toast(e.message, { title: 'Locked', accent: 'crit' })
     }
     else {
-      toast(`<b>${e.message}</b>`, { accent: 'crit' })
+      toast(e.message, { accent: 'crit' })
     }
   }
 

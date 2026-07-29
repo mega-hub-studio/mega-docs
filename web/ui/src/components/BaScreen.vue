@@ -83,8 +83,9 @@ const importRefused = e => gate.fail(e, 'The server refused the password: ')
          "nothing waiting" case, so this only shows when there is work. -->
     <div v-if="queue.tickets.length" class="callout memo">
       <b>A DEV files what the documents couldn't answer.</b> Your answer becomes a document
-      in <code>docs/qa/</code>, indexed and cited by name — so the next person who asks
-      gets it, with a source.
+      in <code>qa/</code>, indexed and cited by name — so the next person who asks
+      gets it, with a source. Publishing is reversible: correct it, take it back to a
+      draft, or remove it, from the ticket itself.
     </div>
 
     <!-- The password is the permission. Reads are open; confirming an answer into the

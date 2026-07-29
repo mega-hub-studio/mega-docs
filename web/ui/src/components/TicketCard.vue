@@ -77,7 +77,7 @@ const isArmed = action => props.armed === `${props.ticket.id}:${action}`
           @input="$emit('update:draft', $event.target.value)"
         />
         <span class="hint">
-          Confirming writes <code>docs/qa/ticket-{{ ticket.id }}.md</code>, indexes it, and
+          Confirming writes <code>qa/ticket-{{ ticket.id }}.md</code>, indexes it, and
           cites it by name. Dismissing uses this box as the reason.
         </span>
       </label>

@@ -99,6 +99,16 @@ var retiredClaims = []struct{ phrase, why string }{
 	// sizes the copy"), which is the drift rule 26 exists for.
 	{"pinned in JS because an SVG", "<nes-zoom> owns the sizing now; nothing in this app pins a width"},
 	{"set bằng JS vì SVG có viewBox", "<nes-zoom> owns the sizing now"},
+	// `confirmed` was terminal — every transition refused it and no route deleted a ticket —
+	// so both pages taught that publishing was the end of the line. It is four verbs now
+	// (correct · back to draft · dismiss · delete), and a reader told the answer is beyond
+	// reach is a reader who leaves a wrong one in the corpus.
+	{"Nobody — it is a document now", "a BA can correct, retract, dismiss or delete a confirmed answer"},
+	{"Không ai — giờ nó là tài liệu", "a BA can correct, retract, dismiss or delete a confirmed answer"},
+	// The confirmed answer's path lost its `docs/` prefix when the corpus directory stopped
+	// existing: rag.QADir is "qa", so `docs/qa/…` is an address nothing resolves — printed on
+	// two guide pages and inside the app's own ticket form.
+	{"docs/qa/", "the path is qa/ticket-N.md; there is no docs/ prefix and no corpus directory"},
 }
 
 // TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the

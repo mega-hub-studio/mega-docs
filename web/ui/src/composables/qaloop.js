@@ -46,13 +46,14 @@ export function useQaLoop({ toast }) {
     try {
       const ticket = await qa.file(turn.q, turn.error || turn.a)
       turn.ticket = ticket
-      toast(`<b>Ticket #${ticket.id}.</b> A BA will answer this, and the answer joins the documents.`, {
+      toast('A BA will answer this, and the answer joins the documents.', {
+        title: `Ticket #${ticket.id}`,
         accent: 'good',
       })
       refresh()
     }
     catch (e) {
-      toast(`<b>Couldn't file it.</b> ${e.message}`, { accent: 'crit' })
+      toast(e.message, { title: 'Couldn\'t file it', accent: 'crit' })
     }
   }
 

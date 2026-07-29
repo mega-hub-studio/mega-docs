@@ -60,7 +60,7 @@ export function useAdmin({ toast }) {
         unlockError.value = e.message
         return
       }
-      toast(`<b>${e.message}</b>`, { accent: 'crit' })
+      toast(e.message, { accent: 'crit' })
     }
   }
 

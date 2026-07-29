@@ -457,6 +457,53 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
 .dock nes-chat-prompt { display: block; max-inline-size: var(--col); margin-inline: auto; }
+.dock-body { display: contents; }
+
+/* ── the handle that puts the dock away ──
+   Measured on a 390×844 phone: the scope line, the prompt and the status line together are
+   about a fifth of the screen, and `main` reserves all of it as bottom padding because
+   `--dock-h` is the dock's real height. That is the right behaviour and the wrong trade while
+   somebody is reading a long answer with a table in it — so the dock collapses to this, and
+   `viewport.js` measures the smaller box and hands the space back with no number in either
+   file.
+
+   Right-aligned and label-plus-chevron rather than a bare icon: a lone chevron floating over
+   an answer reads as decoration, and the two words say which way it goes. It keeps the 44px
+   touch height the rest of the app's controls have — the whole point is a target that is easy
+   to hit, on the control a reader uses when the screen is already too small.
+
+   It is not a `.btn`: next to the prompt's Send this would read as a second action of equal
+   weight, and it is chrome. Same reasoning as the version badge in the status line, and the
+   same treatment — the affordance is the border and the pointer, not a filled control.
+
+   Centred, and `fit-content` is what makes that possible: `.dock` is a block box, so a
+   full-width child cannot be pushed to either side by a margin. Centre is also the honest
+   answer — the prompt below it is a centred column, so an edge-aligned handle would line up
+   with the viewport on a wide screen and with the prompt on a narrow one, which is two
+   different layouts wearing one rule. */
+.dock-handle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  inline-size: fit-content;
+  margin-inline: auto;
+  margin-block-end: var(--sp-2);
+  min-block-size: 2.75rem;
+  padding-inline: var(--sp-3);
+  appearance: none;
+  color: var(--muted);
+  background: var(--panel);
+  border: var(--bw-2) solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-label);
+  text-transform: uppercase; letter-spacing: var(--ls-chrome);
+  cursor: pointer;
+}
+.dock-handle:hover,
+.dock-handle:focus-visible { color: var(--primary); border-color: var(--primary); }
+
+/* Collapsed, the gradient is fading into nothing — it would paint a band of --screen across
+   the answer for no reason, which is the space this was supposed to give back. The handle
+   brings its own panel fill, and that is what keeps it readable over whatever it sits on. */
+.dock[data-collapsed] { background: none; padding-block-start: 0; }
+.dock[data-collapsed] .dock-handle { margin-block-end: 0; }
 
 /* The scope picker: a closed row above the prompt naming the folder answers come
    from, opening into the corpus tree.
@@ -485,7 +532,7 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 /* On a phone the sentence is what costs a second row; the badge already names the
    folder, and with no scope the count is the whole message. */
 .scopepick .scope-note { display: none; }
-.scopepick:not(:has(.badge)) .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
+.scopepick:not(:has(.badge)) .scope-note { display: inline; font-size: var(--fs-chip); }
 /* The status line sits inside the dock, under the prompt, so viewport.js keeps
    measuring one height and the conversation still clears everything fixed. The
    strip, its light and its items are all .statusline — this only undoes the dock's
@@ -589,6 +636,35 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 .diagram-zoom > .head { flex: none; }
 .diagram-zoom > nes-zoom { flex: 1; min-block-size: 0; }
 
+/* ── inside the viewer, .mermaid-view is a stage, not a frame ──
+   `.mermaid-view` is the library's diagram *frame*: a bordered, padded, filled panel, which
+   is exactly right in an answer where a drawing sits among paragraphs. In the viewer the
+   drawing is the entire screen, and the frame costs two things it should not:
+
+   1. **The drag fights itself.** The frame is `overflow: auto` — a scroll container — and it
+      is nested inside `.zoom-view`, which sets `touch-action: none` precisely so it can own
+      the drag. So one gesture had two handlers: the panner translating the stage while the
+      element inside it scrolled its own overflow. That is the whole of "the pan is not
+      smooth" — not easing, two things moving at once.
+   2. **A third concentric border.** The dialog draws one, `.zoom-view` draws one, and this
+      drew a third, all in `--line-hi`, with a second `--panel` fill over the first and
+      `--sp-4` of padding shrinking the drawing inside the box the reader opened to make it
+      bigger.
+
+   Scoped to the viewer, so the in-answer diagram keeps the frame it is written for. */
+.diagram-zoom .mermaid-view {
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* On a phone the dialog is edge to edge, so the `.modal` border and its accent bar are two
+   lines hugging the screen and one green stripe eating the width — and `.zoom-view` is
+   already drawing the edge of the pannable area just inside them. One frame is enough; the
+   desktop rule below puts the dialog's own border back, where it means "this is a window". */
+.diagram-zoom { border: 0; }
+
 /* ── desktop upgrade ── */
 @media (min-width: 640px) {
   /* Sticky again: a laptop has the vertical budget a phone does not, and a pointer expects
@@ -616,6 +692,11 @@ main.ba .datalist code { overflow-wrap: anywhere; }
     block-size: auto; max-block-size: 90dvh;
     margin: auto;
     padding: var(--sp-5);
+    /* The window edge comes back with the window: off the phone there is a page behind this
+       and the border is what says the dialog is on top of it. Spelled from the `.modal`
+       recipe's own tokens rather than `revert`, which would go to the UA's dialog border. */
+    border: var(--bw) solid var(--line-hi);
+    border-inline-start: var(--accent-bar) solid var(--accent);
   }
 }
 
@@ -667,7 +748,30 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   padding: var(--sp-4);
 }
 .release > .head { flex: none; }
-.release .rel-body { flex: 1; min-block-size: 0; overflow-y: auto; }
+/* `1 1 auto`, and the `auto` is the whole fix: this was `flex: 1`, which is `1 1 0%`, and a
+   zero basis inside a dialog whose own height is `auto` leaves the body contributing nothing
+   to the height it is being sized against. Chrome resolves that from the item's max-content
+   contribution anyway; WebKit does not — so on the phone the dialog rendered as its title bar
+   and nothing else, and the release notes were unreachable on the only device anyone opens
+   them on. With `auto` the base size is the content, `max-block-size` above does the
+   clamping, and `min-block-size: 0` is what still lets it shrink and scroll when it clamps. */
+.release .rel-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
+
+/* ── dialog heads are chrome, not headlines ──
+   `.title` is `--fs-h2` bold — right on a card in the page, where it names a block the reader
+   scrolled to. In a dialog it is the largest type on the screen and it is labelling a box the
+   reader just opened on purpose, so it announces something they already know, louder than the
+   content they came for. The modal's own headings (`.eyebrow`) and its metadata are all in the
+   chrome scale; this puts the title in the same one, so the surface reads as a single object
+   rather than a headline with small print under it.
+   Both dialogs, not just the release one: two modals with two different title sizes is the
+   inconsistency, and fixing one of them would be the other half of it. */
+.release > .head > .title,
+.diagram-zoom > .head > .title {
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-chrome);
+}
 
 /* Tag · date · what it is measured from — one row, mono for the two machine facts. */
 .rel-meta {

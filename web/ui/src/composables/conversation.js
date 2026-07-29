@@ -121,10 +121,10 @@ export function useConversation({ scope, prompt, scroll, toast, onSettled }) {
   async function copy(turn) {
     try {
       await navigator.clipboard.writeText(turn.a)
-      toast('<b>Copied.</b> Answer on the clipboard.', { accent: 'good' })
+      toast('Answer on the clipboard.', { title: 'Copied', accent: 'good' })
     }
     catch {
-      toast('<b>Copy blocked.</b> Select the text instead.', { accent: 'warn' })
+      toast('Select the text instead.', { title: 'Copy blocked', accent: 'warn' })
     }
   }
 

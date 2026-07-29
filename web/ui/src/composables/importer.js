@@ -38,7 +38,7 @@ export function useImporter({ documents, toast, onLocked, onIndexed }) {
     const { ok, rejected } = upload.sort(files)
     dragging.value = false
     if (!ok.length) {
-      toast(`<b>Nothing to import.</b> Only ${upload.ACCEPT} — convert a PDF first.`, { accent: 'warn' })
+      toast(`Only ${upload.ACCEPT} — convert a PDF first.`, { title: 'Nothing to import', accent: 'warn' })
       return
     }
     importing.value = true
@@ -51,13 +51,14 @@ export function useImporter({ documents, toast, onLocked, onIndexed }) {
       r.failed = [...r.failed, ...rejected.map(f => ({ name: f.name, error: `not ${upload.ACCEPT}` }))]
       imported.value = r
       if (r.uploaded.length) {
-        toast(`<b>${r.uploaded.length} document(s) indexed.</b> ${r.chunks} sections — ask about them now.`, {
+        toast(`${r.chunks} sections — ask about them now.`, {
+          title: `${r.uploaded.length} document(s) indexed`,
           accent: 'good',
         })
         onIndexed()
       }
       else {
-        toast('<b>Nothing was indexed.</b> See the list below.', { accent: 'crit' })
+        toast('See the list below.', { title: 'Nothing was indexed', accent: 'crit' })
       }
     }
     catch (e) {
@@ -101,11 +102,15 @@ export function useImporter({ documents, toast, onLocked, onIndexed }) {
     removing.value = path
     try {
       const r = await upload.remove(path)
-      // Name where it went. "Deleted" would be a lie — the file is in the corpus's own
-      // .trash/, which is the difference between a mistake and a loss.
-      toast(r.trash
-        ? `<b>${r.path} removed.</b> The file is in <code>${r.trash}</code> if you need it back.`
-        : `<b>${r.path} removed.</b> Its file was already gone; the index is clean.`, { accent: 'good' })
+      // Say what actually happened, which is not "deleted": the chunks go, so it stops
+      // answering immediately, and the row keeps its text with a removal date. This used to
+      // branch on `r.trash` and name a `.trash/` directory — the server has returned nothing
+      // but `path` since removal became a `deleted_at` column, so the branch was dead and the
+      // sentence it guarded described an architecture two inversions ago.
+      toast('It stops answering now; its text stays in the library.', {
+        title: `${r.path} removed`,
+        accent: 'good',
+      })
       onIndexed()
     }
     catch (e) {

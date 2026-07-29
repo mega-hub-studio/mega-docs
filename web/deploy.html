@@ -219,8 +219,8 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th>Việc</th><th>Làm thế nào</th></tr>
         </thead>
         <tbody>
-          <tr lang="en"><th>Review what BAs published</th><td><code>git diff docs/qa/</code>. Every confirm is one file, so the knowledge base has a review trail without anyone opening the database.</td></tr>
-          <tr lang="vi"><th>Xem BA đã publish gì</th><td><code>git diff docs/qa/</code>. Mỗi lần confirm là một file, nên knowledge base có vết để review mà không cần mở database.</td></tr>
+          <tr lang="en"><th>Review what BAs published</th><td>The <b>BA</b> screen: the queue shows every confirmed ticket with its answer, and the library lists the documents they became under <code>qa/</code>. There is no <code>git diff</code> for this — the documents are rows, so the app is the review surface.</td></tr>
+          <tr lang="vi"><th>Xem BA đã publish gì</th><td>Màn hình <b>BA</b>: hàng đợi hiện mọi ticket đã confirm kèm câu trả lời, còn thư viện liệt kê các tài liệu sinh ra từ đó dưới <code>qa/</code>. Không có <code>git diff</code> cho việc này — tài liệu là các dòng trong database, nên chính app là chỗ để review.</td></tr>
           <tr lang="en"><th>Add / update docs</th><td><code>./bin/ingest &lt;dir&gt;</code> — exits non-zero if anything failed</td></tr>
           <tr lang="vi"><th>Thêm / sửa tài liệu</th><td><code>./bin/ingest &lt;dir&gt;</code> — exit khác 0 nếu có gì lỗi</td></tr>
           <tr lang="en"><th>Update the app</th><td>Pull, build, restart — the four lines under <b>Upgrading</b> below. Browsers revalidate by ETag, so there is no cache to clear.</td></tr>

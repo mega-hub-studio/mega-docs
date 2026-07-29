@@ -24,12 +24,17 @@ import * as qa from '../lib/qa.js'
 
 /* What each transition means, said once, in the words of what just happened rather than the
    verb that did it. A confirm is the only one worth celebrating: it is the moment a gap
-   became part of the documents. */
+   became part of the documents.
+
+   `title` and not `<b>` in the message: `toast(msg)` renders msg as *text* — markup needs
+   `{html: true}`, which every call in this app had quietly skipped, so a toast that meant to
+   emphasise its first three words printed the tag names instead. `title` is the recipe for
+   this exact shape, and it cannot inject the way an interpolated `html: true` could. */
 const TOASTS = {
-  draft: t => `<b>Draft saved.</b> Ticket #${t.id} is not published yet.`,
-  confirm: t => `<b>In the knowledge base.</b> ${t.doc} — the next question retrieves it.`,
-  retract: t => `<b>Taken back out.</b> #${t.id} is a draft again and answers nothing until you confirm it.`,
-  reject: t => `<b>Dismissed #${t.id}.</b> It stays on the list, with your reason.`,
+  draft: t => ['Draft saved', `Ticket #${t.id} is not published yet.`],
+  confirm: t => ['In the knowledge base', `${t.doc} — the next question retrieves it.`],
+  retract: t => ['Taken back out', `#${t.id} is a draft again and answers nothing until you confirm it.`],
+  reject: t => [`Dismissed #${t.id}`, 'It stays on the list, with your reason.'],
 }
 
 /* The destructive pair, and what the button says on the press that arms it. A label is the
@@ -94,7 +99,8 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
       const updated = await qa.act(ticket.id, action, { answer, note: answer })
       drafts[ticket.id] = updated.answer || ''
       editing.value = 0
-      toast(TOASTS[action](updated), { accent: action === 'confirm' ? 'good' : 'warn' })
+      const [title, body] = TOASTS[action](updated)
+      toast(body, { title, accent: action === 'confirm' ? 'good' : 'warn' })
       onMoved(action === 'confirm' ? updated : null)
     }
     catch (e) {
@@ -117,10 +123,10 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
       await qa.drop(ticket.id)
       delete drafts[ticket.id]
       editing.value = 0
-      toast(
-        `<b>Deleted #${ticket.id}.</b> The question is gone; the answer's text stays in the library.`,
-        { accent: 'warn' },
-      )
+      toast('The question is gone; the answer\'s text stays in the library.', {
+        title: `Deleted #${ticket.id}`,
+        accent: 'warn',
+      })
       onMoved(null)
     }
     catch (e) {

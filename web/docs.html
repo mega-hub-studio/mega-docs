@@ -250,10 +250,12 @@
       <li>
         <div class="title" lang="en">4 · Confirm into knowledge</div>
         <div class="title" lang="vi">4 · Confirm into knowledge</div>
-        <p lang="en">The answer is written to <code>docs/qa/ticket-N.md</code> and
-          indexed on the spot. No command, no restart.</p>
-        <p lang="vi">Câu trả lời được ghi ra <code>docs/qa/ticket-N.md</code> và index
-          ngay. Không cần lệnh, không cần restart.</p>
+        <p lang="en">The answer becomes a document at <code>qa/ticket-N.md</code> and is
+          indexed on the spot. No command, no restart. Get it wrong and you can correct it
+          later — publishing is not a one-way door.</p>
+        <p lang="vi">Câu trả lời thành một tài liệu ở <code>qa/ticket-N.md</code> và được
+          index ngay. Không cần lệnh, không cần restart. Lỡ sai thì sửa lại được — publish
+          không phải cánh cửa một chiều.</p>
       </li>
       <li>
         <div class="title" lang="en">5 · the next person gets it</div>
@@ -278,8 +280,8 @@
           <tr lang="vi"><th><span class="badge warn">OPEN</span></th><td>DEV đã báo, chưa ai trả lời.</td><td>BA</td></tr>
           <tr lang="en"><th><span class="badge todo">DRAFT</span></th><td>A BA wrote an answer but hasn't published it. Safe to leave and come back to.</td><td>The same or another BA</td></tr>
           <tr lang="vi"><th><span class="badge todo">DRAFT</span></th><td>BA đã viết câu trả lời nhưng chưa publish. Có thể để đó rồi quay lại.</td><td>Chính BA đó hoặc BA khác</td></tr>
-          <tr lang="en"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>Indexed and retrievable. Retrieval prefers it on a tie, because a person vouched for it.</td><td>Nobody — it is a document now</td></tr>
-          <tr lang="vi"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>Đã index và truy xuất được. Khi điểm bằng nhau, truy xuất ưu tiên nó, vì có người chịu trách nhiệm.</td><td>Không ai — giờ nó là tài liệu</td></tr>
+          <tr lang="en"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>Indexed and retrievable. Retrieval prefers it on a tie, because a person vouched for it.</td><td>A BA, who can correct it, take it back to a draft, or remove it</td></tr>
+          <tr lang="vi"><th><span class="badge clear">IN KNOWLEDGE</span></th><td>Đã index và truy xuất được. Khi điểm bằng nhau, truy xuất ưu tiên nó, vì có người chịu trách nhiệm.</td><td>BA — sửa lại, đưa về nháp, hoặc gỡ đi</td></tr>
           <tr lang="en"><th><span class="badge crit">DISMISSED</span></th><td>Not a documentation gap. The reason stays on the ticket, so the question isn't just swallowed.</td><td>Nobody — ask again if it recurs</td></tr>
           <tr lang="vi"><th><span class="badge crit">DISMISSED</span></th><td>Không phải phần thiếu tài liệu. Lý do vẫn nằm trên ticket, để câu hỏi không bị mất hút.</td><td>Không ai — nếu còn gặp thì hỏi lại</td></tr>
         </tbody>
@@ -302,16 +304,20 @@
     </div>
 
     <div class="callout memo">
-      <b lang="en">Why a confirm writes a file.</b>
-      <span lang="en">A confirmed answer lands in <code>docs/qa/ticket-N.md</code>, not
-        just in the database — so it is reviewable in a diff, it goes in git with the
-        rest of the documents, and re-indexing from scratch reproduces it. The database
-        stays disposable.</span>
-      <b lang="vi">Vì sao confirm lại ghi ra file.</b>
-      <span lang="vi">Câu trả lời đã confirm nằm ở <code>docs/qa/ticket-N.md</code>, chứ
-        không chỉ trong database — nên xem được trong diff, đi vào git cùng các tài liệu
-        khác, và index lại từ đầu vẫn dựng đúng như vậy. Database vẫn là thứ có thể bỏ
-        đi.</span>
+      <b lang="en">A confirmed answer is a document, not a file.</b>
+      <span lang="en">It is stored at <code>qa/ticket-N.md</code>, and that is an
+        <em>address</em> — what a citation prints and what a folder filter matches — not a
+        path on a disk. The knowledge base is the database, so there is no second copy to
+        keep in step and nothing to re-index from. It also means the database is the one
+        thing worth backing up: losing it loses the documents, including every answer a BA
+        wrote.</span>
+      <b lang="vi">Câu trả lời đã confirm là một tài liệu, không phải một file.</b>
+      <span lang="vi">Nó được lưu ở <code>qa/ticket-N.md</code>, và đó là một
+        <em>địa chỉ</em> — thứ mà dẫn nguồn in ra và bộ lọc thư mục khớp vào — chứ không
+        phải đường dẫn trên đĩa. Kho tri thức chính là database, nên không có bản sao thứ
+        hai nào phải giữ cho khớp và cũng không có gì để index lại. Cũng vì thế database là
+        thứ duy nhất đáng backup: mất nó là mất tài liệu, kể cả mọi câu trả lời BA đã
+        viết.</span>
     </div>
   </section>
 

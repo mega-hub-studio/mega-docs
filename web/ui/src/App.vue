@@ -38,6 +38,7 @@ import StatusLine from './components/StatusLine.vue'
 import { useConversation } from './composables/conversation.js'
 import { useCorpus } from './composables/corpus.js'
 import { useDiagrams } from './composables/diagrams.js'
+import { useDock } from './composables/dock.js'
 import { useT } from './composables/lang.js'
 import { useQaLoop } from './composables/qaloop.js'
 import { useRelease } from './composables/release.js'
@@ -59,6 +60,8 @@ const route = useRoute() // which screen: the header, the dock and the props bel
 const { t, lang, langs, setLang } = useT()
 const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
+// The dock gets out of the way on request; `--dock-h` is measured, so main reclaims the room.
+const { collapsed: dockCollapsed, toggle: toggleDock, show: showDock } = useDock()
 const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, stepped, open: openZoom, close: closeZoom }
@@ -202,9 +205,12 @@ function replay(entry) {
       {{ other }}
     </button>
 
+    <!-- The dock comes back first, then the thread clears: `reset` focuses the prompt, and
+         focusing one that is hidden puts the caret somewhere the reader cannot see. Asking
+         for a new question is the one moment the box must be on screen. -->
     <button
       v-if="turns.length && route.name === 'ask'" class="btn ghost icon sm"
-      :aria-label="t('app.newQuestion')" @click="reset"
+      :aria-label="t('app.newQuestion')" @click="showDock(); reset()"
     >
       <nes-icon name="plus" />
     </button>
@@ -297,26 +303,46 @@ function replay(entry) {
   <!-- The prompt belongs to asking. On the BA screen there is nothing to send, so it goes
        away rather than sitting there disabled. v-show, not v-if: the dock element is what
        the keyboard maths bound at mount, and it has to stay the same element. -->
-  <div v-show="route.name === 'ask'" ref="dock" class="dock">
-    <ScopePicker
-      v-if="corpus.documents.length" ref="pick"
-      :documents="corpus.documents" :docs="corpus.docs" :scope="scope"
-      @pick="pickScope" @clear="setScope('')"
-    />
+  <div
+    v-show="route.name === 'ask'" ref="dock" class="dock"
+    :data-collapsed="dockCollapsed || null"
+  >
+    <!-- The handle is outside the hidden part on purpose: the control that puts the dock
+         away is the control that brings it back, in the same place, so there is nothing to
+         hunt for. It is the only thing left on screen when collapsed. -->
+    <button
+      class="dock-handle" type="button" :aria-expanded="!dockCollapsed"
+      :aria-label="dockCollapsed ? 'Show the question box' : 'Hide the question box'"
+      @click="toggleDock"
+    >
+      <nes-icon :name="dockCollapsed ? 'chevronUp' : 'chevronDown'" />
+      <span>{{ dockCollapsed ? 'ASK' : 'HIDE' }}</span>
+    </button>
 
-    <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing textarea,
-         Enter-to-send, and the send/stop button (busy → red ■). The app only listens for
-         nes:submit / nes:stop, so none of that is reimplemented.
-         `busy` reaches it as an attribute via a watcher in useConversation, not :busy. -->
-    <nes-chat-prompt
-      ref="prompt"
-      placeholder="Ask the documents…" aria-label="Question"
-      @nes:submit="ask($event.detail.value)" @nes:stop="stop"
-    />
+    <!-- v-show, not v-if: <nes-chat-prompt> has to stay the same element, because
+         useConversation drives its `busy` attribute through a watcher and an answer keeps
+         streaming while the box that asked for it is out of sight. -->
+    <div v-show="!dockCollapsed" class="dock-body">
+      <ScopePicker
+        v-if="corpus.documents.length" ref="pick"
+        :documents="corpus.documents" :docs="corpus.docs" :scope="scope"
+        @pick="pickScope" @clear="setScope('')"
+      />
 
-    <StatusLine
-      :line="statusLine" :model="runtime.model" :version="runtime.version"
-      :release="runtime.release" @show-release="openRelease"
-    />
+      <!-- <nes-chat-prompt> is the library's prompt element: it owns the growing textarea,
+           Enter-to-send, and the send/stop button (busy → red ■). The app only listens for
+           nes:submit / nes:stop, so none of that is reimplemented.
+           `busy` reaches it as an attribute via a watcher in useConversation, not :busy. -->
+      <nes-chat-prompt
+        ref="prompt"
+        placeholder="Ask the documents…" aria-label="Question"
+        @nes:submit="ask($event.detail.value)" @nes:stop="stop"
+      />
+
+      <StatusLine
+        :line="statusLine" :model="runtime.model" :version="runtime.version"
+        :release="runtime.release" @show-release="openRelease"
+      />
+    </div>
   </div>
 </template>

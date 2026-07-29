@@ -195,7 +195,10 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
         kind: f.kind.trim(),
         description: f.description.trim(),
       })
-      toast(`Saved ${res.path} · ${res.chunks} sections indexed`, 'good')
+      // An options object, not `'good'`: the second argument is destructured, so a bare
+      // string reads no `accent` off it and every toast here landed on the default one —
+      // the `'gold'` below asked for a colour it never got, silently.
+      toast(`${res.chunks} sections indexed.`, { title: `Saved ${res.path}`, accent: 'good' })
       cancel()
       onChanged()
     }
@@ -222,7 +225,10 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     armed.value = '' // it is acting now: the armed label must not survive the press
     try {
       const res = await remove(path)
-      toast(`${res.path} no longer answers questions`, 'gold')
+      toast('Its text stays in the library, with a removal date.', {
+        title: `${res.path} no longer answers`,
+        accent: 'warn',
+      })
       if (editing.value === path)
         cancel()
       onChanged()
