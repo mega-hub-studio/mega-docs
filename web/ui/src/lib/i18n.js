@@ -176,7 +176,7 @@ export const messages = {
       askedBefore: 'Đã hỏi trước đó ({n}) — hỏi lại miễn phí',
       wholeCorpus: 'toàn bộ corpus',
       freeRepeats: 'đã hỏi lại miễn phí {n} lần',
-      withBa: 'Câu hỏi đang chờ BA ({n})',
+      withBa: 'Câu hỏi đã gửi BA ({n})',
     },
     release: {
       label: 'Phiên bản {v} — có gì thay đổi',

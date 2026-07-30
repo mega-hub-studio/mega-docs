@@ -192,6 +192,17 @@ function dressAlerts(html) {
     start.data = start.data.slice(kind[0].length)
     if (!start.data)
       start.remove()
+    // Nothing left, so there is nothing to panel. Two ways a blockquote arrives holding only
+    // its marker, and both shipped an empty bordered box with the real content stranded under
+    // it: the model wrote `> [!NOTE]` and put the prose in a *sibling* block instead of the
+    // quote, and — every alert, every time — the moment mid-stream when the marker has arrived
+    // and its first word has not. Removing the quote rather than keeping an empty one is what
+    // makes the streaming case read right: the panel appears with its first character instead
+    // of flashing as an empty frame first. An alert with no content is not an alert.
+    if (!quote.textContent.trim()) {
+      quote.remove()
+      continue
+    }
     /* A <div>, not the blockquote with a class added: the library styles blockquote as a
        pull-quote — italic, and capped at a reading measure — and .callout does not undo
        either, so a panel left as one rendered at 646px inside a 1207px card, in italics.

@@ -162,7 +162,14 @@ const { query, shown, extra } = useFinder({ documents: () => props.corpus.docume
     <!-- What the team has already sent to a BA, so a gap doesn't get filed twice and the
          person who filed it can see it land. The count is the whole list: "waiting" was
          open + answered, which reads "(0 waiting)" over a list of three the moment they
-         are all confirmed. -->
+         are all confirmed.
+
+         Every status belongs here, `confirmed` most of all — an answered question is the one
+         outcome the person who filed it is waiting to see. Reported as a bug ("why is an
+         IN KNOWLEDGE ticket in the waiting list?") and it was the *label*: `empty.withBa` read
+         "đang chờ BA" in Vietnamese, which promises a queue, while the English says "with a
+         BA", which promises what this is. Do not answer that report by filtering the list —
+         the filter is what the comment above is already arguing against. -->
     <details v-if="queue.tickets.length" class="corpus">
       <summary>
         <span class="eyebrow">

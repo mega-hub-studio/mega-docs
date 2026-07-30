@@ -15,9 +15,21 @@
 // oxlint is otherwise the obvious upgrade (Rust, ~50x faster). Measured against oxlint
 // 1.76.0: its `vue` plugin has no `no-undef-properties`, no `no-undef-components` and no
 // `require-explicit-emits` — the three enforcers of CLAUDE.md rules 11 and 12. A linter
-// that cannot run the gate's reason for existing is not a replacement, and running both
-// would mean two toolchains and two configs for rules this one already covers, on a tree
-// of 28 files where the whole lint takes about two seconds.
+// that cannot run the gate's reason for existing is not a replacement.
+//
+// Re-checked 2026-07-30, and against oxc's own docs rather than against a rule list, which
+// is the stronger evidence because it is upstream saying it: compatibility.html reads "Vue,
+// Svelte, Angular […]: No template linting yet", and the linter guide handles framework
+// files "by linting only their `<script>` blocks". So the gap is not three rules, it is a
+// whole half of the file — 149 of the 161 `vue/*` rules are on here, and none of the ones
+// that read a template have an oxlint equivalent. Running both would leave ESLint doing that
+// work anyway, for two toolchains and two configs.
+//
+// The numbers, so the next reader compares rather than assumes: 46 files / 6009 lines, and
+// the whole lint takes about four seconds warm, seven cold. It was 28 files and two seconds
+// when this paragraph was first written — the tree doubled and so did the cost, which is the
+// half of the argument that will keep moving. Re-measure with
+// `for i in 1 2 3; do time npx eslint . --max-warnings 0; done`.
 //
 // TypeScript stays off: one maintainer, and the type surface here is three API shapes
 // already described in web/spec.json.

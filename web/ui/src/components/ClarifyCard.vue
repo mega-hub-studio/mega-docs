@@ -49,9 +49,20 @@ const picked = event => composeClarify(props.clarify, new FormData(event.target)
           :checked="opt.recommended"
         >
         <span>{{ opt.text }}</span>
-        <!-- Ticked already, so the badge only says why — the fastest path is one tap on
-             ASK THIS, and the reader can still disagree with the pick. -->
-        <span v-if="opt.recommended" class="badge">RECOMMENDED</span>
+        <!-- Ticked already, so this only says why — the fastest path is one tap on ASK THIS,
+             and the reader can still disagree with the pick.
+
+             A star, not the word. `.check` is `inline-flex` with no wrap and the option text is
+             its only shrinkable child, so a 90px uppercase chip took that width out of the
+             sentence it was labelling: on a phone the question broke into a three-word column
+             beside a badge nobody needs to read twice. The icon is ~14px and says the same
+             thing in the space of one character. `role`/`aria-label` because the library
+             renders the svg `aria-hidden` — without them the mark is invisible to a screen
+             reader, and `title` alone is not reliably announced. -->
+        <nes-icon
+          v-if="opt.recommended" name="star"
+          role="img" aria-label="Recommended" title="Recommended"
+        />
       </label>
     </fieldset>
     <button class="btn xs" type="submit">ASK THIS</button>
