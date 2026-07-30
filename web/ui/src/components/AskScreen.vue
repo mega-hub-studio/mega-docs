@@ -27,7 +27,7 @@ defineProps({
 })
 
 // `askBa` — see ChatTurn.vue for why two capitals in a row break a kebab-case listener.
-defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBa', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
+defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBa', 'refine', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 </script>
 
 <template>
@@ -42,7 +42,8 @@ defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBa', 'diagramDrawn', 'di
       v-for="turn in turns" :key="turn.id"
       :turn="turn" :diagrams-ready="diagramsReady"
       @copy="$emit('copy', $event)" @regenerate="$emit('regenerate', $event)"
-      @ask-ba="$emit('askBa', $event)" @diagram-drawn="$emit('diagramDrawn', $event)"
+      @ask-ba="$emit('askBa', $event)" @refine="$emit('refine', $event)"
+      @diagram-drawn="$emit('diagramDrawn', $event)"
       @diagram-stepped="$emit('diagramStepped', $event)"
       @zoom-diagram="$emit('zoomDiagram', $event)"
     />

@@ -51,6 +51,40 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 | 25 | **The version is a git tag; the changelog is generated from `git log`.** `make release V=vX.Y.Z` is the only thing that changes either — never a `VERSION` file, never a hand-edited `web/release.json`, never a `CHANGELOG.md`. No tag means an **empty** version, which removes the badge rather than asserting a stale number | `TestReleaseNotesAreGenerated` (the do-not-edit marker · the tag shape · a sha behind every line) · `TestEveryRouteAndKnobIsSpecified` (`GET /api/release` must earn a documented section) · `TestRootDocsAreTheFourWeKnowAbout` (a root `CHANGELOG.md` is a fifth doc) |
 | 26 | **HARD: the official guide syncs in the same commit, and the claim it replaces is retired.** A behaviour change edits its `<section>`; the superseded passage is **deleted**, never parked beside its replacement, and its dead sentence is added to `retiredClaims` so it cannot return. Stale prose is context an agent loads and believes | `TestGuidePagesCarryNoRetiredClaim` (every published page, both languages) · `TestEverySpecNameExistsInTheCode` · `TestEveryRouteAndKnobIsSpecified` · `TestSpecJSONIsGeneratedFromThePages` · `make check-ui` |
+| 27 | **HARD: a seam belongs to the container, never to the blocks. One `gap`, set once on the parent — no margin per child, and no two stacked blocks touching at 0px.** A design-system recipe spaces only *inside* itself; the space *between* two of them is this repo's job, and no app container may stack blocks without declaring it | `make check-ui` (the guide's `--flow` rule) · the app is `prose only` — measure it in the running product at 390×844, and the probe plus the five pairs it caught are in `changelog/2026-07-30-seams.md` |
+
+Rule 27 is the layout half of rule 17, and it is a rule because the same defect shipped **five
+times** in one card family before anyone measured it. The cause is one fact about the design
+system that is easy to read the wrong way: **a recipe spaces its own parts and nothing else.**
+`.field` puts --sp-2 between a label, its control and its hint. `.card > .head` carries a
+`margin-block-end`. `.sources` and `.feedback` carry a `margin-block-start`. `.callout`, a
+*text* recipe, carries nothing. So a `.card` — **not** a flex container — stacked eight blocks
+whose seams were whatever each one happened to bring, and where that was nothing it was zero:
+a hint against the next field's label, a ticket badge against the actions row, the Find field
+against the document list, that list against the form, a password field against its button.
+
+What the rule forbids is not the 0px, it is the *per-child margin* that produces it. Three
+cards had been fixed one at a time before this, each carrying its own copy of
+`display: flex; flex-direction: column; gap: …` — so the fix was written three times and the
+fourth card still had the bug, which is rule 17's drift on schedule. It is one declaration now
+(`main .card` in `web/ui/src/styles.css`), and a card names **only its own value**: --sp-3 for
+a queue that is scanned, --sp-5 for a form that is typed into.
+
+Two consequences, both got wrong at least once:
+
+1. **Give the recipe's own margin back.** A surviving `margin-block-start` lands *on top of*
+   the gap, so that one seam measures half again as much as every other seam in the same card
+   — which reads as "the head is detached" and gets fixed by nudging something unrelated.
+2. **0px is sometimes the recipe.** `.stat`'s number and its label, `.result`'s title and its
+   path: two lines of one thing, not two blocks. The rule is about blocks a reader parses
+   separately, and the probe's output is where to tell them apart — whatever is left in it
+   after a fix must be a library recipe's internals, or the fix is not finished.
+
+`prose only` is honest rather than convenient. `make check-ui` measures the *guide* — that is
+where `--flow` and its 31 touching pairs come from — and measuring the app needs a running
+server, a real answer and a browser, which is a rig for one thing and rule 21 refuses it. What
+replaces it is the probe in that changelog entry: twenty lines pasted into `pinchtab eval`,
+printing every adjacent pair under 3px. Run it on both screens after touching layout.
 
 Rule 26 is the enforcer rule 24 was missing. "No stale doc" was already written down, and
 this repo still published a page telling operators that `rm knowledge.db` was safe — three

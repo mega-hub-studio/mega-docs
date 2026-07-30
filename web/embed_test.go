@@ -111,6 +111,12 @@ var retiredClaims = []struct{ phrase, why string }{
 	// reach is a reader who leaves a wrong one in the corpus.
 	{"Nobody — it is a document now", "a BA can correct, retract, dismiss or delete a confirmed answer"},
 	{"Không ai — giờ nó là tài liệu", "a BA can correct, retract, dismiss or delete a confirmed answer"},
+	// An ambiguous question used to be answered *both* ways in one reply, and the guide taught
+	// that as the feature. It is a choice now — tickable readings, the likeliest pre-ticked, and
+	// nothing written under them until one is picked — so a page still promising both answers
+	// tells a reader to read past the one thing they are being asked to do.
+	{"gets both readings, each with", "the readings are tickable options now; nothing is answered until one is picked"},
+	{"sẽ nhận cả hai cách hiểu", "the readings are tickable options now; nothing is answered until one is picked"},
 	// The confirmed answer's path lost its `docs/` prefix when the corpus directory stopped
 	// existing: rag.QADir is "qa", so `docs/qa/…` is an address nothing resolves — printed on
 	// two guide pages and inside the app's own ticket form.

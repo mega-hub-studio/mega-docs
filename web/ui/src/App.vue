@@ -242,6 +242,7 @@ function replay(entry) {
       :turns="turns" :corpus="corpus" :history="history" :queue="queue"
       :diagrams-ready="diagramsReady"
       @ask="ask" @replay="replay" @copy="copy" @regenerate="regenerate" @ask-ba="askBa"
+      @refine="ask"
       @diagram-drawn="drawn" @diagram-stepped="stepped" @zoom-diagram="openZoom"
     />
     <component

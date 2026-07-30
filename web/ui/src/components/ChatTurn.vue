@@ -9,8 +9,10 @@
    diagram arrives inside v-html, so Vue never sees it as a component, and `nes:render`
    and `nes:step` are the library's own events and bubble to here.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { fileName, section, turnHtml } from '../lib/answer.js'
+import { computed } from 'vue'
+import { fileName, section, turnClarify, turnHtml } from '../lib/answer.js'
 import { STATUS } from '../lib/qa.js'
+import ClarifyCard from './ClarifyCard.vue'
 
 const props = defineProps({
   turn: { type: Object, required: true },
@@ -23,13 +25,19 @@ const props = defineProps({
 // `@ask-ba` looks for `onAskBa` while `emit("askBA")` resolves `onAskBA` — two capitals in a
 // row are the one shape that does not round-trip, and the mismatch is silent. The button did
 // nothing, in every build, with no warning outside dev mode.
-defineEmits(['copy', 'regenerate', 'askBa', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
+defineEmits(['copy', 'regenerate', 'askBa', 'refine', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 
 const srcId = n => `s${props.turn.id}-${n}`
 
 // What may appear in the answer mid-stream is a rendering rule, so it lives in
 // lib/answer.js with the rest of them. This says only "render this turn".
 const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
+
+// A computed, unlike `html` above, and not to save the work: it has to be the *same object*
+// until this turn changes. A fresh one on every parent render — asking a new question is one —
+// re-applies :checked on the card's boxes, so a reader part-way through picking would have
+// their ticks reset by somebody else's answer arriving below.
+const clarify = computed(() => turnClarify(props.turn))
 </script>
 
 <template>
@@ -73,6 +81,12 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
         @keydown="$emit('zoomDiagram', $event)"
         v-html="html()"
       />
+
+      <!-- Above the sources rather than below them, because a [!QUESTION] card *is* the reply:
+           its prose is empty, and the citations underneath are the evidence behind each
+           reading. A reader who has to answer something should not have to scroll past a
+           source list to find out what. -->
+      <ClarifyCard v-if="clarify" :clarify="clarify" @refine="$emit('refine', $event)" />
 
       <!-- official grounded-answer recipe: .sources rows that the inline .cite markers
            in the prose above link down to. Both halves show a leaf and keep the whole
@@ -127,7 +141,7 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
       >
         <span class="badge" :class="STATUS[turn.ticket.status].badge">
           {{ STATUS[turn.ticket.status].label }}</span>
-        <b>#{{ turn.ticket.id }}</b> — {{ STATUS[turn.ticket.status].hint }}
+        <b style="margin-left: 5px;">#{{ turn.ticket.id }}</b> — {{ STATUS[turn.ticket.status].hint }}
         <template v-if="turn.ticket.status === 'confirmed'">
           <code>{{ turn.ticket.doc }}</code> — ask again to see it cited.
         </template>

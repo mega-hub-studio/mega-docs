@@ -243,15 +243,20 @@
 
     <div class="callout tip">
       <b lang="en">Unclear beats confidently wrong.</b>
-      <span lang="en">A question the documents cover two ways gets both readings, each with
-        its own citation, and a question of which one you meant. A question with nothing to
-        hold onto — <code>?</code>, <code>...</code> — is asked back using words this corpus
-        actually contains, rather than answered with "not in the documents".</span>
+      <span lang="en">A question the documents cover two ways is answered with the choice
+        rather than with one of them: the readings arrive as tickable options, each citing the
+        section behind it, and the likeliest one ticked already — so agreeing costs one tap.
+        Tick two to ask about both. Nothing else is written until you pick. A question with
+        nothing to hold onto — <code>?</code>, <code>...</code> — is asked back using words
+        this corpus actually contains, rather than answered with "not in the
+        documents".</span>
       <b lang="vi">Hỏi lại tốt hơn trả lời sai một cách tự tin.</b>
-      <span lang="vi">Câu hỏi mà tài liệu bao phủ theo hai cách sẽ nhận cả hai cách hiểu, mỗi
-        cách kèm trích dẫn riêng, và một câu hỏi bạn muốn cách nào. Câu hỏi không có gì để
-        bám — <code>?</code>, <code>...</code> — được hỏi lại bằng chính từ ngữ corpus này
-        có, thay vì bị trả lời "không có trong tài liệu".</span>
+      <span lang="vi">Câu hỏi mà tài liệu bao phủ theo hai cách sẽ được trả lời bằng chỗ để
+        chọn, chứ không phải bằng một trong hai: các cách hiểu hiện ra thành những ô tick, mỗi
+        ô kèm dẫn nguồn của nó, và cách khả năng cao nhất đã được tick sẵn — nên đồng ý chỉ tốn
+        một lần bấm. Tick hai ô để hỏi cả hai. Chưa chọn thì chưa có gì được viết thêm. Câu hỏi
+        không có gì để bám — <code>?</code>, <code>...</code> — được hỏi lại bằng chính từ ngữ
+        corpus này có, thay vì bị trả lời "không có trong tài liệu".</span>
     </div>
   </section>
 
@@ -406,6 +411,12 @@
           <tr lang="vi"><th>Đặt câu hỏi</th><td>Câu trả lời stream về từng chữ, chỉ dựng từ các đoạn đã index.</td></tr>
           <tr lang="en"><th>Follow a citation</th><td>Every <code>[1]</code> is a link down to the file it came from. This is the quality check.</td></tr>
           <tr lang="vi"><th>Mở dẫn nguồn</th><td>Mỗi <code>[1]</code> là link xuống đúng file gốc. Đây chính là chỗ để kiểm chất lượng.</td></tr>
+          <tr lang="en"><th>Pick which question you meant</th><td>When the documents cover your question two ways, the reply is the choice rather than a guess: each reading is a tickable option carrying its own citation, and the likeliest is ticked already — so the fast path is one tap on <b>ASK THIS</b>. Tick two to ask about both. Nothing is answered until you pick, because a confident wrong answer costs more than one extra turn.</td></tr>
+          <tr lang="vi"><th>Chọn đúng ý bạn muốn hỏi</th><td>Khi tài liệu bao phủ câu hỏi của bạn theo hai cách, câu trả lời là chỗ để chọn chứ không phải một phỏng đoán: mỗi cách hiểu là một ô tick kèm dẫn nguồn riêng, và cách khả năng cao nhất được tick sẵn — nên đường nhanh nhất là một lần bấm <b>ASK THIS</b>. Tick hai ô để hỏi cả hai. Chưa chọn thì chưa có câu trả lời nào, vì trả lời sai một cách tự tin đắt hơn một lượt hỏi thêm.</td></tr>
+          <tr lang="en"><th>Spot a caveat before acting on it</th><td>Something that has to be true first, a part of the question the documents don't cover, or two sources that disagree gets its own coloured panel instead of a sentence in the middle of a paragraph. Yellow is the part that is missing; red is the disagreement, with both sources cited.</td></tr>
+          <tr lang="vi"><th>Thấy cảnh báo trước khi làm theo</th><td>Điều kiện phải đúng trước, phần câu hỏi mà tài liệu không bao phủ, hoặc hai nguồn nói khác nhau sẽ có panel màu riêng thay vì một câu nằm lẫn giữa đoạn văn. Vàng là phần còn thiếu; đỏ là chỗ xung đột, kèm dẫn nguồn cả hai.</td></tr>
+          <tr lang="en"><th>Dig deeper without typing</th><td>A finished answer ends with two or three narrower questions the same sections can already answer — tick and send. Nothing is ticked for you: these are offers, not a recommendation. An answer that is a single fact gets none, and neither does one the documents couldn't answer.</td></tr>
+          <tr lang="vi"><th>Đào sâu mà không cần gõ</th><td>Câu trả lời hoàn chỉnh kết thúc bằng hai hoặc ba câu hỏi hẹp hơn mà chính những đoạn đó đã trả lời được — tick rồi gửi. Không ô nào được tick sẵn: đây là gợi ý, không phải khuyến nghị. Câu trả lời chỉ có một dữ kiện thì không có, câu mà tài liệu không trả lời được cũng không.</td></tr>
           <tr lang="en"><th>Find a document</th><td>The empty screen lists every indexed document, ranked by how many retrievable sections it has, with a field that filters by title or folder. Tapping one asks what it covers — so the first tap is about your corpus, not about the engine.</td></tr>
           <tr lang="vi"><th>Tìm một tài liệu</th><td>Màn hình trống liệt kê mọi tài liệu đã index, xếp theo số mục truy xuất được, kèm ô lọc theo tên hoặc thư mục. Bấm một dòng là hỏi tài liệu đó nói về gì — nên lần bấm đầu tiên là về corpus của bạn, không phải về engine.</td></tr>
           <tr lang="en"><th>Stop a long answer</th><td>The send button becomes ■ while generating. Stopping keeps what already arrived.</td></tr>

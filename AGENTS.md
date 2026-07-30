@@ -76,6 +76,14 @@ it, so trust the table.
 1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
+
+   The sharpest edge of that split, and rule 27 in [`CLAUDE.md`](CLAUDE.md): **a recipe
+   spaces its own parts and nothing else.** `.field` spaces its label, control and hint;
+   `.card > .head`, `.sources` and `.feedback` each carry one margin; `.callout` carries
+   none — and `.card` is not a flex container. So the space *between* two recipes is
+   always this repo's, it belongs to the container as one `gap`, and a per-child margin is
+   how five pairs of blocks ended up touching at 0px on a phone. Add a container, declare
+   its `gap`; never a margin on the child, and never nothing.
 2. **Every local override of the design system is named, and there are two kinds.** All of
    them are in `web/ui/src/styles.css`, against **8bit-nes 0.14.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a

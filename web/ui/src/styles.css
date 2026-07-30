@@ -142,6 +142,37 @@ main {
 }
 .turn + .turn { margin-block-start: var(--sp-6); }
 
+/* ── every card is a column with a gap, and that is the only place a seam is set ──
+   `.card` is **not** a flex container, and the library spaces only *inside* its own recipes:
+   `.card > .head` brings a `margin-block-end`, `.sources` and `.feedback` a
+   `margin-block-start`, `.field` a `gap` between its own three parts, and `.callout` brings
+   nothing at all. So the seam between any two blocks in a card was whatever the block above
+   happened to carry — and where that was nothing, it was **0px**. Measured at 390×844, five
+   pairs touching with no space between them:
+
+     .feedback → .callout        the ticket badge against the actions row: reported from a
+                                 phone as `OPEN #2` sitting on the copy button's box
+     .prose → form.callout       the clarify card against the answer it belongs to
+     .field → .lib-rows          the library's Find field against the document list
+     .lib-rows → .doc-form       that list against the form below it
+     .field → .btn               the unlock form's password field against its button
+
+   Three cards had already been fixed one at a time (`.ticket`, `.drop`, `.doc-form`), each
+   with its own copy of the same three declarations — which is rule 17's drift arriving on
+   schedule, and the reason this is central now rather than a fourth copy. A card declares
+   **only its own value**: a queue of tickets reads tighter than a form somebody types into.
+
+   The two lines under it are the other half of the rule: a recipe's own margin has to be
+   given back, or it lands *on top of* the gap and that one seam measures half again as much
+   as every other seam in the same card (--sp-4 + --sp-3 = 28px against 16px, which is what
+   made the head look detached in `.ticket` before this).
+
+   `main` scopes it because a card on a screen is what this is about; the dialogs carry
+   `.modal`/`.drawer` and size themselves. See rule 27 in CLAUDE.md. */
+main .card { display: flex; flex-direction: column; gap: var(--sp-4); }
+main .card > .head { margin-block-end: 0; }
+.a > .sources, .a > .feedback { margin-block-start: 0; }
+
 /* The question. No message-bubble recipe exists, so this is the one piece of
    app-owned styling — a gold classifier bar mirroring .card's accent bar.
 
@@ -175,13 +206,28 @@ main {
 
 .a .head { justify-content: space-between; }
 
+/* The clarify card is a `.callout` used as a form, and a callout is a *text* recipe — it has
+   no rhythm of its own, so its option group and its ASK THIS button touched. `align-items`
+   keeps the button at its own width (70px, measured): a stretched flex child would have made
+   the one action in the card as wide as the question, which reads as the card's primary
+   surface rather than as the answer to it. Both kinds are the same shape, so this names the
+   element rather than `.info`/`.quest`. */
+.a > form.callout {
+  display: flex; flex-direction: column; align-items: start;
+  gap: var(--sp-3);
+}
+
 /* Text keeps a reading measure while the shell does not, which is what makes --col: 80rem
    safe — widening it without this buys a wide table at the price of 160-character prose.
    Inside `.prose` that split is the library's since 0.8.0 (`--prose-measure` on the
-   children, and the constructs whose content *is* width opting out). These three are the
-   text this app renders *outside* `.prose`, so they borrow the same token. */
+   children, and the constructs whose content *is* width opting out). These four are the
+   text this app renders *outside* `.prose`, so they borrow the same token — the clarify card
+   most visibly, because it sits directly under the prose it belongs to: left uncapped it came
+   out at 1207px against 646px of answer above it, which read as a different column rather
+   than the next thing to do. */
 .q,
 .sources,
+.clarify,
 main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
@@ -293,6 +339,11 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    that file as a declaration — so this line is load-bearing. Width comes from the stretch
    rule above. */
 .corpus summary { cursor: pointer; }
+/* A `<details>` is the other container with no rhythm of its own: what it reveals opened
+   flush against the label that revealed it, so the list read as part of the summary line
+   rather than as its answer. One rule, either payload — the document list or the callout
+   that replaces it when there is nothing to remove. */
+.corpus > summary + * { margin-block-start: var(--sp-3); }
 
 /* ── BA mode: the queue ──
    Layout only. Every block inside is a library recipe (.steps, .stat, .card,
@@ -307,7 +358,8 @@ main.ba {
   display: grid; gap: var(--sp-3);
   grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
 }
-.ticket { display: flex; flex-direction: column; gap: var(--sp-3); }
+/* Tighter than the default: a queue is scanned, and a ticket's four blocks are one thought. */
+.ticket { gap: var(--sp-3); }
 .ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
 /* Fills the card on a phone, measured on a desktop: what gets typed here becomes a
    document, and drafting a paragraph across the full 80rem is the same long-line problem
@@ -316,17 +368,6 @@ main.ba {
 /* The three actions wrap instead of shrinking: a 44px target that has been
    squeezed to 30px is worse than one on the next line. */
 .ticket .control-group { flex-wrap: wrap; }
-
-/* ── one rhythm, one left edge ──
-   .ticket and .drop are the two flex-column cards, so `gap` is the only thing allowed to
-   space their blocks — the same "absolute vertical evenness is one property, set once, on
-   the parent" the .empty panel above already learned. The library's `.card > .head` carries
-   margin-block-end: --sp-3 because a plain .card is *not* a flex container; in these two it
-   lands on top of the gap, so the seam under the head measured --sp-6 and every other seam
-   in the same card measured --sp-3. Not the unlock form (`.card` with no flex) — it needs
-   the library's margin, which is why this names the two cards instead of `main.ba .card`. */
-.ticket > .head,
-.drop > .head { margin-block-end: 0; }
 
 /* .q is a chat bubble on the ASK screen: its gold bar says "this turn is the user's" in a
    thread, and it brings its own margin. Inside a ticket neither is true — there is one
@@ -348,17 +389,19 @@ main.ba {
 
    The paragraph is a bare `.hint`, and the library defines that as `.field > .hint` — so
    outside a field it arrives at body weight, which is the same trap the document list hit.
-   The two properties it was reaching for are spelled out here. */
+   The two properties it was reaching for are spelled out here, for both places the card
+   explains a destructive button with one: this drawer, and the dismissed card's DELETE. */
 .ticket-undo {
   border-block-start: var(--bw-2) solid var(--line);
   padding-block-start: var(--sp-3);
 }
 .ticket-undo > summary { color: var(--muted); }
 .ticket-undo .control-group { flex-wrap: wrap; margin-block-start: var(--sp-3); }
-.ticket-undo > .hint {
-  display: block; margin-block-start: var(--sp-3);
-  font-size: var(--fs-chip); color: var(--muted);
-}
+.ticket-undo > .hint,
+.ticket > .hint { font-size: var(--fs-chip); color: var(--muted); }
+/* Only the drawer needs the margin: it is not a flex container, so nothing else spaces it.
+   On the card itself the gap does (see "every card is a column with a gap"). */
+.ticket-undo > .hint { display: block; margin-block-start: var(--sp-3); }
 
 /* ── BA mode: the import card ──
    The card, the badge and the datalist are library recipes. Two things are not,
@@ -368,10 +411,7 @@ main.ba {
        exact moment the user is asking whether it works
    The <label> wraps a hidden <input type=file>, so the library's own .btn is the
    picker and no button styling is duplicated here. */
-.drop {
-  display: flex; flex-direction: column; gap: var(--sp-3);
-  border-style: dashed;
-}
+.drop { gap: var(--sp-3); border-style: dashed; }
 .drop[data-over="true"] { border-style: solid; border-color: var(--primary); }
 /* The progress block: .spinner and .pbar are the library's; this only stacks them
    and puts the spinner on the same line as its sentence. Not the library's .row —
@@ -437,21 +477,14 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 .lib-acts { display: flex; gap: var(--sp-2); }
 
 /* ── the form's rhythm ──
-   Seven fields and a textarea stacked at **0px**, and the cause is the same one `.ticket` and
-   `.drop` above already paid for: `.card` is not a flex container, so nothing spaces its
-   children. The library spaces only *inside* a `.field` (`gap: --sp-2` for label → control →
-   hint) — so one field's hint sat against the next field's label, closer to it than to its own
-   input, and the label read as a caption for the field above it. Eight blocks at one distance
-   is not a form, it is a wall.
+   Wider than the default, and the reason is the `.field` recipe: --sp-2 between a label, its
+   control and its hint. The seam between two *fields* has to outrank that clearly or the
+   grouping inverts — which is exactly what shipped, a hint sitting against the next field's
+   label and reading as its caption.
 
-   One property, set once, on the parent, and --sp-5 rather than --sp-4 because the seam
-   between two fields has to outrank the --sp-2 inside one, or the grouping inverts. The head
-   gives back the margin the library adds for non-flex cards (--sp-3 on top of the gap = a
-   seam half again as wide as every other one), and the two-up rows take the same seam when a
-   pair wraps to one field per line — their inherited row-gap is --sp-3, which is where the
-   pair used to sit closer than the fields around it. */
-.doc-form { display: flex; flex-direction: column; gap: var(--sp-5); }
-.doc-form > .head { margin-block-end: 0; }
+   The two-up rows take the same seam when a pair wraps to one field per line: their inherited
+   row-gap is --sp-3, which is where the pair used to sit closer than the fields around it. */
+.doc-form { gap: var(--sp-5); }
 .doc-form .control-group.row { row-gap: var(--sp-5); }
 
 /* The form's two-up field rows. `.control-group.row` is the library's wrapper for controls

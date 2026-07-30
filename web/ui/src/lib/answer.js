@@ -16,9 +16,9 @@ import { isDiagram } from './diagram.js'
 let configured = false
 
 /**
- * Render one conversation turn. This is `answerHtml` with the two mid-stream rules applied,
- * and it lives here rather than in ChatTurn.vue because both are decisions about what the
- * HTML may contain — which is this file's job — and a component that decides is a branch
+ * Render one conversation turn. This is `answerHtml` with the three mid-stream rules applied,
+ * and it lives here rather than in ChatTurn.vue because all of them are decisions about what
+ * the HTML may contain — which is this file's job — and a component that decides is a branch
  * rule 11 forbids. What they decide:
  *
  *   · no citation links while streaming — the source list only lands at the end, so a "[1]"
@@ -26,6 +26,10 @@ let configured = false
  *   · no diagrams until the renderer has arrived AND the stream has finished — <nes-mermaid>
  *     must never exist before the thing that draws it, and a half-written fence is not a
  *     diagram yet
+ *   · the clarify block stays in the prose while streaming, and only moves out of it once
+ *     the reply is whole. Half a checklist is a set of options with one still missing, and
+ *     `dressAlerts` renders it as a panel in the meantime — so what the reader sees is the
+ *     question forming, then becoming pickable, rather than an empty card
  *
  * @param {{ a: string, streaming?: boolean, citations?: {n: number}[] }} turn
  * @param {boolean} diagramsReady whether the lazy mermaid chunk has loaded
@@ -33,7 +37,7 @@ let configured = false
  */
 export function turnHtml(turn, diagramsReady, srcId) {
   const done = !turn.streaming
-  return answerHtml(turn.a, {
+  return answerHtml(done ? stripClarify(turn.a).rest : turn.a, {
     diagrams: done && diagramsReady,
     // The numbers, not how many: the engine returns only the sources the answer cited and
     // keeps their original n, so [2] can arrive alone.
@@ -69,6 +73,7 @@ function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}) {
   let html = DOMPurify.sanitize(marked.parse(markdown || ''))
   html = dressTables(html)
   html = dressTaskLists(html)
+  html = dressAlerts(html)
   if (nums.length && srcId)
     html = linkCites(html, new Set(nums), srcId)
   return diagrams ? asDiagrams(html) : html
@@ -126,6 +131,167 @@ function dressTaskLists(html) {
     }
   }
   return tpl.innerHTML
+}
+
+/* ── panels: a caveat the reader cannot walk past ───────────────────────────────
+   PICK holds the two markers the clarify card owns, ALERTS the five GFM ones plus those
+   two, and both regexes are built from the same keys — the kind list is one fact.
+
+   The markers are GitHub's alert syntax because that is the argument dressTaskLists makes
+   above, applied to the other half: every model already writes "> [!WARNING]", so the
+   prompt spends one line naming which five kinds mean what instead of describing a
+   structure. marked 18 has no native support for it — "> [!WARNING]" parses as an ordinary
+   <blockquote><p> with the marker as a leading text node — so the marker is stripped here
+   rather than by a renderer override, for dressTables' reason: it has to work on a
+   blockquote that arrived mid-stream.
+
+   QUESTION and NEXT are in ALERTS as the fallback for a clarify block stripClarify could
+   not read. It takes a blockquote and the list under it together, so a marker the model
+   wrote without its checklist would otherwise leak "[!QUESTION]" onto the page as text.
+   Mid-stream that is every one of them, which is where the fallback actually earns its
+   keep: the panel renders as the question is written, and turns into the pickable card
+   when the reply is whole. */
+const PICK = { QUESTION: 'quest', NEXT: 'info' }
+
+/* What the card is called when the model wrote the marker with nothing after it, which
+   `make smoke` caught it doing on the first real answer: "> [!NEXT]" alone on its line, so the
+   group had no name and the fieldset rendered an empty legend. The prompt asks for the label
+   and mostly gets one — this is what happens the rest of the time. */
+const LABEL = { QUESTION: 'Which one do you mean?', NEXT: 'Ask next' }
+const ALERTS = { NOTE: 'info', TIP: 'tip', IMPORTANT: 'memo', WARNING: 'warn', CAUTION: 'gotcha', ...PICK }
+const marker = kinds => new RegExp(`^\\[!(${Object.keys(kinds).join('|')})\\]\\s*`)
+const alertMark = marker(ALERTS)
+const clarifyMark = marker(PICK)
+
+/** The text of a blockquote's opening paragraph — where a marker has to be to count. */
+const lead = quote => (quote.tokens?.[0]?.type === 'paragraph' ? quote.tokens[0].text : '')
+
+/* The next token that is content. A blank line between the marker and its checklist — which
+   is how the block reads, and so how a model writes it — is its own `space` token, and
+   treating "followed by" as `tokens[i + 1]` therefore missed every well-formed block and
+   matched only the cramped ones. */
+function after(tokens, i) {
+  let j = i + 1
+  while (tokens[j]?.type === 'space') j += 1
+  return j
+}
+
+function dressAlerts(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  for (const quote of tpl.content.querySelectorAll('blockquote')) {
+    const first = quote.firstElementChild
+    const start = first?.tagName === 'P' ? first.firstChild : null
+    const kind = start?.nodeType === Node.TEXT_NODE && alertMark.exec(start.data)
+    if (!kind)
+      continue
+    // The marker had the line to itself, so the <br> that `breaks: true` put after it would
+    // open the panel with a blank line.
+    if (start.data === kind[0] && start.nextSibling?.tagName === 'BR')
+      start.nextSibling.remove()
+    start.data = start.data.slice(kind[0].length)
+    if (!start.data)
+      start.remove()
+    /* A <div>, not the blockquote with a class added: the library styles blockquote as a
+       pull-quote — italic, and capped at a reading measure — and .callout does not undo
+       either, so a panel left as one rendered at 646px inside a 1207px card, in italics.
+       This is the markup the guide pages already use for the same recipe, which is the other
+       reason to swap: one appearance for one thing. It also makes the pass idempotent for
+       free — a second run finds a div and no blockquote to match. */
+    const panel = document.createElement('div')
+    panel.className = `callout ${ALERTS[kind[1]]}`
+    panel.append(...quote.childNodes)
+    quote.replaceWith(panel)
+  }
+  return tpl.innerHTML
+}
+
+/**
+ * The pickable block a turn is currently showing, or null.
+ *
+ * `turnHtml`'s companion, and here for its reason: whether the block may be interactive yet is
+ * a rendering rule, so a component asking for it holds no branch of its own. Nothing stores
+ * the result — the block is still in `turn.a`, which is the field that already persists, so a
+ * card the reader has not answered survives a reload without session.js knowing it exists.
+ *
+ * @param {{ a: string, streaming?: boolean }} turn
+ * @returns {Clarify | null}
+ */
+export function turnClarify(turn) {
+  return turn.streaming ? null : stripClarify(turn.a).clarify
+}
+
+/**
+ * @typedef {object} Clarify
+ * @property {string} kind QUESTION when the reply is a question back, NEXT when it is an offer
+ * @property {string} prompt the sentence sharing the marker's line
+ * @property {{ text: string, recommended: boolean }[]} options one per checklist item
+ */
+
+/**
+ * Split a reply into the prose that renders and the pickable block inside it.
+ *
+ * Read with marked's own lexer rather than a scan over the text: the block is GFM this file
+ * already parses, so the parser is what should say what is in it — a regex over "> "-prefixed
+ * lines reimplements blockquote and list parsing, badly, which is the mistake dressTaskLists
+ * argues against one layer up.
+ *
+ * Only a blockquote *immediately followed by* a list counts. That is what lets the two
+ * positions the prompt asks for — [!QUESTION] opening a reply, [!NEXT] closing one — share
+ * one code path, and what stops a [!WARNING] panel that happens to have a list under it from
+ * being mistaken for one.
+ *
+ * @param {string} markdown raw model output
+ * @returns {{ rest: string, clarify: Clarify | null }} rest is the markdown without the block
+ */
+export function stripClarify(markdown) {
+  const tokens = marked.lexer(markdown || '')
+  const at = tokens.findIndex((t, i) =>
+    t.type === 'blockquote' && tokens[after(tokens, i)]?.type === 'list' && clarifyMark.test(lead(t)))
+  if (at < 0)
+    return { rest: markdown, clarify: null }
+  const end = after(tokens, at)
+  const opening = lead(tokens[at])
+  const kind = clarifyMark.exec(opening)[1]
+  return {
+    // A top-level token's `raw` is its own slice of the source, so dropping the block's own
+    // tokens and joining the rest is how the answer around it survives being read. The range
+    // rather than the two ends: the blank line between them is a token too, and leaving it
+    // behind puts a gap where the block used to be.
+    rest: tokens.filter((_, i) => i < at || i > end).map(t => t.raw).join(''),
+    clarify: {
+      kind,
+      prompt: opening.replace(clarifyMark, '').trim() || LABEL[kind],
+      options: tokens[end].items.map(i => ({ text: i.text, recommended: i.checked === true })),
+    },
+  }
+}
+
+/**
+ * The question a submitted pick is worth asking again.
+ *
+ * Empty when nothing was ticked, which needs no handling of its own: `ask()` already returns
+ * on a blank question, so an empty submit is a silent no-op rather than a turn with no
+ * question in it.
+ *
+ * @param {Clarify} clarify the block the card rendered
+ * @param {FormData} form the card's own form — one "reading" entry per ticked option
+ * @returns {string}
+ */
+export function composeClarify(clarify, form) {
+  const picked = form
+    .getAll('reading')
+    // The [n] belongs to the option as *shown*, pointing at the source behind that reading.
+    // Asked back it would be a citation number in a question, which retrieval reads as text.
+    .map(text => text.replaceAll(/\[\d+\]/g, '').trim())
+    .filter(Boolean)
+  if (picked.length === 0)
+    return ''
+  const joined = picked.join(' ; ')
+  // A [!NEXT] item is already a whole question and its prompt is only the heading over them.
+  // A [!QUESTION] item is one reading *of the question that was asked*, so it means nothing
+  // without that question in front of it.
+  return clarify.kind === 'NEXT' ? joined : `${clarify.prompt} ${joined}`
 }
 
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before

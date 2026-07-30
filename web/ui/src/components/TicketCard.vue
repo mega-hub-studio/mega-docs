@@ -179,8 +179,30 @@ const isArmed = action => props.armed === `${props.ticket.id}:${action}`
       <p v-else-if="writes && !unlocked">Unlock above to change this.</p>
     </template>
 
-    <div v-else class="callout memo">
-      <b>Dismissed.</b> {{ ticket.note || "No reason recorded." }}
-    </div>
+    <!-- Dismissed, and the way out of it. The note is the whole record; DELETE is the only
+         verb, because `rejected` is a resting state the store has no transition out of — a
+         question dismissed in error is re-asked, which files a fresh ticket (`ticketByNorm`
+         only dedupes against open and answered ones). Inline rather than behind the confirmed
+         card's disclosure: a drawer holding one button is ceremony, and the two-press arming
+         is what guards the press. -->
+    <template v-else>
+      <div class="callout memo">
+        <b>Dismissed.</b> {{ ticket.note || "No reason recorded." }}
+      </div>
+      <div v-if="unlocked" class="control-group">
+        <button
+          class="btn ghost" type="button" data-accent="crit" :disabled="busy()"
+          :aria-label="isArmed('delete') ? 'Confirm: delete this ticket' : 'Delete this ticket'"
+          @click="isArmed('delete') ? $emit('remove') : $emit('arm', 'delete')"
+        >
+          {{ isArmed('delete') ? ARMED_LABEL.delete : 'DELETE' }}
+        </button>
+      </div>
+      <p v-if="unlocked" class="hint">
+        Clears the question out of the queue. Nothing else is lost — a dismissal published no
+        document, so there is no text to keep.
+      </p>
+      <p v-else-if="writes">Unlock above to clear this.</p>
+    </template>
   </article>
 </template>
