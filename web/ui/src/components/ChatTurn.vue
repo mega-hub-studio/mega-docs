@@ -19,7 +19,11 @@ const props = defineProps({
   diagramsReady: Boolean,
 })
 
-defineEmits(['copy', 'regenerate', 'askBA', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
+// `askBa`, not `askBA`: a template listener is compiled by camelising its kebab name, so
+// `@ask-ba` looks for `onAskBa` while `emit("askBA")` resolves `onAskBA` — two capitals in a
+// row are the one shape that does not round-trip, and the mismatch is silent. The button did
+// nothing, in every build, with no warning outside dev mode.
+defineEmits(['copy', 'regenerate', 'askBa', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 
 const srcId = n => `s${props.turn.id}-${n}`
 
@@ -103,7 +107,7 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
             v-if="!turn.ticket"
             class="btn ghost xs"
             title="Send this question to a BA — their answer joins the documents"
-            @click="$emit('askBA', turn)"
+            @click="$emit('askBa', turn)"
           >
             <nes-icon name="help" /> ASK BA
           </button>

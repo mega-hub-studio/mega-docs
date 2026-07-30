@@ -6,7 +6,7 @@
    out loud:
 
      ask · regenerate · stop · copy · reset          the conversation
-     askBA · baChanged · replay                      the loop that fills the gaps
+     askBa · baChanged · replay                      the loop that fills the gaps
      setScope · pickScope                            which folder answers
 
    Which screen you are on is the router's answer now, not this file's — `/ask` and `/ba`
@@ -65,7 +65,7 @@ const { corpus, refresh: refreshCorpus } = useCorpus()
 // The dock gets out of the way on request; `--dock-h` is measured, so main reclaims the room.
 const { collapsed: dockCollapsed, toggle: toggleDock, show: showDock } = useDock()
 const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
-const { queue, history, file: askBA, refresh: refreshQueue } = useQaLoop({ toast })
+const { queue, history, file: askBa, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, stepped, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
 // The notes are fetched on the first open and kept — they describe the binary that is
@@ -241,7 +241,7 @@ function replay(entry) {
       :is="Component" v-if="route.name === 'ask'"
       :turns="turns" :corpus="corpus" :history="history" :queue="queue"
       :diagrams-ready="diagramsReady"
-      @ask="ask" @replay="replay" @copy="copy" @regenerate="regenerate" @ask-ba="askBA"
+      @ask="ask" @replay="replay" @copy="copy" @regenerate="regenerate" @ask-ba="askBa"
       @diagram-drawn="drawn" @diagram-stepped="stepped" @zoom-diagram="openZoom"
     />
     <component

@@ -99,6 +99,12 @@ var retiredClaims = []struct{ phrase, why string }{
 	// sizes the copy"), which is the drift rule 26 exists for.
 	{"pinned in JS because an SVG", "<nes-zoom> owns the sizing now; nothing in this app pins a width"},
 	{"set bằng JS vì SVG có viewBox", "<nes-zoom> owns the sizing now"},
+	// Fitting the in-answer diagram to the card was the decision above's other half, and it
+	// shipped a 20px strip of 4px labels: a 938×64 flowchart squeezed into 289px. The frame
+	// scrolls a natural-size drawing now, and the width still comes from no number of ours —
+	// mermaid's own inline max-width is the cap (styles.css). The zoom copy is unchanged.
+	{"drawing is fitted so its shape is visible", "the answer draws it at natural size and the frame scrolls; fitted meant 20px of 4px labels"},
+	{"sơ đồ được thu để thấy tổng thể", "the answer draws it at natural size and the frame scrolls"},
 	// `confirmed` was terminal — every transition refused it and no route deleted a ticket —
 	// so both pages taught that publishing was the end of the line. It is four verbs now
 	// (correct · back to draft · dismiss · delete), and a reader told the answer is beyond

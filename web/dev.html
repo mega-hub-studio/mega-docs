@@ -608,9 +608,13 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
       first line instead, and one predicate serves both callers (whether to fetch the
       3.4 MB renderer, and which block to replace) so they cannot disagree. The renderer
       is lazy and integrity-checked; if it never arrives the fence stays, which reads.
-      In the answer the drawing is fitted so its shape is visible, and a tap opens a
-      copy in <code>&lt;nes-zoom&gt;</code>, which owns the panning and the scaling — so
-      nothing in this app sizes it. The copy gets its own id and its mermaid stylesheet
+      In the answer the drawing is left at its natural size and the frame scrolls, because
+      a diagram fitted to a phone is a picture of unreadable text — one whose natural size
+      is 938×64 was squeezed into 289px and drew 20px tall, six labels at about 4px. The
+      width comes from mermaid's own inline <code>max-width</code> rather than from a
+      number in this repo (<code>styles.css</code> says how), and a tap still opens a copy
+      in <code>&lt;nes-zoom&gt;</code>, which owns the panning and the scaling of that
+      copy. The copy gets its own id and its mermaid stylesheet
       rewritten to match, or it renders as black boxes.
       The <b>walkthrough</b> under a diagram is the same fold the guide's pages do, minus
       the shim: the prompt asks for the explanation as a numbered list, one item per node
@@ -629,9 +633,13 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
       các loại sơ đồ ở dòng đầu của block, và một hàm phán đoán duy nhất dùng cho cả hai
       chỗ (có tải renderer 3.4 MB không, và thay block nào) để chúng không lệch nhau.
       Renderer tải lười và có kiểm tra integrity; nếu không tải được thì vẫn là fence,
-      vẫn đọc được. Trong câu trả lời sơ đồ được thu để thấy tổng thể, bấm vào là mở bản
-      copy trong <code>&lt;nes-zoom&gt;</code> — component lo phần kéo và phóng, nên app
-      không set kích thước gì cả. Bản copy được đổi id và sửa lại stylesheet mermaid theo
+      vẫn đọc được. Trong câu trả lời sơ đồ giữ nguyên kích thước tự nhiên và khung tự cuộn,
+      vì sơ đồ bị thu vừa màn hình điện thoại là một bức ảnh chữ không đọc được — một sơ đồ
+      938×64 bị nén vào 289px vẽ ra cao 20px, sáu label còn khoảng 4px. Chiều rộng lấy từ
+      <code>max-width</code> inline của chính mermaid chứ không phải từ một con số trong repo
+      (<code>styles.css</code> nói rõ cách), và bấm vào vẫn mở bản copy trong
+      <code>&lt;nes-zoom&gt;</code> — component lo phần kéo và phóng của bản copy đó.
+      Bản copy được đổi id và sửa lại stylesheet mermaid theo
       id mới, không thì nó vẽ ra toàn khối đen.
       <b>Walkthrough</b> dưới sơ đồ dùng đúng cách fold của các trang guide, bỏ phần shim:
       prompt yêu cầu phần giải thích ở dạng danh sách có số, mỗi item một node và mở đầu

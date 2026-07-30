@@ -5,7 +5,7 @@
 
      props   turns · corpus · history · queue · diagramsReady
      emit    ask · replay                 nothing asked yet — the empty screen's two doors
-     emit    copy · regenerate · askBA    what one answer offers
+     emit    copy · regenerate · askBa    what one answer offers
      emit    diagramDrawn · diagramStepped · zoomDiagram   a diagram inside an answer:
                                           drawn, walked one step, or opened full screen
 
@@ -26,7 +26,8 @@ defineProps({
   diagramsReady: Boolean,
 })
 
-defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBA', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
+// `askBa` — see ChatTurn.vue for why two capitals in a row break a kebab-case listener.
+defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBa', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 </script>
 
 <template>
@@ -41,7 +42,7 @@ defineEmits(['ask', 'replay', 'copy', 'regenerate', 'askBA', 'diagramDrawn', 'di
       v-for="turn in turns" :key="turn.id"
       :turn="turn" :diagrams-ready="diagramsReady"
       @copy="$emit('copy', $event)" @regenerate="$emit('regenerate', $event)"
-      @ask-ba="$emit('askBA', $event)" @diagram-drawn="$emit('diagramDrawn', $event)"
+      @ask-ba="$emit('askBa', $event)" @diagram-drawn="$emit('diagramDrawn', $event)"
       @diagram-stepped="$emit('diagramStepped', $event)"
       @zoom-diagram="$emit('zoomDiagram', $event)"
     />

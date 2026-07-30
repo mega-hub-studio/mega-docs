@@ -159,11 +159,19 @@ const {
     >
       <!-- Sticky, because the six fields and a 14-row textarea are taller than a phone: the
            one thing a person must not lose track of while scrolling a form is which document
-           they are changing. The eyebrow says which of the two jobs this is — writing a new
+           they are changing. The icon says which of the two jobs this is — writing a new
            document and correcting an existing one look identical otherwise, and only one of
-           them overwrites something. -->
+           them overwrites something.
+
+           An icon rather than the EDITING/NEW eyebrow it was: the word and the path are the
+           same fact at two sizes, and on a 390px head the label took a third of the row from
+           the one thing that has to stay readable. `edit` and `plus` are the two verbs the
+           library already draws, and `title` carries the word for a pointer. -->
       <div class="head doc-form-head">
-        <span class="eyebrow">{{ editing ? 'Editing' : 'New' }}</span>
+        <nes-icon
+          :name="editing ? 'edit' : 'plus'"
+          :title="editing ? 'Editing an existing document' : 'Writing a new document'"
+        />
         <span class="title">{{ editing || 'New document' }}</span>
         <button
           class="btn ghost xs icon" type="button" :disabled="busy"

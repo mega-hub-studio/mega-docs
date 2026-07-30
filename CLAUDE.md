@@ -545,7 +545,7 @@ address held by a running server is a second home for a fact that already has on
 
 ## Skills
 
-**Sixteen skills are vendored, each with its source recorded in
+**Seventeen skills are vendored, each with its source recorded in
 [`skills-lock.json`](skills-lock.json) — read them, don't re-add them.** `.claude/skills/*` are
 symlinks to `.agents/skills/*`, so neither agent's set can drift from the other. The lock
 records where each one came from; its `computedHash` is written by the tool that fetched them
@@ -583,6 +583,7 @@ code.
 | [`.golangci.yml`](.golangci.yml) | `golang-lint` — this repo's config started from it | same |
 | `web/ui/src/lib/*.js`, `web/ui/src/composables/*.js` | `modern-javascript-patterns` | `wshobson/agents` |
 | `web/ui/**/*.vue` | `vue`, then `building-components` | `antfu/skills`, `vercel/components.build` |
+| a JSDoc contract on a front-end file — a `@typedef` for a payload that crosses a layer, a composable's typed surface | `vue-expert-js` — Vue 3 in JavaScript, typed by JSDoc instead of TS, which is this repo's decision written by somebody else. Its *JSDoc* half only; see *deltas* | `jeffallan/claude-skills` |
 | [`web/ui/src/router.js`](web/ui/src/router.js), a screen behind a route | `vue-router-best-practices` — after that file's own header | `hyf0/vue-skills` |
 | `vite.config.js`, the bundle | `vite` | `antfu/skills` |
 | `eslint.config.js`, `package.json`, tooling | `antfu` | `antfu/skills` |
@@ -603,6 +604,7 @@ nobody wrote yet, however the skill's example is shaped.
 | `golang-lint` | its recommended `.golangci.yml` | This repo's started there, then set `linters.default: none`, so `enable:` is the complete set and a rejected linter is a **comment with its reason**, never a `disable:` key. The file is the truth; the skill is where it came from |
 | `vue-router-best-practices` | Vue Router 4 | `web/ui/package.json` pins **vue-router 5.2.0**. Check a claim against the installed version before acting on it — the same trap as the unversioned design-system docs site in [`AGENTS.md`](AGENTS.md) |
 | `building-components` | TypeScript types, `as-child`/polymorphism, publishing to npm or a registry | JavaScript, nothing published, and 8bit-nes owns components. `principles`, `accessibility`, `composition` and `state` apply; `types`, `npm`, `registry`, `marketplaces`, `as-child` and `polymorphism` do not, and `design-tokens`/`styling` are the library's job (`AGENTS.md`) |
+| `vue-expert-js` | Pinia stores, Vitest suites, and cross-refs into a `vue-expert` skill | Only its JSDoc half applies, and *Conventions* is the version of record. There is no store — state is one composable per concern inside the four-layer table (rule 20), no Vitest and no test file for a change (rule 21), and `vue-expert` is **not vendored**, so its `references/*` are dead ends. It agrees with this repo on the one thing that matters: JavaScript with JSDoc, never TS |
 | `vite` | `vite.config.ts`, TypeScript | `web/ui/vite.config.js` — JavaScript by decision (see *Front end*). `package.json` pins Vite 8, so the Rolldown half is the present, not a migration to plan |
 | `antfu` | scaffolds a project: pnpm, monorepos, library publishing | One npm app with a committed `package-lock.json`, not published. `references/antfu-eslint-config.md` is the useful half; `eslint.config.js` already exists and every rule in it is annotated |
 | the `golang-*` audit modes | `ultracode` and up to five parallel sub-agents per audit | Opt-in only, never the default for a change. `make check-full` is the audit of record, and its *skipped* lines are part of the reading |
