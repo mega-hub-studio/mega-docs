@@ -145,6 +145,7 @@ Guard paths, in isolated clones, with no build and no restart of the real servic
 | `DEPLOY_DIR=.` (dirty tree) | dispatches to `deploy-here` → `refusing: working tree is dirty` |
 | clone A (2 unpushed) → clone B | `note: 2 commit(s) here are not pushed`, `deploying …/B`, then B's own dirty refusal, `make[1] Error 1` → `make Error 2` |
 | `deploy-here UNIT=knowledgey` | `refusing: this machine has no UNIT=knowledgey — nothing would be restarted`, 0.0s, before pull |
+| `deploy UNIT=knowledgey` once the guard had shipped to `/opt/knowledge` (`65a2a4e`) | `deploying /opt/knowledge` → the same refusal → `make[2] Error 1` → `make[1] Error 2` → `make Error 2`, and afterwards `/api/health` still `65a2a4e` with `/proc/<pid>/exe` on the current binary. The original bug, re-run, now changes nothing |
 
 And live, from the dev tree, repairing the half-deploy above:
 
