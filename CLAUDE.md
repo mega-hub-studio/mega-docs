@@ -244,6 +244,12 @@ Every Go command needs the build tags — `sqlite-vec` and FTS5 are cgo, and a p
 
 ```bash
 make deps                  # go mod tidy
+/ship                      # the whole post-implement chain, and the one to reach for: free the
+#                            rig's port → `make lint-fix` → `make check-full` → review the diff
+#                            with `ponytail` at full, through rules 17/20/21/22/24 and the
+#                            four-layer table. Stops at the first red step, so the reviewer
+#                            never reads code the gate rejected. Report-only: applying would
+#                            re-dirty the tree and void the green run. `.claude/commands/ship.md`
 make check-full            # THE FINAL GATE — run before saying anything is done: ui → check
 #                            → build → check-ui → check-wt, cheapest stage first
 make check                 # what CI gates on, and what you run while working: tests, go vet,
@@ -251,8 +257,9 @@ make check                 # what CI gates on, and what you run while working: t
 make lint                  # golangci-lint alone, at the pinned GOLANGCI_VERSION — installing
 #                            it first if PATH has another one (see .golangci.yml for why each
 #                            linter is on, and which are off with the reason)
-make lint-fix              # …applying what it can fix; read the diff
-make lint-js               # eslint over web/ui (antfu + vue); in `check`, skipped without node_modules
+make lint-fix              # …applying what it can fix, BOTH languages. Read the diff. Never a
+#                            step of `check` — the Makefile says why, next to it
+make lint-js               # eslint over web/ui (antfu + vue); skipped without node_modules
 make check-ui              # optional: renders the guide, serves it, measures it in Chromium
 make check-wt              # optional: drives every diagram walkthrough (prev/next + highlight)
 #   both are driven by PinchTab: `npm i -g pinchtab`. They skip when it is not on PATH and

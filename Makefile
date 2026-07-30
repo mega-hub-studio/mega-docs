@@ -218,15 +218,37 @@ check-ui:
 # (VSCODE_PID and friends) unless CI is set, so a terminal *inside* the IDE ran a weaker
 # gate than the push did — and that is not theoretical, it hid a `jsdoc/*` warning that
 # --max-warnings 0 fails on.
+# The guard and the command are ONE recipe line, and that is the whole point: make runs every
+# line in its own shell, so an `exit 0` in a guard on the line above ends *that* shell and make
+# cheerfully runs the next one. Written as two lines — which it was — a box without Node printed
+# "skipped lint-js" and then failed `eslint: not found` with exit 127, so the skip this repo
+# documents had never once happened. Measured by moving node_modules aside.
 lint-js:
-	@[ -d web/ui/node_modules ] || { echo "  skipped lint-js (run \`make ui\` to install web/ui)"; exit 0; }
-	@cd web/ui && CI=1 npm run --silent lint
+	@if [ -d web/ui/node_modules ]; then cd web/ui && CI=1 npm run --silent lint; \
+	else echo "  skipped lint-js (run \`make ui\` to install web/ui)"; fi
 
-# Same linters, applying the fixes they know how to make. Read the diff: the formatters
-# are opinionated and one of them (gofumpt) is left off here for a reason .golangci.yml
-# spells out.
+
+# Same linters as the gate, applying the fixes they know how to make — *both* languages, the
+# way `check` runs `lint` and `lint-js` rather than one of them. It was Go-only until then,
+# which made "the formatter is in the gate" true and "one command formats this repo" false:
+# `npm run lint:fix` existed and nothing called it, so the JS half was a thing you had to
+# remember. One door, both sides.
+#
+# Read the diff: the formatters are opinionated and one of them (gofumpt) is left off here for
+# a reason .golangci.yml spells out. On the JS side the fixer is ESLint's own — eslint-stylistic
+# for semicolons, quotes and trailing commas, never Prettier, and it reflows nothing.
+#
+# Deliberately NOT part of `check`: a gate that rewrites files reports green on code nobody
+# reviewed, and formatting is already *verified* there (gofmt as a golangci-lint formatter,
+# ESLint's style rules as errors). `gofmt -l .` was deleted from `check` for that first reason
+# and for walking web/ui/node_modules; this is the fixer, not a second checker.
+# The JS half is inline rather than its own target: it would have had exactly one caller, and a
+# comment saying "nothing else should call this" is an admission that the name earns nothing.
+# `npm run lint:fix` is the one-liner for anybody who wants only that half.
 lint-fix: lint-deps
 	$(GOLANGCI_BIN) run --fix $(PKGS)
+	@if [ -d web/ui/node_modules ]; then cd web/ui && npm run --silent lint:fix; \
+	else echo "  skipped the JS half of lint-fix (run \`make ui\` to install web/ui)"; fi
 
 # What no linter finds: a function no binary can reach. staticcheck's unused only sees
 # within a package, and it now runs inside `lint` anyway; deadcode does whole-program
