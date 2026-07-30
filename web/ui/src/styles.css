@@ -27,10 +27,25 @@
    --col is the one width this app owns, and it is here because several rules have to
    agree on it:
 
-     --col      the shell. The conversation, the prompt, the scope picker and the
-                diagram viewer all share this edge — the prompt has to look attached
-                to the answers above it, so 760px used to be written out three times
-                and the viewer kept a fourth number of its own. One home instead.
+     --col      the shell. The conversation, the prompt and the scope picker share this
+                edge — the prompt has to look attached to the answers above it, so 760px
+                used to be written out three times. One home instead. The diagram viewer
+                used to share it too and no longer does; see `.diagram-zoom` for why a
+                modal whose job is a drawing must not follow a text column.
+
+                **52rem, down from 80rem.** 80rem was chosen so "an answer — a table, a
+                diagram" had room, and the cost was measured and reported three times: at a
+                1600px window an answer's text ended 469px short of its own card, which
+                reads as a column that gave up. Text cannot follow, because its width is
+                the library's `--prose-measure` (72ch) and that is a reading decision, not
+                a layout one. So the card came to the text instead: 21px of slack at
+                1600px, 113px at 1130px, measured.
+
+                What made it affordable is a change made the same day: a diagram now pans
+                and zooms *in place* (lib/diagram.js), so the widest possible card stopped
+                being the only way to read one. A table still scrolls in `.table-wrap`, and
+                a code block still scrolls itself. It also lands on the guide's own column
+                (`docsbase.html` sets 820px), so the two surfaces stopped disagreeing.
 
    Text measure is not here: 8bit-nes owns it as `--prose-measure` on :root (0.13.0, still), and
    the rules below borrow that rather than keeping a second copy of 72ch. Nor is
@@ -43,7 +58,7 @@
 #app {
   --z-bar: 10;
   --z-dock: 20;
-  --col: 80rem;
+  --col: 52rem;
   min-block-size: 100dvh;
 }
 
@@ -136,14 +151,12 @@ main {
   padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
 }
 
-/* The ask panel does not scale with the shell. --col is sized for an *answer* — a table,
-   a diagram — and this screen is a prompt with a file list under it: stretched to 1280px
-   its rows become a few words at one end of a very long line, and the eye has nothing to
-   land on. It keeps roughly the width the whole app had before, centred in the new one. */
-.empty {
-  max-inline-size: 48rem; margin-inline: auto;
-  margin-block-start: var(--sp-6);
-}
+/* The ask panel used to be capped at 48rem because the column was 80rem and a prompt with a
+   file list under it read badly stretched to 1280px — a few words at one end of a very long
+   line. The column is 52rem now, so the cap was 64px of difference doing the work of a rule:
+   deleted, and the panel takes the column like everything else. `margin-block-start` stays —
+   that is the panel sitting a little down the page, which is a different fact. */
+.empty { margin-block-start: var(--sp-6); }
 .turn + .turn { margin-block-start: var(--sp-6); }
 
 /* ── every card is a column with a gap, and that is the only place a seam is set ──
@@ -229,8 +242,9 @@ main .card > .head { margin-block-end: 0; }
   max-inline-size: none;
 }
 
-/* Text keeps a reading measure while the shell does not, which is what makes --col: 80rem
-   safe — widening it without this buys a wide table at the price of 160-character prose.
+/* Text keeps a reading measure while the shell does not, which is what let --col be 80rem
+   safely — widening a column without this buys a wide table at the price of 160-character
+   prose. The column is 52rem now, close enough to the measure that the two nearly agree.
    Inside `.prose` that split is the library's since 0.8.0 (`--prose-measure` on the
    children, and the constructs whose content *is* width opting out). These three are the
    text this app renders *outside* `.prose`, so they borrow the same token.
@@ -410,7 +424,7 @@ main.ba {
 .ticket { gap: var(--sp-3); }
 .ticket .head { flex-wrap: wrap; gap: var(--sp-2); }
 /* Fills the card on a phone, measured on a desktop: what gets typed here becomes a
-   document, and drafting a paragraph across the full 80rem is the same long-line problem
+   document, and drafting a paragraph across the full column is the same long-line problem
    as reading one. `inline-size` and `max-inline-size` together are what make it both. */
 .ticket .textarea { inline-size: 100%; max-inline-size: var(--prose-measure); }
 /* The three actions wrap instead of shrinking: a 44px target that has been
@@ -847,9 +861,16 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   /* The viewer stops being the screen and becomes a dialog again: a pointer has a window
      manager behind it, the page around the modal is context worth keeping, and the
      backdrop turns back into a way to close it. Still wider than the library's 32rem —
-     the whole point is the drawing at its own size. */
+     the whole point is the drawing at its own size.
+
+     `80rem` written out, not `var(--col)`. It shared the column until the column came down
+     to 52rem to meet the text measure, and this is the one surface where that is exactly
+     wrong: every pixel this dialog does not use is a pixel of diagram nobody can see. A text
+     column and a drawing's window answer different questions, so they stopped sharing an
+     answer — which is also why the number is here rather than a second token nobody else
+     reads. */
   .diagram-zoom {
-    inline-size: min(96vw, var(--col)); max-inline-size: min(96vw, var(--col));
+    inline-size: min(96vw, 80rem); max-inline-size: min(96vw, 80rem);
     block-size: auto; max-block-size: 90dvh;
     margin: auto;
     padding: var(--sp-5);
