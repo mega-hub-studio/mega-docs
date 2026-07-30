@@ -64,18 +64,21 @@ export function hasDiagram(markdown) {
    diagram, and the *labels*. Mermaid scales to fit, which gives the first and loses
    the second — measured at 1083px squeezed into 289, so 16px text drew at about 4.
 
-   So: fitted in the answer, explorable on demand. The card keeps the overview, and one
-   tap opens the same drawing in <nes-zoom>, which pans and scales it — so nothing here
-   sizes the copy. That is deliberate and it is why this file is short: wheel, drag,
-   +/−/reset and the keyboard are the component's, and a viewer that starts whole and
-   zooms in beats one that opens pinned to the top-left corner of a drawing three times
-   the width of the screen. */
+   So the answer keeps the drawing at its natural size in a frame that scrolls, and reading
+   it is three verbs that all work *in place*: drag it (`pannable`), zoom it (`controls`), or
+   open it full screen. The last one was the only one for a while, and it was reported twice —
+   once as "cannot drag", once as "why do I have to go full screen to zoom". A preview you can
+   only look at is a picture of a diagram.
+
+   What still belongs to <nes-zoom> and is not reimplemented here: pinch, wheel, reset, and the
+   panning of the *copy* it holds. In place, pan is the frame's own `scrollLeft` and zoom is one
+   CSS `zoom` factor on the SVG — no transform, no second panner, no pinned width. */
 
 /**
- * Mark a freshly drawn diagram as openable, and say so.
+ * Give a freshly drawn diagram its three verbs: drag, zoom, full screen.
  *
  * Called from the library's own `nes:render` event. Nothing happens for a diagram that
- * fell back to source text — there is no drawing to open.
+ * fell back to source text — there is nothing to drag, zoom or open.
  *
  * @param {Element} host the <nes-mermaid> that just drew
  */
@@ -83,14 +86,64 @@ export function onRender(host) {
   if (!host?.querySelector?.('svg') || host.dataset.zoomable)
     return
   host.dataset.zoomable = '1'
-  host.setAttribute('role', 'button')
-  host.setAttribute('tabindex', '0')
-  host.setAttribute('aria-label', 'Open this diagram full screen')
-  const hint = document.createElement('span')
-  hint.className = 'zoom-hint'
-  hint.textContent = '⤢ TAP TO ZOOM'
-  host.append(hint)
+  host.append(controls())
   pannable(host.querySelector('.mermaid-view'))
+}
+
+/* Zoom is one number on the drawing, because the frame around it is already a scroll
+   container: CSS `zoom` scales the SVG's *used size*, so the scroll area grows with it and
+   `pannable` below reaches every part of it. Measured on a 759×510 drawing at `zoom: 2`:
+   1519×1020 with scrollWidth 1535. `transform: scale(2)` looks identical and is wrong — the
+   box paints twice as big while layout does not, so scrollWidth stayed 1155 and the overflow
+   could not be panned to.
+
+   It also keeps the app out of the business the retired claim named: nothing here pins a
+   width. A factor is what a zoom is, and mermaid's own natural size stays the 1.0. */
+const STEP = 1.25
+const RANGE = [0.5, 4]
+
+/* ── the bar under a diagram ────────────────────────────────────────────────────
+   Three buttons, and only two of them have a listener.
+
+   `⤢` needs none: `useDiagrams.open` keys on `e.target.closest("nes-mermaid")`, so a click
+   anywhere inside the host already opens the viewer — a real <button> inside it therefore
+   *is* the keyboard door, and it replaced the `role="button"` + `tabindex` this function used
+   to put on the host. That swap is the point: a host carrying `role="button"` with two
+   focusable children inside it is a widget with interactive descendants, which is the one
+   thing that role may not have. One `<button>` beats a div pretending to be one.
+
+   `−` and `+` stop propagating, or zooming in place would also open full screen. */
+function controls() {
+  const bar = document.createElement('span')
+  bar.className = 'zoom-hint'
+  bar.append(
+    step('−', 'Zoom out', 1 / STEP),
+    step('+', 'Zoom in', STEP),
+    button('⤢ FULL SCREEN', 'Open this diagram full screen'),
+  )
+  return bar
+}
+
+function step(glyph, label, factor) {
+  const b = button(glyph, label)
+  b.addEventListener('click', (e) => {
+    e.stopPropagation() // …or the viewer opens on top of the zoom that was asked for
+    const svg = b.closest('nes-mermaid')?.querySelector('svg')
+    if (!svg)
+      return
+    const now = Number(svg.style.zoom) || 1
+    svg.style.zoom = Math.min(RANGE[1], Math.max(RANGE[0], now * factor))
+  })
+  return b
+}
+
+function button(text, label) {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'btn ghost xs'
+  b.textContent = text
+  b.setAttribute('aria-label', label)
+  return b
 }
 
 /** Swallows the click that ends a real drag, so panning never also opens the viewer. */
@@ -106,8 +159,9 @@ const swallow = e => e.stopPropagation()
  * the bottom of a 550px card — which reads as "the diagram is cut off", not as "drag it".
  * Reported exactly that way.
  *
- * Scale stays the viewer's: `<nes-zoom>` owns pinch, wheel and the buttons, and reimplementing
- * any of that here would be a second panner to keep in agreement with the first.
+ * Only the drag: the zoom beside it is `controls` above, and pinch, wheel and reset stay the
+ * viewer's — reimplementing those here would be a second panner to keep in agreement with the
+ * first.
  *
  * @param {Element|null} view the library's `.mermaid-view`, or null when the render failed
  */

@@ -41,6 +41,42 @@ is a second thing to keep in agreement with the first.
 Verified with real `PointerEvent`s: `scrollLeft` 0 → 120 → 240, `is-panning` on during and off
 after, then `openedByDrag: false` and `openedByTap: true` in the same run.
 
+## Zoom in place — the third verb, and why `transform` is the wrong one
+
+Reported straight after the drag landed: *why do I have to go full screen to zoom?* Fair — the
+preview could be moved but not scaled, so half of "read this diagram" still needed a modal.
+
+The preview now carries `[−] [+] [⤢ FULL SCREEN]` under the frame, and the whole zoom is **one
+CSS `zoom` factor on the SVG**. That choice is measured, not stylistic — on a 759×510 drawing in
+a 321px frame:
+
+| | svg box | frame `scrollWidth` |
+|---|---|---|
+| base | 759×510 | 775 |
+| `zoom: 2` | 1519×1020 | **1535** — grew with it |
+| `transform: scale(2)` | 1519×1020 | 1155 — **did not** |
+
+`transform` paints twice as big while layout does not, so the overflow it creates cannot be
+scrolled or dragged to: the parts you zoomed in to see are unreachable. `zoom` scales the *used
+size*, so the frame's existing scroller — and therefore `pannable` — reaches all of it for free.
+Range `[0.5, 4]`, step ×1.25, read back off `svg.style.zoom` so there is no state to hold.
+
+It also stays clear of the decision `retiredClaims` records: **nothing here pins a width.** A
+factor is what a zoom is, and mermaid's own natural size remains the 1.0.
+
+**The host stopped pretending to be a button.** `onRender` used to put `role="button"` +
+`tabindex="0"` on `<nes-mermaid>`; with two more focusable children inside it that is a widget
+with interactive descendants, which is the one thing that role may not have. Deleted, and the
+`⤢` button replaces it — a real `<button>`, so the keyboard door is better than it was. It needs
+no listener at all: `useDiagrams.open` keys on `e.target.closest("nes-mermaid")`, so a click
+anywhere inside the host already opens the viewer. Only `−`/`+` stop propagating, or zooming in
+place would open full screen on top of the zoom that was asked for.
+
+Verified at 390×844 against the running product: buttons present with their labels, host carries
+no `role`/`tabindex`, `+`→`1.25`→`1.5625` and `−` back to `1.25` with `scrollWidth` tracking
+(775 → 965 → 1203), a 900px mouse drag reaching `scrollLeft == max`, and `−` leaving the dialog
+shut while `⤢` opens it.
+
 ## One card, three right edges
 
 Measured at a 1220px window, inside one answer card:

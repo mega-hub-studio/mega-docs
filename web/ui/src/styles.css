@@ -726,9 +726,10 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 /* The affordance has to be visible: a diagram that opens on tap and does not say so
    is a diagram nobody taps. Mono and muted, like every other piece of chrome here. */
 .prose nes-mermaid .zoom-hint {
-  display: block; margin-block-start: var(--sp-1);
+  display: flex; justify-content: end; align-items: center; gap: var(--sp-2);
+  margin-block-start: var(--sp-1);
   font-family: var(--font-mono); font-size: var(--fs-label);
-  letter-spacing: var(--ls-chrome); color: var(--muted); text-align: end;
+  letter-spacing: var(--ls-chrome); color: var(--muted);
 }
 /* ── the viewer ──
    Where a diagram is actually *read*, so every pixel this dialog does not use is a pixel
