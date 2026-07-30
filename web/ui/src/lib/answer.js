@@ -244,7 +244,7 @@ export function turnClarify(turn) {
  * @param {string} markdown raw model output
  * @returns {{ rest: string, clarify: Clarify | null }} rest is the markdown without the block
  */
-export function stripClarify(markdown) {
+function stripClarify(markdown) {
   const tokens = marked.lexer(markdown || '')
   const at = tokens.findIndex((t, i) =>
     t.type === 'blockquote' && tokens[after(tokens, i)]?.type === 'list' && clarifyMark.test(lead(t)))

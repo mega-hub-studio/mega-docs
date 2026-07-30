@@ -77,12 +77,30 @@ Nothing. The verification instance ran on :8124 against a scratch DB and is stop
 scratch DB is deleted. `web/dist` is rebuilt and **uncommitted** along with the source changes —
 rule 14 needs it committed in the same change.
 
+## Live, against the deployed corpus
+
+`[!NEXT]` confirmed in production (`d4d82ae`, "work calendar hoạt động thế nào?"):
+
+```
+> [!NEXT] 
+- Làm thế nào để thêm hoặc chỉnh sửa ngày làm việc cụ thể?
+- Có những quy tắc kinh doanh nào liên quan đến lịch làm việc?
+- Ai là những người dùng có thể truy cập vào Work Calendar?
+```
+
+Three questions the retrieved sections can answer, none pre-ticked. It also **ignored the syntax
+twice** — no label after the marker, and plain `- ` bullets instead of `- [ ]` — and the card
+still renders: `marked` types both as `list`, `checked` is `undefined` on a non-task item so
+`recommended` is `false`, and `LABEL` supplies the name. Verified against that exact string.
+
+So both fallbacks are load-bearing, not defensive padding.
+
 ## Open
 
-- `make smoke` showed the model writing `> [!NEXT]` with **no label after the marker**, so the
-  card had no name. `LABEL` in `answer.js` supplies one ("Ask next" / "Which one do you mean?").
-  If that fallback turns out to be the common path rather than the exception, the prompt line
-  asking for the label is what needs tightening — not the fallback.
-- The `[!QUESTION]` path has not been seen from a real provider yet: it needs a corpus that
-  genuinely covers one phrase two ways, and the smoke fixture is one document. The rendering is
-  verified from a seeded session; the *prompt* half of it is not.
+- The label fallback is now the **common** path rather than the exception, which was the
+  condition set for revisiting it: the prompt line asking the model to name the block is what
+  should tighten, not `LABEL`. Same for `- [ ]` — worth one firmer clause, since the checklist is
+  what carries `recommended` and a plain bullet silently loses it.
+- The `[!QUESTION]` path still has not been seen from a real provider: it needs a corpus that
+  genuinely covers one phrase two ways. Rendering is verified from a seeded session in a real
+  browser; the *prompt* half is not.

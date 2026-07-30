@@ -56,7 +56,7 @@ const {
       <span class="badge todo">{{ accept }}</span>
     </div>
     <p>
-      Written into <code>docs/</code> and indexed immediately. The same file name updates
+      Written into the knowledge base and indexed immediately. The same file name updates
       that document in place, so re-importing a corrected version replaces it instead of
       adding a second copy.
     </p>
@@ -156,9 +156,8 @@ const {
       <code class="perm-target">{{ pending }}</code>
       <p class="perm-why">
         Answers that cite this stop citing it, and a BA-confirmed answer removed here is gone
-        from the queue's history too. The file moves to <code>docs/.trash/</code> rather than
-        being deleted, so one <code>mv</code> puts it back — worth knowing, because nothing
-        else backs the corpus up.
+        from the queue's history too. Its text survives: removal sets a date on the row rather
+        than destroying it, so whoever has the database can bring it back.
       </p>
       <div class="perm-actions">
         <button class="btn" data-accent="crit" @click="confirmRemove">

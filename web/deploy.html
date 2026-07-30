@@ -412,7 +412,10 @@ done: 8/8 files, 74 chunks</span></div>
       health check xanh. Một lệnh không làm gì nhưng báo thành công. Dùng
       <code>DEPLOY_DIR=…</code> khi checkout nằm chỗ khác, như trên macOS.</p>
     <p lang="en">What it adds over typing the four by hand, each one a failure that has
-      happened on this host: <code>git pull <b>--ff-only</b></code>, because a deploy
+      happened on this host: it asks <b>first</b> whether the supervisor has ever heard of the
+      unit, because a typo'd name otherwise gets all the way through pull and build — the new
+      binary replaces the old one on disk while the running process keeps serving the deleted
+      inode, <code>ok:true</code>, half-deployed; <code>git pull <b>--ff-only</b></code>, because a deploy
       checkout is a mirror and a local commit here turns an upgrade into a half-finished
       rebase, mid-deploy, on the machine serving the team; a check that <code>web/dist</code>
       is not stale, because this host has no Node and a push that forgot <code>make ui</code>
@@ -420,7 +423,10 @@ done: 8/8 files, 74 chunks</span></div>
       answers "did that change anything?"; and a health check afterwards, because a restart
       that fails leaves systemd retrying quietly.</p>
     <p lang="vi">Nó thêm gì so với gõ tay bốn dòng — mỗi thứ là một lỗi đã xảy ra trên host
-      này: <code>git pull <b>--ff-only</b></code>, vì bản checkout để deploy là một bản sao,
+      này: <b>trước tiên</b> nó hỏi supervisor có biết unit này không, vì gõ sai tên thì mọi
+      bước pull và build vẫn chạy hết — binary mới ghi đè binary cũ trên đĩa trong khi process
+      đang chạy vẫn phục vụ inode đã bị xoá, <code>ok:true</code>, deploy dở dang;
+      <code>git pull <b>--ff-only</b></code>, vì bản checkout để deploy là một bản sao,
       và một commit local ở đây biến việc nâng cấp thành một cuộc rebase dở dang, ngay giữa
       lúc deploy, trên máy đang phục vụ cả nhóm; kiểm tra <code>web/dist</code> có cũ không,
       vì host không có Node nên một lần push quên <code>make ui</code> sẽ deploy ra UI cũ hơn

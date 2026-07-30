@@ -28,8 +28,12 @@ func TestDocPathIsTheSameHoweverIngestWasInvoked(t *testing.T) {
 		{"trailing slash on the corpus", "docs/", "docs/spec.md", "spec.md"},
 		{"dot segments", "docs", "docs/./api/../spec.md", "spec.md"},
 
-		// Outside the corpus there is nothing honest to shorten to, and inventing a
-		// relative path would collide with a real corpus entry.
+		// Outside the corpus there is nothing honest to shorten to, and inventing a relative
+		// path would collide with a real corpus entry. So the path is passed through as given
+		// and `rag.SafePath` — which `Engine.Ingest` runs on every path (invariant 6) — decides:
+		// it normalises what it can and refuses the rest, per file, with the reason logged. The
+		// one thing that cannot happen any more is a document stored under an identity the
+		// import path could never produce.
 		{"sibling directory", "docs", "../elsewhere/spec.md", "../elsewhere/spec.md"},
 		{"no corpus configured", "", "docs/spec.md", "docs/spec.md"},
 	}

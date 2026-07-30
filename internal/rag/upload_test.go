@@ -1,6 +1,7 @@
 package rag_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -24,6 +25,21 @@ func TestSafePathRefusesEscapes(t *testing.T) {
 		if got, err := rag.SafePath(in); err == nil {
 			t.Errorf("SafePath(%q) = %q, want an error", in, got)
 		}
+	}
+
+	// Invariant 6, on the third door. `Engine.Ingest` used to take its path on trust, so
+	// `ingest` run outside CORPUS_DIR stored an absolute one — an identity the import path can
+	// never produce, and the server's directory layout printed beside every citation.
+	e, _ := engine(t, nil)
+	ctx := context.Background()
+	if _, err := e.Ingest(ctx, "../escape.md", "# x\n\nbody\n"); err == nil {
+		t.Error("Ingest accepted a path that walks out of the corpus")
+	}
+	if _, err := e.Ingest(ctx, "/absolute/spec.md", "# x\n\nbody\n"); err != nil {
+		t.Errorf("Ingest refused an absolute path outright (%v) — SafePath makes it relative", err)
+	}
+	if _, ok, _ := e.Document("absolute/spec.md"); !ok {
+		t.Error("the absolute path was not stored under the name SafePath normalises it to")
 	}
 }
 

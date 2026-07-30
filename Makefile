@@ -42,9 +42,13 @@ ifeq ($(shell uname -s),Darwin)
 LABEL  ?= dev.megadocs.knowledge
 RESTART := launchctl kickstart -k gui/$(shell id -u)/$(LABEL)
 STATUS  := launchctl print gui/$(shell id -u)/$(LABEL)
+KNOWN   := launchctl print gui/$(shell id -u)/$(LABEL) >/dev/null 2>&1
+NAMED   := LABEL=$(LABEL)
 else
 RESTART := sudo systemctl restart $(UNIT)
 STATUS  := systemctl status --no-pager -n 20 $(UNIT)
+KNOWN   := systemctl cat $(UNIT) >/dev/null 2>&1
+NAMED   := UNIT=$(UNIT)
 endif
 
 # Where `go install` puts a tool, which is where the targets that install one look for it.
@@ -332,6 +336,12 @@ deploy:
 # does that the hand-typed `git pull && make build && sudo systemctl restart knowledge` does
 # not, each one a failure that has already happened here:
 #
+#   the unit    asked *first*, because a supervisor that has never heard of it is the one
+#               failure that leaves the deploy half-done: a typo'd name (`knowledgey`) got all
+#               the way through pull and build, so the new binary replaced the old one on disk
+#               while the running process kept serving the deleted inode — 31 minutes stale,
+#               `ok:true`, and the health check never reached. `make deploy` failed loudly and
+#               was still the wrong shape: refusing costs nothing and changes nothing.
 #   --ff-only   a deploy checkout is a mirror, not a branch. `pull.rebase=true` is set on
 #               this host, so a local commit turned an upgrade into a half-finished rebase
 #               with a conflicted lockfile — mid-deploy, on the machine serving the team.
@@ -347,6 +357,7 @@ deploy:
 # a deploy host has) and any `git push`. This target only moves this machine to what origin
 # already has.
 deploy-here:
+	@$(KNOWN) || { echo "  refusing: this machine has no $(NAMED) — nothing would be restarted"; exit 1; }
 	@git diff --quiet || { echo "  refusing: working tree is dirty — commit or stash first"; git status --short; exit 1; }
 	@echo "  before: $$(git rev-parse --short HEAD)"
 	git pull --ff-only

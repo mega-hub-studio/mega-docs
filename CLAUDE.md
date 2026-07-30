@@ -267,8 +267,10 @@ make ui                    # build the app's front end (Vite) into web/dist — 
 make ui-dev                # Vite dev server on :5179 with HMR, /api proxied to :8080
 make build                 # bin/knowledge + bin/ingest (no Node: it uses the committed web/dist)
 make deploy                # from ANY tree on the machine: deploys DEPLOY_DIR (/opt/knowledge,
-#                            named on the first line) — pull --ff-only → stale-bundle check →
-#                            build → restart → health, and it says so when this tree holds
+#                            named on the first line) — unit exists? → pull --ff-only →
+#                            stale-bundle check → build → restart → health. The unit is asked
+#                            first: a typo'd UNIT otherwise half-deploys (new binary on disk,
+#                            old process serving a deleted inode). It says so when this tree holds
 #                            commits origin does not. Never a rebase, never a push;
 #                            UNIT/PORT/DEPLOY_DIR override it. `deploy-here` is the work,
 #                            and it assumes it already *is* the supervisor's checkout

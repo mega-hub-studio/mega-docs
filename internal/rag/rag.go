@@ -69,8 +69,18 @@ func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 // name — the only thing a path reliably tells you about a document, and all `ingest` on the
 // command line has to go on. A BA importing through the WebUI says what it is instead.
 func (e *Engine) Ingest(ctx context.Context, path, content string) (int, error) {
-	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	return e.ingest(ctx, db.Doc{Path: path, Title: title, Body: content})
+	// Invariant 6 — one document, one identity — held here rather than in `cmd/ingest`,
+	// because this is the door every import comes through and the only one that used to
+	// take a path on trust: `ingest /srv/docs/spec.md` from outside CORPUS_DIR stored the
+	// absolute path, which SafePath refuses, so the corpus carried an identity the rest of
+	// the product cannot produce (and printed the server's directory layout beside every
+	// citation). Upload and Confirm already validate; this closes the third way in.
+	safe, err := SafePath(path)
+	if err != nil {
+		return 0, err
+	}
+	title := strings.TrimSuffix(filepath.Base(safe), filepath.Ext(safe))
+	return e.ingest(ctx, db.Doc{Path: safe, Title: title, Body: content})
 }
 
 // ingest takes the whole document rather than three of its fields, so the attributes a BA

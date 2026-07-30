@@ -67,12 +67,44 @@ and the launchd equivalent). It would keep the path from being written twice, wh
 Makefile's own rule — but it is two more shell-outs, two more OS branches, and it fails opaquely
 when the unit is not installed yet. A default plus an override is the cheaper correct thing.
 
-## Landmine
+## The fifth guard, found the hard way an hour later
+
+`make deploy UNIT=knowledgey` — a typo — got **all the way through pull and build** and died on
+`Failed to restart knowledgey.service: Unit knowledgey.service not found`. The target failed
+loudly and non-zero, which is correct, and the state it left was still wrong:
+
+```
+running process started 11:09:23   →  /proc/<pid>/exe: (deleted)
+binary on disk           11:40:40  →  31 minutes newer
+/api/health                        →  {"ok":true, "version":"9dc043a"}   ← the OLD commit
+```
+
+The new binary had replaced the old one on disk while the running process kept serving the
+deleted inode, reporting `ok:true` the whole time. The health check never ran, because the
+restart it verifies is what failed. Half-deployed, and green.
+
+So `deploy-here` now asks the supervisor **first**, before the pull and before the build:
+`KNOWN` is `systemctl cat $(UNIT)` on Linux and `launchctl print gui/$UID/$(LABEL)` on macOS —
+the question "have you ever heard of this job", which both answer by exit status. A typo now
+costs 0.0s and changes nothing. That is the same argument `--ff-only` makes: refuse while the
+old binary is still running, rather than discover it mid-deploy.
+
+`NAMED` exists only so the message names the variable the reader must fix (`UNIT=` vs `LABEL=`),
+since which one is wrong depends on the OS.
+
+## Landmines
 
 **`pkill -f 'bin/knowledge'` matches `/opt/knowledge/bin/knowledge`.** Stopping a local
 verification server that way takes the deployed service down with it; systemd brought it back in
 under a second (`NRestarts` → 11) and health was green, so nothing on screen would have told
 you. Kill a scratch instance by its port or its full path.
+
+**The dispatcher runs the *target* tree's Makefile, so a new guard is not in force until it is
+committed and deployed.** Re-running `make deploy UNIT=knowledgey` from the dev tree to test the
+new refusal delegated into `/opt/knowledge`, which still carried the old Makefile, and did a
+second full pull-build-restart cycle instead. Harmless here — same commit in and out, so the
+rebuilt binary was identical and health stayed on `d4d82ae` — but a guard has to be tested
+against `deploy-here` directly (`make deploy-here UNIT=…`) until it has shipped.
 
 ## State outside git
 
@@ -90,6 +122,18 @@ Guard paths, in isolated clones, with no build and no restart of the real servic
 | `DEPLOY_DIR=/tmp` | `refusing: /tmp is not a git checkout` |
 | `DEPLOY_DIR=.` (dirty tree) | dispatches to `deploy-here` → `refusing: working tree is dirty` |
 | clone A (2 unpushed) → clone B | `note: 2 commit(s) here are not pushed`, `deploying …/B`, then B's own dirty refusal, `make[1] Error 1` → `make Error 2` |
+| `deploy-here UNIT=knowledgey` | `refusing: this machine has no UNIT=knowledgey — nothing would be restarted`, 0.0s, before pull |
 
-Not yet exercised: a real end-to-end where origin is genuinely ahead of the host. Nothing is
-unpushed right now, so a live run would restart the service onto the commit it already serves.
+And live, from the dev tree, repairing the half-deploy above:
+
+```
+make deploy
+  deploying /opt/knowledge
+  before: d4d82ae
+  … pull (already up to date) → stale check ok → build → sudo systemctl restart knowledge
+  deployed: d4d82ae — {"ok":true,…,"version":"d4d82ae"}
+```
+
+`/api/health` went `9dc043a` → `d4d82ae`, the process is a fresh pid on the current on-disk
+binary (no longer a deleted inode), and the served bundle contains `ASK THIS`, `RECOMMENDED` and
+`callout clarify` — so the clarify work is what is running, not just what is committed.
