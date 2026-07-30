@@ -696,11 +696,11 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 .prose nes-mermaid .mermaid-view.is-panning { cursor: grabbing; }
 
 /* ── a diagram that walks itself ──
-   `<nes-walkthrough>` is prev/next + dots + one step's prose, and the library styles the
-   `.walkthrough` box it builds rather than the host — an unknown element is
-   `display: inline`, so the stepper would sit on the diagram's last line. docsbase.html
-   carries the same line for the guide's five static diagrams; both are one declaration
-   against the same gap, and it is reported upstream.
+   The `display: block` this rule used to carry is **gone**: 0.14.0 blocks the element itself
+   (`components.css:460`, beside `nes-mermaid` and `nes-zoom`), so the local copy was a second
+   statement of a fact the library already makes. Reported, landed, deleted — which is the shape
+   AGENTS.md asks every override to aim for, and the reason to re-measure each one on a bump
+   rather than trust its own comment.
 
    The cap is tighter than the 70vh above, and only for a diagram that has a walk under it
    (`data-walk`, set by lib/answer.js when it folds the list in). At 70vh the spotlit node
@@ -711,15 +711,14 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    steps of a seven-node graph lit a node 150px below the fold. Released at 640px, where
    the vertical budget is not the constraint. 48svh is the guide's measured value for the
    same pairing, not a fresh guess. */
-/* Two declarations, one fact: the stepper is part of the drawing, not part of the prose.
-   `display` because an unknown element is `display: inline`, so the box would sit on the
-   diagram's last line — and `max-inline-size` because the library's `.prose > *` measure has an
-   opt-out list for the constructs whose content *is* width (`nes-mermaid` is on it,
-   `nes-walkthrough` is not, because upstream has no reason to expect the two paired). So a
-   1147px drawing was annotated by a 646px box: measured at a 1220px window, two right edges
-   500px apart inside one card, which is the raggedness that was reported. The stepper takes the
-   diagram's width, and the answer has one text edge and one structural edge instead of three. */
-.prose nes-walkthrough { display: block; max-inline-size: none; }
+/* One fact: the stepper is part of the drawing, not part of the prose. The library's
+   `.prose > *` measure has an opt-out list for the constructs whose content *is* width —
+   `nes-mermaid` is on it, `nes-walkthrough` is not, because upstream has no reason to expect
+   the two paired. So a 1147px drawing was annotated by a 646px box: measured at a 1220px
+   window, two right edges 500px apart inside one card, which is the raggedness that was
+   reported. The stepper takes the diagram's width, and the answer has one text edge and one
+   structural edge instead of three. */
+.prose nes-walkthrough { max-inline-size: none; }
 .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 48svh; }
 @media (min-width: 640px) {
   .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 70vh; }

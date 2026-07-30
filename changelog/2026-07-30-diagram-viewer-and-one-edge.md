@@ -57,6 +57,13 @@ Two different causes behind one symptom, which is why the fix is in two places:
    measure and the constructs whose content *is* width opt out — `nes-mermaid` is on that list,
    the stepper is not, because upstream has no reason to expect the two paired. A 1185px drawing
    annotated by a 646px box. **Upstream request #6.**
+
+   Found while compacting these requests for the library: the `display: block` this rule also
+   carried had **already landed upstream** (0.14.0 blocks the element at `components.css:460`),
+   so the app had been restating a fact the library makes for at least one release. Deleted —
+   from `styles.css` and from AGENTS.md's row. That is the whole argument for AGENTS.md's
+   "re-measure every override on a bump rather than trusting its own comment": the comment said
+   "reported upstream" and was right, and nobody came back for the second half of the sentence.
 2. **`.clarify` was capped by a rule of ours**, and that rule's own comment says why: a 1207px
    form under 646px of prose "read as a different column". True then, and the answer it sits
    under is a *diagram* now — so the capped form was the one box in five with its own edge. It
