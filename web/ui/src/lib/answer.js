@@ -122,6 +122,21 @@ function dressImages(html) {
     // is a pointer. The `.prose` keydown listener that already serves diagrams handles Enter and
     // Space, so one attribute is the whole keyboard path.
     img.setAttribute('tabindex', '0')
+
+    /* A paragraph holding nothing but the image is not a paragraph. Markdown wraps every
+       standalone image in one, and that wrapper is what puts the picture inside the *reading*
+       measure: the library opts `img` out of `--prose-measure`, but only as a direct child of
+       `.prose`, so a `<p>` in between defeats the rule the library states itself — "if the
+       content is the width, it opts out".
+       Measured on 0.15.0: a 1200px screenshot rendered at 646px, half the card, because its
+       parent paragraph was capped at 72ch. Unwrapping hands the picture back to the rule.
+       A paragraph with text *and* an image keeps both — there the picture is part of a
+       sentence and the measure is the right answer. */
+    const p = img.parentElement
+    const alone = p?.tagName === 'P'
+      && [...p.childNodes].every(n => n === img || (n.nodeType === Node.TEXT_NODE && !n.data.trim()))
+    if (alone)
+      p.replaceWith(img)
   }
   return tpl.innerHTML
 }

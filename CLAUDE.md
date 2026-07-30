@@ -440,8 +440,9 @@ plan.
 - **A Vue `computed` name that collides with a `data` key silently loses.** `data`
   wins and every field reads `undefined`, with no console error.
 - **`cp` over a running binary fails with `Text file busy`.** Install with `mv`.
-- **`.steps` in 8bit-nes is a stage bar, not an instruction list.** It is
-  `display: inline-flex` with mono uppercase `<li>`s, for "STAGE 1 · 2 · 3". Used for a
+- **`.steps` in 8bit-nes is a stage bar, not an instruction list.** The list is
+  `display: flex` and each `<li>` is `inline-flex`, mono uppercase, for "STAGE 1 · 2 · 3"
+  (re-measured on 0.15.0 — this said `inline-flex` on the list itself). Used for a
   numbered list with paragraphs it renders as uppercase columns four characters wide on a
   phone — which shipped. Numbered instructions on the docs pages are `.step` blocks;
   `make check-ui` fails on `main .steps > li`.

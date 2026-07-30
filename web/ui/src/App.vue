@@ -323,9 +323,12 @@ function replay(entry) {
          at upgrade time, so the frame below has to be here in the markup, not appended
          later. `.mermaid-view` is the library's diagram frame — panel, and the square
          node corners the inline copy already has.
-         One thing it does not do: pinch. `.zoom-view` sets `touch-action: none` to own the
-         drag, and the element listens for `wheel` and pointers only — so on a phone you
-         pan with a finger and scale with its own +/− buttons. -->
+         Pinch is the element's, not the browser's, and this said the opposite until 0.15.0
+         was read: `.zoom-view` sets `touch-action: none` precisely so the component owns
+         every gesture, and it tracks two pointers itself — `spread()` computes the distance
+         and midpoint and anchors the scale there. So on a phone you pan with one finger and
+         pinch with two, and the +/− buttons are the third way in, not the only one. Nothing
+         here reimplements any of it (see lib/diagram.js, which always said so). -->
     <nes-zoom aria-label="Diagram — drag to pan, scroll to zoom">
       <div ref="zoomBody" class="mermaid-view" />
     </nes-zoom>

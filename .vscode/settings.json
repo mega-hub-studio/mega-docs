@@ -1,4 +1,6 @@
 {
+  // This repo lints web/ui with ESLint (antfu) — `make lint-js`. No Biome, no binary to find.
+  "biome.enabled": false,
   "sarif-viewer.connectToGithubCodeScanning": "off",
   "github.copilot.chat.commitMessageGeneration.instructions": [
     {

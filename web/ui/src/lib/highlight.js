@@ -16,8 +16,10 @@
    grammar this file does not carry — the vendor's colours stay. There is no empty frame and no
    error, the same trade `diagram.js` makes for mermaid.
 
-   Two facts from the vendor's source make the in-place swap safe, and both were checked
-   against the installed 0.14.0 rather than assumed:
+   Two facts from the vendor's source make the in-place swap safe, and both were read out of the
+   installed bytes rather than assumed — first on 0.14.0, re-read on the 0.15.0 bump and
+   unchanged, along with the reason this file exists at all: `<nes-code>` still has no `lang`
+   attribute and still highlights with one JS-keyword regex, so nothing upstream does this yet:
      · its escaper only encodes & < >, so `pre.textContent` is byte-for-byte the original
        source — that is where the text to re-highlight comes from.
      · it renders once behind a `_done` flag, with no MutationObserver and no observed

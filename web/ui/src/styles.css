@@ -286,7 +286,12 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 }
 
 /* An answer's image opens in the diagram viewer, so it has to look like it does something.
-   `.prose` already caps it to the reading measure — nothing here sets a width. */
+   No width here, and the reason is worth being precise about because the obvious reading is
+   wrong: the library DOES opt `img` out of `--prose-measure`, but only as a direct child of
+   `.prose`. Markdown wraps a standalone image in a `<p>`, and the paragraph is what carries the
+   measure — so the picture was inheriting a 72ch cap through its wrapper, not from any rule
+   about images. `dressImages` unwraps a lone-image paragraph so the library's own opt-out
+   applies; an image sharing a paragraph with text stays inside the measure, where it belongs. */
 .prose img { cursor: zoom-in; }
 
 /* ── citations: the row a marker jumps to ──
