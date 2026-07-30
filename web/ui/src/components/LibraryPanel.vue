@@ -62,12 +62,11 @@ const {
     <div class="head">
       <span class="title">Library</span>
       <span class="badge">{{ documents.length }}</span>
-      <button
-        v-if="writes" class="btn sm" type="button" :disabled="busy"
-        @click="create(form.folder)"
-      >
-        NEW DOCUMENT
-      </button>
+      <div class="head-right">
+        <button v-if="writes" class="btn sm" type="button" :disabled="busy" @click="create(form.folder)">
+          NEW DOCUMENT
+        </button>
+      </div>
     </div>
 
     <!-- Searched by half-remembered words, which is what the alias field is for: the filter
@@ -248,3 +247,11 @@ const {
     </form>
   </section>
 </template>
+
+<style scoped>
+.head-right {
+  width: 100%;
+  display: flex;
+  justify-content: end;
+}
+</style>
