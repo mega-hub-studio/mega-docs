@@ -51,15 +51,15 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.14.0
+    8bit-nes@0.15.0
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.14.0/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -85,23 +85,28 @@ it, so trust the table.
    how five pairs of blocks ended up touching at 0px on a phone. Add a container, declare
    its `gap`; never a margin on the child, and never nothing.
 2. **Every local override of the design system is named, and there are two kinds.** All of
-   them are in `web/ui/src/styles.css`, against **8bit-nes 0.14.0**, and each was re-verified
+   them are in `web/ui/src/styles.css`, against **8bit-nes 0.15.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a
-   claim about bytes — on the 0.13.0 → 0.14.0 bump all eight that existed then were still
-   needed. Three more were measured after that bump and have yet to meet one — `.cite`'s
-   centring, `.zoom-stage`'s `will-change` and `nes-walkthrough`'s width — and only
-   `all.min.css` changed at all (the JS and the three fonts came back with identical digests).
+   claim about bytes.
 
-   **Waiting on a release. Re-measure on the next bump, and delete what has landed:**
+   **The first kind is empty.** All six overrides that were waiting on a release landed in
+   0.15.0, and each local rule was deleted rather than parked beside its replacement — the
+   sites keep one line saying what they fixed, so the loop reads as closed. On the bump
+   `all.min.css` and `elements.min.js` both changed digest; the three fonts came back
+   identical.
 
-   | override | why |
+   | landed in 0.15.0 | what the release does instead |
    |---|---|
-   | `.palette-list` un-capped (`max-block-size: none`) | the library still sizes it for the modal its own docs describe — `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested* scroller which hid four of seven documents on a phone. Gone when a release ships an in-page `.palette` |
-   | `.prose a.cite` restored to cyan with no underline | two of the library's own recipes collide: `.prose a` and `.cite` are both in the components layer and `.prose a` scores higher, so every citation marker rendered as a prose link — green, with a 2px underline through a digit already sitting in a cyan chip. Gone when a release scopes that rule away from `.cite` |
-   | `.drawer[open]` gets `inset-inline-start: auto` | the recipe anchors with `inset-inline-end: 0` and leaves the start inset alone, which is correct on a plain box and not on a `<dialog>`: the UA sheet sets `inset-inline: 0`, so with the recipe's `margin: 0` the box is over-constrained and the start wins. Measured — the panel opened flush against the **left** edge, and `.drawer.start` rendered identically. Gone when a release qualifies its own rule |
-   | `.prose nes-walkthrough` gets `max-inline-size: none` | `.prose > *` carries the text measure with an opt-out list for the constructs whose content *is* width — `nes-mermaid` is on it, `nes-walkthrough` is not, because upstream has no reason to expect the two paired. Measured at a 1220px window: a 1185px drawing annotated by a 646px stepper, two right edges 500px apart in one card. Gone when a release adds the element to that list. **Its `display: block` half is already gone** — 0.14.0 blocks the element (`components.css:460`) and the local copy sat here for at least one release after it landed, which is what re-measuring on a bump is for |
-   | `nes-zoom .zoom-stage` gets `will-change: auto` (in `.diagram-zoom` only) | the recipe hints `will-change: transform`, which promotes the stage to a composited layer — **rasterised once at scale 1**, so every later `scale(s)` stretches that bitmap. Right for the `<img>` the same rule holds and wrong for the one thing here that is vector: reported as "zoom mode is blurry", and at `zoomTo(3)` it was, labels soft and every box edge haloed. Measured side by side at the same scale: `auto` gives Chromium the hint back, it re-rasterises per scale, and the same label is razor sharp. Gone when a release stops hinting a transform it cannot know the content of |
-   | `.prose a.cite` gets `padding-block-start: 0.1em` | the chip is `inline-flex` + `align-items: center`, and **flexbox centres the line box, not the ink**: NES Mono's em box at `.7em` is ascent 9 / descent 3 while a digit's ink is ascent 7 / descent 0, so the centred box carries 2px of unused space above the glyph and 3px below it and the digit sits 0.5px high — one device pixel at 2× DPR, on the one thing in a sentence that is a chip. Measured with the font's own metrics: `slack: {above: 3.86, below: 4.84}` in a 15.7px chip, and `{4.83, 4.84}` after. Gone when a release puts `text-box-trim: trim-both; text-box-edge: cap alphabetic` on the recipe, which is the fix that needs no number |
+   | `.prose a.cite` recoloured, un-underlined | the prose-link rule is `& a:not(.cite)` now, so the two recipes stop colliding |
+   | `.prose a.cite` `padding-block-start: 0.1em` | `@supports (text-box-trim: trim-both)` trims the chip to cap height — and switches it to `display: inline-block`, because trim does nothing on an `inline-flex`, which the local patch never found |
+   | `.palette-list` un-capped | the `min(50vh, 340px)` cap is scoped `:is(dialog, .modal) .palette-list`, so a palette in the page is content-height |
+   | `.drawer[open]` `inset-inline-start: auto` | the recipe sets it itself, so a `<dialog>` and a plain box anchor the same way |
+   | `.prose nes-walkthrough` `max-inline-size: none` | `nes-walkthrough` is on `.prose`'s width opt-out list beside `nes-mermaid` |
+   | `.diagram-zoom .zoom-stage` `will-change: auto` | no static hint at all — `<nes-zoom>` sets it on pointerdown/wheel and drops it ~200ms after the gesture, which keeps a vector sharp *and* frees the layer |
+
+   Six reported, six landed, six deleted here — that is what this rule is for, and the
+   `display: block` half of the walkthrough row is the counter-example worth remembering: it
+   had landed in **0.14.0** and sat here unnoticed for a release, because nobody re-measured.
 
    **This app using a recipe outside the context it was written for.** Nothing upstream to
    fix; each is permanent until the app's own use changes:
@@ -114,7 +119,13 @@ it, so trust the table.
    | `.empty .palette > .palette-empty` — start-aligned, at the rows' inset | centring is right for a state filling a blank list, wrong for a truncation notice under nine left-aligned rows |
    | `::selection` softened to a 32% `--primary` tint | the solid fill is ~11:1 on this dark page — correct contrast, and a flare when a long-press selects a word on a phone |
 
-   The six upstream requests are in the changelog.
+   All five were re-measured against 0.15.0 and all five are still needed: the recipe still
+   underlines `.source-title` on hover, `.result` is still a control (`cursor: pointer`, a hover
+   edge, `--pad-snug`), `.statusline` is still `inline-size: 100%` with `.sl-end` pushed,
+   `.palette-empty` is still centred, and `::selection` is still a solid fill (`base.css:137`).
+
+   The six requests that produced 0.15.0's fixes, and the prompt they were sent as, are in
+   `changelog/upstream-8bit-nes-0.14.0.md`.
 
    `.prose` used to be a fourth. Its `72ch` sat on the container and so capped the tables and
    diagrams inside an answer as well as its text; 0.8.0 moved that measure onto the children

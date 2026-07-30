@@ -243,6 +243,28 @@ export function onStep(e) {
  * @param {Element} host the <nes-mermaid> that was tapped
  * @returns {boolean} false when there was no drawing to show
  */
+/**
+ * Show an answer's image in the same viewer a diagram uses.
+ *
+ * A separate function rather than a branch inside `zoomInto` because the two share nothing but
+ * the destination: an SVG needs its id-scoped styles rewritten (`reid`) or the clone steals the
+ * original's rules, and an image needs none of that — it is one node with a src.
+ *
+ * @param {Element} into the viewer's stage
+ * @param {HTMLImageElement} img the image that was tapped
+ * @returns {boolean} whether there was anything to show
+ */
+export function zoomImage(into, img) {
+  if (!into || !img)
+    return false
+  const copy = img.cloneNode(true)
+  copy.removeAttribute('tabindex') // inside the viewer it is the subject, not a control
+  copy.removeAttribute('loading') // it is the only thing on screen; do not defer it
+  into.replaceChildren(copy)
+  into.closest('nes-zoom')?.reset?.()
+  return true
+}
+
 export function zoomInto(into, host) {
   const svg = host?.querySelector?.('svg')
   if (!into || !svg)

@@ -46,14 +46,21 @@ export function useDiagrams({ zoom, zoomBody }) {
     diagram.onStep(e)
   }
 
+  /* One viewer, two subjects. An answer's image opens in the same dialog a diagram does —
+     evidence a BA attached is exactly the thing a reader wants full size, and a second viewer
+     would be a second set of Escape/backdrop/reset behaviour to keep in agreement with this one. */
   function open(e) {
     if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ')
       return
     const host = e.target.closest?.('nes-mermaid')
-    if (!host)
+    const img = host ? null : e.target.closest?.('.prose img')
+    if (!host && !img)
       return
     e.preventDefault() // Space would otherwise scroll the conversation
-    if (diagram.zoomInto(zoomBody.value, host))
+    const shown = host
+      ? diagram.zoomInto(zoomBody.value, host)
+      : diagram.zoomImage(zoomBody.value, img)
+    if (shown)
       zoom.value?.showModal()
   }
 

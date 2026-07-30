@@ -12,11 +12,12 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
 import { isDiagram } from './diagram.js'
+import { language } from './highlight.js'
 
 let configured = false
 
 /**
- * Render one conversation turn. This is `answerHtml` with the three mid-stream rules applied,
+ * Render one conversation turn. This is `answerHtml` with the four mid-stream rules applied,
  * and it lives here rather than in ChatTurn.vue because all of them are decisions about what
  * the HTML may contain — which is this file's job — and a component that decides is a branch
  * rule 11 forbids. What they decide:
@@ -26,6 +27,9 @@ let configured = false
  *   · no diagrams until the renderer has arrived AND the stream has finished — <nes-mermaid>
  *     must never exist before the thing that draws it, and a half-written fence is not a
  *     diagram yet
+ *   · no <nes-code> while streaming, and for a harder reason than the diagram: it reads its
+ *     text once at upgrade and then refuses to re-render, so a block created halfway through
+ *     a function would show that half for good. A plain fence in the meantime.
  *   · the clarify block stays in the prose while streaming, and only moves out of it once
  *     the reply is whole. Half a checklist is a set of options with one still missing, and
  *     `dressAlerts` renders it as a panel in the meantime — so what the reader sees is the
@@ -39,6 +43,7 @@ export function turnHtml(turn, diagramsReady, srcId) {
   const done = !turn.streaming
   return answerHtml(done ? stripClarify(turn.a).rest : turn.a, {
     diagrams: done && diagramsReady,
+    code: done,
     // The numbers, not how many: the engine returns only the sources the answer cited and
     // keeps their original n, so [2] can arrive alone.
     nums: done ? turn.citations.map(c => c.n) : [],
@@ -63,9 +68,12 @@ export function turnHtml(turn, diagramsReady, srcId) {
  *   diagrams — turn ```mermaid fences into &lt;nes-mermaid&gt;. Off while streaming (half a
  *   graph is a parse error) and off until the renderer is actually loaded, so the fallback is
  *   the code block the model wrote.
+ *   code — turn every remaining fence into &lt;nes-code&gt;. Off while streaming for a harder
+ *   reason than diagrams: that element reads its text once and then refuses to re-render, so
+ *   one created mid-stream would freeze half a function on the page for good.
  * @returns {string} sanitized HTML
  */
-function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}) {
+function answerHtml(markdown, { nums = [], srcId, diagrams = false, code = false } = {}) {
   if (!configured) {
     marked.setOptions({ breaks: true })
     configured = true
@@ -74,9 +82,86 @@ function answerHtml(markdown, { nums = [], srcId, diagrams = false } = {}) {
   html = dressTables(html)
   html = dressTaskLists(html)
   html = dressAlerts(html)
+  html = dressImages(html)
   if (nums.length && srcId)
     html = linkCites(html, new Set(nums), srcId)
-  return diagrams ? asDiagrams(html) : html
+  if (diagrams)
+    html = asDiagrams(html)
+  // Last, and after asDiagrams on purpose — see its own comment.
+  return code ? dressCode(html) : html
+}
+
+/* ── images: a screenshot is worth the paragraph it replaces ────────────────────
+   A BA writes `![what it looks like](https://…)` in a document and the answer that cites it
+   shows the picture. Nothing here allows the tag — DOMPurify's defaults already keep <img> with
+   src and alt — this only narrows what a src may be and adds what a remote image needs.
+
+   `data:` is refused, and the reason is retrieval rather than security: a document's body is the
+   thing that gets chunked and embedded, so a base64 image would be sent to the embedding model
+   *as text*. A few hundred KB of it would poison the vector, blow the chunk up and be paid for
+   on every re-index. DOMPurify allows data: on <img> by default, so the refusal has to be said
+   out loud. The alt text stays behind in its place: dropping the node silently would delete the
+   only description of the thing the BA was pointing at.
+
+   `https:` only, and the three attributes are what stop a remote image from costing more than
+   it shows: no referrer (the host learns nothing about who is reading), lazy (an image far down
+   an answer does not hold up the first paint), async decode (a big screenshot does not stall
+   the main thread while the rest of the answer is still arriving). */
+function dressImages(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  for (const img of tpl.content.querySelectorAll('img')) {
+    if (!/^https:\/\//i.test(img.getAttribute('src') ?? '')) {
+      img.replaceWith(img.getAttribute('alt') ?? '')
+      continue
+    }
+    img.setAttribute('referrerpolicy', 'no-referrer')
+    img.setAttribute('loading', 'lazy')
+    img.setAttribute('decoding', 'async')
+    // The viewer opens on tap, and an <img> is not focusable — so without this the only way in
+    // is a pointer. The `.prose` keydown listener that already serves diagrams handles Enter and
+    // Space, so one attribute is the whole keyboard path.
+    img.setAttribute('tabindex', '0')
+  }
+  return tpl.innerHTML
+}
+
+/* ── code: the library's block, upgraded later by a real grammar ────────────────
+   `<nes-code>` brings the frame, the filename header, a working COPY button and a first pass of
+   colour, for nothing — it is already in the bundle. lib/highlight.js replaces the colour with a
+   real grammar once one has been fetched; this only has to produce the element and say which
+   language it is.
+
+   It runs AFTER asDiagrams, and that order is load-bearing: asDiagrams also matches
+   `pre > code`, so a fence turned into <nes-code> first would never become a picture. The
+   skip below covers the other half of the same trap — while the mermaid chunk is still
+   loading `diagrams` is false, so a graph is still sitting here as a plain fence and must be
+   left alone for the render that comes after the renderer lands.
+
+   `file` carries the fence's own word. That slot is a filename header in the library, and using
+   it for a language is a judgement call: there is no other slot, and "go" above a block is worth
+   more to a reader than an empty header. `data-lang` is the resolved grammar name and is only
+   set when this app actually carries one — highlight.js filters on it, so an unknown language
+   keeps the vendor's colours instead of asking for a chunk that does not exist. */
+function dressCode(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  for (const code of tpl.content.querySelectorAll('pre > code')) {
+    const cls = [...code.classList].find(c => c.startsWith('language-'))
+    const label = cls?.slice(9).toLowerCase() ?? ''
+    if (label === 'mermaid' || (!cls && isDiagram(code.textContent)))
+      continue
+    const el = document.createElement('nes-code')
+    if (label) {
+      el.setAttribute('file', label)
+      const lang = language(label)
+      if (lang)
+        el.dataset.lang = lang
+    }
+    el.textContent = code.textContent
+    code.parentElement.replaceWith(el)
+  }
+  return tpl.innerHTML
 }
 
 /* Markdown emits a bare <table>, and every one of the design system's table styles hangs

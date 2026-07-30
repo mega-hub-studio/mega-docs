@@ -4,14 +4,18 @@
    the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
    value comes from a token in tokens.css.
 
-   Where it does overrule a component, the rule says so in its own comment and AGENTS.md
-   keeps the count, split the way it matters: two are waiting on an 8bit-nes release
-   (`.palette-list`, `.prose a.cite`) and the rest are this app using a recipe outside the
-   context it was written for — a `.result` that is a record rather than a control, a
-   `.statusline` bleeding out of a padded dock, a `.palette` in the page instead of a modal.
-   Only the first kind is deletable on a bump. `.prose` was one of those until 0.8.0 moved its
-   measure onto the children; reporting it and then deleting the local rule is the shape to
-   aim for.
+   Where it does overrule a component, the rule says so in its own comment and AGENTS.md keeps
+   the count, split the way it matters. **After the 0.15.0 bump the first kind is empty:** all
+   six overrides that were waiting on a release landed in it, and each one was deleted here
+   rather than kept beside its replacement — the sites still carry one line saying what they
+   fixed, so the next reader knows the loop closed instead of wondering why a comment describes
+   a rule that is not there.
+
+   What is left is the second kind: this app using a recipe outside the context it was written
+   for — a `.result` that is a record rather than a control, a `.statusline` bleeding out of a
+   padded dock, a `.palette-empty` under nine left-aligned rows. Those do not land upstream,
+   because nothing upstream is wrong. Reporting the first kind and then deleting the local rule
+   is the shape to aim for, and 0.15.0 is what it looks like when it works.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.
@@ -251,40 +255,48 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 }
 .prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
 
-/* ── citations: the marker, and the row it jumps to ──
-   The first rule is a LOCAL OVERRIDE of the design system (8bit-nes 0.13.0, and
-   AGENTS.md names it), and it is two of the library's own recipes disagreeing: `.prose a`
-   and `.cite` are both in the components layer, so specificity decides — (0,1,1) against
-   (0,1,0) — and every marker an answer renders came out as a prose link. Measured on the
-   built bundle: colour rgb(86,211,100) with a 2px underline in the same green, inside the
-   cyan chip `.cite` had already drawn. The chip *is* the affordance (superscript, slot
-   background, its own edge), so the underline was a second one struck through the digit,
-   in a colour that says "ordinary link" about the one thing on the line that is not.
-   Restores the recipe and nothing else. Delete it on the release that scopes the prose-link
-   rule away from `.cite`; the request is in the changelog.
-   The hover half is the same collision — `.prose a:hover` recolours to --ink and outscores
-   a bare `.cite:hover`, whose only job is the background lift. */
-.prose a.cite,
-.prose a.cite:hover { color: var(--cyan); text-decoration: none; }
+/* ── syntax colours: shiki's names, the library's palette ──
+   lib/highlight.js builds shiki with `createCssVariablesTheme`, so every token it emits carries
+   `style="color:var(--shiki-token-…)"` and no colour of its own. These bindings are what resolve
+   them, and every value is the token the library already uses for that job in `.t-*` — so a
+   block shiki has upgraded and one still showing the vendor's regex are the same palette rather
+   than two.
 
-/* The digit sat one device pixel high in its chip, and `align-items: center` is why it could
-   not fix itself: **flexbox centres the line box, not the ink.** The line box a text run
-   contributes is the font's em box — for NES Mono at the chip's `.7em` (9.8px): ascent 9,
-   descent 3 — while a digit's ink is ascent 7, descent 0. So the box being centred carries
-   2px of unused space above the glyph and 3px below it, and the ink's optical centre lands
-   (3 − 2) / 2 = 0.5px above the chip's. Measured with the font's own metrics rather than
-   guessed: `slack: {above: 3.86, below: 4.84}` inside a 15.7px chip.
+   Scoped to `.codeblock`, the frame `<nes-code>` renders, because that is the only place
+   highlighted code exists. Two of these have no `.t-*` twin in use: the library defines `.t-fn`
+   (gold) and `.t-at` (cyan) and its own regex never emits either, so those two hues were sitting
+   unused and a real grammar is what finally has something to put in them.
 
-   One padding, and its value is that asymmetry rather than a nudge that looked right: 1px at
-   9.8px is 0.1em, which re-centres exactly (the content box moves down 0.1em, the border box
-   grows by it, so the ink gains 0.1em and the chip's centre only half of it). In `em` because
-   the chip is sized in `em` too — a marker beside a heading has to stay centred.
+   `--shiki-background` is deliberately absent. Only the <pre>'s children are replaced, so the
+   frame keeps its own `--slot`; defining it would paint a second background inside the first. */
+.codeblock {
+  --shiki-foreground: var(--text);
+  --shiki-token-keyword: var(--blue);
+  --shiki-token-string: var(--warn);
+  --shiki-token-string-expression: var(--warn);
+  --shiki-token-comment: var(--dim);
+  --shiki-token-constant: var(--lime);
+  --shiki-token-function: var(--gold);
+  --shiki-token-parameter: var(--cyan);
+  --shiki-token-punctuation: var(--muted);
+  --shiki-token-link: var(--primary);
+  --shiki-token-inserted: var(--good);
+  --shiki-token-deleted: var(--crit);
+  --shiki-token-changed: var(--warn);
+}
 
-   An override, so it is named: 8bit-nes 0.14.0's `.cite` cannot know this, and the honest fix
-   upstream is `text-box-trim: trim-both; text-box-edge: cap alphabetic` on the recipe, which
-   trims the half-leading to the ink and makes the centring exact at every size. Delete this
-   the release that ships it; the request is in the changelog. */
-.prose a.cite { padding-block-start: 0.1em; }
+/* An answer's image opens in the diagram viewer, so it has to look like it does something.
+   `.prose` already caps it to the reading measure — nothing here sets a width. */
+.prose img { cursor: zoom-in; }
+
+/* ── citations: the row a marker jumps to ──
+   Two overrides used to open this section and **both are gone in 0.15.0**, which is the whole
+   point of re-measuring on a bump: the citation chip needed its colour and underline restored
+   (`.prose a` at (0,1,1) beat `.cite` at (0,1,0)) and its digit sat 0.5px high (flexbox centres
+   the line box, not the ink). The release scopes the prose-link rule as `& a:not(.cite)` and
+   trims the chip inside `@supports (text-box-trim: trim-both)` — with `display: inline-block`,
+   because trim does nothing on an inline-flex, which is a detail the local patch never found.
+   Both local rules are deleted rather than kept beside their replacement. */
 
 /* `.source-title` ships `&:hover { text-decoration: underline }`, which is right for the
    <a> the recipe expects. This app renders the row as three <span>s — nothing here can open
@@ -317,17 +329,12 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    phone line-break that .note-stats' flex-wrap produces. */
 .empty > .note-stats { justify-content: center; }
 
-/* A LOCAL OVERRIDE OF THE DESIGN SYSTEM — 8bit-nes 0.13.0 still lacks the fix
-   (AGENTS.md lists every one of them, and which are waiting on a release). It caps .palette-list at min(50vh, 340px) and scrolls it, which is right
-   for the modal its docs describe ("drop it in a modal"). In the page it made a *nested*
-   scroller: measured on an iPhone 14, three of seven documents were visible and the other
-   four were behind an inner scrollbar — a scroll trap on touch, and the same documents this
-   menu exists to expose. The page is the scroller; the row count is capped in
-   composables/finder.js instead.
-   Delete this when a release ships an in-page variant of .palette. `overflow` is not reset
-   here: with no cap the box is content-height, so the library's `overflow-y: auto` can never
-   produce a scrollbar. */
-.empty .palette-list { max-block-size: none; }
+/* The un-cap that used to be here is **gone in 0.15.0**: the `min(50vh, 340px)` cap is scoped
+   `:is(dialog, .modal) .palette-list` now, so a palette in the page is content-height on its
+   own and the page is the scroller. What it fixed, for the record: measured on an iPhone 14,
+   three of seven documents were visible and four sat behind an inner scrollbar — a scroll trap
+   on touch, over the documents the menu exists to expose. The row count is still capped in
+   composables/finder.js, which is a product decision rather than a patch. */
 
 /* The history rows' own stack. `.palette-list` is nested inside `.palette` in the library,
    so it cannot be borrowed out here — this supplies the same rhythm and inset from the same
@@ -711,14 +718,11 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    steps of a seven-node graph lit a node 150px below the fold. Released at 640px, where
    the vertical budget is not the constraint. 48svh is the guide's measured value for the
    same pairing, not a fresh guess. */
-/* One fact: the stepper is part of the drawing, not part of the prose. The library's
-   `.prose > *` measure has an opt-out list for the constructs whose content *is* width —
-   `nes-mermaid` is on it, `nes-walkthrough` is not, because upstream has no reason to expect
-   the two paired. So a 1147px drawing was annotated by a 646px box: measured at a 1220px
-   window, two right edges 500px apart inside one card, which is the raggedness that was
-   reported. The stepper takes the diagram's width, and the answer has one text edge and one
-   structural edge instead of three. */
-.prose nes-walkthrough { max-inline-size: none; }
+/* The stepper's width override is **gone in 0.15.0**: `nes-walkthrough` is on the library's
+   own opt-out list beside `nes-mermaid` now, so it takes the diagram's width rather than the
+   text measure. What it fixed: at a 1220px window a 1185px drawing was annotated by a 646px
+   box, two right edges 500px apart inside one card. */
+
 .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 48svh; }
 @media (min-width: 640px) {
   .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 70vh; }
@@ -794,21 +798,13 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   background: none;
 }
 
-/* ── the viewer was scaling a picture of the diagram, not the diagram ──
-   Reported as "zoom mode is blurry", and it was: at 3× the labels were soft and every box edge
-   had a halo. An SVG scaled by a transform should be redrawn from its vectors at the new size,
-   and this one was not — `will-change: transform` on `.zoom-stage` promotes it to a composited
-   layer, the layer is rasterised **once at scale 1**, and every later `scale(s)` stretches that
-   bitmap. Correct for an `<img>`, which the recipe also holds, and exactly wrong for the one
-   thing in this app that is vector.
+/* The `will-change: auto` that used to sit here is **gone in 0.15.0**. The recipe no longer
+   hints the transform statically — <nes-zoom> sets it on pointerdown/wheel and drops it ~200ms
+   after the gesture ends, so a stage is composited while it is being moved and plain otherwise.
+   That is a better fix than the one requested: it keeps the sharpness (vector re-rasterised at
+   the settled scale) without keeping a layer alive for every diagram on the page for the page's
+   whole life. The local rule would now be dead anyway — an inline style beats a stylesheet. */
 
-   `auto` gives the compositor its hint back and Chromium re-rasterises per scale — measured
-   side by side at `zoomTo(3)`: the same label goes from fuzzy to razor sharp. What it costs is
-   the promotion during a pan, and a pan is a translate of one SVG: measured on a 759×510
-   drawing there is nothing to see.
-
-   Scoped to this dialog, so an `<img>` in some other `<nes-zoom>` keeps the recipe's hint. */
-.diagram-zoom nes-zoom .zoom-stage { will-change: auto; }
 
 /* On a phone the dialog is edge to edge, so the `.modal` border and its accent bar are two
    lines hugging the screen and one green stripe eating the width — and `.zoom-view` is
@@ -967,22 +963,19 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    rhythm from a single `gap` — the same "absolute vertical evenness is one property, set once,
    on the parent" the .empty panel and the ticket cards already follow. */
 .drawer[open] {
-  display: flex; flex-direction: column;
-  /* LOCAL OVERRIDE (8bit-nes 0.14.0, re-measured on the bump): the recipe anchors itself with
-     `inset-inline-end: 0` and leaves the start inset alone, which works on a plain box and not
-     on a <dialog> — the UA sheet already sets `inset-inline: 0`, so with `margin: 0` the box is
-     over-constrained and the start wins. Measured: the panel opened flush against the *left*
-     edge, and `.drawer.start` (`inset-inline: 0 auto`) rendered identically, which is the tell.
-     `auto` hands the anchoring back to the recipe. Delete when a release qualifies its own rule.
+  /* One qualified rule, and no unqualified `.drawer` rule at all: an unqualified
+     `display: flex` beats the UA's `dialog:not([open]) { display: none }` (origin before
+     specificity, as the diagram viewer above documents), and the minifier folds an adjacent
+     pair — `.drawer[open]{display:flex}` beside `.drawer{flex-direction:column}` came out of
+     the build as one `.drawer{flex-direction:column;display:flex}`, which is the bug again
+     wearing the fix's name.
 
-     Both declarations sit in the *same* qualified rule and there is no unqualified `.drawer`
-     rule at all: an unqualified `display: flex` beats the UA's `dialog:not([open])
-     { display: none }` (origin before specificity, as the diagram viewer above documents), and
-     the minifier folds an adjacent pair — `.drawer[open]{display:flex}` beside
-     `.drawer{flex-direction:column}` came out of the build as one
-     `.drawer{flex-direction:column;display:flex}`, which is the bug again wearing the fix's
-     name. */
-  inset-inline-start: auto;
+     The `inset-inline-start: auto` that used to be here is **gone in 0.15.0**: the recipe sets
+     it itself now. What it fixed — the panel opened flush against the *left* edge on a
+     <dialog>, because the UA sheet's `inset-inline: 0` plus the recipe's `margin: 0`
+     over-constrained the box and the start won. `.drawer.start` rendering identically was the
+     tell. */
+  display: flex; flex-direction: column;
 }
 .drawer > .head { flex: none; }
 .drawer-body {

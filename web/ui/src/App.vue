@@ -40,6 +40,7 @@ import { useConversation } from './composables/conversation.js'
 import { useCorpus } from './composables/corpus.js'
 import { useDiagrams } from './composables/diagrams.js'
 import { useDock } from './composables/dock.js'
+import { useHighlight } from './composables/highlight.js'
 import { useT } from './composables/lang.js'
 import { useQaLoop } from './composables/qaloop.js'
 import { useRelease } from './composables/release.js'
@@ -68,6 +69,8 @@ const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBa, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, stepped, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
+// Colour for the code blocks, fetched per language and only when an answer has one.
+const { paintCode } = useHighlight()
 // The notes are fetched on the first open and kept — they describe the binary that is
 // answering, so they cannot change until it restarts.
 const {
@@ -112,6 +115,7 @@ const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useCo
     if (corpus.value.state !== 'ready')
       refreshCorpus()
     loadFor(turn.a)
+    paintCode()
   },
 })
 
@@ -121,6 +125,24 @@ const statusLine = useStatusLine({ turns, busy, online, runtime, model: pickedMo
 // the BA works it, the empty screen lists what is already filed — so refresh on every
 // arrival rather than reasoning about which screen needed it.
 watch(() => route.name, refreshQueue)
+
+/* Paint the code blocks whenever a screen is showing one, and note the two options that do
+   not work — both were tried and measured, because the failure is silent either way.
+
+   `onMounted` is too early: it reads the DOM, unlike `loadFor` above which reads the answer
+   *text*, and at mount the screen holding the answers has not rendered.
+
+   A plain `watch` on the route is too late — or rather, never: `/ask` is an eager import, so
+   the router's first navigation resolves before this setup runs and `route.name` is already
+   "ask". There is no change to see, so the callback never fires on a fresh load. It fired
+   only when navigating to `/ba` (a dynamic import) and back, which is exactly the shape of a
+   bug that looks fixed while you are clicking around.
+
+   `immediate` is what covers the first load, and `flush: "post"` is what makes it correct
+   rather than lucky: the callback runs after Vue has patched the DOM, so the elements are
+   there to find. `paintCode` also waits a tick of its own, which is what keeps the other
+   caller — `onSettled`, running out of a promise rather than a watcher — safe too. */
+watch(() => route.name, paintCode, { immediate: true, flush: 'post' })
 
 onMounted(() => {
   view = bindViewport(dock.value)
