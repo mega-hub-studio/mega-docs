@@ -122,7 +122,7 @@ const {
       </template>
     </dl>
 
-    <p class="hint">PDF or DOCX? Convert first — <code>markitdown spec.pdf &gt; spec.md</code>.</p>
+    <p class="hint">PDF or DOCX? Convert first!</p>
 
     <!-- Removal belongs on this card rather than a screen of its own: it is the same
          password, the same corpus, and the same person's job. Collapsed, because a BA opens
