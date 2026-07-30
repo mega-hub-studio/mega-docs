@@ -23,7 +23,8 @@ type fakeAnswers struct {
 	err    error
 	corpus db.Corpus
 	cErr   error
-	asked  []rag.Ask // what the handler passed down, so `fresh` can be verified
+	recall rag.Recall // how much of the thread the model read, for the `done` frame
+	asked  []rag.Ask  // what the handler passed down, so `fresh` can be verified
 }
 
 func (f *fakeAnswers) Answer(_ context.Context, a rag.Ask) (rag.Reply, error) {
@@ -31,7 +32,7 @@ func (f *fakeAnswers) Answer(_ context.Context, a rag.Ask) (rag.Reply, error) {
 	for _, t := range f.tokens {
 		a.OnToken(t)
 	}
-	return rag.Reply{Citations: f.cites, Cached: f.cached}, f.err
+	return rag.Reply{Citations: f.cites, Cached: f.cached, Recall: f.recall}, f.err
 }
 
 func (f *fakeAnswers) Corpus(int) (db.Corpus, error) { return f.corpus, f.cErr }
@@ -132,13 +133,24 @@ func TestTheBuiltBundleIsImmutable(t *testing.T) {
 	}
 }
 
+// The `done` frame is asserted whole, and with every optional field populated, because it is
+// the one frame that carries facts the client cannot re-derive: which model answered, and how
+// much of the thread it read. A client reading only some of them renders a blank model badge
+// and a memory meter about nothing, with no error anywhere — so the wire shape is pinned here.
 func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
-	h := newTestServer(&fakeAnswers{
-		tokens: []string{"Hybrid ", "search [1]"},
-		cites:  []rag.Citation{{N: 1, DocPath: "docs/a.md", Heading: "How"}},
+	h := New(Deps{
+		Answers: &fakeAnswers{
+			tokens: []string{"Hybrid ", "search [1]"},
+			cites:  []rag.Citation{{N: 1, DocPath: "docs/a.md", Heading: "How"}},
+			recall: rag.Recall{Kept: 3, Offered: 8},
+		},
+		Index: []byte("<html>index</html>"),
+		// A named model only survives readQuestion when the instance offers it: pick() answers
+		// "" for an empty list, whatever was asked for.
+		Runtime: Runtime{Models: []Model{{Name: "gpt-4"}}},
 	})
 
-	w := do(t, h, "POST", "/api/chat", `{"question":"how?"}`, nil)
+	w := do(t, h, "POST", "/api/chat", `{"question":"how?","model":"gpt-4"}`, nil)
 	if w.Code != 200 {
 		t.Fatalf("chat = %d", w.Code)
 	}
@@ -152,7 +164,8 @@ func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
 		"event: token\ndata: {\"t\":\"search [1]\"}\n\n",
 		`event: citations`,
 		`"doc":"docs/a.md"`,
-		"event: done\ndata: {\"done\":true,\"cached\":false}\n\n",
+		"event: done\ndata: {\"done\":true,\"cached\":false," +
+			"\"model\":\"gpt-4\",\"kept\":3,\"offered\":8}\n\n",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("stream missing %q\n--- got ---\n%s", want, body)

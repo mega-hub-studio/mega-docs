@@ -66,10 +66,19 @@ export function useRuntime() {
    * The browser knows about the network before a request fails, so listen — but only
    *  trust it in one direction: "offline" is a fact, "online" only means the interface
    *  came back, so it triggers a real check.
+   *
+   * A refocus is the third signal, and the only one that catches a deploy: /api/health's body
+   * is built once at process start, so a tab left open all day reports whatever was true when
+   * it loaded — a green light over a dead server, or last week's model list. An interval would
+   * poll a constant to learn the same thing; coming back to the tab is when it matters.
    */
   function watchNetwork() {
     addEventListener('online', check)
     addEventListener('offline', () => (online.value = false))
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible')
+        check()
+    })
   }
 
   return { online, writes, admin, runtime, check, watchNetwork }

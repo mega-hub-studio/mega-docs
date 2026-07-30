@@ -89,7 +89,7 @@ const scroll = opts => view?.scrollToEnd(opts)
 // carries it. A getter for the list, because /api/health answers after the first render.
 const {
   el: settingsEl,
-  open: openSettings,
+  open: openDrawer,
   close: closeSettings,
   picked,
   current: pickedModel,
@@ -140,6 +140,17 @@ onMounted(() => {
 function pickScope(next) {
   setScope(next)
   pick.value?.close()
+}
+
+/**
+ * Opening the panel is the question "what is this instance, right now" — so ask again rather
+ *  than showing what was true when the tab loaded. It is wired here because the drawer's own
+ *  composable may not reach for another's state, and the answer arrives while it is already
+ *  open: the model list and the version fill in, they do not gate the open.
+ */
+function openSettings() {
+  check()
+  openDrawer()
 }
 
 /**

@@ -14,10 +14,39 @@
 /** @typedef {{ q: string, a: string }} Turn one exchange already on screen */
 
 /**
+ * @typedef {object} Done the last frame of a stream, and the only one carrying facts the
+ *   client cannot re-derive: `model` because a reader may switch mid-thread, `kept`/`offered`
+ *   because a budget that trims silently looks like an assistant that forgot.
+ * @property {boolean} cached served from the answer cache — it cost nothing
+ * @property {number} in prompt tokens, 0 when the provider reported none
+ * @property {number} out completion tokens, 0 when the provider reported none
+ * @property {string} model which one actually answered
+ * @property {number} kept turns of the thread the model read
+ * @property {number} offered turns it was given to choose from
+ */
+
+/**
+ * @typedef {object} Health what the server is and what it allows. Zero and "" mean unknown,
+ *   and the UI prints nothing rather than a zero.
+ * @property {boolean} online the server answered at all
+ * @property {boolean} writes a BA can confirm here
+ * @property {boolean} admin this instance has an admin surface
+ * @property {string} model the default model's name
+ * @property {number} window its context window, in tokens
+ * @property {{name: string, window: number, price_in: number, price_out: number}[]} models
+ *   every model this instance will answer with — the picker's whole source of truth
+ * @property {{topK: number, threadShare: number, cacheKeep: number}} engine what it is tuned to
+ * @property {number} priceIn USD per 1M prompt tokens
+ * @property {number} priceOut USD per 1M completion tokens
+ * @property {string} version the commit this server was built from
+ * @property {string} release the tag that commit was cut from
+ */
+
+/**
  * Ask one question and stream the answer.
  * @param {string} question
  * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
- *          onDone?: (info: { cached: boolean }) => void, fresh?: boolean,
+ *          onDone?: (info: Done) => void, fresh?: boolean,
  *          scope?: string, history?: Turn[], model?: string }} handlers
  *   fresh skips the server's answer cache — what Regenerate means. scope narrows
  *   retrieval to one document or folder; "" is the whole corpus. history is the thread
@@ -106,26 +135,41 @@ function apply(frame, { onToken, onCitations, onDone }) {
   if (!frame)
     return
   const { event, payload } = frame
-  if (event === 'token')
+  if (event === 'token') {
     onToken?.(payload.t)
-  else if (event === 'citations')
+  }
+  else if (event === 'citations') {
     onCitations?.(payload)
-  else if (event === 'done')
-    onDone?.({ cached: !!payload.cached, in: payload.in || 0, out: payload.out || 0 })
-  else if (event === 'error')
+  }
+  // Every field the frame carries, not the three this once forwarded: the server omits an
+  // unmeasured count and an unnamed model rather than sending a zero, so the defaults are here
+  // and the layer above gets a whole `Done` either way. Dropping one is silent — a blank model
+  // badge and a memory meter reading "—" are what a missing field looks like, with no error.
+  else if (event === 'done') {
+    onDone?.({
+      cached: !!payload.cached,
+      in: payload.in || 0,
+      out: payload.out || 0,
+      model: payload.model || '',
+      kept: payload.kept || 0,
+      offered: payload.offered || 0,
+    })
+  }
+  else if (event === 'error') {
     throw new Error(payload.message)
+  }
 }
 
 /**
  * What the server is and what it allows. Never throws — an unreachable server is
  * a state the UI shows, not an error it handles.
- * @returns {Promise<{online: boolean, writes: boolean}>} writes: a BA can confirm here
+ * @returns {Promise<Health>}
  */
 export async function health() {
   try {
     const res = await fetch('/api/health')
     if (!res.ok)
-      return { online: false, writes: false, admin: false }
+      return unknown() // a proxy's 502 mid-deploy, which is the common way this fails
     const body = await res.json()
     // The runtime fields are what the status line reports. Absent or zero means
     // "unknown", and the strip prints nothing rather than a zero — an unmeasured
@@ -161,16 +205,30 @@ export async function health() {
     }
   }
   catch {
-    return {
-      online: false,
-      writes: false,
-      admin: false,
-      model: '',
-      window: 0,
-      priceIn: 0,
-      priceOut: 0,
-      version: '',
-      release: '',
-    }
+    return unknown()
+  }
+}
+
+/**
+ * A server that told us nothing, as every key the success path returns. Both failure paths
+ * answer with this rather than with a shorter object: the caller assigns the result wholesale,
+ * so an *absent* key is not a zeroed one — it lands as `undefined` on the panel, which is how
+ * the engine group read undefined for a while. One shape, so the three can never drift again,
+ * and a fresh object each time because the caller is handed the array.
+ * @returns {Health}
+ */
+function unknown() {
+  return {
+    online: false,
+    writes: false,
+    admin: false,
+    model: '',
+    window: 0,
+    models: [],
+    engine: { topK: 0, threadShare: 0, cacheKeep: 0 },
+    priceIn: 0,
+    priceOut: 0,
+    version: '',
+    release: '',
   }
 }
