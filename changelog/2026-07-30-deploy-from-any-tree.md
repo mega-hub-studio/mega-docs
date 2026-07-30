@@ -99,6 +99,28 @@ verification server that way takes the deployed service down with it; systemd br
 under a second (`NRestarts` → 11) and health was green, so nothing on screen would have told
 you. Kill a scratch instance by its port or its full path.
 
+**A leaked rig server makes `make check-ui` measure a *stale* render and fail on pages you never
+touched.** `scripts/guide-rig.sh` serves `mktemp -d` on port 8123 and kills it from an EXIT trap;
+a run interrupted before the trap leaves it bound. The next run's own `python3 -m http.server`
+then fails to bind — silently, it is `>/dev/null 2>&1` — and the readiness probe that follows
+succeeds *against the leaked server*, so the browser measures last run's HTML. It reported
+`table rows stacked on a laptop` on `dev.html` and `deploy.html`, and `language toggle stuck at
+en`, none of which were true of the tree. Worse, each failed run leaks another one, so it
+compounds.
+
+Proving it was not the edit under review took reverting `web/deploy.html` to `HEAD` and watching
+the baseline fail identically. The cheap check first, next time:
+
+```
+pgrep -af 'http.server 8123'      # must be empty before check-ui
+```
+
+The rig already sweeps stale *pinchtab instances* by port for the same reason (`409 port already
+reserved`); it does not yet sweep the HTTP server, and a foreign server answering the readiness
+probe is the more dangerous of the two because it looks like a pass. Not fixed here — it is
+outside this change — but a `check-ui` failure naming a page you did not edit should send you to
+that `pgrep` before the diff.
+
 **The dispatcher runs the *target* tree's Makefile, so a new guard is not in force until it is
 committed and deployed.** Re-running `make deploy UNIT=knowledgey` from the dev tree to test the
 new refusal delegated into `/opt/knowledge`, which still carried the old Makefile, and did a
