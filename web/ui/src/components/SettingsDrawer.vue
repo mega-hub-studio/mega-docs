@@ -43,6 +43,12 @@ defineProps({
   // how many answers the cache holds. Read-only here on purpose — all three are read at startup
   // from .env, and a panel that let you type into a value it cannot change would be lying.
   engine: { type: Object, default: () => ({}) },
+  // The two halves of "which system is this", and they answer different questions (rule 25):
+  // `release` is the git tag — what changed — and `version` the commit the binary was built
+  // from — which bytes are running. Either can be empty and then it simply is not shown: no
+  // tag means no release was cut, and no commit means a build with no VCS stamp.
+  version: { type: String, default: '' },
+  release: { type: String, default: '' },
   t: { type: Function, required: true },
 })
 
@@ -186,6 +192,22 @@ defineExpose({
           </button>
         </router-link>
       </div>
+    </div>
+
+    <!-- ── which system this is ──
+         Outside `.drawer-body`, which is the whole point: the body is `flex: 1` with its own
+         overflow, so this is the panel's last row and never scrolls away. The one fact you open
+         this panel to confirm must not be the one that left the screen.
+         It is here rather than only in the status line because this is a *modal* <dialog> — it
+         covers the status line, so while the panel is open the version is otherwise unreadable.
+         Right-aligned: the rows above are read down their left edge, and this is a stamp rather
+         than a control, so it sits out of that column.
+         No `nes-icon`: the library ships no `branch` or `tag` glyph, and a name a release does
+         not have renders an empty box in silence — the same call StatusLine.vue already made. -->
+    <div class="set-foot" :title="t('settings.version')">
+      <b v-if="release">{{ release }}</b>
+      <span v-if="version">@{{ version }}</span>
+      <span v-if="!release && !version">—</span>
     </div>
   </dialog>
 </template>

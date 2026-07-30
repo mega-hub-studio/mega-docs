@@ -210,24 +210,32 @@ main .card > .head { margin-block-end: 0; }
    no rhythm of its own, so its option group and its ASK THIS button touched. `align-items`
    keeps the button at its own width (70px, measured): a stretched flex child would have made
    the one action in the card as wide as the question, which reads as the card's primary
-   surface rather than as the answer to it. Both kinds are the same shape, so this names the
-   element rather than `.info`/`.quest`. */
-.a > form.callout {
+   surface rather than as the answer to it.
+
+   And it takes the card's own width, which reverses the cap noted above. What changed is what
+   it sits under: with the answer at the text measure a 1207px form read as a different column,
+   but a *diagram* answer is 1185px, its walkthrough is 1185px, and the head and the actions row
+   above and below it are 1185px — so the capped form was the one box out of five with its own
+   right edge. Measured at a 1220px window: 684 against 1185, 500px of visible misalignment
+   inside one card. A form is a control panel, not prose; the boxes share one edge and only the
+   text keeps a measure. */
+.a > .clarify {
   display: flex; flex-direction: column; align-items: start;
   gap: var(--sp-3);
+  max-inline-size: none;
 }
 
 /* Text keeps a reading measure while the shell does not, which is what makes --col: 80rem
    safe — widening it without this buys a wide table at the price of 160-character prose.
    Inside `.prose` that split is the library's since 0.8.0 (`--prose-measure` on the
-   children, and the constructs whose content *is* width opting out). These four are the
-   text this app renders *outside* `.prose`, so they borrow the same token — the clarify card
-   most visibly, because it sits directly under the prose it belongs to: left uncapped it came
-   out at 1207px against 646px of answer above it, which read as a different column rather
-   than the next thing to do. */
+   children, and the constructs whose content *is* width opting out). These three are the
+   text this app renders *outside* `.prose`, so they borrow the same token.
+   None of them draws a right edge — a question bubble, a citation row and a BA-screen
+   paragraph are ragged text — which is the line this rule now stops at. `.clarify` used to be
+   here, capped because a 1207px form under 646px of prose "read as a different column"; it is
+   uncapped again a few rules below, and that comment says what changed. */
 .q,
 .sources,
-.clarify,
 main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 
 /* .prose covers lists, quotes, links and images but not code *blocks* (base.css
@@ -682,6 +690,10 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   max-block-size: 70vh;
 }
 .prose nes-mermaid .mermaid-view > svg { inline-size: 1000%; }
+/* The frame is a scroll container and `lib/diagram.js` makes a mouse able to drag it, so the
+   cursor says which of the two things a press is doing: `zoom-in` until it moves, `grabbing`
+   while it does. Only the second is written here — the first is the rule above. */
+.prose nes-mermaid .mermaid-view.is-panning { cursor: grabbing; }
 
 /* ── a diagram that walks itself ──
    `<nes-walkthrough>` is prev/next + dots + one step's prose, and the library styles the
@@ -699,7 +711,15 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    steps of a seven-node graph lit a node 150px below the fold. Released at 640px, where
    the vertical budget is not the constraint. 48svh is the guide's measured value for the
    same pairing, not a fresh guess. */
-.prose nes-walkthrough { display: block; }
+/* Two declarations, one fact: the stepper is part of the drawing, not part of the prose.
+   `display` because an unknown element is `display: inline`, so the box would sit on the
+   diagram's last line — and `max-inline-size` because the library's `.prose > *` measure has an
+   opt-out list for the constructs whose content *is* width (`nes-mermaid` is on it,
+   `nes-walkthrough` is not, because upstream has no reason to expect the two paired). So a
+   1147px drawing was annotated by a 646px box: measured at a 1220px window, two right edges
+   500px apart inside one card, which is the raggedness that was reported. The stepper takes the
+   diagram's width, and the answer has one text edge and one structural edge instead of three. */
+.prose nes-walkthrough { display: block; max-inline-size: none; }
 .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 48svh; }
 @media (min-width: 640px) {
   .prose nes-mermaid[data-walk] .mermaid-view { max-block-size: 70vh; }
@@ -773,6 +793,22 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   border: 0;
   background: none;
 }
+
+/* ── the viewer was scaling a picture of the diagram, not the diagram ──
+   Reported as "zoom mode is blurry", and it was: at 3× the labels were soft and every box edge
+   had a halo. An SVG scaled by a transform should be redrawn from its vectors at the new size,
+   and this one was not — `will-change: transform` on `.zoom-stage` promotes it to a composited
+   layer, the layer is rasterised **once at scale 1**, and every later `scale(s)` stretches that
+   bitmap. Correct for an `<img>`, which the recipe also holds, and exactly wrong for the one
+   thing in this app that is vector.
+
+   `auto` gives the compositor its hint back and Chromium re-rasterises per scale — measured
+   side by side at `zoomTo(3)`: the same label goes from fuzzy to razor sharp. What it costs is
+   the promotion during a pan, and a pan is a translate of one SVG: measured on a 759×510
+   drawing there is nothing to see.
+
+   Scoped to this dialog, so an `<img>` in some other `<nes-zoom>` keeps the recipe's hint. */
+.diagram-zoom nes-zoom .zoom-stage { will-change: auto; }
 
 /* On a phone the dialog is edge to edge, so the `.modal` border and its accent bar are two
    lines hugging the screen and one green stripe eating the width — and `.zoom-view` is
@@ -984,3 +1020,20 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 /* The meter and its figure read as one value, so they share the row's second column. */
 .set-meter { display: flex; align-items: center; gap: var(--sp-3); }
 .set-meter > small { font-family: var(--font-mono); font-size: var(--fs-label); color: var(--dim); }
+
+/* The identity line, pinned under the body rather than scrolling with it: it is a sibling of
+   `.drawer-body`, which is the `flex: 1` box that owns the overflow, so this is always the last
+   thing on screen. Which is the point — "what version is this?" is the one question the panel
+   answers that must not be the answer that scrolled away, and a modal <dialog> is covering the
+   status line that otherwise says it.
+   Separated the way one `.set-group` is from the next, because that is what it is: a last group
+   holding one fact. Right-aligned, and dim mono like `.set-meter > small` above — the rows above
+   are values read down a left edge, and this is a stamp on the panel rather than another of
+   them. Weight alone ranks the two halves; no second colour is invented for it. */
+.set-foot {
+  display: flex; align-items: baseline; justify-content: flex-end; gap: var(--sp-2);
+  margin-block-start: var(--sp-4);
+  padding-block-start: var(--sp-3);
+  border-block-start: var(--bw-2) solid var(--line);
+  font-family: var(--font-mono); font-size: var(--fs-label); color: var(--dim);
+}

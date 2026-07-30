@@ -90,6 +90,71 @@ export function onRender(host) {
   hint.className = 'zoom-hint'
   hint.textContent = '⤢ TAP TO ZOOM'
   host.append(hint)
+  pannable(host.querySelector('.mermaid-view'))
+}
+
+/** Swallows the click that ends a real drag, so panning never also opens the viewer. */
+const swallow = e => e.stopPropagation()
+
+/**
+ * Drag a diagram that is wider than its frame — with a mouse, which is the case the platform
+ * leaves out.
+ *
+ * The frame is already a scroll container, so this is `scrollLeft`/`scrollTop` and nothing
+ * here remembers a position: a touch drags it natively (hence the `pointerType` guard, or a
+ * finger would move it twice), a trackpad has two fingers, and a mouse has an 8px scrollbar at
+ * the bottom of a 550px card — which reads as "the diagram is cut off", not as "drag it".
+ * Reported exactly that way.
+ *
+ * Scale stays the viewer's: `<nes-zoom>` owns pinch, wheel and the buttons, and reimplementing
+ * any of that here would be a second panner to keep in agreement with the first.
+ *
+ * @param {Element|null} view the library's `.mermaid-view`, or null when the render failed
+ */
+function pannable(view) {
+  if (!view || view.dataset.pan)
+    return
+  view.dataset.pan = '1'
+  let from = null
+
+  view.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0)
+      return
+    from = { x: e.clientX, y: e.clientY, left: view.scrollLeft, top: view.scrollTop, moved: false }
+    // Keeps the drag alive past the frame's edge. Not every browser will hand it over, and a
+    // drag that stops at the border is still better than no drag.
+    try {
+      view.setPointerCapture(e.pointerId)
+    }
+    catch {}
+  })
+
+  view.addEventListener('pointermove', (e) => {
+    if (!from)
+      return
+    const dx = e.clientX - from.x
+    const dy = e.clientY - from.y
+    // A tap with a tremor in it is still a tap: under the threshold nothing scrolls and the
+    // click goes on to open the viewer.
+    if (!from.moved && Math.hypot(dx, dy) < 4)
+      return
+    from.moved = true
+    view.classList.add('is-panning')
+    view.scrollLeft = from.left - dx
+    view.scrollTop = from.top - dy
+  })
+
+  const end = () => {
+    view.classList.remove('is-panning')
+    // A drag must not also open the viewer. One capture-phase listener, once, so the tap on a
+    // still pointer keeps working — the alternative is a flag two files apart deciding what a
+    // click meant.
+    if (from?.moved)
+      view.addEventListener('click', swallow, { capture: true, once: true })
+    from = null
+  }
+  view.addEventListener('pointerup', end)
+  view.addEventListener('pointercancel', end)
 }
 
 /**

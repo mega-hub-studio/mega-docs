@@ -270,7 +270,8 @@ function replay(entry) {
   <SettingsDrawer
     ref="settingsEl" :models="runtime.models" :picked="picked" :current="pickedModel"
     :muted="muted" :lang="lang" :langs="langs" :admin="admin"
-    :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :engine="runtime.engine" :t="t"
+    :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :engine="runtime.engine"
+    :version="runtime.version" :release="runtime.release" :t="t"
     @pick="pickModel" @mute="mute" @set-lang="setLang" @close="closeSettings"
   />
 

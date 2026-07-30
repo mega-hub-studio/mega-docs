@@ -70,6 +70,7 @@ export const messages = {
       cacheKeep: 'Answers held in the cache',
       instance: 'INSTANCE',
       instanceHint: 'Every knob and where its value came from. Read-only.',
+      version: 'Release tag and the commit this build came from — a trailing + means the tree was dirty',
     },
     empty: {
       title: 'Ask the source of truth',
@@ -156,6 +157,7 @@ export const messages = {
       cacheKeep: 'Số câu trả lời cache giữ lại',
       instance: 'INSTANCE',
       instanceHint: 'Mọi knob và giá trị đến từ đâu. Chỉ đọc.',
+      version: 'Tag release và commit đã build ra bản này — dấu + ở cuối nghĩa là cây làm việc bẩn',
     },
     empty: {
       title: 'Hỏi nguồn sự thật',
