@@ -259,6 +259,25 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 .prose a.cite,
 .prose a.cite:hover { color: var(--cyan); text-decoration: none; }
 
+/* The digit sat one device pixel high in its chip, and `align-items: center` is why it could
+   not fix itself: **flexbox centres the line box, not the ink.** The line box a text run
+   contributes is the font's em box — for NES Mono at the chip's `.7em` (9.8px): ascent 9,
+   descent 3 — while a digit's ink is ascent 7, descent 0. So the box being centred carries
+   2px of unused space above the glyph and 3px below it, and the ink's optical centre lands
+   (3 − 2) / 2 = 0.5px above the chip's. Measured with the font's own metrics rather than
+   guessed: `slack: {above: 3.86, below: 4.84}` inside a 15.7px chip.
+
+   One padding, and its value is that asymmetry rather than a nudge that looked right: 1px at
+   9.8px is 0.1em, which re-centres exactly (the content box moves down 0.1em, the border box
+   grows by it, so the ink gains 0.1em and the chip's centre only half of it). In `em` because
+   the chip is sized in `em` too — a marker beside a heading has to stay centred.
+
+   An override, so it is named: 8bit-nes 0.14.0's `.cite` cannot know this, and the honest fix
+   upstream is `text-box-trim: trim-both; text-box-edge: cap alphabetic` on the recipe, which
+   trims the half-leading to the ink and makes the centring exact at every size. Delete this
+   the release that ships it; the request is in the changelog. */
+.prose a.cite { padding-block-start: 0.1em; }
+
 /* `.source-title` ships `&:hover { text-decoration: underline }`, which is right for the
    <a> the recipe expects. This app renders the row as three <span>s — nothing here can open
    a document — so the underline offered a link that does not exist, on every row of every

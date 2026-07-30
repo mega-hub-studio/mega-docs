@@ -20,6 +20,7 @@ type fakeKnow struct {
 	history  []db.Cached
 	err      error
 	confirms []string // the answers a confirm was called with, in order
+	names    []string // the document names it was called with, alongside them
 	opened   [][2]string
 	deleted  []int64 // the ids a delete was called with, in order
 }
@@ -36,8 +37,9 @@ func (f *fakeKnow) Draft(_ int64, a string) (db.Ticket, error) {
 	return f.ticket, f.err
 }
 
-func (f *fakeKnow) Confirm(_ context.Context, _ int64, a string) (db.Ticket, error) {
+func (f *fakeKnow) Confirm(_ context.Context, _ int64, a, name string) (db.Ticket, error) {
 	f.confirms = append(f.confirms, a)
+	f.names = append(f.names, name)
 	f.ticket.Answer, f.ticket.Status = a, db.StatusConfirmed
 	return f.ticket, f.err
 }
@@ -238,6 +240,23 @@ func TestConfirmPassesTheAnswerThroughAndReturnsTheTicket(t *testing.T) {
 	}
 	if got.Status != db.StatusConfirmed {
 		t.Errorf("the response must carry the new status, got %q — the UI renders from it", got.Status)
+	}
+	// No name in that body, and none may be invented: the engine reads an empty one as "keep
+	// the name this ticket already has", so a client that does not know about the field must
+	// not be able to rename a published document by omitting it.
+	if k.names[0] != "" {
+		t.Errorf("a confirm with no name field reached the engine as %q", k.names[0])
+	}
+
+	// And with one, it is the BA's word for what the document is about — trimmed, because a
+	// name typed on a phone arrives with a space on it.
+	w = do(t, h, "POST", "/api/tickets/12/confirm",
+		`{"answer":"30 days from issue.","name":" invoice-validity "}`, withPass(baPass))
+	if w.Code != 200 {
+		t.Fatalf("confirm with a name = %d %s", w.Code, w.Body.String())
+	}
+	if k.names[1] != "invoice-validity" {
+		t.Errorf("the document name reached the engine as %q", k.names[1])
 	}
 }
 

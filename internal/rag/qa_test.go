@@ -186,7 +186,7 @@ func TestConfirmedAnswerBecomesADocumentAndThenACitation(t *testing.T) {
 	}
 
 	const answer = "An invoice is valid for 30 days from the issue date, then it is void."
-	ticket, err = e.Confirm(ctx, ticket.ID, answer)
+	ticket, err = e.Confirm(ctx, ticket.ID, answer, "")
 	if err != nil {
 		t.Fatalf("confirm: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestADraftSurvivesAndStaysOutOfRetrieval(t *testing.T) {
 	}
 
 	// The BA comes back and publishes it.
-	if ticket, err = e.Confirm(ctx, ticket.ID, ticket.Answer); err != nil {
+	if ticket, err = e.Confirm(ctx, ticket.ID, ticket.Answer, ""); err != nil {
 		t.Fatalf("confirm after draft: %v", err)
 	}
 	if ticket.Status != db.StatusConfirmed {
@@ -336,10 +336,10 @@ func TestConfirmingTwiceCorrectsTheAnswerInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+	if _, err := e.Confirm(ctx, ticket.ID, "Seven years.", ""); err != nil {
 		t.Fatal(err)
 	}
-	corrected, err := e.Confirm(ctx, ticket.ID, "Actually five.")
+	corrected, err := e.Confirm(ctx, ticket.ID, "Actually five.", "")
 	if err != nil {
 		t.Fatalf("a correction was refused: %v", err)
 	}
@@ -357,6 +357,38 @@ func TestConfirmingTwiceCorrectsTheAnswerInPlace(t *testing.T) {
 	if strings.Contains(doc.Body, "Seven years.") {
 		t.Errorf("both answers are in one document — a correction must replace, not append:\n%s", doc.Body)
 	}
+	// The name is the BA's, and an empty one keeps whatever the citation already prints. Both
+	// confirms above passed "", so neither may have moved the document off the id-derived name.
+	if corrected.DocPath != "qa/ticket-1.md" {
+		t.Errorf("doc path = %q, want the id-derived name when no name was given", corrected.DocPath)
+	}
+
+	// Now a name, which is the whole point of it: a citation reads as domain knowledge rather
+	// than as a ticket number. The extension is added because "retention" is what a person
+	// types, and the old name is *unpublished* — two documents holding one answer, one of them
+	// still retrievable under a name nothing points at, is the drift this has to avoid.
+	named, err := e.Confirm(ctx, ticket.ID, "Actually five.", "retention")
+	if err != nil {
+		t.Fatalf("a rename was refused: %v", err)
+	}
+	if named.DocPath != "qa/retention.md" {
+		t.Errorf("doc path after naming = %q", named.DocPath)
+	}
+	if inCorpus(t, e, "qa/ticket-1.md") {
+		t.Error("the old name is still retrievable — a rename must unpublish it")
+	}
+	// Its text survives, like every soft removal: a rename costs the address, never the words.
+	if _, ok, _ := e.Document("qa/ticket-1.md"); !ok {
+		t.Error("the old row lost its text; removal is a deleted_at column")
+	}
+	if doc, ok, _ := e.Document(named.DocPath); !ok || !strings.Contains(doc.Body, "Actually five.") {
+		t.Errorf("the renamed document does not hold the answer (ok=%v)", ok)
+	}
+	// Every structural rule an import has still applies inside qa/, and `..` is the one that
+	// matters most: a name is typed by a person, so it is untrusted input like any path.
+	if _, err := e.Confirm(ctx, ticket.ID, "Actually five.", "../escape"); err == nil {
+		t.Error("a name walking out of the folder was accepted")
+	}
 }
 
 func TestTakingAConfirmedAnswerBackOutStopsItAnswering(t *testing.T) {
@@ -370,7 +402,7 @@ func TestTakingAConfirmedAnswerBackOutStopsItAnswering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years.", ""); err != nil {
 		t.Fatal(err)
 	}
 	path := ticket.DocPath
@@ -410,7 +442,7 @@ func TestDeletingATicketDropsTheQuestionAndKeepsTheWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years.", ""); err != nil {
 		t.Fatal(err)
 	}
 	path := ticket.DocPath
@@ -446,7 +478,7 @@ func TestDismissingAConfirmedTicketUnpublishesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years."); err != nil {
+	if ticket, err = e.Confirm(ctx, ticket.ID, "Seven years.", ""); err != nil {
 		t.Fatal(err)
 	}
 	path := ticket.DocPath
@@ -480,7 +512,7 @@ func TestConfirmRefusesAnEmptyAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.Confirm(context.Background(), ticket.ID, "   \n "); err == nil {
+	if _, err := e.Confirm(context.Background(), ticket.ID, "   \n ", ""); err == nil {
 		t.Error("an empty answer was indexed as knowledge")
 	}
 }

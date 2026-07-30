@@ -25,6 +25,37 @@ export const STATUS = {
   rejected: { label: 'DISMISSED', badge: 'crit', accent: 'crit', hint: 'Not a documentation gap.' },
 }
 
+/**
+ * Where a confirm will publish, so a BA can read it before pressing the button.
+ *
+ * A *preview*, not the decision: `rag.qaPath` in Go is the authority and does this plus every
+ * structural check a path gets (no `..`, no hidden segment, MaxDepth). The three rules a BA has
+ * to see are the three this repeats — `qa/` is not typed, `.md` is added, and an empty name
+ * falls back to the ticket's id — because a name whose result is invisible until after it is
+ * published is a name nobody dares change.
+ * @param {string} name what the BA typed, or ""
+ * @param {number} id the ticket, for the fallback
+ * @returns {string} the path a citation will print
+ */
+export function docPath(name, id) {
+  const leaf = (name || '').trim().replace(/\.(?:md|markdown|txt)$/i, '') || `ticket-${id}`
+  return `qa/${leaf}.md`
+}
+
+/**
+ * The other direction: what to put in the name box for a document that already exists.
+ *
+ * The path *inside* `qa/`, so `docPath` takes it straight back — folders included. Seeding the
+ * box with the file name alone loses them, and then the box disagrees with the document it was
+ * seeded from: the hint reads "that is a rename" before the BA has typed anything, and saving
+ * a correction would quietly move `qa/business/pricing-2026.md` to `qa/pricing-2026.md`.
+ * @param {string} path the document's stored path, or ""
+ * @returns {string} the name, ready to edit
+ */
+export function docName(path) {
+  return (path || '').replace(/^qa\//i, '')
+}
+
 /** WrongPass means the password was refused; anything else is a real failure. */
 export class WrongPass extends Error {}
 

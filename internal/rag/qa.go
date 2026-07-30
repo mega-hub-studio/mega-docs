@@ -25,9 +25,11 @@ import (
 // disagree about whether an answer is live.
 //
 // A confirm writes the answer straight into the database as a document row and indexes
-// it in the same call — nothing reaches disk. The path stays `qa/ticket-N.md` because
+// it in the same call — nothing reaches disk. The path stays a `.md` one under `qa/` because
 // that is what a citation prints and what a scope matches, not because a file exists,
-// and the row *is* the document like every other one (invariant 1).
+// and the row *is* the document like every other one (invariant 1). Its *name* is the BA's
+// (see qaPath): `qa/ticket-N.md` when they do not give one, so a citation always resolves to
+// something a reader can place.
 
 // QADir is where confirmed answers land, relative to the corpus directory. A
 // separate folder because these are answers to questions, not authored documents —
@@ -120,12 +122,17 @@ func (e *Engine) unpublish(id int64) error {
 // together by one ingest, so a failure anywhere leaves the ticket in the queue rather than
 // silently swallowing the work a BA just typed.
 //
-// Confirming an already-confirmed ticket republishes it, and that is the edit: the path is
-// derived from the id, so the corrected text lands where the citation already points and
-// UpsertDocument replaces the old chunks rather than adding a second set. Refusing it was
-// what made a published typo permanent — the only remedy on offer was a document the BA had
-// to know to go and find in the library.
-func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticket, error) {
+// Confirming an already-confirmed ticket republishes it, and that is the edit: with no name
+// given the path is the one the ticket already has, so the corrected text lands where the
+// citation already points and UpsertDocument replaces the old chunks rather than adding a
+// second set. Refusing it was what made a published typo permanent — the only remedy on offer
+// was a document the BA had to know to go and find in the library.
+//
+// `name` is what the BA wants the document called (see qaPath). Giving a *different* one to an
+// already-published ticket is a rename, and it is honest rather than free: the old row is
+// removed first, so the name it was cited by stops answering instead of leaving two documents
+// with one answer between them.
+func (e *Engine) Confirm(ctx context.Context, id int64, answer, name string) (db.Ticket, error) {
 	answer = strings.TrimSpace(answer)
 	if answer == "" {
 		return db.Ticket{}, fmt.Errorf("an answer is required to confirm ticket %d", id)
@@ -135,7 +142,15 @@ func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticke
 		return db.Ticket{}, err
 	}
 
-	rel := path.Join(QADir, fmt.Sprintf("ticket-%d.md", id))
+	rel, err := qaPath(id, name, t.DocPath)
+	if err != nil {
+		return t, err
+	}
+	if t.DocPath != "" && t.DocPath != rel {
+		if _, err := e.store.RemoveDocument(t.DocPath); err != nil {
+			return t, fmt.Errorf("renaming %s to %s: %w", t.DocPath, rel, err)
+		}
+	}
 	body := qaMarkdown(t.Question, answer)
 	// The .md path is kept even though nothing writes a file: it is what a citation reads,
 	// what a scope matches, and what the ticket stores as its DocPath. A confirmed answer
@@ -153,6 +168,53 @@ func (e *Engine) Confirm(ctx context.Context, id int64, answer string) (db.Ticke
 		return t, err
 	}
 	return e.store.Confirm(id, answer, rel)
+}
+
+// qaPath decides what a confirmed answer is called, and the default is the part worth
+// understanding: **an empty name never invents one.**
+//
+//	name given          → qa/<name>.md, whatever folder depth the BA typed inside qa/
+//	name empty, live    → the path the ticket already has, so a correction cannot rename by
+//	                      omission — a client that forgets the field must not move a document
+//	                      every citation already points at
+//	name empty, first   → qa/ticket-N.md, the id-derived fallback that was the only name
+//
+// A typed name goes through `readPath`, so it inherits every structural rule an import has
+// (no `..`, no absolute, no hidden segment, a text extension, MaxDepth) and *not* the qa/
+// refusal — that refusal exists to stop an import impersonating a BA-vouched answer, and this
+// is the one writer that is one. `.md` is appended when the BA left the extension off, because
+// "pricing-2026" is what a person types and being told it is not a text file is a worse answer
+// than the obvious one.
+//
+// The name is what a citation prints, so it earns the same care as the answer: `qa/ticket-2.md`
+// tells a reader which ticket, and `qa/pricing-2026.md` tells them what it is about.
+func qaPath(id int64, name, current string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		if current != "" {
+			return current, nil
+		}
+		return path.Join(QADir, fmt.Sprintf("ticket-%d.md", id)), nil
+	}
+	// A BA who types the folder as well is agreeing with us, not asking for qa/qa/.
+	if len(name) > len(QADir) && strings.EqualFold(name[:len(QADir)], QADir) && name[len(QADir)] == '/' {
+		name = name[len(QADir)+1:]
+	}
+	if !IsText(name) {
+		name += ".md"
+	}
+	rel, err := readPath(path.Join(QADir, name))
+	if err != nil {
+		return "", err
+	}
+	// `path.Join` *cleans*, so it resolves a `..` before readPath can refuse one: "../escape"
+	// became "escape.md", a valid path outside qa/, and the answer would have been published
+	// as an ordinary document with an approval boost. Checking the result rather than the input
+	// is what closes every spelling of that, including the ones nobody has thought of.
+	if !strings.HasPrefix(rel, QADir+"/") {
+		return "", fmt.Errorf("%q would leave the %s/ folder", name, QADir)
+	}
+	return rel, nil
 }
 
 // qaKind is what a confirmed answer files itself under, so the library can show a BA which

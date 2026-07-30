@@ -117,10 +117,21 @@ var retiredClaims = []struct{ phrase, why string }{
 	// tells a reader to read past the one thing they are being asked to do.
 	{"gets both readings, each with", "the readings are tickable options now; nothing is answered until one is picked"},
 	{"sẽ nhận cả hai cách hiểu", "the readings are tickable options now; nothing is answered until one is picked"},
+	// `make deploy` deploys DEPLOY_DIR from wherever it is typed, so teaching the cd teaches the
+	// one thing that used to go wrong: run in a dev tree, the old target pulled and built there,
+	// restarted the unit — which re-execs /opt/knowledge/bin/knowledge, untouched — and reported
+	// success. Narrow on purpose: `cd /opt/knowledge && make backup` and `&& ./bin/ingest` are
+	// still correct, because those targets really are relative to the checkout.
+	{"cd /opt/knowledge &amp;&amp; make deploy", "deploy takes DEPLOY_DIR from anywhere now; the cd hid a no-op that reported success"},
 	// The confirmed answer's path lost its `docs/` prefix when the corpus directory stopped
 	// existing: rag.QADir is "qa", so `docs/qa/…` is an address nothing resolves — printed on
 	// two guide pages and inside the app's own ticket form.
 	{"docs/qa/", "the path is qa/ticket-N.md; there is no docs/ prefix and no corpus directory"},
+	// A confirmed answer's name is the BA's now — `qa/ticket-N.md` is only what they get by
+	// leaving the box blank. "Derived from the id" was the sentence that made a correction
+	// safe *because* nothing could move it, so it has to go with the field that can.
+	{"document path is derived from the id", "the name is the BA's; an empty one keeps the path the ticket already has"},
+	{"đường dẫn tài liệu suy ra từ id", "the name is the BA's; an empty one keeps the path the ticket already has"},
 }
 
 // TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the

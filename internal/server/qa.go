@@ -19,7 +19,12 @@ type Knowledge interface {
 	Queue(limit int) (db.Queue, error)
 	OpenTicket(question, miss string) (db.Ticket, error)
 	Draft(id int64, answer string) (db.Ticket, error)
-	Confirm(ctx context.Context, id int64, answer string) (db.Ticket, error)
+	// Confirm publishes the answer. `name` is what the BA wants the document called, inside
+	// `qa/`; empty keeps the name it already has, or falls back to the id. A *different* name
+	// on a published ticket is a rename, and the engine unpublishes the old one — so this seam
+	// carries the name rather than a separate rename verb, which would be a second way to
+	// change one fact.
+	Confirm(ctx context.Context, id int64, answer, name string) (db.Ticket, error)
 	// Retract is the way back out of `confirmed`: the document leaves retrieval and the
 	// ticket becomes the draft it was, answer kept. On this interface rather than a fourth
 	// seam because publishing and unpublishing are one capability held by one person.
@@ -43,6 +48,7 @@ const maxTicket = 64 << 10 // 64 KiB
 //	GET    /api/tickets                {"tickets":[…],"open":n,…}
 //	POST   /api/tickets                {"question":"…","miss":"…"} → the ticket
 //	POST   /api/tickets/{id}/{action}  draft | confirm | retract | reject → the ticket
+//	                                   confirm takes {"answer":"…","name":"pricing-2026"}
 //	DELETE /api/tickets/{id}           → {"id":n}
 //	GET    /api/history                [{"question":"…","hits":n,…}]
 func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
@@ -85,7 +91,7 @@ func tickets(mux *http.ServeMux, k Knowledge, pass BAPass) {
 		case "draft":
 			t, err = k.Draft(id, body.Answer)
 		case "confirm":
-			t, err = k.Confirm(r.Context(), id, body.Answer)
+			t, err = k.Confirm(r.Context(), id, body.Answer, body.Name)
 		case "retract":
 			t, err = k.Retract(r.Context(), id)
 		case "reject":
@@ -162,6 +168,10 @@ type ticketBody struct {
 	Miss     string `json:"miss"`
 	Answer   string `json:"answer"`
 	Note     string `json:"note"`
+	// Name is what to call the document a confirm publishes, inside qa/. Optional: absent
+	// keeps whatever the ticket already has, which is what stops a client that does not know
+	// about this field from renaming a document by leaving it out.
+	Name string `json:"name"`
 }
 
 // readTicket tolerates an empty body: reject takes no fields, and requiring `{}`
@@ -174,6 +184,7 @@ func readTicket(r *http.Request) (ticketBody, error) {
 	}
 	b.Question = strings.TrimSpace(b.Question)
 	b.Answer = strings.TrimSpace(b.Answer)
+	b.Name = strings.TrimSpace(b.Name)
 	return b, nil
 }
 

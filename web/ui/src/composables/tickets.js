@@ -7,7 +7,9 @@
    reason" message that makes a dismissal readable.
 
    The drafts live here, not on the server's copy of the ticket: someone typing an answer
-   must not have it overwritten by the next queue refresh.
+   must not have it overwritten by the next queue refresh. The *names* live here for the same
+   reason and one more: a name is only a suggestion until the confirm lands, so the box has to
+   hold what was typed even while the ticket still says `ticket-N.md`.
 
    Two pieces of state exist only because `confirmed` stopped being a dead end:
 
@@ -53,6 +55,7 @@ export const ARMED_LABEL = {
  */
 export function useTickets({ tickets, toast, onMoved, onLocked }) {
   const drafts = reactive({}) // ticket id → the answer being typed
+  const names = reactive({}) // ticket id → what to call the document it publishes
   const working = ref(0) // id of the ticket currently being published
   const editing = ref(0) // id of the confirmed ticket whose answer is open for correction
   const armed = ref('') // `${id}:${action}` of the destructive button pressed once
@@ -65,14 +68,19 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
       for (const t of list) {
         if (drafts[t.id] === undefined)
           drafts[t.id] = t.answer || ''
+        // Seeded from the document's own leaf, so a BA correcting a published answer sees the
+        // name it is already cited by rather than an empty box that would rename by accident.
+        if (names[t.id] === undefined)
+          names[t.id] = qa.docName(t.doc)
       }
     },
     { immediate: true },
   )
 
-  /** Open a published answer for correction, starting from the text that is live. */
+  /** Open a published answer for correction, starting from the text and name that are live. */
   function edit(ticket) {
     drafts[ticket.id] = ticket.answer || ''
+    names[ticket.id] = qa.docName(ticket.doc)
     armed.value = ''
     editing.value = ticket.id
   }
@@ -80,6 +88,7 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
   /** Put the editor away, discarding the correction rather than the published answer. */
   function cancel(ticket) {
     drafts[ticket.id] = ticket.answer || ''
+    names[ticket.id] = qa.docName(ticket.doc)
     editing.value = 0
   }
 
@@ -96,8 +105,12 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
     armed.value = '' // it is acting now: an armed label must not survive the press
     const answer = (drafts[ticket.id] || '').trim()
     try {
-      const updated = await qa.act(ticket.id, action, { answer, note: answer })
+      // The name only travels with a confirm — it is the one action that writes a document,
+      // and sending it on a dismissal would be a field the server has to ignore.
+      const name = action === 'confirm' ? (names[ticket.id] || '').trim() : undefined
+      const updated = await qa.act(ticket.id, action, { answer, note: answer, name })
       drafts[ticket.id] = updated.answer || ''
+      names[ticket.id] = qa.docName(updated.doc)
       editing.value = 0
       const [title, body] = TOASTS[action](updated)
       toast(body, { title, accent: action === 'confirm' ? 'good' : 'warn' })
@@ -122,6 +135,7 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
     try {
       await qa.drop(ticket.id)
       delete drafts[ticket.id]
+      delete names[ticket.id]
       editing.value = 0
       toast('The question is gone; the answer\'s text stays in the library.', {
         title: `Deleted #${ticket.id}`,
@@ -137,5 +151,5 @@ export function useTickets({ tickets, toast, onMoved, onLocked }) {
     }
   }
 
-  return { drafts, working, editing, armed, isArmed, arm, edit, cancel, move, remove }
+  return { drafts, names, working, editing, armed, isArmed, arm, edit, cancel, move, remove }
 }

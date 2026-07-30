@@ -27,11 +27,15 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { ARMED_LABEL } from '../composables/tickets.js'
 import { shortDate } from '../lib/library.js'
-import { STATUS } from '../lib/qa.js'
+import { docPath, STATUS } from '../lib/qa.js'
 
 const props = defineProps({
   ticket: { type: Object, required: true },
   draft: { type: String, default: '' },
+  // What the published document will be called, inside qa/. `v-model:name` for the same
+  // reason as the draft: it belongs to the queue, and a BA who switches tabs mid-thought
+  // expects to find it. Blank keeps the name the ticket already has.
+  name: { type: String, default: '' },
   unlocked: Boolean,
   writes: Boolean,
   // The id of the ticket currently being written, or null — one at a time, so a
@@ -44,11 +48,14 @@ const props = defineProps({
   armed: { type: String, default: '' },
 })
 
-defineEmits(['update:draft', 'move', 'edit', 'cancel', 'arm', 'remove'])
+defineEmits(['update:draft', 'update:name', 'move', 'edit', 'cancel', 'arm', 'remove'])
 
 const busy = () => props.working === props.ticket.id
 const correcting = () => props.editing === props.ticket.id
 const isArmed = action => props.armed === `${props.ticket.id}:${action}`
+// The path this confirm will write, in the hint rather than left for the BA to predict. The
+// rule is lib/qa.js's, which says why it is a preview of the engine's.
+const path = () => docPath(props.name, props.ticket.id)
 </script>
 
 <template>
@@ -77,9 +84,21 @@ const isArmed = action => props.armed === `${props.ticket.id}:${action}`
           @input="$emit('update:draft', $event.target.value)"
         />
         <span class="hint">
-          Confirming writes <code>qa/ticket-{{ ticket.id }}.md</code>, indexes it, and
-          cites it by name. Dismissing uses this box as the reason.
+          Confirming writes <code>{{ path() }}</code>, indexes it, and cites it by that name.
+          Dismissing uses this box as the reason.
         </span>
+      </label>
+      <!-- The name is the citation, so it is worth a box: `ticket-4.md` tells a reader which
+           ticket and nothing about the answer, while `pricing-2026.md` tells them what they
+           are about to read. Optional on purpose — a BA in a hurry should not be stopped to
+           name a file, and the id is a name that always works. -->
+      <label v-if="unlocked" class="field">
+        <span class="label">Document name</span>
+        <input
+          class="input" :value="name" placeholder="pricing-2026"
+          @input="$emit('update:name', $event.target.value)"
+        >
+        <span class="hint">Optional. Lives in <code>qa/</code>, and <code>.md</code> is added.</span>
       </label>
       <div v-if="unlocked" class="control-group">
         <button
@@ -121,6 +140,25 @@ const isArmed = action => props.armed === `${props.ticket.id}:${action}`
         <span class="hint">
           Saving replaces <code>{{ ticket.doc }}</code> and re-indexes it, so the next
           answer uses this text. The citation keeps pointing at the same name.
+        </span>
+      </label>
+
+      <!-- Renaming a published answer, which is the same box doing a different job — so it
+           says the consequence rather than repeating the label above. The old name stops
+           answering the moment this saves: one answer, one address, and a reader who saved the
+           old one finds nothing rather than a stale copy. -->
+      <label v-if="correcting()" class="field">
+        <span class="label">Document name</span>
+        <input
+          class="input" :value="name" placeholder="pricing-2026"
+          @input="$emit('update:name', $event.target.value)"
+        >
+        <span class="hint">
+          Saving writes <code>{{ path() }}</code>.
+          <template v-if="path() !== ticket.doc">
+            That is a rename — <code>{{ ticket.doc }}</code> stops being retrieved, and anything
+            that quoted it by name no longer resolves. The text of both stays in the library.
+          </template>
         </span>
       </label>
 

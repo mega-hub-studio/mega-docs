@@ -11,10 +11,20 @@ export CGO_ENABLED := 1
 # directories, so the pattern is the fix.
 PKGS := ./cmd/... ./internal/... ./web
 
-# The deploy host's two facts, both overridable (`make deploy UNIT=… PORT=…`). PORT is read
-# from .env rather than repeated here, because .env is what the server itself reads — a port
-# written twice is a health check that passes against nothing on the day one of them changes.
+# The deploy host's three facts, all overridable (`make deploy UNIT=… PORT=… DEPLOY_DIR=…`).
+# PORT is read from .env rather than repeated here, because .env is what the server itself
+# reads — a port written twice is a health check that passes against nothing on the day one of
+# them changes.
+#
+# DEPLOY_DIR is the checkout the supervisor runs from, and it exists because the supervisor
+# names that absolutely (`ExecStart=/opt/knowledge/bin/knowledge`) while `make` is relative to
+# wherever it was typed. Without it, `deploy` from a dev tree succeeds against the wrong
+# directory at every step: it pulls *here*, builds `./bin/knowledge` *here*, restarts the unit
+# — which re-execs the other binary, untouched — then prints a revision and a green health
+# check. A no-op that reports success, which is the one outcome the guards on `deploy-here`
+# exist to prevent. On macOS the checkout is wherever the launchd plist points; override it.
 UNIT ?= knowledge
+DEPLOY_DIR ?= /opt/knowledge
 PORT ?= $(shell sed -n 's/^PORT=//p' .env 2>/dev/null | tail -1)
 HEALTH := http://127.0.0.1:$(or $(PORT),8080)/api/health
 
@@ -41,7 +51,7 @@ endif
 # GOBIN wins when it is set, or `dead-deps` installs on every run and finds nothing.
 GOBIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
 
-.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy release backup
+.PHONY: deps check check-full ui-deps test lint lint-deps lint-fix lint-js dead dead-deps secrets live smoke server ingest build vendor vendor-clean diagram clean check-ui check-wt ui ui-dev deploy deploy-here release backup
 
 deps:
 	go mod tidy
@@ -280,9 +290,47 @@ build:
 	go build -tags "$(TAGS)" -o bin/knowledge ./cmd/server
 	go build -tags "$(TAGS)" -o bin/ingest   ./cmd/ingest
 
-# Re-deploy this host: pull, build, restart, prove it came back. Four things it does that
-# the hand-typed `git pull && make build && sudo systemctl restart knowledge` does not, each
-# one a failure that has already happened here:
+# Cut a release: the annotated tag is the only input, and web/release.json is generated
+# from git log in the commit the tag points at. Not part of `build` or `deploy` — cutting a
+# release is a decision somebody makes, and a tag is a side effect no automated target may
+# take. scripts/release.sh explains the write-commit-tag order.
+release:
+	@V="$(V)" scripts/release.sh
+
+# `make deploy` from any tree on the machine. All it decides is *where* the work happens; the
+# work is `deploy-here`, which assumes it is already in the checkout the supervisor executes
+# from. That split is the whole fix for the failure DEPLOY_DIR describes above — the wrong
+# directory is no longer reachable, rather than merely documented as "cd there first".
+#
+# It hands over to `deploy` and not to `deploy-here`: a deploy checkout still carrying an older
+# Makefile has no `deploy-here`, and its own `deploy` is correct in place — so the first run
+# after this change installs the dispatcher instead of failing on it. Once installed, that copy
+# sees itself and runs the work directly.
+#
+# The unpushed-commit note is the other half of "it did nothing": this target moves the host to
+# what origin already has (below), so work that never left this tree is invisible to it. Saying
+# so beats a green deploy that shipped none of it. A note, not a refusal — redeploying or
+# rolling back to what origin has is a legitimate reason to run this.
+deploy:
+	@here=$$(pwd -P); \
+	there=$$(cd "$(DEPLOY_DIR)" 2>/dev/null && pwd -P) || { \
+	  echo "  refusing: DEPLOY_DIR=$(DEPLOY_DIR) is not a directory — pass DEPLOY_DIR=…"; exit 1; }; \
+	if [ "$$here" = "$$there" ]; then \
+	  $(MAKE) --no-print-directory deploy-here; \
+	else \
+	  [ -d "$$there/.git" ] || { \
+	    echo "  refusing: $$there is not a git checkout — pass DEPLOY_DIR=…"; exit 1; }; \
+	  n=$$(git rev-list --count '@{u}..HEAD' 2>/dev/null) || n=; \
+	  if [ -n "$$n" ] && [ "$$n" != 0 ]; then \
+	    echo "  note: $$n commit(s) here are not pushed — the deploy cannot see them"; \
+	  fi; \
+	  echo "  deploying $$there"; \
+	  $(MAKE) -C "$$there" --no-print-directory deploy; \
+	fi
+
+# Re-deploy the checkout this runs in: pull, build, restart, prove it came back. Four things it
+# does that the hand-typed `git pull && make build && sudo systemctl restart knowledge` does
+# not, each one a failure that has already happened here:
 #
 #   --ff-only   a deploy checkout is a mirror, not a branch. `pull.rebase=true` is set on
 #               this host, so a local commit turned an upgrade into a half-finished rebase
@@ -298,14 +346,7 @@ build:
 # Deliberately not here: `make ui`, `make check-full` (Node, and a browser, neither of which
 # a deploy host has) and any `git push`. This target only moves this machine to what origin
 # already has.
-# Cut a release: the annotated tag is the only input, and web/release.json is generated
-# from git log in the commit the tag points at. Not part of `build` or `deploy` — cutting a
-# release is a decision somebody makes, and a tag is a side effect no automated target may
-# take. scripts/release.sh explains the write-commit-tag order.
-release:
-	@V="$(V)" scripts/release.sh
-
-deploy:
+deploy-here:
 	@git diff --quiet || { echo "  refusing: working tree is dirty — commit or stash first"; git status --short; exit 1; }
 	@echo "  before: $$(git rev-parse --short HEAD)"
 	git pull --ff-only

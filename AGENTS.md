@@ -87,7 +87,8 @@ it, so trust the table.
 2. **Every local override of the design system is named, and there are two kinds.** All of
    them are in `web/ui/src/styles.css`, against **8bit-nes 0.14.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a
-   claim about bytes — on the 0.13.0 → 0.14.0 bump all eight were still needed, and only
+   claim about bytes — on the 0.13.0 → 0.14.0 bump all eight that existed then were still
+   needed (the ninth, `.cite`'s centring, was measured after it and has yet to meet a bump), and only
    `all.min.css` changed at all (the JS and the three fonts came back with identical digests).
 
    **Waiting on a release. Re-measure on the next bump, and delete what has landed:**
@@ -97,6 +98,7 @@ it, so trust the table.
    | `.palette-list` un-capped (`max-block-size: none`) | the library still sizes it for the modal its own docs describe — `min(50vh, 340px)` with `overflow-y: auto` — and in the page that made a *nested* scroller which hid four of seven documents on a phone. Gone when a release ships an in-page `.palette` |
    | `.prose a.cite` restored to cyan with no underline | two of the library's own recipes collide: `.prose a` and `.cite` are both in the components layer and `.prose a` scores higher, so every citation marker rendered as a prose link — green, with a 2px underline through a digit already sitting in a cyan chip. Gone when a release scopes that rule away from `.cite` |
    | `.drawer[open]` gets `inset-inline-start: auto` | the recipe anchors with `inset-inline-end: 0` and leaves the start inset alone, which is correct on a plain box and not on a `<dialog>`: the UA sheet sets `inset-inline: 0`, so with the recipe's `margin: 0` the box is over-constrained and the start wins. Measured — the panel opened flush against the **left** edge, and `.drawer.start` rendered identically. Gone when a release qualifies its own rule |
+   | `.prose a.cite` gets `padding-block-start: 0.1em` | the chip is `inline-flex` + `align-items: center`, and **flexbox centres the line box, not the ink**: NES Mono's em box at `.7em` is ascent 9 / descent 3 while a digit's ink is ascent 7 / descent 0, so the centred box carries 2px of unused space above the glyph and 3px below it and the digit sits 0.5px high — one device pixel at 2× DPR, on the one thing in a sentence that is a chip. Measured with the font's own metrics: `slack: {above: 3.86, below: 4.84}` in a 15.7px chip, and `{4.83, 4.84}` after. Gone when a release puts `text-box-trim: trim-both; text-box-edge: cap alphabetic` on the recipe, which is the fix that needs no number |
 
    **This app using a recipe outside the context it was written for.** Nothing upstream to
    fix; each is permanent until the app's own use changes:
@@ -109,7 +111,7 @@ it, so trust the table.
    | `.empty .palette > .palette-empty` — start-aligned, at the rows' inset | centring is right for a state filling a blank list, wrong for a truncation notice under nine left-aligned rows |
    | `::selection` softened to a 32% `--primary` tint | the solid fill is ~11:1 on this dark page — correct contrast, and a flare when a long-press selects a word on a phone |
 
-   The three upstream requests are in the changelog.
+   The four upstream requests are in the changelog.
 
    `.prose` used to be a fourth. Its `72ch` sat on the container and so capped the tables and
    diagrams inside an answer as well as its text; 0.8.0 moved that measure onto the children

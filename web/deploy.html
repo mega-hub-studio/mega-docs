@@ -396,7 +396,21 @@ done: 8/8 files, 74 chunks</span></div>
       compile vào binary, nên pull mà không build thì vẫn đang phục vụ bytes cũ — và
       <code>make deploy</code> là bốn dòng đó, kèm sẵn bốn kiểu sai đã từng xảy ra.</p>
 
-    <div class="terminal"><span class="cmd">cd /opt/knowledge &amp;&amp; make deploy</span><span class="out">  before: 228607e</span><span class="out">  deployed: 9c4a34d — {"ok":true,"writes":true,…,"version":"9c4a34d"}</span></div>
+    <div class="terminal"><span class="cmd">make deploy</span><span class="out">  deploying /opt/knowledge</span><span class="out">  before: 228607e</span><span class="out">  deployed: 9c4a34d — {"ok":true,"writes":true,…,"version":"9c4a34d"}</span></div>
+    <p lang="en">From any checkout on the machine, including the one you work in — it deploys
+      <code>DEPLOY_DIR</code> (<code>/opt/knowledge</code>) and names it on the first line, so
+      the output says which tree moved. That is not a convenience: the supervisor names its
+      binary by absolute path, so the same command run in a dev tree used to pull there, build
+      there, restart the unit — which re-executes the untouched binary — and then print a
+      revision and a green health check. A no-op that reported success. Pass
+      <code>DEPLOY_DIR=…</code> where the checkout lives elsewhere, as on macOS.</p>
+    <p lang="vi">Chạy được từ bất kỳ checkout nào trên máy, kể cả cây bạn đang làm việc — nó
+      deploy <code>DEPLOY_DIR</code> (<code>/opt/knowledge</code>) và in tên thư mục đó ở dòng
+      đầu, nên output nói rõ cây nào vừa đổi. Đây không phải tiện lợi: supervisor gọi binary
+      bằng đường dẫn tuyệt đối, nên cùng lệnh đó chạy trong cây dev sẽ pull ở đó, build ở đó,
+      restart unit — và unit exec lại đúng binary cũ không đổi — rồi in ra một revision kèm
+      health check xanh. Một lệnh không làm gì nhưng báo thành công. Dùng
+      <code>DEPLOY_DIR=…</code> khi checkout nằm chỗ khác, như trên macOS.</p>
     <p lang="en">What it adds over typing the four by hand, each one a failure that has
       happened on this host: <code>git pull <b>--ff-only</b></code>, because a deploy
       checkout is a mirror and a local commit here turns an upgrade into a half-finished
@@ -716,10 +730,14 @@ systemd=true</span><span class="cmd">wsl --shutdown</span><span class="out"># ru
 
         <p lang="en"><b>3 · Deploy, and read the two revisions.</b> Different before and
           after means the pull moved this host; identical means origin had nothing new and the
-          change is still sitting unpushed on a laptop.</p>
+          change is still sitting unpushed on a laptop. Run from that laptop's own checkout the
+          command says so before it starts — <code>note: 2 commit(s) here are not pushed</code>
+          — because this target only ever moves the host to what origin already has.</p>
         <p lang="vi"><b>3 · Deploy, rồi đọc hai revision.</b> Trước và sau khác nhau là host
           đã đi tới bản mới; giống nhau là origin không có gì mới, và thay đổi vẫn đang nằm
-          chưa push trên máy nào đó.</p>
+          chưa push trên máy nào đó. Chạy từ chính checkout đang làm việc thì lệnh nói trước khi
+          bắt đầu — <code>note: 2 commit(s) here are not pushed</code> — vì target này chỉ đưa
+          host tới đúng những gì origin đã có.</p>
         <div class="terminal"><span class="cmd">make deploy</span><span class="out">  before: 9c4a34d</span><span class="out ok">  deployed: 711de34 — {"ok":true,"writes":true,…,"version":"711de34"}</span></div>
         <p lang="en">If it stalls before the build with nothing on screen, it is downloading
           modules: some networks cannot reach <code>proxy.golang.org</code> while GitHub is

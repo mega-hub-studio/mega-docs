@@ -35,7 +35,7 @@ const emit = defineEmits(['changed'])
 const gate = useGate({ toast })
 const { unlocked, passInput, unlocking, unlockError, unlock } = gate
 
-const { drafts, working, editing, armed, arm, edit, cancel, move, remove } = useTickets({
+const { drafts, names, working, editing, armed, arm, edit, cancel, move, remove } = useTickets({
   tickets: () => props.queue.tickets,
   toast,
   onMoved: ticket => emit('changed', ticket),
@@ -141,8 +141,9 @@ const importRefused = e => gate.fail(e, 'The server refused the password: ')
     <TicketCard
       v-for="t in queue.tickets" :key="t.id"
       :ticket="t" :unlocked="unlocked" :writes="writes" :working="working"
-      :draft="drafts[t.id] ?? ''" :editing="editing" :armed="armed"
-      @update:draft="drafts[t.id] = $event" @move="move(t, $event)"
+      :draft="drafts[t.id] ?? ''" :name="names[t.id] ?? ''" :editing="editing" :armed="armed"
+      @update:draft="drafts[t.id] = $event" @update:name="names[t.id] = $event"
+      @move="move(t, $event)"
       @edit="edit(t)" @cancel="cancel(t)" @arm="arm(t, $event)" @remove="remove(t)"
     />
   </main>
