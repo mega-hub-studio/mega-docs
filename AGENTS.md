@@ -71,9 +71,29 @@ The pin lives in one place, [`web/vendor.sha384`](web/vendor.sha384) — version
 (`TestAgentNotesPinMatchesTheManifest`) fails if the version quoted above drifts from
 it, so trust the table.
 
-## Two things to know before changing the UI
+## Three things to know before changing the UI
 
-1. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
+1. **Measure at 390 first — the phone is the design, not a breakpoint.** Rule 28 in
+   [`CLAUDE.md`](CLAUDE.md). Base styles are the phone; one `min-width` query upgrades to
+   desktop, and a `max-width` query going down is the wrong direction. Decide the layout at
+   390, then widen only if it survives.
+
+   One measurement has a right answer and the rest are judgement: **the page may never scroll
+   sideways.** `documentElement.scrollWidth === innerWidth`, at every width. A block too wide
+   for a phone scrolls or pans *inside itself* — a `<pre>`, a `.table-wrap` and `<nes-zoom>`
+   all do — or it is capped.
+
+   The trap to know, because it looks like the opposite of a bug: 8bit-nes opts a list of
+   elements out of `--prose-measure` with `max-inline-size: none`, on its own stated principle
+   *"if the content is the width, it opts out"*. That is right for every entry that scrolls
+   itself and **wrong for `img`**, which has no such escape — a 1400px screenshot took
+   `none` and rendered 1404px inside a 1207px card. A *reading* limit and a *container* limit
+   are two caps: an image may escape the measure, nothing may escape the container.
+
+   PinchTab cannot emulate `pointer: coarse` — `set media pointer coarse` reports "applied"
+   while `matchMedia` stays false, so **touch-target heights are unchecked here** and rest on
+   8bit-nes' own release testing. `scripts/check-docs-ui.mjs` says so at the site.
+2. **Do not reimplement a recipe 8bit-nes already ships.** Check its `llms.txt`
    first. `web/ui/src/styles.css` and the `<style>` block in `web/docsbase.html` own
    *layout*; the design system owns components.
 
@@ -84,7 +104,7 @@ it, so trust the table.
    always this repo's, it belongs to the container as one `gap`, and a per-child margin is
    how five pairs of blocks ended up touching at 0px on a phone. Add a container, declare
    its `gap`; never a margin on the child, and never nothing.
-2. **Every local override of the design system is named, and there are two kinds.** All of
+3. **Every local override of the design system is named, and there are two kinds.** All of
    them are in `web/ui/src/styles.css`, against **8bit-nes 0.15.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a
    claim about bytes.

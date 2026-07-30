@@ -51,7 +51,44 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 24 | **HARD: no technical debt leaves a change.** No deferred marker, no suppressed finding, no half-migration, no stale doc — a change lands whole and `make check-full` green, or it does not land | `godox` + `no-warning-comments` (a deferred-work marker is a lint error, both languages) · `nolintlint` (a suppression must name the linter *and* the reason) · `make check-full` · rule 13's **zero** findings |
 | 25 | **The version is a git tag; the changelog is generated from `git log`.** `make release V=vX.Y.Z` is the only thing that changes either — never a `VERSION` file, never a hand-edited `web/release.json`, never a `CHANGELOG.md`. No tag means an **empty** version, which removes the badge rather than asserting a stale number | `TestReleaseNotesAreGenerated` (the do-not-edit marker · the tag shape · a sha behind every line) · `TestEveryRouteAndKnobIsSpecified` (`GET /api/release` must earn a documented section) · `TestRootDocsAreTheFourWeKnowAbout` (a root `CHANGELOG.md` is a fifth doc) |
 | 26 | **HARD: the official guide syncs in the same commit, and the claim it replaces is retired.** A behaviour change edits its `<section>`; the superseded passage is **deleted**, never parked beside its replacement, and its dead sentence is added to `retiredClaims` so it cannot return. Stale prose is context an agent loads and believes | `TestGuidePagesCarryNoRetiredClaim` (every published page, both languages) · `TestEverySpecNameExistsInTheCode` · `TestEveryRouteAndKnobIsSpecified` · `TestSpecJSONIsGeneratedFromThePages` · `make check-ui` |
+| 28 | **HARD: the phone is the design, not a breakpoint. Base styles are 390px; one `min-width` query upgrades to desktop, never a `max-width` query down.** A layout decision is made at 390 first and widened only if it survives there — and the page may never scroll sideways, at any width | `make check-ui` measures every guide page at **390 · 1440 · 1920** and fails on a section wider than its parent · the app is `prose only`, and the two cheap probes plus the overflow this caught are in `changelog/2026-07-30-mobile-first.md` |
 | 27 | **HARD: a seam belongs to the container, never to the blocks. One `gap`, set once on the parent — no margin per child, and no two stacked blocks touching at 0px.** A design-system recipe spaces only *inside* itself; the space *between* two of them is this repo's job, and no app container may stack blocks without declaring it | `make check-ui` (the guide's `--flow` rule) · the app is `prose only` — measure it in the running product at 390×844, and the probe plus the five pairs it caught are in `changelog/2026-07-30-seams.md` |
+
+Rule 28 was the practice before it was a rule, which is exactly why it needed writing down:
+`styles.css` has said "base styles are the phone — never the reverse" since it was written, and
+its comments carry two dozen measurements taken at 320 · 360 · 390. None of that was in the
+rules, so nothing stopped a change being *reasoned* about at laptop width and measured after.
+
+Two directions it fixes, and they are not the same:
+
+1. **Order.** Decide at 390, then widen. The reverse produces a layout that technically reflows
+   and is unusable: the bar was a quarter of an iPhone 14's screen until it was measured there,
+   and `.steps` renders as four-character columns on a phone — a trap this file keeps because it
+   *shipped*.
+2. **The one absolute.** No sideways scroll, ever. Everything else is a judgement about spacing;
+   this is the only measurement with a right answer, and it is `documentElement.scrollWidth ===
+   innerWidth`. A block too wide for a phone must scroll or pan **inside itself** — the way a
+   `<pre>`, a `.table-wrap` and `<nes-zoom>` all do — or be capped.
+
+The trap that motivated the rule is the second one wearing the first one's clothes. 8bit-nes opts
+a list of elements out of `--prose-measure` with `max-inline-size: none`, on the stated principle
+*"if the content is the width, it opts out"* — correct for every entry that scrolls itself, and
+wrong for `img`, which has no such escape. Unwrapping a lone image so that opt-out applied gave a
+1400px screenshot `max-inline-size: none`, and it rendered **1404px inside a 1207px card**: a
+reading limit and a container limit had been treated as one cap. `.prose > img` takes the
+container limit back (`styles.css`), and the distinction is the rule in one line — an image may
+escape the *measure*, nothing may escape the *container*.
+
+What is machine-checked and what is not: the guide is measured at three widths on every page, so
+a section that outgrows its parent fails `make check-ui`. **The app is not measured by anything**,
+and rule 27 already says so for the same reason — a rig for one screen is what rule 21 refuses.
+Two probes cost nothing and catch the whole class; run them against the running product before
+saying a layout is done:
+
+- `documentElement.scrollWidth === innerWidth` — the absolute above.
+- every child of the answer card reports **one** `getBoundingClientRect().left`. Five blocks that
+  share an edge read as a column; one block 2px off reads as a mistake nobody can name. Measured
+  at 390: all five agree at 34px, and so does every block in `.prose`.
 
 Rule 27 is the layout half of rule 17, and it is a rule because the same defect shipped **five
 times** in one card family before anyone measured it. The cause is one fact about the design

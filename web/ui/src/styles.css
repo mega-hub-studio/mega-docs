@@ -291,7 +291,16 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    `.prose`. Markdown wraps a standalone image in a `<p>`, and the paragraph is what carries the
    measure — so the picture was inheriting a 72ch cap through its wrapper, not from any rule
    about images. `dressImages` unwraps a lone-image paragraph so the library's own opt-out
-   applies; an image sharing a paragraph with text stays inside the measure, where it belongs. */
+   applies; an image sharing a paragraph with text stays inside the measure, where it belongs.
+
+   And then the cap has to come back one level up, which is the whole mobile-first lesson in one
+   declaration. `max-inline-size: none` is right for everything else on that opt-out list — a
+   `<pre>`, a `.table-wrap`, a `nes-zoom` each scroll or pan *inside themselves*. An image has no
+   such escape: with the cap gone it renders at its intrinsic width, and a 1400px screenshot
+   measured **1404px inside a 1207px card** — which on a 390px phone is the page scrolling
+   sideways. Two different caps had been conflated: `--prose-measure` is a *reading* limit an
+   image should escape, `100%` is a *container* limit nothing may. */
+.prose > img { max-inline-size: 100%; }
 .prose img { cursor: zoom-in; }
 
 /* ── citations: the row a marker jumps to ──
