@@ -61,11 +61,11 @@ not a file. Footers last: `BREAKING CHANGE: …`, `Refs: #123`.
 
 ## good
 
-fix(rag): stop caching a whole miss, cache a partial answer [1.4.3]
-feat(ui): pick a scope from the corpus tree before asking [1.5.0]
-refactor(db): move the scope out of the cache signature into the key [2.0.0]
-docs(changelog): record why the DB stays derived until backup exists [1.5.1]
-build(deps): take 8bit-nes 0.7.3 and drop the workaround it replaces [1.5.2]
+- `fix(rag): stop caching a whole miss, cache a partial answer [1.4.3]`
+- `feat(ui): pick a scope from the corpus tree before asking [1.5.0]`
+- `refactor(db): move the scope out of the cache signature into the key [2.0.0]`
+- `docs(changelog): record why the DB stays derived until backup exists [1.5.1]`
+- `build(deps): take 8bit-nes 0.7.3 and drop the workaround it replaces [1.5.2]`
 
 ## reject
 
