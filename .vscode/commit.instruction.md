@@ -2,9 +2,7 @@
 
 Generate exactly one commit message in this shape. No preamble, no code fence, no emoji.
 
-```
 type(scope): summary [x.y.z]
-```
 
 Subject line ≤ 72 characters, including the version. Imperative mood, lowercase after
 the colon, no trailing period. Say what the change *does*, never which files it touched.
