@@ -551,7 +551,7 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
        The rules live in internal/rag/websearch.go; this is what a reader needs. -->
   <section id="external-search" data-feature="external-search"
            data-api="POST /api/chat" data-env="SEARCH_BASE_URL,SEARCH_API_KEY"
-           data-test="TestAMissReachesABANotTheWeb,TestWebResultsAreCitedInTheirOwnNumbering">
+           data-test="TestAMissReachesABANotTheWeb,TestACorpusThatDidNotRunOutIsNotSupplemented,TestWebResultsAreCitedInTheirOwnNumbering">
     <h2 lang="en">Supplementing a thin answer</h2>
     <h2 lang="vi">Bổ trợ khi câu trả lời mỏng</h2>
     <p class="lede" lang="en">Off unless <code>SEARCH_API_KEY</code> is set, and even then it
@@ -583,21 +583,32 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
     <div class="step">
       <span class="num">1</span>
       <div class="body">
-        <b lang="en">When it fires: the corpus said less than the model could read</b>
-        <b lang="vi">Khi nào nó chạy: corpus nói ít hơn những gì model đọc được</b>
-        <p lang="en">Not a tuned threshold — a statement. The retrieved sections fill less than
-          half the budget <code>CONTEXT_SHARE</code> allows, so the model had room for twice as
-          much and the documents did not have it. That is only measurable because the budget
-          exists, so an instance that never declared a window never searches: it cannot tell
-          "the corpus was quiet" from "the model is small", and guessing between those two
-          would send an internal question to a third party on the strength of a number nobody
-          set.</p>
-        <p lang="vi">Không phải một ngưỡng đi tinh chỉnh — là một mệnh đề. Các section lấy được
-          lấp chưa tới một nửa ngân sách mà <code>CONTEXT_SHARE</code> cho phép, tức model còn
-          chỗ cho gấp đôi mà tài liệu không có. Chỉ đo được điều đó vì có ngân sách, nên
-          instance chưa khai window thì không bao giờ search: nó không phân biệt được "corpus
-          im lặng" với "model nhỏ", và đoán giữa hai cái đó là gửi một câu hỏi nội bộ ra bên
-          thứ ba dựa trên một con số không ai đặt.</p>
+        <b lang="en">When it fires: the corpus ran out before retrieval did</b>
+        <b lang="vi">Khi nào nó chạy: corpus cạn trước khi truy xuất cạn</b>
+        <p lang="en">One comparison, and there is nothing to tune. Retrieval asks for a fixed
+          number of sections — the whole candidate pool when a window is declared,
+          <code>TOP_K</code> when one is not — and if fewer come back, the corpus was the limit
+          rather than the budget. That is the question worth asking, and it is the *only* thing
+          the trigger asks.</p>
+        <p lang="vi">Một phép so sánh, và không có gì để tinh chỉnh. Truy xuất hỏi một số
+          section cố định — cả candidate pool khi đã khai window, <code>TOP_K</code> khi chưa —
+          và nếu về ít hơn thì giới hạn nằm ở corpus chứ không ở ngân sách. Đó là câu hỏi đáng
+          hỏi, và là điều <i>duy nhất</i> trigger hỏi.</p>
+        <div class="callout warn">
+          <b lang="en">A small corpus supplements almost every question.</b>
+          <span lang="en"><code>maxPerDoc</code> caps an answer at three sections per document,
+            so a corpus of fewer than about fourteen documents reports "ran out" even when each
+            one is long. That is honest — it really does have little to say — but every firing
+            is a third-party call and a credit, so <b>check the document count before turning
+            the key on</b>. The status line prints sections-read of sections-weighed on every
+            answer, which is where to watch it.</span>
+          <b lang="vi">Corpus nhỏ sẽ bổ trợ gần như mọi câu hỏi.</b>
+          <span lang="vi"><code>maxPerDoc</code> giới hạn mỗi tài liệu ba section, nên corpus
+            dưới khoảng mười bốn tài liệu sẽ luôn báo "đã cạn" dù từng tài liệu rất dài. Điều đó
+            là thật — nó có ít thứ để nói — nhưng mỗi lần chạy là một lần gọi ra bên thứ ba và
+            một credit, nên <b>hãy xem số tài liệu trước khi bật key</b>. Status line in số
+            section đã đọc trên số đã cân nhắc ở mỗi câu trả lời, đó là chỗ để theo dõi.</span>
+        </div>
       </div>
     </div>
 

@@ -31,6 +31,20 @@ func (e *Engine) contextBudget(model string) int {
 	return int(float64(window)*share) * perToken
 }
 
+// askFor is how many sections retrieval is asked for: everything the candidate pool holds
+// when a budget will decide what fits, and TOP_K when there is no window to be a share of.
+//
+// One function because two callers need the same number for two different questions —
+// retrieve asks for it, and corpusRanOut compares what came back against it (websearch.go).
+// Two copies of that branch would disagree the first time one of them moved, and the
+// disagreement would read as the supplement firing at random.
+func (e *Engine) askFor(model string) int {
+	if e.contextBudget(model) > 0 {
+		return db.CandidatePool
+	}
+	return e.topK
+}
+
 // trimToBudget keeps the best-ranked hits that fit, and always at least the first one — a
 // section too big for the budget on its own is still the best answer there is, and dropping
 // it would answer from nothing rather than from too much.
@@ -59,11 +73,7 @@ func trimToBudget(hits []db.Hit, budget int) []db.Hit {
 // raising the limit.
 func (e *Engine) retrieve(qEmb []float32, query, model, scope string) ([]db.Hit, Recall, error) {
 	budget := e.contextBudget(model)
-	k := e.topK
-	if budget > 0 {
-		k = db.CandidatePool
-	}
-	hits, err := e.store.Search(qEmb, query, k, scope, budget > 0)
+	hits, err := e.store.Search(qEmb, query, e.askFor(model), scope, budget > 0)
 	if err != nil {
 		return nil, Recall{}, err
 	}

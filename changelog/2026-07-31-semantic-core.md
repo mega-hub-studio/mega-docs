@@ -17,18 +17,38 @@ every other limitation followed from nobody having a number to compare against.
 
 ## The decisions the next session would otherwise re-derive
 
-### The budget is what makes external search measurable
+### The trigger is "the corpus ran out", and the first version had the wrong denominator
 
-These two are not independent features that happened to land together. The supplement's
-trigger is *"the corpus said less than this model could have read"* — `contextChars <
-budget/2` — and that sentence has no meaning without a budget. It is why an instance that
-never declared a window **never searches**: it cannot tell "the corpus was quiet" from "the
-model is small", and guessing between those two would send an internal question to a third
-party on the strength of a number nobody set.
+`corpusRanOut` is one comparison: `r.Offered < e.askFor(model)`. Retrieval asks for a fixed
+number of sections — `db.CandidatePool` when a window is declared, `TOP_K` when it is not —
+and fewer coming back means the **corpus** was the limit rather than the budget. No share, no
+threshold, nothing to tune, and `askFor` is one function because `retrieve` and
+`corpusRanOut` must agree about that number or the supplement fires at random.
 
-The alternative was a similarity threshold on the top hit's distance. Rejected: absolute
-embedding distances are model-dependent, so the threshold becomes a knob nobody knows how to
-turn — rule 20's own test, failed at the design stage.
+**The first version shipped with the wrong denominator and was caught by measuring, not by
+review.** It was `contextChars < budget × thinShare`, i.e. the retrieved text against half of
+`CONTEXT_SHARE` of the model's window. Against this machine's `CHAT_MODELS`
+(`gpt-4o-mini:128000`) that threshold is **128,000 characters** — about 53 full chunks — so
+it called almost every answer thin and would have sent almost every internal question to a
+third party. The mistake is worth naming because it is a class: it measured *how big the model
+is* when the question was *how much the documents had*.
+
+Two alternatives rejected:
+
+- **A similarity threshold on the top hit's distance.** Absolute embedding distances are
+  model-dependent, so the threshold becomes a knob nobody knows how to turn — rule 20's own
+  test, failed at the design stage.
+- **A threshold on the fused RRF score.** RRF *is* model-independent (it is rank-based, max
+  `2/60`), and "the top hit ranked in both retrievers" is a genuinely explainable gate. But
+  the approved-chunk `×1.2` boost perturbs it exactly across the single-leg/both-legs
+  boundary, so the clean statement stops being true. Too clever for what it buys.
+
+**The residual, recorded rather than hidden:** `maxPerDoc` caps an answer at three sections
+per document, so a corpus of fewer than ~14 documents reports "ran out" even when each
+document is long, and therefore supplements most questions. That is honest — it does have
+little to say — but every firing is a third-party call and a credit, so the document count is
+the thing to check before setting `SEARCH_API_KEY`. It is in the guide's own `[!WARNING]`
+panel, not just here.
 
 ### The signature carries the web, and the key does not — and the two documents that look
 ### like they disagree do not

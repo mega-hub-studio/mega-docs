@@ -442,9 +442,11 @@ func TestRetrievalWidensToTheModelsWindow(t *testing.T) {
 
 // engineWithSearch is `engine` with the public-search supplement switched on, pointed at the
 // same fake provider — one server, one call log, so a test can assert what was *not* called.
-// A big window because the supplement's trigger is a fraction of the retrieval budget, and
-// without a window there is no budget to be a fraction of.
-func engineWithSearch(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
+//
+// The model list is a parameter because it decides how many sections retrieval asks for, and
+// that is the number the trigger compares against: a declared window asks for the whole
+// candidate pool, no window asks for TOP_K.
+func engineWithSearch(t *testing.T, p *aitest.Provider, models []rag.Model) (*rag.Engine, *aitest.Provider) {
 	t.Helper()
 	if p == nil {
 		p = &aitest.Provider{}
@@ -464,7 +466,7 @@ func engineWithSearch(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Pr
 		EmbedModel: "embed-model", ChatModel: "chat-model",
 	})
 	return rag.New(store, client, rag.Options{
-		TopK: 3, Models: []rag.Model{{Name: "chat-model", Window: 100_000}},
+		TopK: 3, Models: models,
 		SearchBaseURL: base, SearchAPIKey: "search-key",
 	}), prov
 }
@@ -481,7 +483,7 @@ func engineWithSearch(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Pr
 // which is what keeps Ask BA the only thing on screen to do next.
 func TestAMissReachesABANotTheWeb(t *testing.T) {
 	t.Run("retrieval found nothing: no external call at all", func(t *testing.T) {
-		e, prov := engineWithSearch(t, &aitest.Provider{Reply: "unreachable"})
+		e, prov := engineWithSearch(t, &aitest.Provider{Reply: "unreachable"}, []rag.Model{{Name: "chat-model", Window: 100_000}})
 		if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
 			t.Fatal(err)
 		}
@@ -501,7 +503,7 @@ func TestAMissReachesABANotTheWeb(t *testing.T) {
 	})
 
 	t.Run("the model declared the miss: nothing is cited under it", func(t *testing.T) {
-		e, _ := engineWithSearch(t, &aitest.Provider{Reply: rag.NoAnswer})
+		e, _ := engineWithSearch(t, &aitest.Provider{Reply: rag.NoAnswer}, []rag.Model{{Name: "chat-model", Window: 100_000}})
 		if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
 			t.Fatal(err)
 		}
@@ -520,6 +522,35 @@ func TestAMissReachesABANotTheWeb(t *testing.T) {
 	})
 }
 
+// TestACorpusThatDidNotRunOutIsNotSupplemented is the trigger's other side, and it is the one
+// that decides the bill: retrieval coming back full means the corpus was not the limit, so
+// there is nothing to supplement and no reason to send the question anywhere.
+//
+// Deliberately on an instance with no declared window, because that is where the numbers are
+// small enough to be obvious: retrieval is asked for TOP_K, the corpus has more than TOP_K
+// matching sections, so what comes back is exactly TOP_K and the comparison is an equality
+// rather than a threshold. The first version of this trigger measured retrieved characters
+// against a fraction of the model's context window, and against a 128k window that called
+// almost every answer thin — every question would have gone to a third party.
+func TestACorpusThatDidNotRunOutIsNotSupplemented(t *testing.T) {
+	e, prov := engineWithSearch(t,
+		&aitest.Provider{Reply: "Entirely from the documents [1]."},
+		[]rag.Model{{Name: "chat-model", Window: 0}})
+	wideCorpus(t, e)
+
+	_, reply, err := ask(t, e, "what are the rules for booking?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if reply.Retrieval.Offered != 3 {
+		t.Fatalf("retrieval offered %d sections; this test needs it to come back full at TOP_K's 3",
+			reply.Retrieval.Offered)
+	}
+	if n := len(prov.Searches()); n != 0 {
+		t.Errorf("a corpus that filled its own request bought %d public searches: %v", n, prov.Searches())
+	}
+}
+
 // TestWebResultsAreCitedInTheirOwnNumbering is the provenance half. A sentence from a search
 // API and a sentence from a specification a person approved must not render identically, so
 // the web gets its own markers, its own list, and its own kind on the wire.
@@ -534,7 +565,7 @@ func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
 			Title: "OAuth 2.0", URL: "https://example.test/oauth",
 			Content: "OAuth 2.0 is an authorisation framework for delegated access.",
 		}},
-	})
+	}, []rag.Model{{Name: "chat-model", Window: 100_000}})
 	if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
 		t.Fatal(err)
 	}
@@ -544,7 +575,7 @@ func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
 		t.Fatalf("answer: %v", err)
 	}
 	if len(prov.Searches()) == 0 {
-		t.Fatal("a one-document corpus against a 100k window is thin by any measure, and no search ran")
+		t.Fatal("a one-document corpus cannot fill a 40-candidate pool, so it ran out and no search ran")
 	}
 	var doc, web []rag.Citation
 	for _, c := range reply.Citations {
@@ -564,7 +595,7 @@ func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
 		t.Errorf("web citation = %+v; want a URL and no document path", web[0])
 	}
 	// The same corpus, the same search, an answer that used neither web result.
-	e2, _ := engineWithSearch(t, &aitest.Provider{Reply: "Entirely from the documents [1]."})
+	e2, _ := engineWithSearch(t, &aitest.Provider{Reply: "Entirely from the documents [1]."}, []rag.Model{{Name: "chat-model", Window: 100_000}})
 	if _, err := e2.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
 		t.Fatal(err)
 	}
