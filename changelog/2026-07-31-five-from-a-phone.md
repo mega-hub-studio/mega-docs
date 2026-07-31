@@ -68,13 +68,19 @@ first paragraph, not the panel, because a text node before a block element gets 
 own. A `<b>` label was the other candidate and lost: it is a word to translate on every panel,
 and the recipe has no icon slot.
 
-## 4 · The import bar never filled, and it was never this repo's bug
+## 4 · The import bar never filled, and the docs had said so all along
 
 **8bit-nes 0.15.0 registers `@property --fill { syntax: "<percentage>"; inherits: false;
 initial-value: 0% }`**, while the recipe's own CSS writes `.pbar { --fill: 0% }` and its `<i>`
-reads `inline-size: var(--fill)`. Those two cannot both be right. Follow the container — which
-is what the CSS implies, and what `ImportPanel.vue` did — and the child resolves the registered
-*initial* instead. Measured at the same 66.66%: **0px on the container, 1031.89px on the `<i>`.**
+reads `inline-size: var(--fill)`. Follow the container — which is what that CSS implies, and
+what `ImportPanel.vue` did — and the child resolves the registered *initial* instead. Measured
+at the same 66.66%: **0px on the container, 1031.89px on the `<i>`.**
+
+The published docs put it on the `<i>`: `<span class="pbar"><i style="--fill:64%"></i></span>`.
+So this was **ours**, not the library's — `AGENTS.md` says to read the pinned docs and this
+markup was derived from the stylesheet instead. What the library owes is one line:
+`.pbar { --fill: 0% }` can be read by nothing, and it is what made the wrong reading look like
+the API.
 
 So the bar was empty at every count, at every width, with the correct number in the sentence
 beside it and no error anywhere. Worth naming why it survived: `changelog/2026-07-27` records

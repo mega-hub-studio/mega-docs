@@ -491,6 +491,11 @@ plan.
   every count, at every width, with no error anywhere and the right number in the sentence
   beside it. A registered custom property is the one case where "set it on the parent" is not
   a style preference; check for `@property` before assuming a variable reaches a child.
+  **The published docs already show `<span class="pbar"><i style="--fill:64%"></i></span>`, and
+  this repo read the recipe's CSS instead** — which is `AGENTS.md`'s pinned-docs rule earning its
+  keep, and the reason this trap is filed under ours rather than the library's. What the library
+  owes is one line: `.pbar { --fill: 0% }` cannot be read by anything and made the wrong reading
+  look like the API.
 - **`nes-toc` sets `z-index: 20` on itself.** The sticky header has to sit above it or a
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the
