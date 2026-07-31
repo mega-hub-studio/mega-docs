@@ -39,7 +39,12 @@ DATE="$(git log -1 --format=%cs)"
 # Conventional-Commit subjects become {kind, scope, subject}; anything else lands under
 # "other" with its subject intact rather than being dropped — a release that silently omits
 # commits is worse than one with an untidy line in it.
-NOTES="$(git log --no-merges --format='%h%x1f%s' "$RANGE" | awk -F'\037' '
+#
+# A function over a range, because the same parser now serves the release being cut *and*
+# every earlier one: the modal shows a history, and one parser is what stops the current
+# release and the ones behind it from being formatted by two slightly different rules.
+notes_for() {
+  git log --no-merges --format='%h%x1f%s' "$1" | awk -F'\037' '
   function esc(s) { gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s); gsub(/\t/, " ", s); return s }
   {
     sha = $1; subj = $2; kind = "other"; scope = ""
@@ -54,7 +59,42 @@ NOTES="$(git log --no-merges --format='%h%x1f%s' "$RANGE" | awk -F'\037' '
     }
     printf "%s{\"kind\":\"%s\",\"scope\":\"%s\",\"subject\":\"%s\",\"commit\":\"%s\"}",
       (NR > 1 ? ",\n    " : ""), esc(kind), esc(scope), esc(subj), esc(sha)
-  }')"
+  }'
+}
+
+NOTES="$(notes_for "$RANGE")"
+
+# The releases behind this one, newest first, regenerated from the tags every time rather
+# than appended to. Appending would make release.json its own input — a second truth that
+# drifts the first time a tag is moved or a range recomputed — and this file's whole claim is
+# that git is the only source. Reachable tags only (`--merged`), so a tag on an abandoned
+# branch never appears as a version of this binary.
+#
+# Five, because the question a reader has is "what changed recently", not "what changed ever":
+# the full list is `git log`, and the modal is the phone-sized answer to a different question.
+HISTORY=5
+PAST=""
+# HISTORY + 1 tags, and only the first HISTORY are emitted: the extra one exists to be the
+# *previous* of the oldest entry. Without it that entry's range is unbounded and it reports
+# the whole history — a dry run showed v0.14.0 with 180 notes instead of its own 44, which is
+# the off-by-one this comment exists to stop somebody reintroducing.
+mapfile -t TAGS < <(git tag --merged HEAD --sort=-creatordate | head -n "$((HISTORY + 1))")
+for i in "${!TAGS[@]}"; do
+  [ "$i" -lt "$HISTORY" ] || break
+  cur="${TAGS[$i]}"
+  prv="${TAGS[$((i + 1))]:-}"
+  pnotes="$(notes_for "${prv:+$prv..}$cur")"
+  [ -n "$pnotes" ] || continue
+  PAST="$PAST${PAST:+,}
+    {
+      \"version\": \"$cur\",
+      \"date\": \"$(git log -1 --format=%cs "$cur")\",
+      \"previous\": \"$prv\",
+      \"notes\": [
+    $pnotes
+      ]
+    }"
+done
 
 cat > web/release.json <<JSON
 {
@@ -64,6 +104,8 @@ cat > web/release.json <<JSON
   "previous": "${PREV:-}",
   "notes": [
     $NOTES
+  ],
+  "history": [$PAST
   ]
 }
 JSON

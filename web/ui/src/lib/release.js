@@ -23,6 +23,15 @@
  * @property {string} date     the tagged commit's date, `YYYY-MM-DD`
  * @property {string} previous the tag this is measured from, `''` for a first release
  * @property {ReleaseNote[]} notes    one entry per commit since `previous`, newest first
+ * @property {PastRelease[]} history  the releases behind this one, newest first
+ */
+
+/**
+ * @typedef {object} PastRelease
+ * @property {string} version  the tag
+ * @property {string} date     `YYYY-MM-DD`
+ * @property {string} previous the tag it was measured from
+ * @property {ReleaseNote[]} notes what changed in it
  */
 
 /**
@@ -42,8 +51,15 @@ export async function release() {
     version: body.version || '',
     date: body.date || '',
     previous: body.previous || '',
-    // Defensive about the array only: an older binary with a newer bundle is the one
-    // version skew a committed front end can actually meet.
+    // Defensive about the arrays only: an older binary with a newer bundle is the one
+    // version skew a committed front end can actually meet — and `history` is exactly that
+    // case, absent on every binary cut before it existed.
     notes: Array.isArray(body.notes) ? body.notes : [],
+    history: (Array.isArray(body.history) ? body.history : []).map(r => ({
+      version: r.version || '',
+      date: r.date || '',
+      previous: r.previous || '',
+      notes: Array.isArray(r.notes) ? r.notes : [],
+    })),
   }
 }

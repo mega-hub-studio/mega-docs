@@ -13,6 +13,10 @@ import { useT } from '../composables/lang.js'
 
 defineProps({
   groups: { type: Array, required: true }, // [{ kind, notes }], already ordered
+  // The releases behind this one, each already grouped by the same function: [{ version,
+  // date, groups }]. Closed by default — what a reader came for is the version they are on,
+  // and eight releases of history opened on a phone buries it.
+  past: { type: Array, default: () => [] },
   meta: { type: Object, required: true }, // version · date · previous
   loading: Boolean,
   error: { type: String, default: '' },
@@ -58,5 +62,27 @@ const { t } = useT()
         </li>
       </ul>
     </section>
+
+    <!-- What changed before this version. `<details>` because the disclosure is the
+         platform's — a keyboard-reachable summary, the open/closed state, and the arrow all
+         come free, and a component holding a `shown` ref would be state the shell does not
+         own. One per release rather than one for all of them: a reader who was away for two
+         versions opens two, not a wall. -->
+    <details v-for="r in past" :key="r.version" class="rel-past">
+      <summary>
+        <span class="badge">{{ r.version }}</span>
+        <span v-if="r.date" class="rel-date">{{ r.date }}</span>
+      </summary>
+      <section v-for="g in r.groups" :key="g.kind" class="rel-group">
+        <h3 class="eyebrow">{{ t(`release.kind.${g.kind}`) }}</h3>
+        <ul class="rel-list">
+          <li v-for="n in g.notes" :key="n.commit">
+            <b v-if="n.scope" class="rel-scope">{{ n.scope }}</b>
+            <span class="rel-subject">{{ n.subject }}</span>
+            <code class="rel-commit">{{ n.commit }}</code>
+          </li>
+        </ul>
+      </section>
+    </details>
   </div>
 </template>

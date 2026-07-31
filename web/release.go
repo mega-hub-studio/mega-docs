@@ -42,6 +42,24 @@ type Release struct {
 	Date     string        `json:"date"`
 	Previous string        `json:"previous"`
 	Notes    []ReleaseNote `json:"notes"`
+	// History is the releases behind this one, newest first. The badge names the current
+	// version and the top of the modal describes it; this is the rest of the answer to "what
+	// changed?", for a reader who was away for three of them.
+	//
+	// Regenerated from the tags on every cut, never appended to: appending would make this
+	// file its own input, which is the one thing rule 25 refuses — a second truth that drifts
+	// the first time a range is recomputed.
+	History []PastRelease `json:"history"`
+}
+
+// PastRelease is one earlier release, in the same shape as the current one minus the fields
+// only the newest needs. Its own type rather than a self-referencing Release, because a
+// history of histories is a shape nothing generates and every reader would have to guard.
+type PastRelease struct {
+	Version  string        `json:"version"`
+	Date     string        `json:"date"`
+	Previous string        `json:"previous"`
+	Notes    []ReleaseNote `json:"notes"`
 }
 
 // ReleaseInfo parses that stamp. Only the version reaches /api/health — the notes are a

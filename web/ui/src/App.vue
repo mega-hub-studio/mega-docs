@@ -75,6 +75,7 @@ const { paintCode } = useHighlight()
 // answering, so they cannot change until it restarts.
 const {
   groups: relGroups,
+  past: relPast,
   meta: relMeta,
   loading: relLoading,
   error: relError,
@@ -357,7 +358,8 @@ function replay(entry) {
       </button>
     </div>
     <ReleaseModal
-      :groups="relGroups" :meta="relMeta" :loading="relLoading" :error="relError"
+      :groups="relGroups" :past="relPast" :meta="relMeta"
+      :loading="relLoading" :error="relError"
     />
   </dialog>
 

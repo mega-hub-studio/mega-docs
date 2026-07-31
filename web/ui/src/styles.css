@@ -1082,6 +1082,26 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    clamping, and `min-block-size: 0` is what still lets it shrink and scroll when it clamps. */
 .release .rel-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
 
+/* ── the releases behind this one ──
+   `<details>` brings no spacing of its own and `.rel-body` is the container, so the seam
+   between one collapsed version and the next belongs here (rule 27) — a per-child margin is
+   what left five pairs of blocks touching at 0px elsewhere in this file.
+
+   The summary is a row, not a heading: a badge and a date on one line, tappable across its
+   whole width because that is the control on a phone. `list-style` off removes the default
+   marker so the badge is the affordance; the disclosure arrow is still announced. */
+.rel-past > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  padding-block: var(--sp-2);
+}
+
+.rel-past > summary::-webkit-details-marker { display: none; }
+
+.rel-past[open] { padding-block-end: var(--sp-2); }
+
 /* ── dialog heads are chrome, not headlines ──
    `.title` is `--fs-h2` bold — right on a card in the page, where it names a block the reader
    scrolled to. In a dialog it is the largest type on the screen and it is labelling a box the
@@ -1236,7 +1256,13 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    and a --sp-5 gap already separate. */
 .admin nes-tabs > section:not([hidden]) { display: flex; flex-direction: column; gap: var(--sp-5); }
 .admin nes-tabs > section > section { display: flex; flex-direction: column; gap: var(--sp-3); }
-.admin .datalist { grid-template-columns: auto 1fr auto; }
+/* `:has(> dd.src)`, not `.admin .datalist` — the third track belongs to the list that has a
+   third cell, and nothing else. Settings gives one `<dt>` two `<dd>`s; Runtime gives it one.
+   A blanket three-column rule reflowed Runtime's pairs across those tracks and printed them
+   as a zigzag — "CHAT MODEL · gpt-4o-mini · CONTEXT WINDOW" on one line — which shipped.
+   Binding the columns to the markup that needs them is what makes the two lists disagree
+   safely, and a list that grows a source column later gets it without being told. */
+.admin .datalist:has(> dd.src) { grid-template-columns: auto 1fr auto; }
 /* The badge fills its cell so the column has two straight edges rather than one: the chips
    are different words (ENV · DEFAULT) and a ragged right edge is what the report called
    "lệch" in the first place. */

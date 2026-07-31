@@ -26,11 +26,15 @@ const ORDER = Object.keys(messages.en.release.kind)
  * @param {{ dialog: import("vue").Ref<HTMLDialogElement | null> }} deps the <dialog> the
  *   shell owns — the platform provides focus trapping and Escape, so neither is written here
  * @returns {{ groups: import("vue").Ref<Array<{kind: string, notes: object[]}>>,
+ *   past: import("vue").Ref<Array<{version: string, date: string, groups: object[]}>>,
  *   meta: import("vue").Ref<object>, loading: import("vue").Ref<boolean>,
  *   error: import("vue").Ref<string>, open: () => Promise<void>, close: () => void }}
  */
 export function useRelease({ dialog }) {
   const groups = ref([])
+  // The releases behind this one, each grouped the same way — by the same function, so a
+  // reader scanning down the dialog never meets two orderings of the same kinds.
+  const past = ref([])
   const meta = ref({ version: '', date: '', previous: '' })
   const loading = ref(false)
   const error = ref('')
@@ -46,6 +50,11 @@ export function useRelease({ dialog }) {
       const r = await release()
       meta.value = { version: r.version, date: r.date, previous: r.previous }
       groups.value = group(r.notes)
+      past.value = r.history.map(h => ({
+        version: h.version,
+        date: h.date,
+        groups: group(h.notes),
+      }))
       loaded = true
     }
     catch (e) {
@@ -62,7 +71,7 @@ export function useRelease({ dialog }) {
     dialog.value?.close()
   }
 
-  return { groups, meta, loading, error, open, close }
+  return { groups, past, meta, loading, error, open, close }
 }
 
 /**
