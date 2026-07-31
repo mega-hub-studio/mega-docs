@@ -30,8 +30,9 @@ export function useRuntime() {
     priceOut: 0,
     models: [],
     // What the engine is tuned to, published so the settings panel can show it without a
-    // password: sections per answer, the share of the window a thread may take, cached rows.
-    engine: { topK: 0, threadShare: 0, cacheKeep: 0 },
+    // password: the floor on sections per answer, the share of the window a thread may take,
+    // the share the retrieved sections may take, and cached rows.
+    engine: { topK: 0, threadShare: 0, contextShare: 0, cacheKeep: 0 },
     version: '',
     release: '',
   })

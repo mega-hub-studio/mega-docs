@@ -37,15 +37,33 @@ type Store struct {
 // constant — a typo in a string comparison is a boost that silently never applies.
 const statusApproved = "approved"
 
-// Hit is one retrieved chunk with provenance for citation.
+// Hit is one retrieved chunk with provenance for citation. DocumentID and Ord are not
+// provenance a reader ever sees — they are what stitchNeighbours needs to find the chunks
+// either side of this one, which is the only reason they leave this package.
 type Hit struct {
-	ChunkID int
-	DocPath string
-	Heading string
-	Content string
-	Status  string
-	Score   float64
+	ChunkID    int
+	DocumentID int
+	Ord        int
+	DocPath    string
+	Heading    string
+	Content    string
+	Status     string
+	Score      float64
 }
+
+// CandidatePool is how many candidates each retriever offers before fusion, and therefore
+// the widest an answer can ever be. Exported because the engine asks for exactly this many
+// when it is filling a context budget rather than a fixed count: two numbers for "as wide
+// as retrieval goes" would disagree the first time one of them moved.
+const CandidatePool = 40
+
+// maxPerDoc caps how many chunks one document may contribute to an answer.
+//
+// Without it the whole budget can go to a single file — six near-identical sections of one
+// spec, which reads as a thorough answer and is a narrow one. The cap costs nothing: the
+// slots freed go to the next-best chunk of some other document, so the answer is the same
+// size and covers more of the corpus.
+const maxPerDoc = 3
 
 // Open opens (or creates) the SQLite DB and runs migrations.
 // dim = embedding dimension (must match your embedding model).
@@ -173,23 +191,29 @@ func (s *Store) InsertChunk(docID int64, heading, content string, ord int, emb [
 // above it; "" is everything. Both retrievers are filtered *before* they rank, never
 // after fusion: dropping out-of-scope rows afterwards leaves fewer than k results and
 // degrades the answer without saying so.
-func (s *Store) Search(qEmb []float32, qText string, k int, scope string) ([]Hit, error) {
-	const pool = 40 // candidates pulled from each retriever before fusion
-
-	vecOrder, err := s.vectorCandidates(qEmb, scope, pool)
+//
+// withNeighbours grows each hit to the chunks either side of it. The caller decides,
+// because the thing that makes it affordable — a model window big enough to read them —
+// is a fact about the model, and this package does not know there is one.
+func (s *Store) Search(qEmb []float32, qText string, k int, scope string, withNeighbours bool) ([]Hit, error) {
+	vecOrder, err := s.vectorCandidates(qEmb, scope, CandidatePool)
 	if err != nil {
 		return nil, err
 	}
 	// The keyword leg is best-effort by design: a query FTS5 refuses must cost the
 	// answer some recall, never the whole answer, because the vector leg can still
 	// carry it. So this one returns no error to check.
-	ftsOrder := s.keywordCandidates(qText, scope, pool)
+	ftsOrder := s.keywordCandidates(qText, scope, CandidatePool)
 
 	score := fuse(vecOrder, ftsOrder)
 	if len(score) == 0 {
 		return nil, nil
 	}
-	return s.hits(score, k)
+	hits, err := s.hits(score, k)
+	if err != nil || !withNeighbours {
+		return hits, err
+	}
+	return s.stitchNeighbours(hits)
 }
 
 // vectorCandidates returns chunk ids by embedding distance, nearest first.
@@ -281,7 +305,7 @@ func (s *Store) hits(score map[int]float64, k int) ([]Hit, error) {
 	}
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(args)), ",")
 	rows, err := s.db.Query(fmt.Sprintf(
-		`SELECT c.id, d.path, c.heading, c.content, c.status
+		`SELECT c.id, c.document_id, c.ord, d.path, c.heading, c.content, c.status
 		 FROM chunks c JOIN documents d ON d.id = c.document_id
 		 WHERE c.id IN (%s)`, placeholders), args...)
 	if err != nil {
@@ -292,7 +316,9 @@ func (s *Store) hits(score map[int]float64, k int) ([]Hit, error) {
 	var hits []Hit
 	for rows.Next() {
 		var h Hit
-		if err := rows.Scan(&h.ChunkID, &h.DocPath, &h.Heading, &h.Content, &h.Status); err != nil {
+		if err := rows.Scan(
+			&h.ChunkID, &h.DocumentID, &h.Ord, &h.DocPath, &h.Heading, &h.Content, &h.Status,
+		); err != nil {
 			return nil, err
 		}
 		h.Score = score[h.ChunkID]
@@ -305,8 +331,98 @@ func (s *Store) hits(score map[int]float64, k int) ([]Hit, error) {
 		return nil, err
 	}
 	sort.Slice(hits, func(i, j int) bool { return hits[i].Score > hits[j].Score })
+	hits = capPerDoc(hits)
 	if len(hits) > k {
 		hits = hits[:k]
+	}
+	return hits, nil
+}
+
+// capPerDoc drops the chunks past maxPerDoc from any one document. Score order in, score
+// order out — it keeps each document's best and lets the freed slots fall to the next
+// document, so k still decides the size and this decides the spread.
+func capPerDoc(hits []Hit) []Hit {
+	seen := map[string]int{}
+	kept := hits[:0] // in place: the write index never overtakes the read index
+	for _, h := range hits {
+		if seen[h.DocPath] >= maxPerDoc {
+			continue
+		}
+		seen[h.DocPath]++
+		kept = append(kept, h)
+	}
+	return kept
+}
+
+// stitchNeighbours grows each hit to the chunks immediately before and after it in its own
+// document, so the model reads a whole section instead of the 2400-character piece that
+// happened to rank. SplitMarkdown cuts at a size, not at a thought, and a chunk that starts
+// mid-argument is what makes an answer read as if it skipped a step.
+//
+// The hits themselves do not change: same count, same order, same ChunkID, DocPath and
+// Heading, so a citation still numbers exactly one hit and [n] never moves. Only Content
+// grows.
+//
+// A neighbour that is already a hit in its own right is skipped — two adjacent chunks that
+// both ranked would otherwise print the same paragraph under two different citations.
+func (s *Store) stitchNeighbours(hits []Hit) ([]Hit, error) {
+	if len(hits) == 0 {
+		return hits, nil
+	}
+	type at struct{ doc, ord int }
+	ranked := make(map[at]bool, len(hits))
+	wanted := make(map[at]bool, 2*len(hits))
+	for _, h := range hits {
+		ranked[at{h.DocumentID, h.Ord}] = true
+	}
+	for _, h := range hits {
+		for _, ord := range [...]int{h.Ord - 1, h.Ord + 1} {
+			if !ranked[at{h.DocumentID, ord}] {
+				wanted[at{h.DocumentID, ord}] = true
+			}
+		}
+	}
+	if len(wanted) == 0 {
+		return hits, nil
+	}
+
+	args := make([]any, 0, 2*len(wanted))
+	for w := range wanted {
+		args = append(args, w.doc, w.ord)
+	}
+	placeholders := strings.TrimRight(strings.Repeat("(?,?),", len(wanted)), ",")
+	rows, err := s.db.Query(fmt.Sprintf(
+		`SELECT document_id, ord, content FROM chunks WHERE (document_id, ord) IN (%s)`,
+		placeholders), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	body := make(map[at]string, len(wanted))
+	for rows.Next() {
+		var w at
+		var content string
+		if err := rows.Scan(&w.doc, &w.ord, &content); err != nil {
+			return nil, err
+		}
+		body[w] = content
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range hits {
+		h := &hits[i]
+		var b strings.Builder
+		if before, ok := body[at{h.DocumentID, h.Ord - 1}]; ok {
+			b.WriteString(before + "\n\n")
+		}
+		b.WriteString(h.Content)
+		if after, ok := body[at{h.DocumentID, h.Ord + 1}]; ok {
+			b.WriteString("\n\n" + after)
+		}
+		h.Content = b.String()
 	}
 	return hits, nil
 }

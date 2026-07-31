@@ -10,7 +10,18 @@
    Callers never see an AbortController, a TextDecoder, or an "event:" line.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/** @typedef {{ n: number, doc: string, heading: string }} Citation */
+/**
+ * @typedef {object} Citation where one claim came from. Two kinds, two numberings: a document
+ *   is `[n]` and carries `doc`/`heading`, a public search result is `[wN]` and carries
+ *   `kind: "web"` with `title`/`url`. An absent `kind` is a document — every payload written
+ *   before the web existed still means what it did.
+ * @property {number} n the marker's number, within its own kind
+ * @property {string} [doc] the document's path
+ * @property {string} [heading] the section breadcrumb inside it
+ * @property {string} [kind] "web", or absent for one of this organisation's documents
+ * @property {string} [title] the page title, for a web result
+ * @property {string} [url] the page, for a web result
+ */
 /** @typedef {{ q: string, a: string }} Turn one exchange already on screen */
 
 /**
@@ -23,6 +34,8 @@
  * @property {string} model which one actually answered
  * @property {number} kept turns of the thread the model read
  * @property {number} offered turns it was given to choose from
+ * @property {number} sections sections of the corpus the answer was built from
+ * @property {number} candidates sections retrieval weighed before the budget cut it
  */
 
 /**
@@ -31,11 +44,12 @@
  * @property {boolean} online the server answered at all
  * @property {boolean} writes a BA can confirm here
  * @property {boolean} admin this instance has an admin surface
+ * @property {boolean} search this instance can supplement a thin answer from the public web
  * @property {string} model the default model's name
  * @property {number} window its context window, in tokens
  * @property {{name: string, window: number, price_in: number, price_out: number}[]} models
  *   every model this instance will answer with — the picker's whole source of truth
- * @property {{topK: number, threadShare: number, cacheKeep: number}} engine what it is tuned to
+ * @property {object} engine what it is tuned to: topK, threadShare, contextShare, cacheKeep
  * @property {number} priceIn USD per 1M prompt tokens
  * @property {number} priceOut USD per 1M completion tokens
  * @property {string} version the commit this server was built from
@@ -153,6 +167,8 @@ function apply(frame, { onToken, onCitations, onDone }) {
       model: payload.model || '',
       kept: payload.kept || 0,
       offered: payload.offered || 0,
+      sections: payload.sections || 0,
+      candidates: payload.candidates || 0,
     })
   }
   else if (event === 'error') {
@@ -181,6 +197,10 @@ export async function health() {
       // discover which routes exist, so an unset ADMIN_PASS has to arrive as a fact rather
       // than as a 404 the Admin tab hits after someone taps it.
       admin: !!body.admin,
+      // Whether this instance can reach the public web at all. A labelled outside source is
+      // something a reader has to be able to expect, so the capability arrives with the rest
+      // of them rather than being inferred from a badge that did or did not appear.
+      search: !!body.search,
       model: body.model || '',
       window: body.window || 0,
       // Every model this instance will answer with, each with the two numbers the strip
@@ -192,6 +212,7 @@ export async function health() {
       engine: {
         topK: body.top_k || 0,
         threadShare: body.thread_share || 0,
+        contextShare: body.context_share || 0,
         cacheKeep: body.cache_keep || 0,
       },
       priceIn: body.price_in || 0,
@@ -222,10 +243,11 @@ function unknown() {
     online: false,
     writes: false,
     admin: false,
+    search: false,
     model: '',
     window: 0,
     models: [],
-    engine: { topK: 0, threadShare: 0, cacheKeep: 0 },
+    engine: { topK: 0, threadShare: 0, contextShare: 0, cacheKeep: 0 },
     priceIn: 0,
     priceOut: 0,
     version: '',

@@ -26,6 +26,11 @@ type Engine struct {
 	// constant because the trade it makes — memory against grounding — is one an operator
 	// watching their own corpus is better placed to settle than this file is.
 	share float64
+	// contextShare is the same kind of number for the retrieved sections. See retrieve.go.
+	contextShare float64
+	// search supplements a thin answer from the public web, and is nil unless the instance
+	// configured a key. Nil is the whole off switch — see websearch.go.
+	search *searchClient
 }
 
 // Model is one chat model this engine may answer with, and the one number it needs about it:
@@ -50,6 +55,14 @@ type Options struct {
 	// ThreadShare is the fraction of the window a conversation may occupy; <=0 means the
 	// engine's own default. The other two thirds are the retrieved sections and the answer.
 	ThreadShare float64
+	// ContextShare is the fraction of the window the retrieved sections may occupy; <=0
+	// means the engine's own default. Only read when the picked model has a window at all —
+	// without one, TopK still decides the count. See retrieve.go.
+	ContextShare float64
+	// SearchBaseURL and SearchAPIKey configure the public-search supplement. An empty key
+	// means the engine never makes an external call at all. See websearch.go.
+	SearchBaseURL string
+	SearchAPIKey  string
 }
 
 // New builds the engine. A TopK of zero means the default.
@@ -62,7 +75,11 @@ func New(store *db.Store, client *ai.Client, opt Options) *Engine {
 	if opt.TopK <= 0 {
 		opt.TopK = 6
 	}
-	return &Engine{store: store, ai: client, topK: opt.TopK, models: opt.Models, share: opt.ThreadShare}
+	return &Engine{
+		store: store, ai: client, topK: opt.TopK, models: opt.Models,
+		share: opt.ThreadShare, contextShare: opt.ContextShare,
+		search: newSearchClient(opt.SearchBaseURL, opt.SearchAPIKey),
+	}
 }
 
 // Ingest parses, chunks, embeds and stores one markdown document. The title is the file
@@ -124,12 +141,22 @@ func (e *Engine) ingest(ctx context.Context, doc db.Doc) (int, error) {
 	return len(chunks), nil
 }
 
-// Citation points a claim back to its source chunk.
+// Citation points a claim back to where it came from. Two kinds share the struct and not the
+// numbering: a document is [n] with a path and a heading, a public search result is [wN] with
+// a title and a URL. Kind is empty for a document, so every existing payload still means what
+// it always did and the front end reads the absence rather than a migration.
 type Citation struct {
 	N       int    `json:"n"`
-	DocPath string `json:"doc"`
-	Heading string `json:"heading"`
+	DocPath string `json:"doc,omitempty"`
+	Heading string `json:"heading,omitempty"`
+	Kind    string `json:"kind,omitempty"` // "" = one of this organisation's documents
+	Title   string `json:"title,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
+
+// webKind is the Kind a search result carries. A constant because three layers compare
+// against it and a typo in a string comparison is a badge that silently never renders.
+const webKind = "web"
 
 // NoAnswer is what the engine says when the documents don't cover the question. It
 // is one string because three things depend on it agreeing: the prompt, the
@@ -137,7 +164,12 @@ type Citation struct {
 const NoAnswer = "Không tìm thấy thông tin này trong tài liệu."
 
 // citeMarker matches the [n] the prompt asks for and answer.js turns into a link.
-var citeMarker = regexp.MustCompile(`\[(\d+)\]`)
+// webCiteMarker is the same for [wN]. They cannot collide: the character after `[` is a digit
+// in one and `w` in the other, so neither pattern can read the other's marker.
+var (
+	citeMarker    = regexp.MustCompile(`\[(\d+)\]`)
+	webCiteMarker = regexp.MustCompile(`\[w(\d+)\]`)
+)
 
 // referenced narrows a source list to the entries the answer actually pointed at.
 //
@@ -171,6 +203,29 @@ func referenced(all []Citation, answer string) []Citation {
 	return kept
 }
 
+// referencedWeb is `referenced` for [wN], and it has the opposite fallback on purpose.
+//
+// An answer that cited no document still shows its sources: they are the only provenance the
+// reader has, and guessing which one mattered would be worse. An answer that cited no *web*
+// result shows none — printing a list of links under an answer that did not use them says the
+// organisation's documents were supplemented when they were not, which is exactly the
+// invisible failure the separate numbering exists to prevent.
+func referencedWeb(all []Citation, answer string) []Citation {
+	used := map[int]bool{}
+	for _, m := range webCiteMarker.FindAllStringSubmatch(answer, -1) {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			used[n] = true
+		}
+	}
+	var kept []Citation
+	for _, c := range all {
+		if used[c.N] {
+			kept = append(kept, c)
+		}
+	}
+	return kept
+}
+
 // isMiss reports whether a reply *is* the no-answer, rather than merely containing
 // it.
 //
@@ -198,15 +253,17 @@ func isMiss(s string) bool { return strings.TrimSpace(s) == NoAnswer }
 const systemPrompt = `You are a precise knowledge assistant over one organisation's own documents — engineering, product, business and support alike.
 
 RULES:
-- Answer ONLY from the CONTEXT below. Never use outside knowledge.
+- Every claim about this organisation comes from the CONTEXT below and is cited [n]. A WEB section, when one is present, is a public search result and not this organisation's: cite it [w1], [w2]… in its own numbering, never as [n], and never leave it uncited. Your own reasoning and general knowledge may appear only inside the single [!GENERAL] panel described in the alert rule below — to explain or define a term the CONTEXT leans on, never as a fact about the organisation and never in place of a citation.
 - If the context contains nothing that answers the question, reply with exactly this sentence and nothing else: "` + NoAnswer + `"
+- A WEB section can never satisfy that: the question is about this organisation, and a public page does not know what this organisation does. If the CONTEXT does not answer it, the sentence above is the answer even when the WEB section looks relevant, and especially then. WEB explains a term the CONTEXT already uses; it does not supply a fact the CONTEXT is missing.
 - If the context answers part of the question, answer that part and name the missing part in your own words, in a [!WARNING] alert (see the alert rule below). Do not fill the gap, and do not use the sentence above — it is reserved for answering nothing at all.
 - If the question is ambiguous — it could mean two different things the CONTEXT covers differently, or it names something the CONTEXT holds several of — do not pick one silently, do not answer one reading and mention the others in passing, and do not use the sentence above. Open the reply with a blockquote line "> [!QUESTION]" followed by the one thing you need to know, and under it a GFM checklist with one item per reading: the wording a reader would recognise, then the [n] of the section behind that reading. Mark the single most likely reading "- [x]" and every other one "- [ ]". Write nothing after that checklist — the reader picks from it and the pick comes back as the next question, so an answer underneath is an answer to a question nobody has asked yet. A wrong answer delivered confidently costs more than one extra turn.
-- Cite every claim with [n]. Cite only sources you actually used, and never a number that is not in the CONTEXT.
+- Cite every claim with [n]. Cite only sources you actually used, and never a number that is not in the CONTEXT. Do the same for a WEB section with [w1], [w2]… — and never write one when there is no WEB section to point at.
 - If two sources disagree, say so in a [!CAUTION] alert and cite both. Do not silently pick one.
-- Reasoning about the CONTEXT is not outside knowledge. Connect its sections, draw the conclusion that follows from them, and explain a term the documents rely on when a reader would need it. What you may not do is import a fact that is not there.
+- Reasoning about the CONTEXT is not outside knowledge: connect its sections and draw the conclusion that follows from them, inline, with no panel around it. What you may not do is import an *unlabelled* fact that is not there — the [!GENERAL] panel is the one place a fact from outside may go, and it goes nowhere else.
 - Explain, do not transcribe. A list of quoted fragments is not an answer; say what it means for the person asking. Length follows the question — one line for a lookup, a walk-through for "how does this work".
-- A caveat buried in a paragraph is a caveat the reader finds after acting on it, so give one its own panel: a blockquote whose first line is [!NOTE] for context the answer leans on, [!TIP] for the way the documents say to do it, [!IMPORTANT] for something that has to be true first, [!WARNING] for the part of the question the documents do not cover, or [!CAUTION] for two sources that disagree. It is GitHub's own alert syntax and it renders as a coloured panel. At most two in an answer — a reply that is all panels has no emphasis left in it, and the ordinary sentence is still the right place for an ordinary fact.
+- A caveat buried in a paragraph is a caveat the reader finds after acting on it, so give one its own panel: a blockquote whose first line is [!NOTE] for context the answer leans on, [!TIP] for the way the documents say to do it, [!IMPORTANT] for something that has to be true first, [!WARNING] for the part of the question the documents do not cover, [!CAUTION] for two sources that disagree, or [!GENERAL] for a term the CONTEXT relies on and does not define — what it means in the field generally, so a reader can follow the rest. The first five are GitHub's own alert syntax; [!GENERAL] is this assistant's own, rendered the same coloured way and deliberately a different colour, because a reader has to be able to see at a glance which sentences their organisation vouched for. At most two panels in an answer — a reply that is all panels has no emphasis left in it, and the ordinary sentence is still the right place for an ordinary fact — and at most one of the two may be [!GENERAL].
+- [!GENERAL] never stands alone and never appears beside the no-answer sentence: an answer that opens one also cites at least one [n]. A question the CONTEXT does not cover gets that sentence, by itself — explaining a word from a question nobody could answer is not an answer, it is a way of looking like one.
 - When the CONTEXT describes a flow, a state machine or a structure with several parts, add a mermaid diagram in a ` + "```mermaid" + ` block on top of the prose — nodes and edges taken only from what the documents say. Keep it under about ten nodes, and leave it out entirely when the answer is a single fact.
 - Keep a node label to about four words, and open it with one emoji standing for what the node *is*: 👆 something the reader does, ⚙️ something the system does, ❓ a decision, ✅ or ⛔ how a branch ends, 📄 a screen, record or document. A box is a landmark, not a sentence — a label wide enough to wrap makes every box taller, and past a few of those the shape of the flow stops fitting on one screen, which is the only thing the diagram was there to show. The full wording belongs in the prose underneath, written as a numbered list in the diagram's own order — one item per node, each opening with that node's exact label in bold and then explaining it. That list is what the reader steps through, one node lit at a time. Never replace an identifier with an emoji: a file path, a status the documents name, a field or an error code is written out as it appears, emoji or not.
 - When the question asks you to *enumerate* — "list every…", "what are all the…", "which conventions/rules/fields apply to X", "liệt kê…" — answer with a markdown table, not prose. One row per item, and the LAST column is the [n] for that row. A reader checking a convention against their own code needs to see every item at once and verify each one separately; a paragraph makes them re-read to find out whether an item is missing. Say above the table how many items you found and which document each came from, and if the CONTEXT covers only part of the set, say which part is missing under the table rather than padding it. Keep a cell to a few words: a grid is read across, and one sentence-long cell makes its whole row as tall as that sentence — the explanation belongs in the prose under the table. No emoji in a cell either; write the status the documents themselves use, in their words.
@@ -265,10 +322,16 @@ type Reply struct {
 	// line prints it, because a budget that trims silently is indistinguishable from an
 	// assistant that forgot.
 	Recall Recall `json:"recall"`
+	// Retrieval is the same pair for the corpus: sections read, of sections retrieval
+	// weighed. It is what says whether the window is being used or wasted.
+	Retrieval Recall `json:"retrieval"`
 }
 
-// Recall is the thread as the model saw it. Both numbers or neither: 0/0 is a first question,
-// and 3/8 says five turns did not fit the window.
+// Recall is how much of something the model actually read: kept of offered. Both numbers or
+// neither — 0/0 is a thread's first question, and 3/8 says five turns did not fit the
+// window. Retrieval reports its sections the same way, because it is the same question
+// asked of the corpus and a second type for one pair of ints would be a second thing to
+// keep in step.
 type Recall struct {
 	Kept    int `json:"kept"`
 	Offered int `json:"offered"`
@@ -337,7 +400,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	if err != nil {
 		return Reply{}, err
 	}
-	hits, err := e.store.Search(qv[0], query, e.topK, scope)
+	hits, retrieval, err := e.retrieve(qv[0], query, model, scope)
 	if err != nil {
 		return Reply{}, err
 	}
@@ -354,13 +417,20 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 		cites[i] = Citation{N: n, DocPath: h.DocPath, Heading: h.Heading}
 	}
 
+	// Whatever the public web adds, when the documents said much less than this model could
+	// have read. Nothing at all on an instance with no key, and nothing on a question the
+	// corpus answered properly. See websearch.go — the rules it works to are there, not here.
+	webBlock, webCites := e.supplement(ctx, query, model, hits)
+
 	// The thread sits between the rules and this question, which is where a chat model
 	// expects it: the retrieved CONTEXT is fresh for every turn, so it belongs with the
 	// question it was retrieved for rather than with the conversation behind it.
 	msgs := make([]ai.Msg, 0, len(turns)+2)
 	msgs = append(msgs, ai.Msg{Role: "system", Content: systemPrompt})
 	msgs = append(msgs, turns...)
-	msgs = append(msgs, ai.Msg{Role: "user", Content: "CONTEXT:\n" + cb.String() + "\nQUESTION: " + question})
+	msgs = append(msgs, ai.Msg{
+		Role: "user", Content: "CONTEXT:\n" + cb.String() + webBlock + "\nQUESTION: " + question,
+	})
 	// Accumulate what the user is already seeing: the cache stores the answer, and
 	// re-serialising it from the model would cost the tokens twice.
 	var full strings.Builder
@@ -374,13 +444,13 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	usage.PromptTokens += spent.PromptTokens
 	usage.CompletionTokens += spent.CompletionTokens
 	if err != nil {
-		return Reply{Citations: cites, Usage: usage}, err
+		return Reply{Citations: cites, Usage: usage, Retrieval: retrieval}, err
 	}
 	// Show the sources the answer used, not everything retrieval considered. TOP_K is
 	// a retrieval budget, not a reading list: an answer that cites [2] alongside five
 	// untouched sections asks the reader to check five places for a claim that came
 	// from one. Narrowed before caching, so a replay shows the same short list.
-	cites = referenced(cites, full.String())
+	cites = append(referenced(cites, full.String()), referencedWeb(webCites, full.String())...)
 
 	// Only cache a grounded, complete answer. A cut-off stream or an ungrounded
 	// reply is exactly what someone will retry, and a cache that remembers it turns
@@ -398,9 +468,9 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// reported, because it was really spent.
 	recall := Recall{Kept: kept, Offered: offered}
 	if isMiss(full.String()) {
-		return Reply{Usage: usage, Recall: recall}, nil
+		return Reply{Usage: usage, Recall: recall, Retrieval: retrieval}, nil
 	}
-	return Reply{Citations: cites, Usage: usage, Recall: recall}, nil
+	return Reply{Citations: cites, Usage: usage, Recall: recall, Retrieval: retrieval}, nil
 }
 
 // serveCached replays a stored answer as if it had just been generated, so the client

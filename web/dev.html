@@ -133,32 +133,39 @@ view.scrollToEnd();                            // viewport.js</span></div>
        Rendered from web/retrieval.mmd at build time — mermaid never reaches this page. -->
   <section id="pipeline" data-feature="retrieval"
            data-api="POST /api/chat"
-           data-env="TOP_K,CHAT_MODEL,EMBED_MODEL,EMBED_DIM,THREAD_SHARE,CACHE_KEEP"
-           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestChangingTopKInvalidatesTheCache,TestOnlyAWholeMissSkipsTheCache,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
+           data-env="TOP_K,CONTEXT_SHARE,CHAT_MODEL,EMBED_MODEL,EMBED_DIM,THREAD_SHARE,CACHE_KEEP"
+           data-test="TestHybridSearch,TestIndexingInvalidatesTheCache,TestChangingTheChatModelInvalidatesTheCache,TestChangingTopKInvalidatesTheCache,TestChangingTheRetrievalBudgetInvalidatesTheCache,TestRetrievalWidensToTheModelsWindow,TestOneDocumentCannotFillTheAnswer,TestOnlyAWholeMissSkipsTheCache,TestAFollowUpIsRewrittenForRetrievalAndNeverCached">
     <h2 lang="en">How an answer is built</h2>
     <h2 lang="vi">Một câu trả lời được dựng thế nào</h2>
     <div class="callout memo">
-      <b lang="en">Three numbers, and the cache knows about one of them.</b>
-      <span lang="en"><code>TOP_K</code> is how many sections an answer is built from,
-        <code>THREAD_SHARE</code> how much of a model's window a conversation may occupy (0.35:
-        the other two thirds are the sections and the answer), and <code>CACHE_KEEP</code> how
-        many answers survive a prune. Only the first is in the cache signature, and it had to
-        be: a cache filled at six and read at twelve served the narrower answer under the wider
-        setting. The other two cannot serve a stale answer —
+      <b lang="en">Four numbers, and the cache knows about two of them.</b>
+      <span lang="en">How wide an answer reads follows the <i>model's context window</i>, not a
+        fixed count: <code>CONTEXT_SHARE</code> (0.5) is the fraction of that window the
+        retrieved sections may fill, so a 128k model reads tens of sections rather than six.
+        <code>TOP_K</code> is the floor underneath it — what an instance answers with when no
+        window was ever configured. Then <code>THREAD_SHARE</code> is how much of the window a
+        conversation may occupy (0.35), and <code>CACHE_KEEP</code> how many answers survive a
+        prune. The first two are in the cache signature, and both had to be: a cache filled at
+        six and read at twelve served the narrower answer under the wider setting.
         <code>THREAD_SHARE</code> only shapes follow-ups, which are never cached, and
-        <code>CACHE_KEEP</code> is a row count. All three are on
-        <code>/api/health</code>, so the settings panel shows what this instance is tuned like
-        without a password.</span>
-      <b lang="vi">Ba con số, và cache biết về một trong ba.</b>
-      <span lang="vi"><code>TOP_K</code> là số section một câu trả lời được dựng từ,
-        <code>THREAD_SHARE</code> là phần context window một hội thoại được chiếm (0.35: hai
-        phần ba còn lại là các section và câu trả lời), và <code>CACHE_KEEP</code> là số câu trả
-        lời sống sót sau mỗi lần prune. Chỉ cái đầu nằm trong cache signature, và buộc phải
-        nằm: cache lấp ở sáu rồi đọc ở mười hai sẽ trả lời bằng bản hẹp hơn dưới thiết lập rộng
-        hơn. Hai cái còn lại không thể trả về câu cũ — <code>THREAD_SHARE</code> chỉ định hình
-        câu hỏi tiếp, mà câu hỏi tiếp không bao giờ được cache, còn <code>CACHE_KEEP</code> chỉ
-        là số dòng. Cả ba đều có trên <code>/api/health</code>, nên settings panel hiện được
-        instance này đang được tune thế nào mà không cần mật khẩu.</span>
+        <code>CACHE_KEEP</code> is a row count. All four are on <code>/api/health</code>, so
+        the settings panel shows what this instance is tuned like without a password — and the
+        status line prints sections-read of sections-weighed on every answer, so a window left
+        empty is visible rather than assumed.</span>
+      <b lang="vi">Bốn con số, và cache biết về hai trong bốn.</b>
+      <span lang="vi">Một câu trả lời rộng đến đâu là theo <i>context window của model</i>,
+        không theo một con số cố định: <code>CONTEXT_SHARE</code> (0.5) là phần window mà các
+        section được chiếm, nên model 128k đọc vài chục section thay vì sáu. <code>TOP_K</code>
+        là mức sàn bên dưới — thứ một instance chưa từng khai báo window sẽ trả lời bằng. Rồi
+        <code>THREAD_SHARE</code> là phần window một hội thoại được chiếm (0.35), và
+        <code>CACHE_KEEP</code> là số câu trả lời sống sót sau mỗi lần prune. Hai cái đầu nằm
+        trong cache signature, và cả hai đều buộc phải nằm: cache lấp ở sáu rồi đọc ở mười hai
+        sẽ trả lời bằng bản hẹp hơn dưới thiết lập rộng hơn. <code>THREAD_SHARE</code> chỉ định
+        hình câu hỏi tiếp, mà câu hỏi tiếp không bao giờ được cache, còn <code>CACHE_KEEP</code>
+        chỉ là số dòng. Cả bốn đều có trên <code>/api/health</code>, nên settings panel hiện
+        được instance này đang được tune thế nào mà không cần mật khẩu — và status line in số
+        section đã đọc trên số section đã cân nhắc ở mỗi câu trả lời, nên một window bị bỏ
+        trống là thứ nhìn thấy được chứ không phải đoán.</span>
     </div>
     <p class="lede" lang="en">One question, eight stages, and two of them can return early.
       A question continuing a thread runs one more, ahead of all of them — see
@@ -201,12 +208,18 @@ view.scrollToEnd();                            // viewport.js</span></div>
       <div data-title="3 · RRF fuse" data-title-vi="3 · hợp nhất RRF" data-focus="rrf fuse|top k">
         <p lang="en">Two rankings, one list: reciprocal-rank fusion takes position rather
           than score, so a vector distance and a BM25 weight never have to be compared on
-          the same scale. Then <code>TOP_K</code> sections survive — this is the step that
-          decides quality, because a section that does not get here cannot be cited.</p>
+          the same scale. Then the budget decides how many survive: as many as
+          <code>CONTEXT_SHARE</code> of the model's window holds, capped at three per document
+          so one file cannot fill the answer, and each one read together with the chunks either
+          side of it. This is the step that decides quality, because a section that does not
+          get here cannot be cited.</p>
         <p lang="vi">Hai bảng xếp hạng thành một danh sách: RRF lấy <i>thứ hạng</i> chứ
           không lấy điểm, nên khoảng cách vector và trọng số BM25 không phải so trên cùng
-          một thang. Rồi <code>TOP_K</code> đoạn đi tiếp — đây là bước quyết định chất
-          lượng, vì đoạn không tới được đây thì không thể được dẫn nguồn.</p>
+          một thang. Rồi ngân sách quyết định bao nhiêu đoạn đi tiếp: nhiều bằng phần
+          <code>CONTEXT_SHARE</code> của window model chứa được, tối đa ba đoạn mỗi tài liệu để
+          một file không lấp hết câu trả lời, và mỗi đoạn được đọc kèm hai đoạn liền kề. Đây là
+          bước quyết định chất lượng, vì đoạn không tới được đây thì không thể được dẫn
+          nguồn.</p>
       </div>
       <div data-title="4 · prompt + context" data-title-vi="4 · prompt + ngữ cảnh" data-focus="prompt + context">
         <p lang="en">Those sections go in as the <i>only</i> allowed source, with the
@@ -250,20 +263,25 @@ view.scrollToEnd();                            // viewport.js</span></div>
         khỏi cache theo cả hai chiều. Đoạn hội thoại đi kèm request (<code>history</code>);
         server không giữ session.</dd>
       <dt lang="en">cached?</dt>
-      <dd lang="en">Keyed on the normalised question <i>and its scope</i>, under a signature
-        of the corpus + chat model + a hash of the prompt. A hit costs nothing: no embedding
-        call, no completion. <code>fresh</code> (Regenerate) skips it.</dd>
+      <dd lang="en">Keyed on the normalised question, <i>its scope and the model</i>, under a
+        signature of the corpus + the retrieval budget + a hash of the prompt. The split is the
+        rule: a reader's own pick goes in the key so two of them coexist, and startup config
+        goes in the signature because changing it invalidates every row at once. A hit costs
+        nothing: no embedding call, no completion. <code>fresh</code> (Regenerate) skips it.</dd>
       <dt lang="vi">cached?</dt>
-      <dd lang="vi">Khoá theo câu hỏi đã chuẩn hoá <i>và scope của nó</i>, dưới một signature
-        gồm corpus + chat model + hash của prompt. Trúng cache là không tốn gì: không gọi
-        embedding, không gọi completion. <code>fresh</code> (Regenerate) bỏ qua nó.</dd>
+      <dd lang="vi">Khoá theo câu hỏi đã chuẩn hoá, <i>scope và model của nó</i>, dưới một
+        signature gồm corpus + ngân sách truy xuất + hash của prompt. Cách chia là một quy tắc:
+        lựa chọn của người đọc nằm trong key để hai lựa chọn cùng tồn tại, còn config lúc khởi
+        động nằm trong signature vì đổi nó là vô hiệu hoá mọi dòng cùng lúc. Trúng cache là
+        không tốn gì: không gọi embedding, không gọi completion. <code>fresh</code>
+        (Regenerate) bỏ qua nó.</dd>
       <dt lang="en">vectors · keywords</dt>
       <dd lang="en">Both legs, always, and both filtered by the scope <i>before</i> they
-        rank. sqlite-vec takes the scope as a pre-filter, so <code>TOP_K</code> counts
+        rank. sqlite-vec takes the scope as a pre-filter, so <code>k</code> counts
         matches inside the folder rather than survivors of a global top-k.</dd>
       <dt lang="vi">vectors · keywords</dt>
       <dd lang="vi">Luôn chạy cả hai nhánh, và cả hai đều bị lọc theo scope <i>trước</i> khi
-        xếp hạng. sqlite-vec nhận scope như pre-filter, nên <code>TOP_K</code> đếm kết quả
+        xếp hạng. sqlite-vec nhận scope như pre-filter, nên <code>k</code> đếm kết quả
         trong thư mục chứ không phải phần sót lại của top-k toàn cục.</dd>
       <dt lang="en">RRF fuse</dt>
       <dd lang="en">Reciprocal Rank Fusion: a section both retrievers found beats one that
@@ -373,7 +391,7 @@ view.scrollToEnd();                            // viewport.js</span></div>
 
   <!-- ══ knobs ═════════════════════════════════════════════════════════════ -->
   <section id="knobs" data-feature="knobs"
-           data-env="TOP_K,EMBED_MODEL,EMBED_DIM,EMBED_BASE_URL,EMBED_API_KEY,CORPUS_DIR"
+           data-env="TOP_K,CONTEXT_SHARE,EMBED_MODEL,EMBED_DIM,EMBED_BASE_URL,EMBED_API_KEY,CORPUS_DIR"
            data-test="TestNoChunkExceedsMaxChars,TestUndersizedSectionsMergeUntilTheyAreWorthRetrieving,TestEmbedAndChatCanUseDifferentProviders">
     <h2 lang="en">The knobs people actually turn</h2>
     <h2 lang="vi">Những nút thật sự hay bị xoay</h2>
@@ -385,12 +403,16 @@ view.scrollToEnd();                            // viewport.js</span></div>
       <div class="body">
         <b lang="en">Answer quality → how many sections reach the model</b>
         <b lang="vi">Chất lượng trả lời → bao nhiêu đoạn tới được model</b>
-        <p lang="en"><code>TOP_K</code> in <code>.env</code>. Raise it when answers
-          miss context that you know is indexed; lower it when they wander. Costs
-          tokens per question, nothing else. No re-index.</p>
-        <p lang="vi"><code>TOP_K</code> trong <code>.env</code>. Tăng khi câu trả lời
-          thiếu ngữ cảnh mà bạn biết đã index; giảm khi nó lan lan. Chỉ tốn token mỗi
-          câu hỏi, không gì khác. Không cần index lại.</p>
+        <p lang="en"><code>CONTEXT_SHARE</code> in <code>.env</code>, once
+          <code>CHAT_MODELS</code> says how big each window is. Raise it when answers miss
+          context you know is indexed; lower it when they wander. <code>TOP_K</code> is what
+          applies with no window configured, and the floor everywhere else. Costs tokens per
+          question, nothing else. No re-index.</p>
+        <p lang="vi"><code>CONTEXT_SHARE</code> trong <code>.env</code>, khi
+          <code>CHAT_MODELS</code> đã khai window của từng model. Tăng khi câu trả lời thiếu
+          ngữ cảnh mà bạn biết đã index; giảm khi nó lan lan. <code>TOP_K</code> là thứ áp dụng
+          khi chưa khai window, và là mức sàn ở mọi trường hợp còn lại. Chỉ tốn token mỗi câu
+          hỏi, không gì khác. Không cần index lại.</p>
       </div>
     </div>
 
@@ -524,6 +546,107 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
     </div>
   </section>
 
+  <!-- ══ external search ═══════════════════════════════════════════════════════
+       Off unless a key is set, and the one thing it must never do is answer a gap.
+       The rules live in internal/rag/websearch.go; this is what a reader needs. -->
+  <section id="external-search" data-feature="external-search"
+           data-api="POST /api/chat" data-env="SEARCH_BASE_URL,SEARCH_API_KEY"
+           data-test="TestAMissReachesABANotTheWeb,TestWebResultsAreCitedInTheirOwnNumbering">
+    <h2 lang="en">Supplementing a thin answer</h2>
+    <h2 lang="vi">Bổ trợ khi câu trả lời mỏng</h2>
+    <p class="lede" lang="en">Off unless <code>SEARCH_API_KEY</code> is set, and even then it
+      explains rather than answers. An unset key means the instance makes no external call at
+      all — the same rule as <code>BA_PASS</code>: a missing secret removes a surface, it
+      never opens one.</p>
+    <p class="lede" lang="vi">Tắt trừ khi có <code>SEARCH_API_KEY</code>, và kể cả khi có thì
+      nó giải thích chứ không trả lời thay. Không có key nghĩa là instance không gọi ra ngoài
+      lần nào — đúng quy tắc của <code>BA_PASS</code>: thiếu secret là mất một bề mặt, không
+      bao giờ là mở nó ra.</p>
+
+    <div class="callout gotcha">
+      <b lang="en">A gap belongs to a BA, never to a search API.</b>
+      <span lang="en">When retrieval returns nothing, the reply is the no-answer sentence and
+        the search endpoint is never reached — <code>TestAMissReachesABANotTheWeb</code> asserts
+        that against the fake provider's own call log. The reason is not caution, it is
+        arithmetic: a BA-confirmed answer becomes a document, so it answers everyone who asks
+        next. A web result answers the person in front of you and nobody after them, and a
+        fallback that quietly filled the gap would remove the only reason anybody files one.</span>
+      <b lang="vi">Một khoảng trống thuộc về BA, không bao giờ thuộc về search API.</b>
+      <span lang="vi">Khi truy xuất không ra gì, câu trả lời là câu no-answer và endpoint
+        search không hề được gọi — <code>TestAMissReachesABANotTheWeb</code> kiểm điều đó bằng
+        chính call log của fake provider. Lý do không phải là thận trọng mà là số học: một câu
+        trả lời BA xác nhận sẽ thành tài liệu, nên nó trả lời cho mọi người hỏi sau. Kết quả
+        web chỉ trả lời đúng người đang đứng đó, và một fallback lặng lẽ lấp khoảng trống sẽ
+        xoá mất lý do duy nhất để ai đó mở ticket.</span>
+    </div>
+
+    <div class="step">
+      <span class="num">1</span>
+      <div class="body">
+        <b lang="en">When it fires: the corpus said less than the model could read</b>
+        <b lang="vi">Khi nào nó chạy: corpus nói ít hơn những gì model đọc được</b>
+        <p lang="en">Not a tuned threshold — a statement. The retrieved sections fill less than
+          half the budget <code>CONTEXT_SHARE</code> allows, so the model had room for twice as
+          much and the documents did not have it. That is only measurable because the budget
+          exists, so an instance that never declared a window never searches: it cannot tell
+          "the corpus was quiet" from "the model is small", and guessing between those two
+          would send an internal question to a third party on the strength of a number nobody
+          set.</p>
+        <p lang="vi">Không phải một ngưỡng đi tinh chỉnh — là một mệnh đề. Các section lấy được
+          lấp chưa tới một nửa ngân sách mà <code>CONTEXT_SHARE</code> cho phép, tức model còn
+          chỗ cho gấp đôi mà tài liệu không có. Chỉ đo được điều đó vì có ngân sách, nên
+          instance chưa khai window thì không bao giờ search: nó không phân biệt được "corpus
+          im lặng" với "model nhỏ", và đoán giữa hai cái đó là gửi một câu hỏi nội bộ ra bên
+          thứ ba dựa trên một con số không ai đặt.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">2</span>
+      <div class="body">
+        <b lang="en">Provenance is visible per sentence, not asserted per answer</b>
+        <b lang="vi">Nguồn gốc nhìn thấy được ở từng câu, không phải khẳng định cả câu trả lời</b>
+        <p lang="en">A web claim is <code>[w1]</code>, <code>[w2]</code>… in its own numbering,
+          with its own list under the answer and a <b>WEB</b> badge on it — because a sentence
+          from a search API and a sentence from a specification a person approved would
+          otherwise render identically. The narrowing rule is the opposite of a document's: an
+          answer that cited no <code>[wN]</code> shows no links at all, since printing them
+          claims a supplement that never happened.</p>
+        <p lang="vi">Một khẳng định từ web là <code>[w1]</code>, <code>[w2]</code>… đánh số
+          riêng, có danh sách riêng dưới câu trả lời và một badge <b>WEB</b> — vì nếu không
+          thì một câu lấy từ search API và một câu lấy từ tài liệu có người duyệt sẽ hiện y
+          hệt nhau. Quy tắc thu gọn ngược với tài liệu: câu trả lời không dẫn
+          <code>[wN]</code> nào thì không hiện link nào, vì hiện ra là khẳng định một sự bổ
+          trợ chưa từng xảy ra.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="num">3</span>
+      <div class="body">
+        <b lang="en">The signature carries it; the key does not</b>
+        <b lang="vi">Signature mang nó; key thì không</b>
+        <p lang="en">Whether an instance can reach the web is startup config, the same tier as
+          the prompt and the budget, so it goes in the cache signature and switching the key on
+          invalidates every row at once — those answers were produced under a rule the instance
+          no longer has. Nothing per-request joins the key, because nothing here is
+          per-request: the trigger is derived from the corpus, the question and the budget,
+          which the key and the signature already carry between them. The limitation that
+          leaves is worth knowing: a cached answer that used the web does not re-fetch it.
+          <b>Regenerate</b> is how a reader asks for today's version, exactly as it is for a
+          document that changed between re-indexes.</p>
+        <p lang="vi">Việc một instance có ra được internet hay không là config lúc khởi động,
+          cùng tầng với prompt và ngân sách, nên nó nằm trong cache signature và bật key lên là
+          vô hiệu hoá mọi dòng cùng lúc — những câu trả lời đó được tạo dưới một quy tắc
+          instance không còn nữa. Không có gì theo từng request đi vào key, vì ở đây không có
+          gì là theo từng request: điều kiện kích hoạt suy ra từ corpus, câu hỏi và ngân sách,
+          mà key với signature đã mang đủ giữa hai bên. Hạn chế còn lại nên biết: một câu trả
+          lời đã cache có dùng web sẽ không lấy lại web. <b>Regenerate</b> là cách người đọc
+          xin bản hôm nay, giống hệt với một tài liệu đã đổi giữa hai lần index.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ══ scoped retrieval ══════════════════════════════════════════════════════
        Two invariants a change here can break silently, so both are written down with
        the test that catches them. -->
@@ -546,15 +669,15 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
         <p lang="en">Both retrievers take the scope as a pre-filter — the vector KNN via a
           <code>chunk_id IN (…)</code> constraint, BM25 via the same subquery on
           <code>rowid</code> — so <code>k</code> counts matches <i>inside</i> the folder.
-          Filtering the fused result instead would return fewer than <code>TOP_K</code>
-          sections and quietly thin the answer. <code>sqlite-vec</code> honours that
+          Filtering the fused result instead would return fewer sections than the budget
+          affords and quietly thin the answer. <code>sqlite-vec</code> honours that
           constraint as of v0.1.6; <code>TestScopedSearchRanksWithinTheScope</code> stacks
           twenty nearer out-of-scope chunks against five far ones to prove it still
           does.</p>
         <p lang="vi">Cả hai bộ truy xuất nhận scope như một pre-filter — vector KNN qua
           điều kiện <code>chunk_id IN (…)</code>, BM25 qua đúng subquery đó trên
           <code>rowid</code> — nên <code>k</code> đếm các kết quả <i>trong</i> thư mục. Nếu
-          lọc sau khi fuse thì sẽ trả về ít hơn <code>TOP_K</code> đoạn và làm câu trả lời
+          lọc sau khi fuse thì sẽ trả về ít đoạn hơn ngân sách cho phép và làm câu trả lời
           mỏng đi âm thầm. <code>sqlite-vec</code> tôn trọng điều kiện đó từ v0.1.6;
           <code>TestScopedSearchRanksWithinTheScope</code> dựng hai mươi đoạn ngoài scope
           gần hơn đối đầu năm đoạn xa để chứng minh nó vẫn vậy.</p>

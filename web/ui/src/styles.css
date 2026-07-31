@@ -404,6 +404,21 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    answer. Removed rather than made true. */
 .source .source-title:hover { text-decoration: none; }
 
+/* ── the third tier: what did not come from your documents ──
+   `.callout` reads `--accent` and 0.15.0 aliases six of its tokens to a class (info · tip ·
+   memo · warn · gotcha · quest) — every one of which this app already means something by. So
+   `.explain` is one declaration picking `--teal`, one of the six accent tokens the library
+   ships and aliases to nothing. The colour is the point rather than decoration: a [!GENERAL]
+   panel and a WEB source list are the two places a sentence did *not* come from a document
+   somebody approved, and a reader has to be able to see that without reading.
+
+   The badge sits on the list's own line rather than above it: this is a label on a block, not
+   a heading over a section, and a heading would make three sources look like a chapter. */
+.explain { --accent: var(--teal); }
+.web-sources { display: flex; flex-direction: column; gap: var(--sp-2); }
+.web-sources > .sources { margin-block: 0; }
+.web-sources > .badge { align-self: start; }
+
 /* What a marker click did: scroll, and say nothing. On a short answer the sources are
    already on screen, so the whole interaction was a scroll of zero pixels and no reply.
    The outline is that reply — and it is an outline rather than a border or a background so

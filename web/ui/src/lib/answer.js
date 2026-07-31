@@ -35,19 +35,23 @@ let configured = false
  *     `dressAlerts` renders it as a panel in the meantime — so what the reader sees is the
  *     question forming, then becoming pickable, rather than an empty card
  *
- * @param {{ a: string, streaming?: boolean, citations?: {n: number}[] }} turn
+ * @param {{ a: string, streaming?: boolean, citations?: Citation[] }} turn
  * @param {boolean} diagramsReady whether the lazy mermaid chunk has loaded
- * @param {(n: number) => string} srcId maps a citation number to its source element id
+ * @param {(n: number) => string} srcId maps a document citation number to its row's element id
+ * @param {(n: number) => string} webSrcId the same for a [wN] public result, whose numbering
+ *   restarts at 1 — so the two ids must not be able to collide
  */
-export function turnHtml(turn, diagramsReady, srcId) {
+export function turnHtml(turn, diagramsReady, srcId, webSrcId) {
   const done = !turn.streaming
   return answerHtml(done ? stripClarify(turn.a).rest : turn.a, {
     diagrams: done && diagramsReady,
     code: done,
-    // The numbers, not how many: the engine returns only the sources the answer cited and
-    // keeps their original n, so [2] can arrive alone.
-    nums: done ? turn.citations.map(c => c.n) : [],
+    // The citations themselves, not how many: the engine returns only the sources the answer
+    // cited and keeps their original n, so [2] can arrive alone — and `kind` is what says
+    // which numbering an entry belongs to.
+    cites: done ? turn.citations : [],
     srcId,
+    webSrcId,
   })
 }
 
@@ -58,13 +62,14 @@ export function turnHtml(turn, diagramsReady, srcId) {
  * it.
  *
  * @param {string} markdown raw model output
- * @param {{ nums?: number[], srcId?: (n: number) => string, diagrams?: boolean }} sources
- *   nums — the citation numbers that exist. NOT a count: the engine returns only the sources
- *   the answer cited, keeping their original numbers, so an answer that used [2] alone
- *   arrives with nums [2] and one source. Comparing against a length would leave that marker
- *   unlinked.
- *   srcId — element id for source n. Omit either and no linking happens, which is the right
- *   behaviour mid-stream, when the citation list has not arrived yet.
+ * @param {{ cites?: Citation[], srcId?: (n: number) => string,
+ *   webSrcId?: (n: number) => string, diagrams?: boolean, code?: boolean }} sources
+ *   cites — the citations that exist. NOT a count: the engine returns only the sources the
+ *   answer cited, keeping their original numbers, so an answer that used [2] alone arrives
+ *   with one entry numbered 2. Comparing against a length would leave that marker unlinked.
+ *   srcId / webSrcId — element id for a document source and for a public one. Omit them and
+ *   no linking happens, which is the right behaviour mid-stream, when the citation list has
+ *   not arrived yet.
  *   diagrams — turn ```mermaid fences into &lt;nes-mermaid&gt;. Off while streaming (half a
  *   graph is a parse error) and off until the renderer is actually loaded, so the fallback is
  *   the code block the model wrote.
@@ -73,7 +78,7 @@ export function turnHtml(turn, diagramsReady, srcId) {
  *   one created mid-stream would freeze half a function on the page for good.
  * @returns {string} sanitized HTML
  */
-function answerHtml(markdown, { nums = [], srcId, diagrams = false, code = false } = {}) {
+function answerHtml(markdown, { cites = [], srcId, webSrcId, diagrams = false, code = false } = {}) {
   if (!configured) {
     marked.setOptions({ breaks: true })
     configured = true
@@ -83,8 +88,8 @@ function answerHtml(markdown, { nums = [], srcId, diagrams = false, code = false
   html = dressTaskLists(html)
   html = dressAlerts(html)
   html = dressImages(html)
-  if (nums.length && srcId)
-    html = linkCites(html, new Set(nums), srcId)
+  if (cites.length && srcId)
+    html = linkCites(html, cites, srcId, webSrcId)
   if (diagrams)
     html = asDiagrams(html)
   // Last, and after asDiagrams on purpose — see its own comment.
@@ -258,14 +263,27 @@ const PICK = { QUESTION: 'quest', NEXT: 'info' }
    group had no name and the fieldset rendered an empty legend. The prompt asks for the label
    and mostly gets one — this is what happens the rest of the time. */
 const LABEL = { QUESTION: 'Which one do you mean?', NEXT: 'Ask next' }
-const ALERTS = { NOTE: 'info', TIP: 'tip', IMPORTANT: 'memo', WARNING: 'warn', CAUTION: 'gotcha', ...PICK }
+/* GENERAL is this app's own sixth kind, and the only one that is not GitHub's: it holds the
+   model's own explanation of a term the documents lean on and never define. It needs a colour
+   the library has not already spoken for, because the whole point is that a reader can see at
+   a glance which sentences their organisation vouched for — `.explain` in styles.css is four
+   lines picking `--teal`, one of the six accent tokens 0.15.0 ships and aliases to nothing. */
+const ALERTS = {
+  NOTE: 'info',
+  TIP: 'tip',
+  IMPORTANT: 'memo',
+  WARNING: 'warn',
+  CAUTION: 'gotcha',
+  GENERAL: 'explain',
+  ...PICK,
+}
 
 /* The glyph that says which kind, because the colour alone does not. `.callout` in 0.15.0 is a
    border and a tint and nothing else, so WARNING and CAUTION are two oranges to a reader who
    has not learned the palette — and every one of them looks identical to a colour-blind one.
    One character in front of the first word is the whole affordance; the library has no icon
    slot in this recipe and a `<b>` label would be a word to translate on every panel. */
-const GLYPH = { NOTE: '📝', TIP: '💡', IMPORTANT: '❗', WARNING: '⚠️', CAUTION: '🛑', QUESTION: '❓', NEXT: '➡️' }
+const GLYPH = { NOTE: '📝', TIP: '💡', IMPORTANT: '❗', WARNING: '⚠️', CAUTION: '🛑', GENERAL: '🌐', QUESTION: '❓', NEXT: '➡️' }
 
 const marker = kinds => new RegExp(`^\\[!(${Object.keys(kinds).join('|')})\\]\\s*`)
 const alertMark = marker(ALERTS)
@@ -393,6 +411,8 @@ export function turnClarify(turn) {
 
    Split once, here. The label is what a reader reads, `cites` is what the card renders with the
    library's `.cite` recipe, and composeClarify has nothing left to strip. */
+/** @typedef {import("./chat.js").Citation} Citation */
+
 const citeIn = /\s*\[(\d+)\]/g
 
 /** One checklist item → a pickable option, with its citation numbers taken out of the wording. */
@@ -489,12 +509,22 @@ export function composeClarify(form) {
   return form.getAll('reading').map(text => text.trim()).filter(Boolean).join(' ; ')
 }
 
+/* Both markers, one pattern, because the walk and the fragment-building are the expensive
+   half and neither cares which kind it found: `[1]` is one of this organisation's documents,
+   `[w1]` is a public search result. They cannot collide — the character after `[` is a digit
+   in one and `w` in the other — so one regex reads both and the capture says which. */
+const CITE = /\[(w?)(\d+)\]/g
+
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before
    marked would make a "[1]" inside a code fence render as literal HTML. Text
    inside code/pre — or an existing link — is left exactly as written. */
-function linkCites(html, valid, srcId) {
+function linkCites(html, cites, srcId, webSrcId) {
   const tpl = document.createElement('template')
   tpl.innerHTML = html
+  // Two sets rather than one, because the numbering restarts: [1] and [w1] are different
+  // sources and a single set would link one of them to the other's row.
+  const docs = new Set(cites.filter(c => c.kind !== 'web').map(c => c.n))
+  const web = new Set(cites.filter(c => c.kind === 'web').map(c => c.n))
 
   const walk = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT)
   const hits = []
@@ -502,22 +532,27 @@ function linkCites(html, valid, srcId) {
     const n = walk.currentNode
     if (n.parentElement?.closest('code, pre, a'))
       continue
-    if (/\[\d+\]/.test(n.nodeValue))
+    // Its own pattern, without CITE's captures and without its /g: a shared /g regex carries
+    // lastIndex between calls, so every other text node would report no match.
+    if (/\[w?\d+\]/.test(n.nodeValue))
       hits.push(n)
   }
 
-  for (const node of hits) node.replaceWith(split(node.nodeValue, valid, srcId))
+  for (const node of hits)
+    node.replaceWith(split(node.nodeValue, { docs, web, srcId, webSrcId }))
   return tpl.innerHTML
 }
 
-function split(text, valid, srcId) {
+function split(text, { docs, web, srcId, webSrcId }) {
   const frag = document.createDocumentFragment()
   let last = 0
-  for (const m of text.matchAll(/\[(\d+)\]/g)) {
-    const n = Number(m[1])
+  for (const m of text.matchAll(CITE)) {
+    const isWeb = m[1] === 'w'
+    const n = Number(m[2])
+    const valid = isWeb ? web : docs
     if (!valid.has(n))
       continue // a marker with no source points at nothing
-    frag.append(text.slice(last, m.index), cite(n, srcId(n)))
+    frag.append(text.slice(last, m.index), cite(m[0].slice(1, -1), (isWeb ? webSrcId : srcId)(n)))
     last = m.index + m[0].length
   }
   frag.append(text.slice(last))

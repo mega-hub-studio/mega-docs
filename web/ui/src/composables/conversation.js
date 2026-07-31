@@ -13,10 +13,15 @@ import * as session from '../lib/session.js'
 
 let seq = 0
 
-// How many earlier exchanges ride along with a question. Three is what resolves what a
-// follow-up points at; the whole thread would grow the prompt on every turn and pay to
-// carry a conversation the reader has already moved on from.
-const RECALL_TURNS = 3
+// How many earlier exchanges ride along with a question.
+//
+// Twelve, not the three this was: the server trims the thread to a share of the picked
+// model's window before it reaches the provider and reports what it kept, so sending fewer
+// than the model can hold is a cap on memory that nothing measures and nobody chose. This
+// number is the *tail worth offering*; how much of it fits is THREAD_SHARE's job, one
+// layer down. It still has to be a number, because `session.js` keeps thirty and the
+// oldest of those are a different conversation.
+const RECALL_TURNS = 12
 
 /**
  * The thread behind one turn, in the shape /api/chat takes: oldest first, and only turns
@@ -57,6 +62,8 @@ function newTurn(q, scope) {
     // thread nobody can compare.
     model: '',
     recall: { kept: 0, offered: 0 },
+    // The same pair for the corpus: sections read, of sections retrieval weighed.
+    retrieval: { sections: 0, candidates: 0 },
     ticket: null, // the gap filed from this answer, once there is one
   }
 }
@@ -170,13 +177,14 @@ export function useConversation({ scope, model, prompt, scroll, toast, onSettled
         scroll()
       },
       onCitations: c => (turn.citations = c),
-      onDone: ({ cached, in: tin, out, model: answered, kept = 0, offered = 0 }) =>
+      onDone: ({ cached, in: tin, out, model: answered, kept = 0, offered = 0, sections = 0, candidates = 0 }) =>
         Object.assign(turn, {
           cached,
           in: tin,
           out,
           model: answered || turn.model,
           recall: { kept, offered },
+          retrieval: { sections, candidates },
         }),
     })
     try {

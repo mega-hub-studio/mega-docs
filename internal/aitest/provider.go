@@ -32,12 +32,26 @@ type Provider struct {
 	MidStreamError string
 	ChatStatus     int // non-zero to fail /chat/completions with this status
 
+	// SearchResults is what /search answers with. The public-search supplement is a third
+	// endpoint on the same fake server rather than a second one, because what a test needs to
+	// know is whether the engine called it *at all* for a given question — and one server
+	// with one call log answers that without wiring a second base URL through every helper.
+	SearchResults []SearchHit
+
 	mu       sync.Mutex
 	embedded [][]string // every batch of inputs it was asked to embed
 	chats    []string   // every chat request's last user message
 	messages [][]string // every chat request's whole message list, "role: content"
 	tokens   []string   // the bearer token of every request, in order
+	searches []string   // every public-search query, in order
 	server   *httptest.Server
+}
+
+// SearchHit is one fake public result, in the shape the search client reads.
+type SearchHit struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
 }
 
 // New starts a provider and returns it with the server's base URL.
@@ -54,6 +68,7 @@ func New(p *Provider) (*Provider, string) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/embeddings", p.embeddings)
 	mux.HandleFunc("/chat/completions", p.chat)
+	mux.HandleFunc("/search", p.search)
 	p.server = httptest.NewServer(mux)
 	return p, p.server.URL
 }
@@ -91,6 +106,37 @@ func (p *Provider) Messages() [][]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.messages
+}
+
+// Searches reports every public-search query, in order. An empty result is the assertion
+// that matters most: a question the documents could not answer must reach a BA, not a search
+// API, and "it was never called" is the only way to prove that.
+func (p *Provider) Searches() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.searches
+}
+
+// search is the fake public-search endpoint — Tavily's shape, which is one query in and
+// already-extracted text out.
+func (p *Provider) search(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Query string `json:"query"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	p.mu.Lock()
+	p.searches = append(p.searches, body.Query)
+	p.mu.Unlock()
+
+	results := p.SearchResults
+	if results == nil {
+		results = []SearchHit{{
+			Title: "OAuth 2.0", URL: "https://example.test/oauth",
+			Content: "OAuth 2.0 is an authorisation framework.",
+		}}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
 }
 
 // record notes the bearer token and reports whether one was present at all.

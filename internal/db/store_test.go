@@ -37,7 +37,7 @@ func TestHybridSearch(t *testing.T) {
 	}
 
 	// Query semantically close to chunk 0, and keyword "JWT" also in chunk 0.
-	hits, err := s.Search(vec(0.9, 0.1, 0, 0), "how do I get a JWT token", 3, "")
+	hits, err := s.Search(vec(0.9, 0.1, 0, 0), "how do I get a JWT token", 3, "", false)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestScopedSearchRanksWithinTheScope(t *testing.T) {
 		// what a bare LIKE 'booking%' would do.
 		{"a prefix that is not a path segment", "book", "", 0},
 	} {
-		hits, err := s.Search(vec(1, 0, 0, 0), "refund policy", 3, c.scope)
+		hits, err := s.Search(vec(1, 0, 0, 0), "refund policy", 3, c.scope, false)
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -176,6 +176,87 @@ func TestScopedSearchRanksWithinTheScope(t *testing.T) {
 				t.Errorf("%s: hit from %s; want only %s", c.name, h.DocPath, c.wantDoc)
 			}
 		}
+	}
+}
+
+// TestOneDocumentCannotFillTheAnswer is the breadth half of retrieval, and it is a real
+// failure rather than a preference: the corpus here has one document whose every chunk
+// out-ranks everything else, so without the cap a ten-section answer is ten sections of one
+// file — thorough-looking and narrow. The cap keeps that document's best three and lets the
+// rest fall to whoever is next.
+//
+// TestSearchStitchesOrdAdjacentNeighbours rides along, because the same fixture answers it:
+// SplitMarkdown cuts at a size rather than at a thought, so a chunk that starts mid-argument
+// is what makes an answer read as if it skipped a step. Asking with withNeighbours=true must
+// grow each hit's Content without changing how many hits there are or which they are.
+func TestOneDocumentCannotFillTheAnswer(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "cap.db"), 4)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer s.Close()
+
+	// The loud document ranks first on both legs for every chunk; the quiet ones are further
+	// away but still match the keyword, so only the cap can get them into the answer.
+	loud, err := s.UpsertDocument(Doc{Path: "specs/loud.md", Title: "loud"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 10 {
+		if err := s.InsertChunk(loud, "Loud", "refund policy paragraph", i, vec(1, float32(i)*0.001, 0, 0)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, path := range []string{"specs/quiet-a.md", "specs/quiet-b.md"} {
+		id, err := s.UpsertDocument(Doc{Path: path, Title: path})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.InsertChunk(id, "Quiet", "refund policy elsewhere", 0, vec(0, 1, 0, 0)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	hits, err := s.Search(vec(1, 0, 0, 0), "refund policy", 10, "", false)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	per := map[string]int{}
+	for _, h := range hits {
+		per[h.DocPath]++
+	}
+	if per["specs/loud.md"] > maxPerDoc {
+		t.Errorf("one document contributed %d of %d hits; the cap is %d",
+			per["specs/loud.md"], len(hits), maxPerDoc)
+	}
+	if len(per) < 2 {
+		t.Errorf("every hit came from %v — the cap exists so the freed slots go somewhere", per)
+	}
+
+	stitched, err := s.Search(vec(1, 0, 0, 0), "refund policy", 10, "", true)
+	if err != nil {
+		t.Fatalf("stitched search: %v", err)
+	}
+	if len(stitched) != len(hits) {
+		t.Fatalf("stitching changed the hit count: %d, was %d — a citation numbers one hit",
+			len(stitched), len(hits))
+	}
+	for i, h := range stitched {
+		if h.ChunkID != hits[i].ChunkID {
+			t.Fatalf("hit %d is chunk %d, was %d — stitching may not reorder", i, h.ChunkID, hits[i].ChunkID)
+		}
+	}
+	// The loud document's kept chunks have neighbours on at least one side, so at least one
+	// hit must have read more than it did unstitched. A run where none did means the join
+	// found nothing and the whole step is silently a no-op.
+	grew := 0
+	for i, h := range stitched {
+		if len(h.Content) > len(hits[i].Content) {
+			grew++
+		}
+	}
+	if grew == 0 {
+		t.Error("no hit grew: neighbour stitching read nothing, and an answer still sees the cut")
 	}
 }
 
@@ -197,7 +278,7 @@ func TestScopeTreatsWildcardsAsCharacters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hits, err := s.Search(vec(1, 0, 0, 0), "escaped", 5, "q_1")
+	hits, err := s.Search(vec(1, 0, 0, 0), "escaped", 5, "q_1", false)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}

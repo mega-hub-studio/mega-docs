@@ -35,6 +35,10 @@ export function useStatusLine({ turns, busy, online, runtime, model }) {
       // "3/8" — the thread as the model read it. Empty for a first question, because 0/0 is a
       // memory figure about nothing.
       recall: '',
+      // "18/40" — sections read, of sections retrieval weighed. Empty when the two agree,
+      // because an instance with no window configured reads everything it retrieved and the
+      // pair has nothing to say.
+      sections: '',
     }
     // Mid-stream there is nothing true to say yet: the counts arrive with `done`.
     if (!t || t.streaming)
@@ -66,6 +70,12 @@ export function useStatusLine({ turns, busy, online, runtime, model }) {
     // "0/0" beside a fresh answer reads as a failure.
     if (t.recall?.offered)
       line.recall = `${t.recall.kept}/${t.recall.offered}`
+
+    // How much of the corpus the answer was built from, against how much retrieval weighed.
+    // Only when the two differ: an instance with no window configured reads every section it
+    // retrieved, and "6/6" is a number with nothing to report.
+    if (t.retrieval?.candidates && t.retrieval.candidates !== t.retrieval.sections)
+      line.sections = `${t.retrieval.sections}/${t.retrieval.candidates}`
 
     if (t.cached) {
       line.cost = 'cached · free'

@@ -73,7 +73,11 @@ func run() error {
 		ChatBaseURL: cfg.BaseURL, EmbedBaseURL: cfg.EmbedURL,
 		APIKey: cfg.APIKey, EmbedAPIKey: cfg.EmbedKey,
 		EmbedModel: cfg.EmbedModel, ChatModel: models[0].Name,
-	}), rag.Options{TopK: cfg.TopK, Models: windows, ThreadShare: cfg.ThreadShare})
+	}), rag.Options{
+		TopK: cfg.TopK, Models: windows,
+		ThreadShare: cfg.ThreadShare, ContextShare: cfg.ContextShare,
+		SearchBaseURL: cfg.SearchBaseURL, SearchAPIKey: cfg.SearchKey,
+	})
 	auth := server.Auth{User: cfg.AuthUser, Pass: cfg.AuthPass}
 	// The release is embedded, so a parse failure is a broken build rather than a runtime
 	// condition — but it must not stop the server: the notes are the least important thing
@@ -101,7 +105,8 @@ func run() error {
 		Runtime: server.Runtime{
 			Model: models[0].Name, Window: models[0].Window,
 			PriceIn: models[0].PriceIn, PriceOut: models[0].PriceOut, Models: models,
-			TopK: cfg.TopK, ThreadShare: cfg.ThreadShare, CacheKeep: cfg.CacheKeep,
+			TopK: cfg.TopK, ThreadShare: cfg.ThreadShare, ContextShare: cfg.ContextShare,
+			CacheKeep: cfg.CacheKeep, Search: cfg.SearchKey != "",
 			Version: revision(), Release: release.Version,
 		},
 	})

@@ -381,6 +381,204 @@ func TestAnAnswerThatCitesNothingKeepsEverySource(t *testing.T) {
 	}
 }
 
+// wideCorpus is five documents of three retrievable sections each — enough that the
+// per-document cap binds and a budget has something to widen into. The filler is what keeps
+// each section above SplitMarkdown's minChars, so it stands alone instead of merging with
+// its neighbour and turning fifteen sections into five.
+func wideCorpus(t *testing.T, e *rag.Engine) {
+	t.Helper()
+	filler := strings.Repeat("Retrieval fuses vector distance with keyword rank. ", 14)
+	for _, doc := range []string{"booking", "billing", "support", "auth", "reporting"} {
+		var b strings.Builder
+		b.WriteString("# " + doc + "\n\n")
+		for _, section := range []string{"overview", "rules", "edge cases"} {
+			b.WriteString("## " + section + "\n\n" + doc + " " + section + ": " + filler + "\n\n")
+		}
+		if _, err := e.Ingest(context.Background(), "docs/"+doc+".md", b.String()); err != nil {
+			t.Fatalf("ingest %s: %v", doc, err)
+		}
+	}
+}
+
+// TestRetrievalWidensToTheModelsWindow is the check that an answer is as wide as the model
+// can read rather than as wide as one number nobody re-tuned.
+//
+// TOP_K was six against windows that hold forty: the instance paid for a reader and used a
+// skim. So the count follows CONTEXT_SHARE of the picked model's window when the operator has
+// said what that window is — and, when they have not, it is still exactly TOP_K, because a
+// retrieval width that quietly depended on an optional display knob would make an
+// unconfigured instance answer worse with nothing saying so.
+func TestRetrievalWidensToTheModelsWindow(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		window int
+		want   func(got int) bool
+		wantIf string
+	}{
+		{"no window declared: TOP_K, exactly as before", 0,
+			func(got int) bool { return got == 3 }, "3"},
+		{"a real window: as many sections as it holds", 100_000,
+			func(got int) bool { return got > 3 }, "more than TOP_K's 3"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e, _ := engineWithModels(t, &aitest.Provider{Reply: "grounded [1]"},
+				[]rag.Model{{Name: "chat-model", Window: c.window}})
+			wideCorpus(t, e)
+
+			_, reply, err := ask(t, e, "what are the rules for booking?")
+			if err != nil {
+				t.Fatalf("answer: %v", err)
+			}
+			if !c.want(reply.Retrieval.Kept) {
+				t.Errorf("read %d sections; want %s", reply.Retrieval.Kept, c.wantIf)
+			}
+			if reply.Retrieval.Offered < reply.Retrieval.Kept {
+				t.Errorf("read %d of %d offered — a budget cannot keep more than it weighed",
+					reply.Retrieval.Kept, reply.Retrieval.Offered)
+			}
+		})
+	}
+}
+
+// engineWithSearch is `engine` with the public-search supplement switched on, pointed at the
+// same fake provider — one server, one call log, so a test can assert what was *not* called.
+// A big window because the supplement's trigger is a fraction of the retrieval budget, and
+// without a window there is no budget to be a fraction of.
+func engineWithSearch(t *testing.T, p *aitest.Provider) (*rag.Engine, *aitest.Provider) {
+	t.Helper()
+	if p == nil {
+		p = &aitest.Provider{}
+	}
+	p.Dim = dim
+	prov, base := aitest.New(p)
+	t.Cleanup(prov.Close)
+
+	store, err := db.Open(filepath.Join(t.TempDir(), "search.db"), dim)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	client := ai.New(ai.Config{
+		ChatBaseURL: base, APIKey: "test-key",
+		EmbedModel: "embed-model", ChatModel: "chat-model",
+	})
+	return rag.New(store, client, rag.Options{
+		TopK: 3, Models: []rag.Model{{Name: "chat-model", Window: 100_000}},
+		SearchBaseURL: base, SearchAPIKey: "search-key",
+	}), prov
+}
+
+// TestAMissReachesABANotTheWeb is the guarantee the whole supplement is built around: a gap
+// belongs to a BA, because that route ends in the documents *being able to cover it*, and a
+// web result answers the person in front of you and nobody after them.
+//
+// Two halves, because only one of them can be a call log. Retrieval returning nothing is
+// decided before any provider is called, so that one is asserted as "the search endpoint was
+// never reached". A model that reads real sections and then declares a miss is decided
+// *after* the prompt was built, so no pre-generation gate can see it coming — what holds
+// there is that the reply is still the bare sentence with no sources of any kind under it,
+// which is what keeps Ask BA the only thing on screen to do next.
+func TestAMissReachesABANotTheWeb(t *testing.T) {
+	t.Run("retrieval found nothing: no external call at all", func(t *testing.T) {
+		e, prov := engineWithSearch(t, &aitest.Provider{Reply: "unreachable"})
+		if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
+			t.Fatal(err)
+		}
+		// A scope no document lives under: both retrievers are filtered before they rank, so
+		// this is the zero-hit path rather than a weak-hit one.
+		got, _, err := askIn(t, e, "what is our refund window?", "billing/enterprise")
+		if err != nil {
+			t.Fatalf("answer: %v", err)
+		}
+		if got != rag.NoAnswer {
+			t.Fatalf("answer = %q; want the no-answer sentence", got)
+		}
+		if n := len(prov.Searches()); n != 0 {
+			t.Errorf("a question with no sections at all bought %d public searches: %v",
+				n, prov.Searches())
+		}
+	})
+
+	t.Run("the model declared the miss: nothing is cited under it", func(t *testing.T) {
+		e, _ := engineWithSearch(t, &aitest.Provider{Reply: rag.NoAnswer})
+		if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
+			t.Fatal(err)
+		}
+		got, reply, err := ask(t, e, "what is our refund window for enterprise contracts?")
+		if err != nil {
+			t.Fatalf("answer: %v", err)
+		}
+		if got != rag.NoAnswer {
+			t.Fatalf("answer = %q; want the no-answer sentence", got)
+		}
+		// Not one document, and not one link either. "This is not in the documents" over a
+		// list of web results is an invitation to read the web result as the answer.
+		if len(reply.Citations) != 0 {
+			t.Errorf("a miss carried %d citations: %+v", len(reply.Citations), reply.Citations)
+		}
+	})
+}
+
+// TestWebResultsAreCitedInTheirOwnNumbering is the provenance half. A sentence from a search
+// API and a sentence from a specification a person approved must not render identically, so
+// the web gets its own markers, its own list, and its own kind on the wire.
+//
+// The narrowing rule is the opposite of a document's, and that is the assertion at the end: an
+// answer that cited no web result shows none, because printing links under an answer that did
+// not use them claims a supplement that never happened.
+func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
+	e, prov := engineWithSearch(t, &aitest.Provider{
+		Reply: "The documents cover the handshake [1]; the standard behind it is OAuth 2.0 [w1].",
+		SearchResults: []aitest.SearchHit{{
+			Title: "OAuth 2.0", URL: "https://example.test/oauth",
+			Content: "OAuth 2.0 is an authorisation framework for delegated access.",
+		}},
+	})
+	if _, err := e.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	_, reply, err := ask(t, e, "how does the handshake work?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if len(prov.Searches()) == 0 {
+		t.Fatal("a one-document corpus against a 100k window is thin by any measure, and no search ran")
+	}
+	var doc, web []rag.Citation
+	for _, c := range reply.Citations {
+		if c.Kind == "web" {
+			web = append(web, c)
+			continue
+		}
+		doc = append(doc, c)
+	}
+	if len(doc) == 0 {
+		t.Error("the answer cited [1] and no document came back — a supplement replaced the grounding")
+	}
+	if len(web) != 1 {
+		t.Fatalf("web citations = %d; want the one the answer cited as [w1]", len(web))
+	}
+	if web[0].URL == "" || web[0].DocPath != "" {
+		t.Errorf("web citation = %+v; want a URL and no document path", web[0])
+	}
+	// The same corpus, the same search, an answer that used neither web result.
+	e2, _ := engineWithSearch(t, &aitest.Provider{Reply: "Entirely from the documents [1]."})
+	if _, err := e2.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+	_, plain, err := ask(t, e2, "how does the handshake work?")
+	if err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	for _, c := range plain.Citations {
+		if c.Kind == "web" {
+			t.Errorf("an answer citing no [wN] still listed %+v — that claims a supplement it did not use", c)
+		}
+	}
+}
+
 // engineWithModels is `engine` for the two things a model list changes: which window a thread
 // is trimmed to, and which key an answer is cached under. Same fake provider, same store.
 func engineWithModels(t *testing.T, p *aitest.Provider, models []rag.Model) (*rag.Engine, *aitest.Provider) {

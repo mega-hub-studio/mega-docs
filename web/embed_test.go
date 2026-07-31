@@ -132,6 +132,22 @@ var retiredClaims = []struct{ phrase, why string }{
 	// safe *because* nothing could move it, so it has to go with the field that can.
 	{"document path is derived from the id", "the name is the BA's; an empty one keeps the path the ticket already has"},
 	{"đường dẫn tài liệu suy ra từ id", "the name is the BA's; an empty one keeps the path the ticket already has"},
+	// "Only from the CONTEXT" was the prompt's first rule and the guide's promise, and it is
+	// three tiers now: [n] for the organisation's own documents, [wN] for a public search
+	// result, and one labelled [!GENERAL] panel for a term the documents lean on and never
+	// define. The promise it replaces is *stronger*, not looser — provenance is visible per
+	// sentence instead of asserted per answer — but a page still saying "only" teaches a
+	// reader that a differently coloured panel is a bug.
+	{"answer <b>only</b> from those sections", "three tiers now: [n] documents, [wN] labelled web, one [!GENERAL] panel"},
+	{"buộc chỉ trả lời <b>từ</b> các đoạn đó", "three tiers now: [n] documents, [wN] labelled web, one [!GENERAL] panel"},
+	// TOP_K stopped being the number that decides how much an answer reads: the count follows
+	// CONTEXT_SHARE of the picked model's window, capped per document and stitched to its
+	// neighbours. A page still calling TOP_K the quality knob sends an operator to raise a
+	// floor that nothing is standing on.
+	{"TOP_K</code> is how many sections an answer is built from", "the budget decides; TOP_K is the floor when no window is declared"},
+	{"TOP_K</code> sections survive", "the budget decides how many survive, capped at three per document"},
+	{"TOP_K</code> là số section một câu trả lời được dựng từ", "the budget decides; TOP_K is the floor when no window is declared"},
+	{"Rồi <code>TOP_K</code> đoạn đi tiếp", "the budget decides how many survive, capped at three per document"},
 }
 
 // TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the

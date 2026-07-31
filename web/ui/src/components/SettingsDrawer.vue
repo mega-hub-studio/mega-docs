@@ -173,6 +173,12 @@ defineExpose({
           <nes-icon name="chat" :title="t('settings.threadShare')" />
           <span>{{ Math.round(engine.threadShare * 100) }}%</span>
         </div>
+        <!-- `layers` for the sections' own share of the window, the same glyph the strip uses
+             for tokens: it is the same subject, one configured and one spent. -->
+        <div class="set-row">
+          <nes-icon name="layers" :title="t('settings.contextShare')" />
+          <span>{{ Math.round(engine.contextShare * 100) }}%</span>
+        </div>
         <div class="set-row">
           <nes-icon name="database" :title="t('settings.cacheKeep')" />
           <span>{{ engine.cacheKeep }}</span>

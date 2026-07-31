@@ -914,3 +914,56 @@ func TestChangingTopKInvalidatesTheCache(t *testing.T) {
 			"answer was built from is part of what produced it, so it belongs in the signature")
 	}
 }
+
+// TestChangingTheRetrievalBudgetInvalidatesTheCache is the same hole as TOP_K's, one layer
+// out: the count follows CONTEXT_SHARE of the model's window now, so both of those decide how
+// much an answer was built from and both have to be in the signature. A window widened in
+// CHAT_MODELS with a cache full of narrow answers would otherwise keep serving them, and the
+// setting would read as having no effect.
+//
+// The share and the window are checked together on purpose: a share means nothing without
+// knowing what it is a share of, so a signature carrying one and not the other is half a
+// fingerprint.
+func TestChangingTheRetrievalBudgetInvalidatesTheCache(t *testing.T) {
+	ctx := context.Background()
+	const q = "How does hybrid search rank results?"
+
+	dir := t.TempDir()
+	askAt := func(share float64, window int) rag.Reply {
+		t.Helper()
+		prov, base := aitest.New(&aitest.Provider{Dim: dim, Reply: "grounded [1]"})
+		t.Cleanup(prov.Close)
+		store, err := db.Open(filepath.Join(dir, "budget.db"), dim)
+		if err != nil {
+			t.Fatalf("open: %v", err)
+		}
+		t.Cleanup(func() { store.Close() })
+		e := rag.New(store, ai.New(ai.Config{
+			ChatBaseURL: base, APIKey: "test-key",
+			EmbedModel: "embed-model", ChatModel: "chat-model",
+		}), rag.Options{
+			TopK: 3, ContextShare: share,
+			Models: []rag.Model{{Name: "chat-model", Window: window}},
+		})
+		if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := e.Answer(ctx, rag.Ask{Question: q, OnToken: func(string) {}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+
+	askAt(0.5, 32_000)
+	if reply := askAt(0.5, 32_000); !reply.Cached {
+		t.Error("the same question under the same budget was not served from the cache")
+	}
+	if reply := askAt(0.8, 32_000); reply.Cached {
+		t.Error("a wider CONTEXT_SHARE served the narrow answer's row")
+	}
+	if reply := askAt(0.5, 128_000); reply.Cached {
+		t.Error("a wider window served the narrow answer's row — the share is a fraction of it,\n" +
+			"so the window is half of what decided how much the model read")
+	}
+}

@@ -74,13 +74,21 @@ type Runtime struct {
 	// operator's `curl /api/health` has always answered, the list is what the front end
 	// needs to offer a choice and to price whichever one it is on.
 	Models []Model
-	// The three numbers the engine works to, published so the settings panel can show what
-	// this instance is actually tuned like without a password: how many sections an answer is
-	// built from, how much of the window a thread may take, and how many answers the cache
-	// holds. None of them is a secret and all three change what a reader gets.
-	TopK        int
-	ThreadShare float64
-	CacheKeep   int
+	// The four numbers the engine works to, published so the settings panel can show what
+	// this instance is actually tuned like without a password: the floor on how many sections
+	// an answer is built from, how much of the window a thread may take, how much of it the
+	// sections may take, and how many answers the cache holds. None of them is a secret and
+	// all four change what a reader gets.
+	TopK         int
+	ThreadShare  float64
+	ContextShare float64
+	CacheKeep    int
+	// Search says this instance can supplement a thin answer from the public web. The front
+	// end cannot discover it — the bundle is static — and it has to say so before an answer
+	// appears, because a labelled outside source is a thing a reader agrees to, not a
+	// surprise. Like `writes` and `admin`: a capability the UI is told about, not one it
+	// finds out by getting a 403.
+	Search bool
 	// Version is the commit the binary was built from — the one field here that says
 	// nothing about an answer. It is reported so "which version is deployed?" has an
 	// answer on the screen and from `curl /api/health`, rather than requiring shell access
@@ -144,11 +152,14 @@ func New(d Deps) http.Handler {
 		models = []byte("[]")
 	}
 	health := fmt.Sprintf(
-		`{"ok":true,"writes":%t,"admin":%t,"model":%q,"window":%d,"price_in":%g,"price_out":%g,`+
-			`"models":%s,"top_k":%d,"thread_share":%g,"cache_keep":%d,"version":%q,"release":%q}`,
-		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Model, d.Runtime.Window,
+		`{"ok":true,"writes":%t,"admin":%t,"search":%t,"model":%q,"window":%d,`+
+			`"price_in":%g,"price_out":%g,`+
+			`"models":%s,"top_k":%d,"thread_share":%g,"context_share":%g,"cache_keep":%d,`+
+			`"version":%q,"release":%q}`,
+		d.BAPass.enabled(), d.AdminPass.enabled(), d.Runtime.Search,
+		d.Runtime.Model, d.Runtime.Window,
 		d.Runtime.PriceIn, d.Runtime.PriceOut, models,
-		d.Runtime.TopK, d.Runtime.ThreadShare, d.Runtime.CacheKeep,
+		d.Runtime.TopK, d.Runtime.ThreadShare, d.Runtime.ContextShare, d.Runtime.CacheKeep,
 		d.Runtime.Version, d.Runtime.Release)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

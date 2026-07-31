@@ -15,7 +15,13 @@ import (
 // every follow-up. The cap is therefore the size of a few exchanges rather than of one
 // sentence; the client sends the last few turns and this is what stops a client from
 // deciding to send a thousand.
-const maxAsk = 64 << 10 // 64 KiB
+//
+// 256 KiB because the client offers twelve turns now rather than three, and twelve of the
+// long answers this engine writes clear 64 KiB — at which point the request is refused and
+// the reader sees a failed question, not a shorter memory. The server still decides how much
+// of what arrives the model reads: that is THREAD_SHARE, and it is measured against the real
+// window rather than against a byte cap.
+const maxAsk = 256 << 10 // 256 KiB
 
 var errBadRequest = errors.New("bad request")
 
@@ -79,11 +85,18 @@ func chatHandler(answers Answerer, models []Model) http.HandlerFunc {
 			// first question, where 0 of 0 would print a memory figure about nothing.
 			Kept    int `json:"kept,omitempty"`
 			Offered int `json:"offered,omitempty"`
+			// Sections and Candidates are the same pair for the corpus: how many sections the
+			// answer was built from, of how many retrieval weighed. It is what tells an
+			// operator whether the model's window is being used or left empty — the number
+			// TOP_K used to be, back when it was the only one.
+			Sections   int `json:"sections,omitempty"`
+			Candidates int `json:"candidates,omitempty"`
 		}{Done: true, Cached: reply.Cached, Model: ask.Model}
 		if reply.Usage.Reported() {
 			done.In, done.Out = reply.Usage.PromptTokens, reply.Usage.CompletionTokens
 		}
 		done.Kept, done.Offered = reply.Recall.Kept, reply.Recall.Offered
+		done.Sections, done.Candidates = reply.Retrieval.Kept, reply.Retrieval.Offered
 		s.send("done", done)
 	}
 }

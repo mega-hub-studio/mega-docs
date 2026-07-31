@@ -64,6 +64,15 @@ defineEmits(['showRelease', 'showSettings'])
     >
       <nes-icon name="chat" aria-hidden="true" />{{ line.recall }}
     </span>
+    <!-- Grounding, as sections-read/sections-weighed. Absent when the two agree, which is
+         every instance that never configured a window: it reads all of TOP_K and the pair
+         reports nothing. `database` is in 0.15.0's icons.d.ts; the corpus is what it counts. -->
+    <span
+      v-if="line.sections" class="sl-item"
+      title="Sections of the corpus this answer was built from, of those retrieval weighed"
+    >
+      <nes-icon name="database" aria-hidden="true" />{{ line.sections }}
+    </span>
     <span class="sl-end">
       <span v-if="line.elapsed" class="sl-item">{{ line.elapsed }}</span>
       <span v-if="line.cost" class="sl-item" :title="line.costTitle">{{ line.cost }}</span>

@@ -55,6 +55,12 @@ export const messages = {
       language: 'Language',
       settings: 'Settings',
     },
+    answer: {
+      // The label on the second source list. Short and shouted, because it is a badge: what a
+      // reader needs at a glance is that these rows are not their organisation's documents.
+      webBadge: 'WEB',
+      webHint: 'Public search results — not your organisation\'s documents',
+    },
     settings: {
       title: 'Settings',
       close: 'Close settings',
@@ -65,7 +71,8 @@ export const messages = {
       recall: '{kept} of {offered} turns',
       language: 'Language',
       sound: 'Sound',
-      topK: 'Sections each answer is built from',
+      topK: 'Sections each answer is built from, at minimum',
+      contextShare: 'Share of the window the retrieved sections may take',
       threadShare: 'Share of the window a conversation may take',
       cacheKeep: 'Answers held in the cache',
       instance: 'INSTANCE',
@@ -142,6 +149,10 @@ export const messages = {
       language: 'Ngôn ngữ',
       settings: 'Cài đặt',
     },
+    answer: {
+      webBadge: 'WEB',
+      webHint: 'Kết quả tìm kiếm công khai — không phải tài liệu của tổ chức bạn',
+    },
     settings: {
       title: 'Cài đặt',
       close: 'Đóng cài đặt',
@@ -152,7 +163,8 @@ export const messages = {
       recall: '{kept} trong {offered} lượt',
       language: 'Ngôn ngữ',
       sound: 'Âm thanh',
-      topK: 'Số section mỗi câu trả lời được dựng từ',
+      topK: 'Số section tối thiểu mỗi câu trả lời được dựng từ',
+      contextShare: 'Phần context window các section truy xuất được chiếm',
       threadShare: 'Phần context window một hội thoại được chiếm',
       cacheKeep: 'Số câu trả lời cache giữ lại',
       instance: 'INSTANCE',

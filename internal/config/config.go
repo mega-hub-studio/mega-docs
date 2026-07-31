@@ -33,10 +33,19 @@ type Config struct {
 	// both are here for the same reason: a number an operator would want to move after
 	// watching their own corpus behave has no business being a recompile.
 	ThreadShare float64
-	CacheKeep   int
-	Window      int     // context window of ChatModel, in tokens; 0 = unknown
-	PriceIn     float64 // USD per 1M prompt tokens; 0 = don't price answers
-	PriceOut    float64 // USD per 1M completion tokens
+	// ContextShare is the same for the retrieved sections, and it is what lets an answer be
+	// as wide as the model can read instead of as wide as TOP_K. It only applies where a
+	// window is known; without one, TOP_K still decides.
+	ContextShare float64
+	// SearchBaseURL and SearchKey configure the public-search supplement that explains a term
+	// the documents lean on. The key is the switch: unset means the instance never makes an
+	// external call, the same way an unset BA_PASS means no write surface.
+	SearchBaseURL string
+	SearchKey     string
+	CacheKeep     int
+	Window        int     // context window of ChatModel, in tokens; 0 = unknown
+	PriceIn       float64 // USD per 1M prompt tokens; 0 = don't price answers
+	PriceOut      float64 // USD per 1M completion tokens
 	// Models is what a reader may pick between, first one the default. It is always at
 	// least one entry: with CHAT_MODELS unset it is the single model the four knobs above
 	// describe, which is exactly the instance that never wanted a picker.
@@ -168,7 +177,10 @@ func Load() Config {
 		// 0.35 leaves two thirds of the window for the retrieved sections and the completion.
 		// Raising it buys memory by making answers less grounded, which is why it is a knob
 		// rather than a preference: the trade has to be made on purpose.
-		ThreadShare: envFloat("THREAD_SHARE", 0.35),
+		ThreadShare:   envFloat("THREAD_SHARE", 0.35),
+		ContextShare:  envFloat("CONTEXT_SHARE", 0.5),
+		SearchBaseURL: env("SEARCH_BASE_URL", "https://api.tavily.com"),
+		SearchKey:     env("SEARCH_API_KEY", ""),
 		// 200 answers is more than a team asks between re-indexes, and it keeps the one-file
 		// story honest — a database small enough to copy in a second is one nobody plans around.
 		CacheKeep: envInt("CACHE_KEEP", 200),
@@ -212,6 +224,9 @@ func (c Config) Inventory() []Setting {
 		c.set("models", "EMBED_DIM", num(c.EmbedDim)),
 		c.set("models", "TOP_K", num(c.TopK)),
 		c.set("models", "THREAD_SHARE", strconv.FormatFloat(c.ThreadShare, 'g', -1, 64)),
+		c.set("models", "CONTEXT_SHARE", strconv.FormatFloat(c.ContextShare, 'g', -1, 64)),
+		c.set("provider", "SEARCH_BASE_URL", c.SearchBaseURL),
+		c.secret("provider", "SEARCH_API_KEY", c.SearchKey),
 		c.set("models", "CACHE_KEEP", num(c.CacheKeep)),
 		c.set("hosting", "BIND_ADDR", c.BindAddr),
 		c.set("hosting", "PORT", c.Port),

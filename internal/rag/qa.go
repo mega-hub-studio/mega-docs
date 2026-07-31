@@ -255,7 +255,19 @@ func (e *Engine) sig() (string, error) {
 	// answer under the wider setting and nothing says so. It belongs in the signature rather
 	// than the key because changing it invalidates *every* answer at once — unlike a scope or
 	// a model, there is no other TOP_K whose rows are still worth keeping.
-	return s + "|" + strconv.Itoa(e.topK) + "|" + promptSig, nil
+	return s + "|" + strconv.Itoa(e.topK) + "|" + e.contextSig() + e.searchSig() + "|" + promptSig, nil
+}
+
+// contextSig fingerprints the retrieval budget an answer was built under: the share, and
+// every model's window, because a share means nothing without knowing what it is a share of.
+//
+// Both are startup config, the same tier as TOP_K above, so this belongs in the signature
+// with it and not in the key — even though the number it produces is per-model. Widening one
+// model's window therefore invalidates every model's rows rather than only its own. That is
+// deliberate over-invalidation: it costs one cold cache after an admin edit nobody makes
+// twice a day, and it buys leaving db.cacheKey alone.
+func (e *Engine) contextSig() string {
+	return strconv.FormatFloat(e.contextShare, 'g', -1, 64) + fmt.Sprint(e.models)
 }
 
 // History lists the answers still free to replay. Empty rather than an error when

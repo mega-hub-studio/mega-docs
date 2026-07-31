@@ -10,6 +10,7 @@
    and `nes:step` are the library's own events and bubble to here.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { computed } from 'vue'
+import { useT } from '../composables/lang.js'
 import { fileName, section, turnClarify, turnHtml } from '../lib/answer.js'
 import { STATUS } from '../lib/qa.js'
 import ClarifyCard from './ClarifyCard.vue'
@@ -27,11 +28,23 @@ const props = defineProps({
 // nothing, in every build, with no warning outside dev mode.
 defineEmits(['copy', 'regenerate', 'askBa', 'refine', 'diagramDrawn', 'diagramStepped', 'zoomDiagram'])
 
+const { t } = useT()
+
+// Two id spaces, because the two numberings both start at 1: `[1]` is the first document and
+// `[w1]` the first public result, so one prefix each is what stops a marker linking to the
+// other list's row.
 const srcId = n => `s${props.turn.id}-${n}`
+const webSrcId = n => `w${props.turn.id}-${n}`
 
 // What may appear in the answer mid-stream is a rendering rule, so it lives in
 // lib/answer.js with the rest of them. This says only "render this turn".
-const html = () => turnHtml(props.turn, props.diagramsReady, srcId)
+const html = () => turnHtml(props.turn, props.diagramsReady, srcId, webSrcId)
+
+// The two lists the template renders. Splitting here rather than in the markup keeps the
+// v-for over a plain array — and `kind` absent means a document, which is what every payload
+// written before the web existed says.
+const docCites = computed(() => props.turn.citations.filter(c => c.kind !== 'web'))
+const webCites = computed(() => props.turn.citations.filter(c => c.kind === 'web'))
 
 // A computed, unlike `html` above, and not to save the work: it has to be the *same object*
 // until this turn changes. A fresh one on every parent render — asking a new question is one —
@@ -93,8 +106,8 @@ const clarify = computed(() => turnClarify(props.turn))
            value in `title`: .source-host is the recipe's short secondary label — dim, mono,
            --fs-label — so a full breadcrumb in it wrapped to a second line and lost the
            indent under the filename. See lib/answer.js. -->
-      <ol v-if="turn.citations.length" class="sources">
-        <li v-for="c in turn.citations" :id="srcId(c.n)" :key="c.n" class="source">
+      <ol v-if="docCites.length" class="sources">
+        <li v-for="c in docCites" :id="srcId(c.n)" :key="c.n" class="source">
           <span class="source-n">{{ c.n }}</span>
           <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
           <span v-if="c.heading" class="source-host" :title="c.heading">{{
@@ -102,6 +115,21 @@ const clarify = computed(() => turnClarify(props.turn))
           }}</span>
         </li>
       </ol>
+
+      <!-- The public web, in its own list and never mixed into the one above: a sentence
+           from a search API and a sentence from a document somebody approved would otherwise
+           be indistinguishable on screen, which is the whole thing separate numbering exists
+           to prevent. `[w1]` links here; the badge says what "here" is without a reader
+           having to notice the w. -->
+      <div v-if="webCites.length" class="callout explain web-sources">
+        <span class="badge" :title="t('answer.webHint')">{{ t('answer.webBadge') }}</span>
+        <ol class="sources">
+          <li v-for="c in webCites" :id="webSrcId(c.n)" :key="c.n" class="source">
+            <span class="source-n">w{{ c.n }}</span>
+            <a class="source-title" :href="c.url" target="_blank" rel="noopener noreferrer" :title="c.url">{{ c.title || c.url }}</a>
+          </li>
+        </ol>
+      </div>
 
       <div v-if="!turn.streaming && turn.a" class="feedback">
         <div class="feedback-actions">

@@ -24,7 +24,11 @@ type fakeAnswers struct {
 	corpus db.Corpus
 	cErr   error
 	recall rag.Recall // how much of the thread the model read, for the `done` frame
-	asked  []rag.Ask  // what the handler passed down, so `fresh` can be verified
+	// retrieval is the same pair for the corpus — sections read of sections weighed. Both are
+	// on the `done` frame and both are omitted when zero, so a first question does not print
+	// a memory figure and an unconfigured instance does not print a grounding one.
+	retrieval rag.Recall
+	asked     []rag.Ask // what the handler passed down, so `fresh` can be verified
 }
 
 func (f *fakeAnswers) Answer(_ context.Context, a rag.Ask) (rag.Reply, error) {
@@ -32,7 +36,9 @@ func (f *fakeAnswers) Answer(_ context.Context, a rag.Ask) (rag.Reply, error) {
 	for _, t := range f.tokens {
 		a.OnToken(t)
 	}
-	return rag.Reply{Citations: f.cites, Cached: f.cached, Recall: f.recall}, f.err
+	return rag.Reply{
+		Citations: f.cites, Cached: f.cached, Recall: f.recall, Retrieval: f.retrieval,
+	}, f.err
 }
 
 func (f *fakeAnswers) Corpus(int) (db.Corpus, error) { return f.corpus, f.cErr }
@@ -65,6 +71,33 @@ func TestHealth(t *testing.T) {
 	w := do(t, newTestServer(&fakeAnswers{}), "GET", "/api/health", "", nil)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"ok":true`) {
 		t.Fatalf("health = %d %q", w.Code, w.Body.String())
+	}
+	// A capability the bundle cannot discover, so it has to be told: an instance with no
+	// search key must say so, and the default here is off. Reported false rather than
+	// omitted — the front end assigns the whole object, and an absent key lands as undefined.
+	if !strings.Contains(w.Body.String(), `"search":false`) {
+		t.Errorf("health = %q, want it to report search:false on an instance with no key",
+			w.Body.String())
+	}
+}
+
+// TestHealthReportsTheWebSupplement is the other half of the rule above, and it is here
+// because a labelled outside source is something a reader has to be able to expect rather
+// than discover: the guide's own promise is that an unset SEARCH_API_KEY means no external
+// call is ever made, and the only way the screen can say so before an answer arrives is this
+// field.
+func TestHealthReportsTheWebSupplement(t *testing.T) {
+	h := New(Deps{
+		Answers: &fakeAnswers{},
+		Index:   []byte("<html>index</html>"),
+		Assets:  fstest.MapFS{},
+		Runtime: Runtime{Search: true, ContextShare: 0.5},
+	})
+	body := do(t, h, "GET", "/api/health", "", nil).Body.String()
+	for _, want := range []string{`"search":true`, `"context_share":0.5`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("health = %q, want %s", body, want)
+		}
 	}
 }
 
@@ -141,8 +174,14 @@ func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
 	h := New(Deps{
 		Answers: &fakeAnswers{
 			tokens: []string{"Hybrid ", "search [1]"},
-			cites:  []rag.Citation{{N: 1, DocPath: "docs/a.md", Heading: "How"}},
-			recall: rag.Recall{Kept: 3, Offered: 8},
+			// Both kinds, because the wire shape has to keep them apart: a document carries
+			// doc/heading, a public result carries kind/title/url and its own numbering.
+			cites: []rag.Citation{
+				{N: 1, DocPath: "docs/a.md", Heading: "How"},
+				{N: 1, Kind: "web", Title: "OAuth 2.0", URL: "https://example.test/oauth"},
+			},
+			recall:    rag.Recall{Kept: 3, Offered: 8},
+			retrieval: rag.Recall{Kept: 18, Offered: 40},
 		},
 		Index: []byte("<html>index</html>"),
 		// A named model only survives readQuestion when the instance offers it: pick() answers
@@ -164,8 +203,10 @@ func TestChatStreamsTokensThenCitationsThenDone(t *testing.T) {
 		"event: token\ndata: {\"t\":\"search [1]\"}\n\n",
 		`event: citations`,
 		`"doc":"docs/a.md"`,
+		`{"n":1,"kind":"web","title":"OAuth 2.0","url":"https://example.test/oauth"}`,
 		"event: done\ndata: {\"done\":true,\"cached\":false," +
-			"\"model\":\"gpt-4\",\"kept\":3,\"offered\":8}\n\n",
+			"\"model\":\"gpt-4\",\"kept\":3,\"offered\":8," +
+			"\"sections\":18,\"candidates\":40}\n\n",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("stream missing %q\n--- got ---\n%s", want, body)

@@ -560,7 +560,7 @@ done: 8/8 files, 74 chunks</span></div>
   <!-- Every variable internal/config reads has a row here, and web/spec_test.go fails
        the build if one is missing: a knob nobody documented is a knob nobody finds. -->
   <section id="settings" data-feature="settings"
-           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS,ADMIN_PASS"
+           data-env="BIND_ADDR,PORT,DB_PATH,CORPUS_DIR,AI_BASE_URL,AI_API_KEY,EMBED_BASE_URL,EMBED_API_KEY,EMBED_MODEL,CHAT_MODEL,EMBED_DIM,TOP_K,CONTEXT_SHARE,SEARCH_BASE_URL,SEARCH_API_KEY,CONTEXT_WINDOW,PRICE_IN,PRICE_OUT,AUTH_USER,AUTH_PASS,BA_PASS,ADMIN_PASS"
            data-test="TestHealthAdvertisesWritesWhenConfigured">
     <h2 lang="en">Settings that matter</h2>
     <h2 lang="vi">Các setting quan trọng</h2>
@@ -592,8 +592,14 @@ done: 8/8 files, 74 chunks</span></div>
           <tr lang="vi"><th><code>EMBED_API_KEY</code></th><td>giống <code>AI_API_KEY</code></td><td>chỉ khi embeddings ở nhà cung cấp khác — một key không dùng được ở hai nơi</td></tr>
           <tr lang="en"><th><code>EMBED_DIM</code></th><td><code>1536</code></td><td>must match the embedding model exactly</td></tr>
           <tr lang="vi"><th><code>EMBED_DIM</code></th><td><code>1536</code></td><td>phải khớp chính xác với embedding model</td></tr>
-          <tr lang="en"><th><code>TOP_K</code></th><td><code>6</code></td><td>how many sections feed the answer</td></tr>
-          <tr lang="vi"><th><code>TOP_K</code></th><td><code>6</code></td><td>bao nhiêu đoạn được đưa vào câu trả lời</td></tr>
+          <tr lang="en"><th><code>TOP_K</code></th><td><code>6</code></td><td>the floor on how many sections feed the answer, and the whole rule on an instance whose models have no declared window</td></tr>
+          <tr lang="vi"><th><code>TOP_K</code></th><td><code>6</code></td><td>mức sàn cho số đoạn được đưa vào câu trả lời, và là toàn bộ quy tắc ở instance chưa khai window cho model nào</td></tr>
+          <tr lang="en"><th><code>CONTEXT_SHARE</code></th><td><code>0.5</code></td><td>the share of the picked model's window the retrieved sections may fill. This is what makes a 128k model read tens of sections instead of six — it needs a window from <code>CHAT_MODELS</code> or <code>CONTEXT_WINDOW</code> to be a share <i>of</i>. The status line prints sections-read of sections-weighed, so raising it has a number to check against</td></tr>
+          <tr lang="vi"><th><code>CONTEXT_SHARE</code></th><td><code>0.5</code></td><td>phần context window của model đang chọn mà các đoạn truy xuất được chiếm. Đây là thứ khiến model 128k đọc vài chục đoạn thay vì sáu — nó cần một window từ <code>CHAT_MODELS</code> hoặc <code>CONTEXT_WINDOW</code> để mà chia. Status line in số đoạn đã đọc trên số đoạn đã cân nhắc, nên tăng nó có con số để đối chiếu</td></tr>
+          <tr lang="en"><th><code>SEARCH_API_KEY</code></th><td>empty (off)</td><td>turns on the public-web supplement, which explains a term the documents lean on and never answers in their place. Empty means no external call is ever made — a question the corpus cannot answer still goes to a BA. It sends the question to a third party when it does fire, so this is a decision, not a default</td></tr>
+          <tr lang="vi"><th><code>SEARCH_API_KEY</code></th><td>trống (tắt)</td><td>bật phần bổ trợ từ web công khai — nó giải thích thuật ngữ tài liệu dựa vào chứ không trả lời thay. Trống nghĩa là không bao giờ gọi ra ngoài — câu hỏi corpus không trả lời được vẫn đi tới BA. Khi chạy thì nó gửi câu hỏi ra bên thứ ba, nên đây là một quyết định chứ không phải mặc định</td></tr>
+          <tr lang="en"><th><code>SEARCH_BASE_URL</code></th><td>Tavily</td><td>only to point at a different search provider — the one this expects answers <code>POST /search</code> with already-extracted text, so nothing here scrapes a page</td></tr>
+          <tr lang="vi"><th><code>SEARCH_BASE_URL</code></th><td>Tavily</td><td>chỉ dùng khi trỏ sang provider search khác — cái mặc định trả lời <code>POST /search</code> với text đã trích sẵn, nên ở đây không có gì phải scrape trang</td></tr>
           <tr lang="en"><th><code>CONTEXT_WINDOW</code></th><td><code>0</code> (hidden)</td><td>the chat model's window, in tokens. Set it and the status line shows what share of it an answer used; leave it and that number is simply absent, because a made-up percentage is worse than none</td></tr>
           <tr lang="vi"><th><code>CONTEXT_WINDOW</code></th><td><code>0</code> (ẩn)</td><td>context window của model chat, tính theo token. Đặt vào thì status line hiện câu trả lời dùng bao nhiêu phần trăm; bỏ trống thì không hiện số đó, vì một con số đoán bừa còn tệ hơn không có</td></tr>
           <tr lang="en"><th><code>PRICE_IN</code> · <code>PRICE_OUT</code></th><td><code>0</code> (hidden)</td><td>USD per 1M prompt / completion tokens, from your provider's price list. Both zero means no money is shown at all — the token counts still are, because they come from the provider itself</td></tr>
