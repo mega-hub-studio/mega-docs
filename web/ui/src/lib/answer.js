@@ -400,7 +400,7 @@ export function turnClarify(turn) {
  * @typedef {object} Clarify
  * @property {string} kind QUESTION when the reply is a question back, NEXT when it is an offer
  * @property {string} prompt the sentence sharing the marker's line
- * @property {{ text: string, cites: number[], recommended: boolean }[]} options one per item
+ * @property {{ text: string, cites: string[], recommended: boolean }[]} options one per item
  */
 
 /* An option's [n] is a citation, not part of its wording, and it used to be treated as both:
@@ -413,15 +413,40 @@ export function turnClarify(turn) {
    library's `.cite` recipe, and composeClarify has nothing left to strip. */
 /** @typedef {import("./chat.js").Citation} Citation */
 
-const citeIn = /\s*\[(\d+)\]/g
+/* Both markers, one pattern, because neither caller cares which kind it found: `[1]` is one of
+   this organisation's documents, `[w1]` is a public search result. They cannot collide — the
+   character after `[` is a digit in one and `w` in the other — so one regex reads both and the
+   capture says which.
 
-/** One checklist item → a pickable option, with its citation numbers taken out of the wording. */
+   Declared above both readers rather than beside either. `split` renders a marker inside the
+   prose and `option` below takes one out of a checklist item, and the day those were two
+   patterns the clarify card printed "[w2]" as characters while the paragraph above it drew the
+   same marker as a chip — the exact defect this file already fixed once for `[2]`. One fact,
+   one place, or the second copy is the one that goes stale. */
+const CITE = /\[(w?)(\d+)\]/g
+
+/**
+ * One checklist item → a pickable option, with its citations taken out of the wording.
+ *
+ * `cites` holds the marker's own text — "2" for a document, "w1" for a public result — which is
+ * exactly what `cite()` prints for the same marker in the prose, so the card and the paragraph
+ * label a citation identically.
+ *
+ * One pass with `replaceAll` and a function, not a `matchAll` beside a `replaceAll`: `CITE` is
+ * global and shared now, and two calls would be two chances to inherit a `lastIndex` — the trap
+ * `linkCites` below documents having hit.
+ */
 function option(item) {
-  return {
-    text: item.text.replaceAll(citeIn, '').trim(),
-    cites: [...item.text.matchAll(citeIn)].map(m => Number(m[1])),
-    recommended: item.checked === true,
-  }
+  const cites = []
+  const text = item.text
+    .replaceAll(CITE, (m) => {
+      cites.push(m.slice(1, -1))
+      return ''
+    })
+    // A marker between two words leaves two spaces behind; trim only catches the ends.
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  return { text, cites, recommended: item.checked === true }
 }
 
 /**
@@ -508,12 +533,6 @@ export function composeClarify(form) {
   // rendered it, so what a checkbox carries is already the question's words.
   return form.getAll('reading').map(text => text.trim()).filter(Boolean).join(' ; ')
 }
-
-/* Both markers, one pattern, because the walk and the fragment-building are the expensive
-   half and neither cares which kind it found: `[1]` is one of this organisation's documents,
-   `[w1]` is a public search result. They cannot collide — the character after `[` is a digit
-   in one and `w` in the other — so one regex reads both and the capture says which. */
-const CITE = /\[(w?)(\d+)\]/g
 
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before
    marked would make a "[1]" inside a code fence render as literal HTML. Text
