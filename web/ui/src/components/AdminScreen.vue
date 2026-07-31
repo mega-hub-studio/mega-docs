@@ -89,9 +89,16 @@ onMounted(fetchSettings)
               </dt>
               <dd>
                 <span :class="s.secret ? 'badge clear' : 'val'">{{ s.value }}</span>
-                <!-- The column this screen exists for. `.env` and the shell are
-                     indistinguishable to os.Getenv once the file is loaded, so the server
-                     records which keys the file supplied and reports it here. -->
+              </dd>
+              <!-- The column this screen exists for. `.env` and the shell are
+                   indistinguishable to os.Getenv once the file is loaded, so the server
+                   records which keys the file supplied and reports it here.
+
+                   Its own <dd>, which is what makes it a column rather than a chip trailing
+                   whatever the value happened to measure: a <dl> may give one <dt> several
+                   <dd>s, so this is the third cell of the grid and every source badge shares
+                   one left edge. Inside the value's <dd> they landed at four different x. -->
+              <dd class="src">
                 <span class="badge" :class="s.source === 'default' ? 'todo' : 'good'">
                   {{ s.source }}</span>
               </dd>

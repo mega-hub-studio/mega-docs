@@ -1208,3 +1208,36 @@ main.ba .datalist code { overflow-wrap: anywhere; }
   border-block-start: var(--bw-2) solid var(--line);
   font-family: var(--font-mono); font-size: var(--fs-label); color: var(--dim);
 }
+
+/* ── ADMIN: the seams nothing was declaring, and the source column ──
+   `main.ba` gives its own children a gap, but this screen's blocks are two levels further in
+   — `main.ba.admin > nes-tabs > section` is the tab panel, and each settings group is a
+   `<section>` inside that. Neither was a `.card`, so neither inherited the one declaration
+   that fixed the same class of bug there, and the blocks stacked with whatever margin each
+   recipe brought. Most bring none: measured at 390 and 1440, three pairs touching at **0px**
+   — the memo callout on the first group, one group on the next, and every `.eyebrow` on its
+   own list. That is rule 27, and the fix is its own prescription: the container declares it.
+
+   `:not([hidden])` is load-bearing, not tidiness. `<nes-tabs>` hides an inactive panel with
+   the `hidden` attribute, whose `display: none` comes from the UA sheet — so an author
+   `display` here without the guard outranks it and every tab renders at once.
+
+   The third column is the other half of the report. A source badge used to sit inside the
+   value's `<dd>`, so it started wherever that value stopped: measured **five different right
+   edges** down one screen, and pushing it with `margin-inline-start: auto` only traded that
+   for four different left ones, the badges being different widths. It is its own `<dd>` now
+   — a `<dl>` may give one `<dt>` several — which makes it the grid's third cell and gives
+   every badge one edge. Measured after: one left edge at 390 and at 1440.
+
+   Left alone: the value column starts 22px further in under a group whose keys are longer,
+   because each group is its own grid and `auto` sizes to its own longest key. Sharing one
+   track across groups needs `subgrid`, and that needs the heading and the list to be siblings
+   of one grid rather than wrapped in a section each — a restructure for an edge two headings
+   and a --sp-5 gap already separate. */
+.admin nes-tabs > section:not([hidden]) { display: flex; flex-direction: column; gap: var(--sp-5); }
+.admin nes-tabs > section > section { display: flex; flex-direction: column; gap: var(--sp-3); }
+.admin .datalist { grid-template-columns: auto 1fr auto; }
+/* The badge fills its cell so the column has two straight edges rather than one: the chips
+   are different words (ENV · DEFAULT) and a ragged right edge is what the report called
+   "lệch" in the first place. */
+.admin .datalist > dd.src > .badge { display: block; text-align: center; }
