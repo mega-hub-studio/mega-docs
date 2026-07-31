@@ -33,23 +33,31 @@
                 used to share it too and no longer does; see `.diagram-zoom` for why a
                 modal whose job is a drawing must not follow a text column.
 
-                **52rem, down from 80rem.** 80rem was chosen so "an answer — a table, a
-                diagram" had room, and the cost was measured and reported three times: at a
-                1600px window an answer's text ended 469px short of its own card, which
-                reads as a column that gave up. Text cannot follow, because its width is
-                the library's `--prose-measure` (72ch) and that is a reading decision, not
-                a layout one. So the card came to the text instead: 21px of slack at
-                1600px, 113px at 1130px, measured.
+                **80rem, and it stays there.** An answer's text ending 469px short of its
+                own card was reported three times, and the first fix tried was the wrong
+                one: bringing the column down to 52rem to meet the text. That squeezes the
+                container on a large screen — the opposite of using it — and it costs the
+                width a table, a wide diagram and a code block are here for. Reverted.
+                What moved instead is the measure; see --prose-measure below.
 
-                What made it affordable is a change made the same day: a diagram now pans
-                and zooms *in place* (lib/diagram.js), so the widest possible card stopped
-                being the only way to read one. A table still scrolls in `.table-wrap`, and
-                a code block still scrolls itself. It also lands on the guide's own column
-                (`docsbase.html` sets 820px), so the two surfaces stopped disagreeing.
+   The text measure *is* here now, retuned rather than overridden — the library defines
+   `--prose-measure` on :root and its own comment says "Retune with --prose-measure", so this is
+   the sanctioned knob and not one of AGENTS.md's overrides.
 
-   Text measure is not here: 8bit-nes owns it as `--prose-measure` on :root (0.13.0, still), and
-   the rules below borrow that rather than keeping a second copy of 72ch. Nor is
-   --mmd-fs — see :root below for why it cannot live on #app.
+     --prose-measure   `min(100%, 112ch)`, where the library ships a flat `72ch`.
+
+   `100%` is the card's own content box, so text **fills the container** at every width the
+   container is narrower than the cap — which is every phone, every tablet and a laptop up to
+   about 1120px. Past that the cap holds, because "fill" and "readable" genuinely diverge:
+   measured at 1600px the card's content box is 1248px and `1ch` is 8.97px, so filling it means
+   **139 characters a line**. The eye loses the start of the next line somewhere past 100, which
+   is why the library chose 72 and why this stops at 112 rather than at the card's edge.
+
+   One declaration, no media query, and that is deliberate: a `min()` against `100%` is already
+   responsive, and it has no jump at a breakpoint the way a ladder of four values would. To trade
+   more width for shorter lines, change the one number.
+
+   Nor is --mmd-fs here — see :root below for why it cannot live on #app.
 
    No breakpoint sets --col. `max-inline-size` with `margin-inline: auto` is already
    fluid — it fills anything narrower and centres in anything wider — so the responsive
@@ -58,7 +66,18 @@
 #app {
   --z-bar: 10;
   --z-dock: 20;
-  --col: 52rem;
+  --col: 80rem;
+  /* The inline gutter, in one place, because two surfaces have to agree about it and did not.
+     `main` and `.dock` both cap at --col, but a card sits *inside* main's inline padding while
+     the prompt sits inside the dock's — so the prompt's box was the column and the card's box
+     was the column minus that padding. Measured at 1130px: prompt 149..981, card 165..965, a
+     16px overhang on each side under a rule whose stated job is that "the prompt has to look
+     attached to the answers above it". --col meant two things; now the gutter is the token and
+     the prompt subtracts it, so the alignment is true by construction at every breakpoint. */
+  --gutter-x: var(--sp-3);
+  /* Fills the container, capped where a line stops being readable. See the note above for the
+     139-characters measurement that decides the cap. */
+  --prose-measure: min(100%, 112ch);
   min-block-size: 100dvh;
 }
 
@@ -145,18 +164,21 @@ html {
 /* ── conversation column ── */
 main {
   max-inline-size: var(--col); margin-inline: auto;
-  padding: var(--sp-4) var(--sp-3);
+  padding: var(--sp-4) var(--gutter-x);
   /* clears the fixed prompt, which grows as the textarea grows — measured at
      runtime into --dock-h rather than guessed */
   padding-block-end: calc(var(--dock-h, 5rem) + var(--sp-5));
 }
 
-/* The ask panel used to be capped at 48rem because the column was 80rem and a prompt with a
-   file list under it read badly stretched to 1280px — a few words at one end of a very long
-   line. The column is 52rem now, so the cap was 64px of difference doing the work of a rule:
-   deleted, and the panel takes the column like everything else. `margin-block-start` stays —
-   that is the panel sitting a little down the page, which is a different fact. */
-.empty { margin-block-start: var(--sp-6); }
+/* The ask panel does not scale with the shell. --col is sized for an *answer* — a table, a
+   diagram, a code block — and this screen is a prompt with a file list under it: stretched to
+   1280px its rows become a few words at one end of a very long line, and the eye has nothing to
+   land on. This cap was briefly deleted while the column was 52rem, where it was 64px of
+   difference doing the work of a rule; the column is 80rem again, so it earns its place again. */
+.empty {
+  max-inline-size: 48rem; margin-inline: auto;
+  margin-block-start: var(--sp-6);
+}
 .turn + .turn { margin-block-start: var(--sp-6); }
 
 /* ── every card is a column with a gap, and that is the only place a seam is set ──
@@ -325,6 +347,19 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
    trims the chip inside `@supports (text-box-trim: trim-both)` — with `display: inline-block`,
    because trim does nothing on an inline-flex, which is a detail the local patch never found.
    Both local rules are deleted rather than kept beside their replacement. */
+
+/* A callout inside an answer is a *drawn box*, so it takes the card's edge like the code block
+   and the actions row do — the rule this repo already follows is that every box with a border
+   shares one edge and only running text keeps a measure. It was the last block breaking it:
+   measured at 1600px, its border stopped 58px short of the card while `nes-code` below it went
+   the full width, which is the mismatch the report pointed at.
+
+   Two declarations, because the box and its text want different widths: the panel fills, and the
+   paragraphs inside it inherit the same `min(100%, 112ch)` every other paragraph gets — `100%`
+   there is the callout's own content box, so a narrow callout still fills itself. Without the
+   second line the panel would be a 1200px box of 139-character lines. */
+.prose > .callout { max-inline-size: none; }
+.prose > .callout > * { max-inline-size: var(--prose-measure); }
 
 /* `.source-title` ships `&:hover { text-decoration: underline }`, which is right for the
    <a> the recipe expects. This app renders the row as three <span>s — nothing here can open
@@ -581,14 +616,18 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 /* ── the dock: fixed prompt, safe-area + keyboard aware ── */
 .dock {
   position: fixed; inset-block-end: 0; inset-inline: 0; z-index: var(--z-dock);
-  padding: var(--sp-4) var(--sp-3);
+  padding: var(--sp-4) var(--gutter-x);
   padding-block-end: max(var(--sp-3), env(safe-area-inset-bottom));
   background: linear-gradient(transparent, var(--screen) 40%);
   /* iOS leaves fixed elements under the on-screen keyboard; --kb is the
      overlap measured from visualViewport (0 whenever no keyboard is up). */
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
-.dock nes-chat-prompt { display: block; max-inline-size: var(--col); margin-inline: auto; }
+.dock nes-chat-prompt {
+  display: block; margin-inline: auto;
+  /* main's *content* box, which is what a card is as wide as — see --gutter-x. */
+  max-inline-size: calc(var(--col) - 2 * var(--gutter-x));
+}
 .dock-body { display: contents; }
 
 /* ── the handle that puts the dock away ──
@@ -846,9 +885,10 @@ main.ba .datalist code { overflow-wrap: anywhere; }
      the navigation to stay where it was left. See the base rule for why it scrolls away
      below this width. */
   .bar { position: sticky; inset-block-start: 0; padding-inline: var(--sp-4); }
-  main { padding: var(--sp-5) var(--sp-4) calc(var(--dock-h, 5rem) + var(--sp-6)); }
+  #app { --gutter-x: var(--sp-4); }
+  main { padding: var(--sp-5) var(--gutter-x) calc(var(--dock-h, 5rem) + var(--sp-6)); }
   .empty { margin-block-start: 12vh; }
-  .dock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
+  .dock { padding: var(--sp-5) var(--gutter-x) var(--sp-4); }
   .dock .statusline { margin-inline: calc(-1 * var(--sp-4)); margin-block-end: calc(-1 * var(--sp-4)); }
   .dock .statusline .sl-end { margin-inline-start: auto; }
   .scopepick .scope-note { display: inline; font-size: var(--fs-chip); color: var(--muted); }
@@ -863,12 +903,11 @@ main.ba .datalist code { overflow-wrap: anywhere; }
      backdrop turns back into a way to close it. Still wider than the library's 32rem —
      the whole point is the drawing at its own size.
 
-     `80rem` written out, not `var(--col)`. It shared the column until the column came down
-     to 52rem to meet the text measure, and this is the one surface where that is exactly
-     wrong: every pixel this dialog does not use is a pixel of diagram nobody can see. A text
-     column and a drawing's window answer different questions, so they stopped sharing an
-     answer — which is also why the number is here rather than a second token nobody else
-     reads. */
+     `80rem` written out, not `var(--col)`, even though the two are the same number today. A
+     text column and a drawing's window answer different questions: every pixel this dialog does
+     not use is a pixel of diagram nobody can see, so the next time the column moves for a
+     reading reason this must not follow it. The number is here rather than in a second token
+     nobody else reads. */
   .diagram-zoom {
     inline-size: min(96vw, 80rem); max-inline-size: min(96vw, 80rem);
     block-size: auto; max-block-size: 90dvh;
