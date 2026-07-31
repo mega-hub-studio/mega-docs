@@ -97,6 +97,53 @@ that dialog does not use is a pixel of diagram nobody can see; a text column and
 window answer different questions. Measured at 1600px: **viewer 1280, card 800** while the column
 was still 52rem, which is what made the decoupling visible.
 
+## The dock: one box declared once, and one strip that escapes it
+
+The `--gutter-x` fix above aligned the *prompt* with the card, and that was only a third of the
+dock. Reported from a wide screen with the edges drawn on: an open scope picker was visibly wider
+than the prompt beneath it, on **both** sides.
+
+Cause: every dock child was capping itself, and at different values. `nes-chat-prompt` had
+`calc(var(--col) - 2 * var(--gutter-x))` (the fix from earlier), `.scopepick` still had a bare
+`var(--col)`, and `.dock-body` was `display: contents`, so nothing above them owned the column.
+Three children, three widths, one of them the card's.
+
+The column is declared **once** now, as the middle track of a grid on `.dock-body`:
+
+```css
+.dock-body {
+  display: grid;
+  grid-template-columns: 1fr min(100%, calc(var(--col) - 2 * var(--gutter-x))) 1fr;
+}
+.dock-body > * { grid-column: 2; }
+.dock .statusline { grid-column: 1 / -1; }
+```
+
+`min(100%, …)` and not a bare cap because the track has to collapse on a phone, where the dock is
+narrower than the column and there is nothing to centre. Both per-child caps were deleted.
+
+`.statusline` is the one deliberate exception: it is an ambient bar and its own rule explains why
+it reaches the window edges. Spanning all three tracks is what lets it keep doing that **without a
+viewport calculation** — it takes the dock's content box and its existing negative margins undo
+the dock's padding from there, exactly as before. Its AGENTS.md adjustment row is unchanged and
+still needed.
+
+Measured, card vs scope picker vs prompt:
+
+| viewport | card | scope picker | prompt | statusline |
+|---|---|---|---|---|
+| 390 | 12..378 | 12..378 | 12..378 | 0..390 |
+| 768 | 16..752 | 16..752 | 16..752 | 0..768 |
+| 1130 | 16..1114 | 16..1114 | 16..1114 | 0..1130 |
+| 1920 | 336..1584 | 336..1584 | 336..1584 | 0..1920 |
+
+`columnSpread: 0` at all four — and the strip still spans the window at all four.
+
+**What this cost me twice:** I reported "aligned: true at four viewports" after measuring the
+prompt against the card and calling it done. The dock had two more children. A claim about
+alignment is only as wide as the set of boxes you measured, and the honest set is *every child of
+the container*, enumerated from the DOM rather than from memory.
+
 ## Two measuring notes, both earned the hard way
 
 - **Compare boxes in the same group.** Two "defects" in this session were box models, not bugs:

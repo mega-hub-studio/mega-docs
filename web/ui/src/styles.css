@@ -623,12 +623,27 @@ main.ba .datalist code { overflow-wrap: anywhere; }
      overlap measured from visualViewport (0 whenever no keyboard is up). */
   transform: translateY(calc(-1 * var(--kb, 0px)));
 }
-.dock nes-chat-prompt {
-  display: block; margin-inline: auto;
-  /* main's *content* box, which is what a card is as wide as — see --gutter-x. */
-  max-inline-size: calc(var(--col) - 2 * var(--gutter-x));
+/* ── one box for everything in the dock, and one strip that escapes it ──
+   The dock is full-bleed (it is fixed to the viewport and its gradient has to reach both
+   edges), while everything a reader *aims at* has to line up with the card above it. Capping
+   each child separately is how that goes wrong: the prompt was capped and the scope picker was
+   capped at a different value, so an open picker was visibly wider than the box under it on both
+   sides — reported from a wide screen, with the edges drawn on.
+
+   So the column is declared **once**, as the middle track of a grid, and every child lands in
+   it. `min(100%, …)` rather than a bare cap because the track must collapse on a phone, where
+   the dock is narrower than the column and there is nothing to centre.
+
+   `.statusline` is the one thing that opts out, by spanning all three tracks: it is an ambient
+   bar and its own rule below says why it reaches the window edges. Being a grid item is what
+   lets it do that without a viewport calculation — it takes the dock's content box, and its
+   negative margins undo the dock's padding from there, exactly as before. */
+.dock-body {
+  display: grid;
+  grid-template-columns: 1fr min(100%, calc(var(--col) - 2 * var(--gutter-x))) 1fr;
 }
-.dock-body { display: contents; }
+.dock-body > * { grid-column: 2; }
+.dock .statusline { grid-column: 1 / -1; }
 
 /* ── the handle that puts the dock away ──
    Measured on a 390×844 phone: the scope line, the prompt and the status line together are
@@ -687,7 +702,7 @@ main.ba .datalist code { overflow-wrap: anywhere; }
    hundred documents becomes a dock taller than the phone — and the dock's height is
    what the conversation is padded by, so it would push the answer off screen. */
 .scopepick {
-  max-inline-size: var(--col); margin: 0 auto var(--sp-2);
+  margin-block-end: var(--sp-2);
   background: var(--screen);
 }
 .scopepick > summary {
