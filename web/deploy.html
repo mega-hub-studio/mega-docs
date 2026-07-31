@@ -506,12 +506,16 @@ done: 8/8 files, 74 chunks</span></div>
     <h2 lang="vi">Đang chạy bản nào, và có gì thay đổi</h2>
     <p class="lede" lang="en">The status line's last item is the running version. With a tag
       cut it reads <code>v0.13.0</code> and is a button: it opens what changed since the
-      previous tag, generated from the commits themselves. The <b>Settings</b> panel repeats it
+      previous tag, generated from the commits themselves, and under that the <b>five releases
+      before it</b> — each one collapsed, so a reader who was away for three versions opens
+      three rather than scrolling past them. The <b>Settings</b> panel repeats it
       pinned in its bottom corner — both halves, <code>v0.13.0 @9c4a34d</code>, because that
       panel is a modal and covers the status line while it is open.</p>
     <p class="lede" lang="vi">Mục cuối cùng của status line là phiên bản đang chạy. Nếu đã cắt
       tag thì nó hiện <code>v0.13.0</code> và là một nút bấm: mở ra những gì đã thay đổi so với
-      tag trước, sinh ra từ chính các commit. Panel <b>Settings</b> nhắc lại nó, ghim ở góc dưới
+      tag trước, sinh ra từ chính các commit, và bên dưới là <b>năm bản trước đó</b> — mỗi bản
+      gập lại, nên người vắng ba version thì mở ba bản chứ không phải cuộn qua tất cả. Panel
+      <b>Settings</b> nhắc lại nó, ghim ở góc dưới
       cùng — đủ cả hai nửa, <code>v0.13.0 @9c4a34d</code>, vì panel đó là modal và che status
       line trong lúc đang mở.</p>
 
@@ -542,7 +546,11 @@ done: 8/8 files, 74 chunks</span></div>
         git log already is the release notes, and a prose copy is a second truth with a delay
         on it. Every line carries its short sha, which is what makes that checkable —
         <code>TestReleaseNotesAreGenerated</code> fails on a note with no commit behind
-        it.</span>
+        it — for the history the modal shows as well as for the release being cut, because a
+        section nobody can trace is the hand-written changelog arriving one dialog lower down.
+        The history is regenerated from the tags on every cut rather than appended to: an
+        appended list would make <code>release.json</code> its own input, which is the second
+        truth this whole design refuses.</span>
       <b lang="vi">Không có gì ở đây phải bump tay, và quên cắt tag thì cũng không nói dối.</b>
       <span lang="vi">File <code>VERSION</code> đã bị loại vì lý do ghi trong changelog: một
         version mà ai đó phải nhớ bump là một version nói dối. Tag thì đánh thắng lý do đó chứ
