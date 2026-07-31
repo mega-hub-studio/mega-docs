@@ -93,7 +93,14 @@ const {
          its position says "nearly done" while the last file has not started. .pbar is the
          design system's determinate bar (--fill drives its <i>); the spinner covers the
          moment before the first file returns, when the bar would sit at 0 and read as
-         stuck. -->
+         stuck.
+
+         --fill goes on the <i>, not on the .pbar around it, and that is not a style choice:
+         8bit-nes 0.15.0 registers `@property --fill { syntax: "<percentage>"; inherits:
+         false }`, so a value set on the container never reaches the child that consumes it
+         — `inline-size: var(--fill)` resolves to the registered initial, 0%. Set on the
+         container the bar is empty at every count; measured at 66.66%, 0px against
+         1031.89px. The rest of the recipe is untouched. -->
     <div v-if="importing" class="importing" role="status" aria-live="polite">
       <p class="hint">
         <span class="spinner sm" aria-hidden="true" />
@@ -102,10 +109,9 @@ const {
       </p>
       <div
         class="pbar" role="progressbar"
-        :style="{ '--fill': `${progress.total ? progress.done / progress.total * 100 : 0}%` }"
         :aria-valuenow="progress.done" aria-valuemin="0" :aria-valuemax="progress.total"
       >
-        <i />
+        <i :style="{ '--fill': `${progress.total ? progress.done / progress.total * 100 : 0}%` }" />
       </div>
     </div>
 

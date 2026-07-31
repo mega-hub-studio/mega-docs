@@ -291,6 +291,43 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 }
 .prose pre code { color: var(--text); background: none; border: 0; padding: 0; font-size: inherit; }
 
+/* ── an answer's table, on a phone ──
+   The enumerate rule makes a four-column table a normal reply, and at 390px one shipped
+   717px tall with a single cell 303px of it: "Resource" set as "Reso / urce", four
+   characters to a line. Three separate causes, and only the third is about width.
+
+     · `overflow-wrap: anywhere` — this file's own rule a few blocks up, inherited into
+       every cell. It is right for prose, where a pasted path has nowhere to go and the
+       page must not widen. A cell is the one place in `.prose` that already *has* a
+       horizontal escape: `.table-wrap` scrolls itself. So the rule that saves a paragraph
+       is what shreds a table, and `normal` here is not a relaxation of it — it is the same
+       decision made where the escape exists.
+     · `vertical-align: middle` — the browser's default for a `td`, and wrong for a grid
+       that is read across. One row was a 303px cell beside a one-line cell floating in the
+       middle of it, so no two values in a row started at the same y. `top` is what makes a
+       row scan as a row.
+     · `inline-size: 100%` alone (the library's) is a *preferred* width, so the table
+       squeezed to the 317px card instead of taking the width its content needs and
+       scrolling. `max-content` asks for that width, `min-inline-size: 100%` keeps a narrow
+       table filling the card on a wide screen, and the per-cell cap stops one long sentence
+       taking the whole scroll.
+
+   Measured at 390 · 1440, before → after: 717px → 158px and 186px → 139px tall, tallest
+   cell 303px → 54px, and `documentElement.scrollWidth === innerWidth` at both — the table
+   scrolls inside `.table-wrap`, the page never sideways. --fs-chip is the size `.prose pre`
+   above already uses for the other block that is read in columns. */
+.prose .table {
+  font-size: var(--fs-chip);
+  inline-size: max-content;
+  min-inline-size: 100%;
+}
+.prose .table :is(th, td) {
+  vertical-align: top;
+  overflow-wrap: normal;
+  padding: var(--sp-2);
+  max-inline-size: 16rem;
+}
+
 /* ── syntax colours: shiki's names, the library's palette ──
    lib/highlight.js builds shiki with `createCssVariablesTheme`, so every token it emits carries
    `style="color:var(--shiki-token-…)"` and no colour of its own. These bindings are what resolve

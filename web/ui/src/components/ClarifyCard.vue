@@ -17,7 +17,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { composeClarify } from '../lib/answer.js'
 
-const props = defineProps({
+defineProps({
   clarify: { type: Object, required: true },
 })
 
@@ -25,7 +25,7 @@ defineEmits(['refine'])
 
 // Read once on submit. Nothing ticked composes to "", and ask() already returns on a blank
 // question — so an empty submit is a silent no-op rather than a case handled here.
-const picked = event => composeClarify(props.clarify, new FormData(event.target))
+const picked = event => composeClarify(new FormData(event.target))
 </script>
 
 <template>

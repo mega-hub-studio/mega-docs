@@ -483,6 +483,14 @@ plan.
   numbered list with paragraphs it renders as uppercase columns four characters wide on a
   phone — which shipped. Numbered instructions on the docs pages are `.step` blocks;
   `make check-ui` fails on `main .steps > li`.
+- **`.pbar`'s `--fill` does not inherit, so it goes on the `<i>`, never on the bar.** 0.15.0
+  registers `@property --fill { syntax: "<percentage>"; inherits: false; initial-value: 0% }`,
+  while the recipe's own CSS writes `.pbar { --fill: 0% }` and the `<i>` reads
+  `inline-size: var(--fill)`. Follow the container and the child resolves the registered
+  *initial* instead — measured 0px against 1031.89px at the same 66.66%. The bar is empty at
+  every count, at every width, with no error anywhere and the right number in the sentence
+  beside it. A registered custom property is the one case where "set it on the parent" is not
+  a style preference; check for `@property` before assuming a variable reaches a child.
 - **`nes-toc` sets `z-index: 20` on itself.** The sticky header has to sit above it or a
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the

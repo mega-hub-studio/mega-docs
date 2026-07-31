@@ -259,6 +259,14 @@ const PICK = { QUESTION: 'quest', NEXT: 'info' }
    and mostly gets one — this is what happens the rest of the time. */
 const LABEL = { QUESTION: 'Which one do you mean?', NEXT: 'Ask next' }
 const ALERTS = { NOTE: 'info', TIP: 'tip', IMPORTANT: 'memo', WARNING: 'warn', CAUTION: 'gotcha', ...PICK }
+
+/* The glyph that says which kind, because the colour alone does not. `.callout` in 0.15.0 is a
+   border and a tint and nothing else, so WARNING and CAUTION are two oranges to a reader who
+   has not learned the palette — and every one of them looks identical to a colour-blind one.
+   One character in front of the first word is the whole affordance; the library has no icon
+   slot in this recipe and a `<b>` label would be a word to translate on every panel. */
+const GLYPH = { NOTE: '📝', TIP: '💡', IMPORTANT: '❗', WARNING: '⚠️', CAUTION: '🛑', QUESTION: '❓', NEXT: '➡️' }
+
 const marker = kinds => new RegExp(`^\\[!(${Object.keys(kinds).join('|')})\\]\\s*`)
 const alertMark = marker(ALERTS)
 const clarifyMark = marker(PICK)
@@ -290,8 +298,15 @@ function dressAlerts(html) {
     if (start.data === kind[0] && start.nextSibling?.tagName === 'BR')
       start.nextSibling.remove()
     start.data = start.data.slice(kind[0].length)
-    if (!start.data)
+    if (!start.data) {
       start.remove()
+      // The marker had the whole paragraph — "> [!NOTE]" with its prose in the next quoted
+      // block, which is how a model writes one about half the time. What is left is an empty
+      // <p>, and it used to render as a blank first line inside the panel; now it would take
+      // the glyph with it and put that on a line of its own.
+      if (!first.hasChildNodes())
+        first.remove()
+    }
     // Nothing left, so there is nothing to panel. Two ways a blockquote arrives holding only
     // its marker, and both shipped an empty bordered box with the real content stranded under
     // it: the model wrote `> [!NOTE]` and put the prose in a *sibling* block instead of the
@@ -312,9 +327,40 @@ function dressAlerts(html) {
     const panel = document.createElement('div')
     panel.className = `callout ${ALERTS[kind[1]]}`
     panel.append(...quote.childNodes)
+    dropRepeats(panel)
+    // Into the first paragraph, not the panel: a text node prepended to the <div> would sit
+    // above a block element and give the glyph a line of its own. A panel opening with a list
+    // instead has no line to join, and there the glyph is a lead-in above it.
+    const head = panel.firstElementChild
+    ;(head?.tagName === 'P' ? head : panel).prepend(`${GLYPH[kind[1]]} `)
     quote.replaceWith(panel)
   }
   return tpl.innerHTML
+}
+
+/* The marker above is read off the *first* text node of the first paragraph, which is the only
+   place a well-formed alert puts one. A model that writes two caveats writes them as two lines
+   of one quote:
+
+     > [!WARNING] Cú pháp cho cấu trúc dữ liệu không có trong tài liệu.
+     > [!WARNING] Cú pháp cơ bản không có trong tài liệu.
+
+   marked folds consecutive quoted lines into one blockquote and one paragraph, and `breaks:
+   true` joins them with a <br> — so the second marker is a later text node, the loop above has
+   already moved past it, and "[!WARNING]" rendered as literal text inside the panel it was
+   asking for. The invariant is the point: a marker is syntax, so it never reaches the reader
+   as characters. The panel keeps the kind the first one named — a second panel for a second
+   line would split one caveat in two. */
+function dropRepeats(panel) {
+  const walk = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT)
+  while (walk.nextNode()) {
+    const n = walk.currentNode
+    // Line-leading only: a sentence *about* "[!WARNING]" is prose, and stripping that would
+    // edit what the documents say.
+    if (n.previousSibling?.tagName !== 'BR')
+      continue
+    n.data = n.data.replace(alertMark, '')
+  }
 }
 
 /**
@@ -352,29 +398,50 @@ export function turnClarify(turn) {
  * one code path, and what stops a [!WARNING] panel that happens to have a list under it from
  * being mistaken for one.
  *
+ * Every one of them comes out of the prose, and only one comes back. The prompt already says a
+ * [!QUESTION] ends the reply ("write nothing after that checklist"), so a reply holding both is
+ * a model ignoring it — and taking the first match alone rendered that mistake at its worst:
+ * the card is drawn *under* the prose, so lifting the [!QUESTION] out and leaving the [!NEXT]
+ * behind put the offer at the top of the answer, as an inert `.callout` with a `.tasklist`
+ * nobody can tick, and the real card below it. Two boxes that look alike, in the wrong order,
+ * one of them clickable. A reply that asks has nothing to offer next, so the question wins and
+ * the offer goes; either way nothing is left in the prose pretending to be pickable.
+ *
  * @param {string} markdown raw model output
- * @returns {{ rest: string, clarify: Clarify | null }} rest is the markdown without the block
+ * @returns {{ rest: string, clarify: Clarify | null }} rest is the markdown without any block
  */
 function stripClarify(markdown) {
   const tokens = marked.lexer(markdown || '')
-  const at = tokens.findIndex((t, i) =>
-    t.type === 'blockquote' && tokens[after(tokens, i)]?.type === 'list' && clarifyMark.test(lead(t)))
-  if (at < 0)
+  const found = []
+  for (const [i, t] of tokens.entries()) {
+    if (t.type !== 'blockquote' || !clarifyMark.test(lead(t)))
+      continue
+    const end = after(tokens, i)
+    if (tokens[end]?.type === 'list')
+      found.push({ at: i, end })
+  }
+  if (found.length === 0)
     return { rest: markdown, clarify: null }
-  const end = after(tokens, at)
-  const opening = lead(tokens[at])
-  const kind = clarifyMark.exec(opening)[1]
-  return {
-    // A top-level token's `raw` is its own slice of the source, so dropping the block's own
-    // tokens and joining the rest is how the answer around it survives being read. The range
-    // rather than the two ends: the blank line between them is a token too, and leaving it
-    // behind puts a gap where the block used to be.
-    rest: tokens.filter((_, i) => i < at || i > end).map(t => t.raw).join(''),
-    clarify: {
+  const read = ({ at, end }) => {
+    const opening = lead(tokens[at])
+    const kind = clarifyMark.exec(opening)[1]
+    return {
       kind,
       prompt: opening.replace(clarifyMark, '').trim() || LABEL[kind],
       options: tokens[end].items.map(i => ({ text: i.text, recommended: i.checked === true })),
-    },
+    }
+  }
+  const cards = found.map(read)
+  return {
+    // A top-level token's `raw` is its own slice of the source, so dropping every block's own
+    // tokens and joining the rest is how the answer around them survives being read. The range
+    // rather than the two ends: the blank line between them is a token too, and leaving it
+    // behind puts a gap where the block used to be.
+    rest: tokens
+      .filter((_, i) => !found.some(({ at, end }) => i >= at && i <= end))
+      .map(t => t.raw)
+      .join(''),
+    clarify: cards.find(c => c.kind === 'QUESTION') ?? cards[0],
   }
 }
 
@@ -385,24 +452,26 @@ function stripClarify(markdown) {
  * on a blank question, so an empty submit is a silent no-op rather than a turn with no
  * question in it.
  *
- * @param {Clarify} clarify the block the card rendered
+ * The picks and nothing else, for both kinds. A [!QUESTION] pick used to be sent with the
+ * card's own legend in front of it, on the reasoning that a reading means nothing without the
+ * question it is a reading *of* — and what that produced was a new turn whose heading repeated,
+ * word for word, the sentence still on screen two blocks above it: "Bạn muốn biết về phần nào
+ * của cú pháp Go? Cú pháp cơ bản". It read as a bug, and it retrieved like one too — the legend
+ * is the model asking something, so half the query was wording that appears in no document.
+ * The option is the wording a reader would recognise, which is what the prompt asks the model
+ * to put there and what retrieval wants.
+ *
  * @param {FormData} form the card's own form — one "reading" entry per ticked option
  * @returns {string}
  */
-export function composeClarify(clarify, form) {
+export function composeClarify(form) {
   const picked = form
     .getAll('reading')
     // The [n] belongs to the option as *shown*, pointing at the source behind that reading.
     // Asked back it would be a citation number in a question, which retrieval reads as text.
     .map(text => text.replaceAll(/\[\d+\]/g, '').trim())
     .filter(Boolean)
-  if (picked.length === 0)
-    return ''
-  const joined = picked.join(' ; ')
-  // A [!NEXT] item is already a whole question and its prompt is only the heading over them.
-  // A [!QUESTION] item is one reading *of the question that was asked*, so it means nothing
-  // without that question in front of it.
-  return clarify.kind === 'NEXT' ? joined : `${clarify.prompt} ${joined}`
+  return picked.join(' ; ')
 }
 
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before
