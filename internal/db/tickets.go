@@ -247,5 +247,23 @@ var spaceRe = regexp.MustCompile(`\s+`)
 // semantic — matching by meaning needs a vector and a threshold, and a wrong match
 // there serves a confidently unrelated answer.
 func normalise(q string) string {
-	return spaceRe.ReplaceAllString(strings.ToLower(strings.TrimSpace(q)), " ")
+	n := spaceRe.ReplaceAllString(strings.ToLower(strings.TrimSpace(q)), " ")
+	// Trailing punctuation carries no meaning at the end of a question, and leaving it in cost
+	// twice over: "thanh toán thế nào", "…nào?" and "…nào???" were three cache keys — three
+	// paid completions for one question — and three rows under `tickets_open_q`, the index that
+	// exists so three people hitting one gap give a BA one item and not three.
+	//
+	// Diacritics are deliberately *not* folded, even though FTS5 already ignores them
+	// (`remove_diacritics 2`) so the keyword leg reads "toan" and "toán" as one word. Folding
+	// them here would merge questions that differ only by a mark, and in Vietnamese that is a
+	// real pair of words rather than a typo — má, mà, mã, mạ. The failure would be a cached
+	// answer served to a different question, silently, which is the one class this refuses.
+	if stripped := trailingPunctRe.ReplaceAllString(n, ""); stripped != "" {
+		return stripped
+	}
+	// Punctuation with nothing in front of it: keep what arrived rather than key on "".
+	return n
 }
+
+// trailingPunctRe matches the marks a question ends with, however many of them.
+var trailingPunctRe = regexp.MustCompile(`[\s?!.…]+$`)

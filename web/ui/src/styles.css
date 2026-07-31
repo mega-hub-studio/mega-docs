@@ -4,18 +4,12 @@
    the shell and adapts to a narrow, touch, on-screen-keyboard viewport. Every
    value comes from a token in tokens.css.
 
-   Where it does overrule a component, the rule says so in its own comment and AGENTS.md keeps
-   the count, split the way it matters. **After the 0.15.0 bump the first kind is empty:** all
-   six overrides that were waiting on a release landed in it, and each one was deleted here
-   rather than kept beside its replacement — the sites still carry one line saying what they
-   fixed, so the next reader knows the loop closed instead of wondering why a comment describes
-   a rule that is not there.
-
-   What is left is the second kind: this app using a recipe outside the context it was written
-   for — a `.result` that is a record rather than a control, a `.statusline` bleeding out of a
-   padded dock, a `.palette-empty` under nine left-aligned rows. Those do not land upstream,
-   because nothing upstream is wrong. Reporting the first kind and then deleting the local rule
-   is the shape to aim for, and 0.15.0 is what it looks like when it works.
+   Where it does overrule a component, the rule says so in its own comment. **AGENTS.md keeps
+   the list** — which release each override is measured against, which landed upstream, and
+   which are permanent because the app is using a recipe outside the context it was written
+   for. It is not repeated here: this block used to carry its own copy, and the copy was a
+   release out of date the day after the bump, naming six overrides from a round that had
+   already been replaced by another.
 
    Breakpoint: base styles are the phone. One min-width query upgrades to
    desktop — never the reverse.

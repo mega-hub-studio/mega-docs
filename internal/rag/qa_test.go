@@ -63,6 +63,28 @@ func TestARepeatQuestionCostsNothing(t *testing.T) {
 	if got := len(prov.Embedded()); got != embeds {
 		t.Errorf("a cache hit still spent %d embedding call(s)", got-embeds)
 	}
+
+	// And differing only in how it was punctuated. Three spellings of one question were three
+	// keys and three paid completions — and, through the same normaliser, three rows under
+	// `tickets_open_q`, the index whose whole job is to give a BA one item per gap.
+	for _, variant := range []string{
+		"How does hybrid search rank results",
+		"How does hybrid search rank results???",
+		"How does hybrid search rank results.",
+	} {
+		if _, reply, err := ask(t, e, variant); err != nil || !reply.Cached {
+			t.Errorf("%q was not a cache hit (err=%v) — trailing punctuation is not a different question",
+				variant, err)
+		}
+	}
+	// Punctuation and case are the only things folded. A different *letter* is a different
+	// question, and this is the assertion that keeps the normaliser from growing into one that
+	// merges them — the reason diacritics are left alone is the same, one step further: in
+	// Vietnamese má, mà, mã and mạ are four words, so folding marks the way FTS5 does for
+	// keyword matching would let one question's answer be served to another, silently.
+	if _, reply, err := ask(t, e, "How does hybrid search rank resultz"); err == nil && reply.Cached {
+		t.Error("a question differing by a letter was served from the cache")
+	}
 }
 
 func TestRegenerateIgnoresTheCache(t *testing.T) {

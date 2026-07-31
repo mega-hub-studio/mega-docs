@@ -263,14 +263,23 @@ view.scrollToEnd();                            // viewport.js</span></div>
         khỏi cache theo cả hai chiều. Đoạn hội thoại đi kèm request (<code>history</code>);
         server không giữ session.</dd>
       <dt lang="en">cached?</dt>
-      <dd lang="en">Keyed on the normalised question, <i>its scope and the model</i>, under a
-        signature of the corpus + the retrieval budget + a hash of the prompt. The split is the
+      <dd lang="en">Keyed on the normalised question — lowercased, whitespace collapsed, and
+        trailing punctuation dropped, so "…nào", "…nào?" and "…nào???" are one question rather
+        than three paid completions and three BA tickets. Diacritics are <i>not</i> folded, even
+        though FTS5 ignores them for keyword matching: in Vietnamese má and mà are two words, so
+        merging them would serve one question's answer to another. Plus <i>its scope and the
+        model</i>, under a signature of the corpus + the retrieval budget + a hash of the
+        prompt. The split is the
         rule: a reader's own pick goes in the key so two of them coexist, and startup config
         goes in the signature because changing it invalidates every row at once. A hit costs
         nothing: no embedding call, no completion. <code>fresh</code> (Regenerate) skips it.</dd>
       <dt lang="vi">cached?</dt>
-      <dd lang="vi">Khoá theo câu hỏi đã chuẩn hoá, <i>scope và model của nó</i>, dưới một
-        signature gồm corpus + ngân sách truy xuất + hash của prompt. Cách chia là một quy tắc:
+      <dd lang="vi">Khoá theo câu hỏi đã chuẩn hoá — về chữ thường, gộp khoảng trắng, và bỏ dấu
+        câu ở cuối, nên "…nào", "…nào?" và "…nào???" là một câu hỏi chứ không phải ba completion
+        phải trả tiền và ba ticket BA. Dấu thanh <i>không</i> bị gộp, dù FTS5 bỏ qua chúng khi
+        khớp từ khoá: trong tiếng Việt má và mà là hai từ, gộp lại là đem câu trả lời của câu
+        này trả cho câu khác. Cùng với <i>scope và model của nó</i>, dưới một signature gồm
+        corpus + ngân sách truy xuất + hash của prompt. Cách chia là một quy tắc:
         lựa chọn của người đọc nằm trong key để hai lựa chọn cùng tồn tại, còn config lúc khởi
         động nằm trong signature vì đổi nó là vô hiệu hoá mọi dòng cùng lúc. Trúng cache là
         không tốn gì: không gọi embedding, không gọi completion. <code>fresh</code>

@@ -95,12 +95,11 @@ const {
          moment before the first file returns, when the bar would sit at 0 and read as
          stuck.
 
-         --fill goes on the <i>, not on the .pbar around it, and that is not a style choice:
-         8bit-nes 0.15.0 registers `@property --fill { syntax: "<percentage>"; inherits:
-         false }`, so a value set on the container never reaches the child that consumes it
-         — `inline-size: var(--fill)` resolves to the registered initial, 0%. Set on the
-         container the bar is empty at every count; measured at 66.66%, 0px against
-         1031.89px. The rest of the recipe is untouched. -->
+         --fill goes on the <i>, which is the form the recipe's own docs show. 0.15.0 made
+         that the only form that worked — it registered the property `inherits: false`, so a
+         value on the container resolved to the registered initial and the bar was empty at
+         every count (measured: 0px against 1031.89px at the same 66.66%). 0.16.0 accepts
+         both, reported from here; the child stays because it is what the docs document. -->
     <div v-if="importing" class="importing" role="status" aria-live="polite">
       <p class="hint">
         <span class="spinner sm" aria-hidden="true" />
