@@ -267,7 +267,7 @@ RULES:
 - [!GENERAL] never stands alone and never appears beside the no-answer sentence: an answer that opens one also cites at least one [n]. A question the CONTEXT does not cover gets that sentence, by itself — explaining a word from a question nobody could answer is not an answer, it is a way of looking like one.
 - When the CONTEXT describes a flow, a state machine or a structure with several parts, add a mermaid diagram in a ` + "```mermaid" + ` block on top of the prose — nodes and edges taken only from what the documents say. Keep it under about ten nodes, and leave it out entirely when the answer is a single fact.
 - Keep a node label to about four words, and open it with one emoji standing for what the node *is*: 👆 something the reader does, ⚙️ something the system does, ❓ a decision, ✅ or ⛔ how a branch ends, 📄 a screen, record or document. A box is a landmark, not a sentence — a label wide enough to wrap makes every box taller, and past a few of those the shape of the flow stops fitting on one screen, which is the only thing the diagram was there to show. The full wording belongs in the prose underneath, written as a numbered list in the diagram's own order — one item per node, each opening with that node's exact label in bold and then explaining it. That list is what the reader steps through, one node lit at a time. Never replace an identifier with an emoji: a file path, a status the documents name, a field or an error code is written out as it appears, emoji or not.
-- When the question asks you to *enumerate* — "list every…", "what are all the…", "which conventions/rules/fields apply to X", "liệt kê…" — answer with a markdown table, not prose. One row per item, and the LAST column is the [n] for that row. A reader checking a convention against their own code needs to see every item at once and verify each one separately; a paragraph makes them re-read to find out whether an item is missing. Say above the table how many items you found and which document each came from, and if the CONTEXT covers only part of the set, say which part is missing under the table rather than padding it. Keep a cell to a few words: a grid is read across, and one sentence-long cell makes its whole row as tall as that sentence — the explanation belongs in the prose under the table. No emoji in a cell either; write the status the documents themselves use, in their words.
+- When the question asks you to *enumerate* — "list every…", "what are all the…", "which conventions/rules/fields apply to X", "liệt kê…" — answer with a markdown table, not prose. One row per item, and the LAST column is the [n] for that row. A reader checking a convention against their own code needs to see every item at once and verify each one separately; a paragraph makes them re-read to find out whether an item is missing. Say above the table how many items you found and which document each came from, and if the CONTEXT covers only part of the set, say which part is missing under the table rather than padding it. Keep a cell to a few words: a grid is read across, and one sentence-long cell makes its whole row as tall as that sentence — the explanation belongs in the prose under the table. Where a column's values repeat — a status, a state, a yes/no — put one glyph in the cell (✅ ⛔ ⏸ ⚠️ ❓) instead of the word, and give the table a one-line legend under it mapping each glyph to the documents' own term. A column of repeated words is the widest thing in a narrow table and says the least per character; the legend is what keeps the wording, so nothing is lost by compressing the column. Identifiers are never a glyph: a path, a field, an error code or a name is written as it appears.
 - Mark a settled item and an open one differently when the CONTEXT says which is which: write the list as a GFM checklist, "- [x]" for what the documents state as decided or confirmed and "- [ ]" for what they leave open. It renders as a real checklist, so "which of these are agreed" is answerable at a glance rather than by reading. Never guess a state the documents do not give — use a plain list instead.
 - Group an enumeration by the folder its documents came from when they span more than one, using a heading per group. That folder is how the corpus is organised — qa/ is confirmed answers, and the rest are the team's own modules — so a reader can tell a settled convention from a draft by where it lives.
 - A diagram never replaces a citation. Put no [n] inside the mermaid block — it would corrupt the graph — and cite every claim in the prose exactly as you would without one.
@@ -289,6 +289,10 @@ type Ask struct {
 	// configured default, which is what every non-HTTP caller (ingest, the QA loop, a test)
 	// means by saying nothing.
 	Model string
+	// WebSearch is the reader asking for public sources beside the documents, for this one
+	// question. Off is the default and the honest one: it sends the question to a third party.
+	// It is part of the cache key, because an answer built with them is a different answer.
+	WebSearch bool
 	// History is the thread this question continues, oldest first. It is what lets a
 	// follow-up refer to the answer above it — and it takes the question out of the
 	// cache in both directions, because four words mean something different in every
@@ -392,7 +396,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// `Fresh` excludes only the read: Regenerate says the stored answer was wrong, not
 	// that the answer replacing it is not worth keeping.
 	if cacheable && !a.Fresh {
-		if reply, ok := e.serveCached(sig, model, scope, question, onToken); ok {
+		if reply, ok := e.serveCached(sig, model, scope, a.WebSearch, question, onToken); ok {
 			return reply, nil
 		}
 	}
@@ -421,7 +425,7 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// Whatever the public web adds, when the documents said much less than this model could
 	// have read. Nothing at all on an instance with no key, and nothing on a question the
 	// corpus answered properly. See websearch.go — the rules it works to are there, not here.
-	webBlock, webCites := e.supplement(ctx, query, model, retrieval)
+	webBlock, webCites := e.supplement(ctx, query, a.WebSearch)
 
 	// The thread sits between the rules and this question, which is where a chat model
 	// expects it: the retrieved CONTEXT is fresh for every turn, so it belongs with the
@@ -459,7 +463,8 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	if cacheable && full.Len() > 0 && !isMiss(full.String()) {
 		raw, _ := json.Marshal(cites)
 		_ = e.store.Cache(sig, db.Cached{
-			Question: question, Scope: scope, Model: model, Answer: full.String(), Citations: raw,
+			Question: question, Scope: scope, Model: model, WebSearch: a.WebSearch,
+			Answer: full.String(), Citations: raw,
 		})
 	}
 	// A miss cites nothing. Retrieval did return chunks — that is why the model was
@@ -481,8 +486,10 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 // A read error is a miss, not a failure: the answer is still available for the price of
 // a completion, and refusing the question because a cache could not be read would trade
 // a working answer for a saving.
-func (e *Engine) serveCached(sig, model, scope, question string, onToken func(string)) (Reply, bool) {
-	c, ok, err := e.store.Cached(sig, model, scope, question)
+func (e *Engine) serveCached(
+	sig, model, scope string, web bool, question string, onToken func(string),
+) (Reply, bool) {
+	c, ok, err := e.store.Cached(sig, model, scope, web, question)
 	if err != nil || !ok {
 		return Reply{}, false
 	}

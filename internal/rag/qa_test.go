@@ -928,26 +928,32 @@ func TestChangingTheRetrievalBudgetInvalidatesTheCache(t *testing.T) {
 	ctx := context.Background()
 	const q = "How does hybrid search rank results?"
 
-	dir := t.TempDir()
+	// One store, one ingest, and only the engine's configuration varies. Re-ingesting per case
+	// was the obvious shape and it is a flake: `updated_at` is `datetime('now')`, so the corpus
+	// signature is stable only within one second — two cases either side of a boundary look
+	// like a re-index and miss the cache for a reason the test is not about.
+	prov, base := aitest.New(&aitest.Provider{Dim: dim, Reply: "grounded [1]"})
+	t.Cleanup(prov.Close)
+	store, err := db.Open(filepath.Join(t.TempDir(), "budget.db"), dim)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	client := ai.New(ai.Config{
+		ChatBaseURL: base, APIKey: "test-key",
+		EmbedModel: "embed-model", ChatModel: "chat-model",
+	})
+	if _, err := rag.New(store, client, rag.Options{TopK: 3}).
+		Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
 	askAt := func(share float64, window int) rag.Reply {
 		t.Helper()
-		prov, base := aitest.New(&aitest.Provider{Dim: dim, Reply: "grounded [1]"})
-		t.Cleanup(prov.Close)
-		store, err := db.Open(filepath.Join(dir, "budget.db"), dim)
-		if err != nil {
-			t.Fatalf("open: %v", err)
-		}
-		t.Cleanup(func() { store.Close() })
-		e := rag.New(store, ai.New(ai.Config{
-			ChatBaseURL: base, APIKey: "test-key",
-			EmbedModel: "embed-model", ChatModel: "chat-model",
-		}), rag.Options{
+		e := rag.New(store, client, rag.Options{
 			TopK: 3, ContextShare: share,
 			Models: []rag.Model{{Name: "chat-model", Window: window}},
 		})
-		if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
-			t.Fatal(err)
-		}
 		reply, err := e.Answer(ctx, rag.Ask{Question: q, OnToken: func(string) {}})
 		if err != nil {
 			t.Fatal(err)

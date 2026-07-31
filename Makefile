@@ -394,6 +394,18 @@ deploy-here:
 		|| { echo "  FAILED: $(UNIT) did not answer $(HEALTH) after the restart"; \
 		     $(STATUS); exit 1; }
 	@echo "  deployed: $$(git rev-parse --short HEAD) — $$(curl -s $(HEALTH))"
+# A note, not a refusal, and the same shape as the unpushed-commits one above: shipping
+# unreleased work is normal, shipping it without ever noticing is what went wrong. The badge
+# in the app names the last tag, so every commit past it is a change the modal cannot show —
+# and the one moment an operator is guaranteed to be looking at this is right after the health
+# line prints "release":"v0.13.0" beside a commit that is forty ahead of it. That is exactly
+# how this tree ended up with 40 unreleased commits and a v0.13.0 badge nothing backed: rule 25
+# defeated the VERSION file, then re-created it one level up as a tag somebody has to remember.
+	@t=$$(git describe --tags --abbrev=0 2>/dev/null) || t=; \
+	if [ -n "$$t" ]; then \
+	  n=$$(git rev-list --no-merges --count "$$t..HEAD"); \
+	  [ "$$n" = 0 ] || echo "  note: $$n commit(s) since $$t — the badge still names $$t; \`make release V=…\` is what updates the modal"; \
+	fi
 
 # One snapshot of DB_PATH, verified, outside this machine's disk. The same script the nightly
 # timer runs (Deploy page), so the hand-run path and the scheduled one cannot drift — and

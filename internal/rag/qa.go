@@ -255,7 +255,7 @@ func (e *Engine) sig() (string, error) {
 	// answer under the wider setting and nothing says so. It belongs in the signature rather
 	// than the key because changing it invalidates *every* answer at once — unlike a scope or
 	// a model, there is no other TOP_K whose rows are still worth keeping.
-	return s + "|" + strconv.Itoa(e.topK) + "|" + e.contextSig() + e.searchSig() + "|" + promptSig, nil
+	return s + "|" + strconv.Itoa(e.topK) + "|" + e.contextSig() + "|" + promptSig, nil
 }
 
 // contextSig fingerprints the retrieval budget an answer was built under: the share, and

@@ -19,7 +19,11 @@ type Cached struct {
 	Scope string `json:"scope"`
 	// Model is which chat model produced it, and it is in the key for the same reason the
 	// scope is: replaying a free answer has to replay it as it was answered.
-	Model     string          `json:"model"`
+	Model string `json:"model"`
+	// WebSearch is whether the reader asked for public sources beside the documents. In the
+	// key for the third time for the same reason: an answer built with them is a different
+	// answer, and History has to say which kind it is replaying.
+	WebSearch bool            `json:"websearch"`
 	Answer    string          `json:"answer"`
 	Citations json.RawMessage `json:"citations"` // opaque here: db must not import rag
 	Hits      int             `json:"hits"`
@@ -72,33 +76,43 @@ func (s *Store) Sig() (string, error) {
 // signature is what the answer was produced *under* (the corpus and the prompt) and the key
 // is what it was produced *for*.
 //
-// Three fields, always, even when the scope is empty: a fixed shape is one SplitN to read
+// `web` is here for exactly the same reason as the other two: it is a reader's own choice,
+// made per question, and an answer built with public sources beside the documents must never
+// be served to somebody who asked without them. Not the signature — that would prune every
+// no-web answer the moment one reader ticked the box.
+//
+// Four fields, always, even when the scope is empty: a fixed shape is one SplitN to read
 // back, and the alternative — omitting empties — is a parser plus a rule to remember. Rows
-// written before the model joined the key simply stop matching and age out; one cold cache
+// written before a field joined the key simply stop matching and age out; one cold cache
 // is cheaper than a migration for a derived table.
-func cacheKey(model, scope, question string) string {
-	return model + "\x1f" + scope + "\x1f" + normalise(question)
+func cacheKey(model, scope string, web bool, question string) string {
+	flag := ""
+	if web {
+		flag = "w"
+	}
+	return model + "\x1f" + scope + "\x1f" + flag + "\x1f" + normalise(question)
 }
 
-// keyParts reads the model and scope back out of a key. The stored answer is the only record
-// of how it was produced, and a History row has to replay under the same two or the "free" it
-// advertises is a different answer. A key from before the model joined returns empties, which
-// reads as "unknown" everywhere it lands.
-func keyParts(key string) (model, scope string) {
-	f := strings.SplitN(key, "\x1f", 3)
-	if len(f) < 3 {
-		return "", ""
+// keyParts reads the three back out of a key. The stored answer is the only record of how it
+// was produced, and a History row has to replay under the same ones or the "free" it advertises
+// is a different answer. A key from before a field joined returns zero values, which reads as
+// "unknown" everywhere it lands.
+func keyParts(key string) (model, scope string, web bool) {
+	f := strings.SplitN(key, "\x1f", 4)
+	if len(f) < 4 {
+		return "", "", false
 	}
-	return f[0], f[1]
+	return f[0], f[1], f[2] == "w"
 }
 
 // Cached returns a stored answer for this question in this scope, and counts the hit.
 // A miss is (Cached{}, false, nil) — not an error, since most questions are new.
-func (s *Store) Cached(sig, model, scope, question string) (Cached, bool, error) {
-	norm := cacheKey(model, scope, question)
+func (s *Store) Cached(sig, model, scope string, web bool, question string) (Cached, bool, error) {
+	norm := cacheKey(model, scope, web, question)
 	var c Cached
 	c.Scope = scope
 	c.Model = model
+	c.WebSearch = web
 	var cites []byte // database/sql won't scan into json.RawMessage directly
 	err := s.db.QueryRow(
 		`SELECT question, answer, citations, hits, used_at FROM answers
@@ -131,7 +145,8 @@ func (s *Store) Cache(sig string, c Cached) error {
 		 ON CONFLICT(q_norm) DO UPDATE SET answer=excluded.answer,
 		   citations=excluded.citations, corpus_sig=excluded.corpus_sig,
 		   used_at=datetime('now')`,
-		cacheKey(c.Model, c.Scope, c.Question), c.Question, c.Answer, string(c.Citations), sig); err != nil {
+		cacheKey(c.Model, c.Scope, c.WebSearch, c.Question),
+		c.Question, c.Answer, string(c.Citations), sig); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`DELETE FROM answers WHERE corpus_sig <> ?
@@ -162,7 +177,7 @@ func (s *Store) History(sig string, limit int) ([]Cached, error) {
 		if err := rows.Scan(&key, &c.Question, &c.Answer, &cites, &c.Hits, &c.At); err != nil {
 			return nil, err
 		}
-		c.Model, c.Scope = keyParts(key)
+		c.Model, c.Scope, c.WebSearch = keyParts(key)
 		c.Citations = cites
 		out = append(out, c)
 	}

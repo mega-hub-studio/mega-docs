@@ -35,9 +35,17 @@ desktop layout is untouched. That is rule 28's order: decided at 390, then check
 survives widening.
 
 The other half of the noise is what the model writes — `✅ Chốt` and sentence-long cells — so
-the enumerate rule in `internal/rag/rag.go` gained one sentence: a cell is a few words, no
-emoji in a cell, the status in the documents' own words. The prose under the table is where an
-explanation goes.
+the enumerate rule in `internal/rag/rag.go` gained a sentence. **The first version of that
+sentence was backwards and is retired**: it read "no emoji in a cell, the status in the
+documents' own words", because the request "thay thế emoji/icons nhiều để gọn hơn" was read as
+*remove* the emoji when it asked to use a glyph *in place of* the noisy word. `✅ Chốt` is not
+too much emoji, it is a glyph with a redundant word beside it.
+
+What is there now compresses instead: a column whose values repeat gets one glyph per cell and
+the table gets a one-line legend under it mapping each glyph to the documents' own term. That
+keeps the rule the diagram bullet already states — a status the documents name is not silently
+replaced — while the column itself goes from a word to a character, which is what was asked
+for. An identifier is still never a glyph.
 
 ## 2 · ASK THIS asked the question that was already on screen
 

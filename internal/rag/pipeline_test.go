@@ -64,6 +64,17 @@ func askIn(t *testing.T, e *rag.Engine, question, scope string) (string, rag.Rep
 	return sb.String(), reply, err
 }
 
+// askWeb is ask() with the reader asking for public sources too — the toggle, not a heuristic.
+func askWeb(t *testing.T, e *rag.Engine, question string) (string, rag.Reply, error) {
+	t.Helper()
+	var sb strings.Builder
+	reply, err := e.Answer(context.Background(), rag.Ask{
+		Question: question, WebSearch: true,
+		OnToken: func(tok string) { sb.WriteString(tok) },
+	})
+	return sb.String(), reply, err
+}
+
 const retrievalDoc = `# Retrieval
 
 ## Hybrid search
@@ -522,32 +533,34 @@ func TestAMissReachesABANotTheWeb(t *testing.T) {
 	})
 }
 
-// TestACorpusThatDidNotRunOutIsNotSupplemented is the trigger's other side, and it is the one
-// that decides the bill: retrieval coming back full means the corpus was not the limit, so
-// there is nothing to supplement and no reason to send the question anywhere.
+// TestTheWebIsNotReachedUnlessTheReaderAsks is the toggle's whole point, and it is a call log
+// rather than a flag this test sets itself: an instance with a key configured must still make
+// no external call for a reader who did not tick the box.
 //
-// Deliberately on an instance with no declared window, because that is where the numbers are
-// small enough to be obvious: retrieval is asked for TOP_K, the corpus has more than TOP_K
-// matching sections, so what comes back is exactly TOP_K and the comparison is an equality
-// rather than a threshold. The first version of this trigger measured retrieved characters
-// against a fraction of the model's context window, and against a 128k window that called
-// almost every answer thin — every question would have gone to a third party.
-func TestACorpusThatDidNotRunOutIsNotSupplemented(t *testing.T) {
+// It replaced an automatic judgement that was wrong twice. Both versions measured a proxy for
+// "the documents only partly answered" and both fired on essentially every question — the
+// second because `maxPerDoc` caps a 13-document corpus at 39 sections against a candidate pool
+// of 40, a boundary that is an accident of two unrelated constants. A supplement nobody can see
+// firing is a default, and the reader can answer the question directly.
+func TestTheWebIsNotReachedUnlessTheReaderAsks(t *testing.T) {
 	e, prov := engineWithSearch(t,
 		&aitest.Provider{Reply: "Entirely from the documents [1]."},
-		[]rag.Model{{Name: "chat-model", Window: 0}})
+		[]rag.Model{{Name: "chat-model", Window: 100_000}})
 	wideCorpus(t, e)
 
-	_, reply, err := ask(t, e, "what are the rules for booking?")
-	if err != nil {
+	if _, _, err := ask(t, e, "what are the rules for booking?"); err != nil {
 		t.Fatalf("answer: %v", err)
 	}
-	if reply.Retrieval.Offered != 3 {
-		t.Fatalf("retrieval offered %d sections; this test needs it to come back full at TOP_K's 3",
-			reply.Retrieval.Offered)
-	}
 	if n := len(prov.Searches()); n != 0 {
-		t.Errorf("a corpus that filled its own request bought %d public searches: %v", n, prov.Searches())
+		t.Errorf("a question asked with the toggle off bought %d public searches: %v", n, prov.Searches())
+	}
+
+	// Same engine, same corpus, box ticked: now it goes out.
+	if _, _, err := askWeb(t, e, "what are the rules for cancelling?"); err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if len(prov.Searches()) != 1 {
+		t.Errorf("searches = %v; want exactly the one the reader asked for", prov.Searches())
 	}
 }
 
@@ -570,12 +583,12 @@ func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, reply, err := ask(t, e, "how does the handshake work?")
+	_, reply, err := askWeb(t, e, "how does the handshake work?")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
 	if len(prov.Searches()) == 0 {
-		t.Fatal("a one-document corpus cannot fill a 40-candidate pool, so it ran out and no search ran")
+		t.Fatal("the reader asked for public sources and no search ran")
 	}
 	var doc, web []rag.Citation
 	for _, c := range reply.Citations {
@@ -599,7 +612,7 @@ func TestWebResultsAreCitedInTheirOwnNumbering(t *testing.T) {
 	if _, err := e2.Ingest(context.Background(), "docs/retrieval.md", retrievalDoc); err != nil {
 		t.Fatal(err)
 	}
-	_, plain, err := ask(t, e2, "how does the handshake work?")
+	_, plain, err := askWeb(t, e2, "how does the handshake work?")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}

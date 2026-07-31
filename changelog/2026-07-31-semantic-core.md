@@ -17,86 +17,60 @@ every other limitation followed from nobody having a number to compare against.
 
 ## The decisions the next session would otherwise re-derive
 
-### The trigger is "the corpus ran out", and the first version had the wrong denominator
+### The automatic trigger was built twice, measured twice, and deleted
 
-`corpusRanOut` is one comparison: `r.Offered < e.askFor(model)`. Retrieval asks for a fixed
-number of sections — `db.CandidatePool` when a window is declared, `TOP_K` when it is not —
-and fewer coming back means the **corpus** was the limit rather than the budget. No share, no
-threshold, nothing to tune, and `askFor` is one function because `retrieve` and
-`corpusRanOut` must agree about that number or the supplement fires at random.
+The supplement was meant to fire "when the documents only partly answered". Two versions tried
+to measure that and **both fired on essentially every question**. Neither was caught by review;
+both were caught by pointing them at the real instance.
 
-**The first version shipped with the wrong denominator and was caught by measuring, not by
-review.** It was `contextChars < budget × thinShare`, i.e. the retrieved text against half of
-`CONTEXT_SHARE` of the model's window. Against this machine's `CHAT_MODELS`
-(`gpt-4o-mini:128000`) that threshold is **128,000 characters** — about 53 full chunks — so
-it called almost every answer thin and would have sent almost every internal question to a
-third party. The mistake is worth naming because it is a class: it measured *how big the model
-is* when the question was *how much the documents had*.
+| version | the rule | what it measured against | why it was wrong |
+|---|---|---|---|
+| 1 | `chars < budget × 0.5` | half of `CONTEXT_SHARE` of the model's window | against `gpt-4o-mini:128000` that is **128,000 characters**, ~53 full chunks. It measured *how big the model is* when the question was *how much the documents had* |
+| 2 | `Offered < askFor(model)` | the candidate pool | `maxPerDoc` caps a **13-document** corpus at 39 sections against a pool of **40**. Production was one document short of never firing — a boundary that is an accident of two unrelated constants |
 
-Two alternatives rejected:
+So it is a **reader's switch** now: a `.switch` in the settings drawer, off by default, rendered
+only when `/api/health` reports `search: true`, travelling with the question the way the model
+pick does. Two switches and no guessing — the operator decides whether this instance *can*, the
+reader decides whether this question *should*.
 
-- **A similarity threshold on the top hit's distance.** Absolute embedding distances are
-  model-dependent, so the threshold becomes a knob nobody knows how to turn — rule 20's own
-  test, failed at the design stage.
-- **A threshold on the fused RRF score.** RRF *is* model-independent (it is rank-based, max
-  `2/60`), and "the top hit ranked in both retrievers" is a genuinely explainable gate. But
-  the approved-chunk `×1.2` boost perturbs it exactly across the single-leg/both-legs
-  boundary, so the clean statement stops being true. Too clever for what it buys.
+That deleted `thinShare`, `thin()`, `corpusRanOut()` and `searchSig()`. What survives is the one
+gate that was never a heuristic: `len(hits) == 0` returns the no-answer sentence before any
+provider is reached, so a gap still goes to a BA and never to a search API.
 
-**The residual, recorded rather than hidden:** `maxPerDoc` caps an answer at three sections
-per document, so a corpus of fewer than ~14 documents reports "ran out" even when each
-document is long, and therefore supplements most questions. That is honest — it does have
-little to say — but every firing is a third-party call and a credit, so the document count is
-the thing to check before setting `SEARCH_API_KEY`. It is in the guide's own `[!WARNING]`
-panel, not just here.
+Also rejected on the way through: a similarity threshold on the top hit's distance (absolute
+embedding distances are model-dependent, so the threshold is a knob nobody knows how to turn),
+and a threshold on the fused RRF score (rank-based and genuinely model-independent, but the
+approved-chunk `×1.2` boost perturbs it exactly across the single-leg/both-legs boundary).
 
-### The signature carries the web, and the key does not — and the two documents that look
-### like they disagree do not
+**The cache half inverted with it.** An automatic trigger was startup config, so it belonged in
+the *signature*. A reader's tick is a per-request choice, so it belongs in the **key**, beside
+the scope and the model — the signature would prune every no-web answer the moment one reader
+ticked the box. `cacheKey` is four fields now; rows written under three age out, which is the
+same trade taken when the model joined it.
 
-`2026-07-28-memory-and-external-search.md` says *"the cache signature must carry it"*.
-Invariant 3 says a per-request pick belongs in the **key**. Both are right, because the
-trigger is **automatic**, not a reader's toggle:
+This is where `changelog/2026-07-28-memory-and-external-search.md` and invariant 3 finally agree
+rather than being reconciled: that entry's *"off unless switched on, and visible when it is on"*
+is exactly a reader toggle, and invariant 3's key/signature split then follows without argument.
+The two intermediate designs were the detour.
 
-- Whether an instance *can* reach the web is startup config — the tier of `promptSig` and
-  `TOP_K` — so it is in the signature (`searchSig`), and switching the key on invalidates
-  every row at once. Correct: those answers were produced under a rule the instance no
-  longer has.
-- Nothing per-request joins the key, because nothing here is per-request. The trigger is
-  derived from the corpus, the question, the scope, the model and the budget — all of which
-  the key and the signature already carry between them.
+### One defect the prompt could not fix
 
-A reader toggle was the other option and would have needed a fourth key field. It was
-rejected because the ask was *supplement when the documents fall short*, and a
-default-off switch supplements almost nothing.
+With the supplement on, a real answer came back offering three readings of "what is a
+goroutine" — every one of them cited `[w1]`, `[w2]`, `[w3]`: a YouTube video and two blog posts.
+Picking a reading sends it back as the next question, where the corpus cannot answer it, so the
+clarify card was a menu of guaranteed misses.
 
-The limitation this leaves, stated rather than hidden: **a cached answer that used the web
-does not re-fetch it.** Regenerate is how a reader asks for today's version, exactly as it is
-for a document that changed between re-indexes.
+A prompt rule forbidding it was written, ignored, strengthened, and ignored again. The check is
+in code now — `grounded()` in `web/ui/src/lib/answer.js` drops an option whose citations are
+*all* web, and a card with nothing left to pick is not rendered at all. An option carrying no
+citation is kept: the model does not always cite a reading, and refusing those would empty most
+cards.
 
-### `len(hits) == 0` is a real gate; "the model declared a miss" cannot be one
-
-The first version of `TestAMissReachesABANotTheWeb` asserted that a no-answer reply bought
-zero searches, and it went **red** — correctly. Retrieval returns *something* for almost any
-question against a non-empty corpus, so the search fires before anyone knows the model will
-answer `NoAnswer`. There is no pre-generation signal for "the model will decline"; the only
-one is a second completion, which is the cost the design already refused.
-
-So the guarantee was split into the two halves that are actually enforceable, and the test
-asserts both:
-
-1. **Retrieval found nothing → no external call at all.** Decided before any provider is
-   reached, asserted against the fake provider's own call log.
-2. **The model declared the miss → the bare sentence, no sources of any kind.** `isMiss`
-   already returns a citation-free reply; what is new is that this now also means *no web
-   links under "not in the documents"*, which would otherwise read as an invitation to
-   treat the link as the answer.
-
-The third defence is in the prompt and is the one that stops the web *answering* a gap:
-> A WEB section can never satisfy that … WEB explains a term the CONTEXT already uses; it
-> does not supply a fact the CONTEXT is missing.
-
-The BA loop is untouched. That was the whole constraint: a confirmed answer becomes a
-document, so it answers everyone who asks next; a web result answers one person.
+**Still open, and it needs a decision rather than a patch:** a model that writes a clarify block
+and then appends the no-answer sentence underneath produces a reply `isMiss` does not recognise
+— exact match, by decision — so a gap gets cached as an answer. The prompt now forbids the
+append in two places and a real model did it anyway. Fixing it properly means touching `isMiss`,
+which is invariant 3/5 territory.
 
 ### Why the model's window went in the signature and not the key
 

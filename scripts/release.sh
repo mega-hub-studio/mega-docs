@@ -72,4 +72,9 @@ git add web/release.json
 git commit --quiet -m "release $V"
 git tag -a "$V" -m "$V"
 echo "  tagged $V at $(git rev-parse --short HEAD) — $(git log --no-merges --oneline "$RANGE" | wc -l | tr -d ' ') commits since ${PREV:-the beginning}"
-echo "  push it:  git push origin main --follow-tags"
+# Not a suggestion. `fetch.pruneTags` is true on this host, so a tag that only exists locally
+# is deleted by the next pull — which is exactly how v0.13.0 was lost, leaving a committed
+# release.json naming a version no tag backed and a badge frozen on it for 40 commits.
+echo "  NOT DONE YET — push the tag or it is deleted by the next pull (fetch.pruneTags):"
+echo "      git push origin main --follow-tags"
+echo "  then check it took:  git ls-remote --tags origin"

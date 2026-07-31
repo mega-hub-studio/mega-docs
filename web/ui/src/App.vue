@@ -65,7 +65,7 @@ const { scope, setScope } = useScope()
 const { corpus, refresh: refreshCorpus } = useCorpus()
 // The dock gets out of the way on request; `--dock-h` is measured, so main reclaims the room.
 const { collapsed: dockCollapsed, toggle: toggleDock, show: showDock } = useDock()
-const { online, writes, admin, runtime, check, watchNetwork } = useRuntime()
+const { online, writes, admin, search, runtime, check, watchNetwork } = useRuntime()
 const { queue, history, file: askBa, refresh: refreshQueue } = useQaLoop({ toast })
 const { ready: diagramsReady, loadFor, drawn, stepped, open: openZoom, close: closeZoom }
   = useDiagrams({ zoom, zoomBody })
@@ -99,11 +99,14 @@ const {
   pick: pickModel,
   muted,
   mute,
+  websearch,
+  web,
 } = useSettings({ models: () => runtime.value.models })
 
 const { turns, busy, ask, regenerate, stop, reset, copy, markConfirmed } = useConversation({
   scope,
   model: picked,
+  websearch,
   prompt,
   scroll,
   toast,
@@ -302,10 +305,11 @@ function replay(entry) {
        opens it is in the bar: the composable owns showModal()/close(), this owns who calls it. -->
   <SettingsDrawer
     ref="settingsEl" :models="runtime.models" :picked="picked" :current="pickedModel"
-    :muted="muted" :lang="lang" :langs="langs" :admin="admin"
+    :muted="muted" :websearch="websearch" :can-search="search"
+    :lang="lang" :langs="langs" :admin="admin"
     :recall="turns.at(-1)?.recall ?? { kept: 0, offered: 0 }" :engine="runtime.engine"
     :version="runtime.version" :release="runtime.release" :t="t"
-    @pick="pickModel" @mute="mute" @set-lang="setLang" @close="closeSettings"
+    @pick="pickModel" @mute="mute" @web="web" @set-lang="setLang" @close="closeSettings"
   />
 
   <dialog ref="zoom" class="modal diagram-zoom" @click.self="closeZoom" @close="closeZoom">

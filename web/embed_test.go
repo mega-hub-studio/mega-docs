@@ -148,6 +148,19 @@ var retiredClaims = []struct{ phrase, why string }{
 	{"TOP_K</code> sections survive", "the budget decides how many survive, capped at three per document"},
 	{"TOP_K</code> là số section một câu trả lời được dựng từ", "the budget decides; TOP_K is the floor when no window is declared"},
 	{"Rồi <code>TOP_K</code> đoạn đi tiếp", "the budget decides how many survive, capped at three per document"},
+	// The public-web supplement shipped with an *automatic* trigger and the page taught it as a
+	// measurement. It was deleted rather than tuned: both versions of it fired on essentially
+	// every question, the second because maxPerDoc caps a 13-document corpus at 39 sections
+	// against a candidate pool of 40. It is a reader's switch now, off by default, so a page
+	// still describing a threshold sends an operator looking for a number to move.
+	{"the corpus ran out before retrieval did", "it is the reader's switch now, off by default — there is no automatic trigger"},
+	{"corpus cạn trước khi truy xuất cạn", "it is the reader's switch now, off by default"},
+	{"A small corpus supplements almost every question", "nothing supplements anything unless the reader asks"},
+	{"Corpus nhỏ sẽ bổ trợ gần như mọi câu hỏi", "nothing supplements anything unless the reader asks"},
+	// And its cache half inverted with it: an automatic trigger was startup config (signature),
+	// a reader's tick is a per-request choice (key), exactly like the scope and the model.
+	{"The signature carries it; the key does not", "inverted: the key carries it, beside the scope and the model"},
+	{"Signature mang nó; key thì không", "inverted: the key carries it"},
 }
 
 // TestGuidePagesCarryNoRetiredClaim reads every published page and fails on a sentence the

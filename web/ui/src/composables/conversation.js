@@ -76,7 +76,7 @@ function newTurn(q, scope) {
  *   onSettled runs after every answer, however it ended — the shell uses it to refresh
  *   what an answer can have changed (the corpus, the diagram renderer, health).
  */
-export function useConversation({ scope, model, prompt, scroll, toast, onSettled }) {
+export function useConversation({ scope, model, websearch, prompt, scroll, toast, onSettled }) {
   const turns = ref(session.load()) // a reload shouldn't lose the thread
   seq = turns.value.reduce((m, t) => Math.max(m, t.id || 0), 0)
   const busy = ref(false)
@@ -172,6 +172,10 @@ export function useConversation({ scope, model, prompt, scroll, toast, onSettled
       // The pick as it is *now*, deliberately, including on a regenerate: "answer that again
       // with the stronger model" is the whole point of having a picker beside a thread.
       model: model?.value ?? '',
+      // Read here, like the model, so a regenerate re-asks under whatever the reader wants
+      // *now* — "answer that again, and look outside this time" is the point of a per-question
+      // switch beside a thread.
+      websearch: websearch?.value ?? false,
       onToken: (tok) => {
         turn.a += tok
         scroll()

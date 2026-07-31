@@ -21,6 +21,7 @@ import { setMute } from '8bit-nes'
 import { computed, ref } from 'vue'
 
 const MODEL_KEY = 'md_model'
+const WEB_KEY = 'md_websearch'
 const MUTE_KEY = 'nes_mute' // the library's own key: it reads this on load
 
 /**
@@ -34,6 +35,10 @@ export function useSettings({ models }) {
   const el = ref(null)
   const model = ref(localStorage.getItem(MODEL_KEY) || '')
   const muted = ref(localStorage.getItem(MUTE_KEY) === 'true')
+  // Off unless this browser was told otherwise, and off is the honest default: ticking it
+  // sends the question to a third party. Stored per browser like the model pick, because it
+  // is the same kind of fact — what this reader wants, not what the instance is.
+  const websearch = ref(localStorage.getItem(WEB_KEY) === 'true')
 
   function open() {
     el.value?.showModal()
@@ -75,5 +80,16 @@ export function useSettings({ models }) {
     setMute(on)
   }
 
-  return { el, open, close, model, picked, current, pick, muted, mute }
+  /**
+   * Whether to look outside the documents. It rides on every question the way the model pick
+   * does, and the server ands it with its own capability — so a tick that survives the key
+   * being removed costs a reader nothing.
+   * @param {boolean} on
+   */
+  function web(on) {
+    websearch.value = on
+    localStorage.setItem(WEB_KEY, String(on))
+  }
+
+  return { el, open, close, model, picked, current, pick, muted, mute, websearch, web }
 }

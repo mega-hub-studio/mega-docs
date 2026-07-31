@@ -53,6 +53,7 @@ if you add one here, add its check in the same commit or mark it `prose only` ho
 | 26 | **HARD: the official guide syncs in the same commit, and the claim it replaces is retired.** A behaviour change edits its `<section>`; the superseded passage is **deleted**, never parked beside its replacement, and its dead sentence is added to `retiredClaims` so it cannot return. Stale prose is context an agent loads and believes | `TestGuidePagesCarryNoRetiredClaim` (every published page, both languages) · `TestEverySpecNameExistsInTheCode` · `TestEveryRouteAndKnobIsSpecified` · `TestSpecJSONIsGeneratedFromThePages` · `make check-ui` |
 | 28 | **HARD: the phone is the design, not a breakpoint. Base styles are 390px; one `min-width` query upgrades to desktop, never a `max-width` query down.** A layout decision is made at 390 first and widened only if it survives there — and the page may never scroll sideways, at any width | `make check-ui` measures every guide page at **390 · 1440 · 1920** and fails on a section wider than its parent · the app is `prose only`, and the two cheap probes plus the overflow this caught are in `changelog/2026-07-30-mobile-first.md` |
 | 27 | **HARD: a seam belongs to the container, never to the blocks. One `gap`, set once on the parent — no margin per child, and no two stacked blocks touching at 0px.** A design-system recipe spaces only *inside* itself; the space *between* two of them is this repo's job, and no app container may stack blocks without declaring it | `make check-ui` (the guide's `--flow` rule) · the app is `prose only` — measure it in the running product at 390×844, and the probe plus the five pairs it caught are in `changelog/2026-07-30-seams.md` |
+| 29 | **HARD: a user-visible change is not done until it is in the release modal.** The badge in the app opens what changed, and that list is **generated** from `git log` by `make release V=vX.Y.Z` (rule 25) — so "update the changelog" means *cut a release*, never type into `web/release.json`. Two consequences: the **commit subject is the line a user reads**, so write it for them and not for the diff; and shipping without a tag leaves the badge on the old version while the binary is something else | `TestReleaseNotesAreGenerated` (generated, not hand-written · a sha behind every line) · `scripts/release.sh` refuses a dirty tree · the cadence is `prose only` — `make release` is the only mechanism there is |
 
 Rule 28 was the practice before it was a rule, which is exactly why it needed writing down:
 `styles.css` has said "base styles are the phone — never the reverse" since it was written, and
@@ -122,6 +123,28 @@ where `--flow` and its 31 touching pairs come from — and measuring the app nee
 server, a real answer and a browser, which is a rig for one thing and rule 21 refuses it. What
 replaces it is the probe in that changelog entry: twenty lines pasted into `pinchtab eval`,
 printing every adjacent pair under 3px. Run it on both screens after touching layout.
+
+Rule 29 is rule 26 pointed at the *user* instead of the next agent. Rule 26 keeps the guide
+honest for whoever reads the docs; this keeps the app honest for whoever is looking at it right
+now, and the gap it closes is that **nothing in the gate can tell you the badge is stale**. The
+binary reports its commit, so `/api/health` is never wrong — but a reader does not ask for a
+sha, they tap the version and expect to find the thing that changed under their hands.
+
+What it does *not* mean is writing release notes. `web/release.json` carries a do-not-edit
+marker and a sha behind every line precisely so a hand-written one fails, and rule 25 explains
+why that is the design rather than a restriction. So the work is in two ordinary places:
+
+1. **The commit subject**, because that string is rendered verbatim in the modal, under its
+   scope, next to its sha. `fix(ui): render an option's [n] as a cite chip` reads as a change;
+   `fix stuff` reads as nothing, and no later edit can improve it — the log is the input.
+2. **`make release V=vX.Y.Z`**, on a clean tree that is `make check-full` green. That writes
+   `release.json` from the range since the last tag, commits it, then tags *that* commit — in
+   that order, or every deploy reads one commit past its own release.
+
+The failure it prevents is the one this repo has already lived: a fortnight of fixes deployed
+under `v0.13.0`, so the modal described work three weeks older than the running binary and the
+only honest thing on screen was the commit sha. A version nobody cuts is a version that lies —
+the same sentence that killed the `VERSION` file, aimed at the other end of the pipeline.
 
 Rule 26 is the enforcer rule 24 was missing. "No stale doc" was already written down, and
 this repo still published a page telling operators that `rm knowledge.db` was safe — three
@@ -493,6 +516,17 @@ plan.
   of its own: the published docs always showed `<i style="--fill:64%">`, and this repo derived
   the markup from the stylesheet instead. That is `AGENTS.md`'s pinned-docs rule earning its
   keep — the app still binds the `<i>`, which was right the whole time.
+- **A tag that is not pushed does not survive here — `fetch.pruneTags` is `true`.** So
+  `make release` alone does not cut a release: it creates a local annotated tag, and the next
+  `pull` deletes it because origin has never heard of it. That is not a hypothetical. `v0.13.0`
+  was cut, the `release $V` commit landed and pushed, the tag was not, and a later pull pruned
+  it — leaving an embedded `release.json` naming a version **no tag backed**, a badge frozen on
+  it for 40 commits, and `git describe` failing outright. The safety net `web/release.go`
+  promises ("forget to cut one and Version is simply empty, so the UI falls back to the
+  commit") could never fire, because a *committed* `release.json` outlives the tag it was
+  generated from. `git push origin main --follow-tags` is the second half of the release, and
+  `make release` prints it for a reason. Verify with `git ls-remote --tags origin`, never with
+  `git tag -l`.
 - **`nes-toc` sets `z-index: 20` on itself.** The sticky header has to sit above it or a
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the

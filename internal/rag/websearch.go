@@ -13,12 +13,15 @@ import (
 // Supplementary retrieval: one public search, used only to explain what the documents lean
 // on and never to answer in their place.
 //
-// It is off unless SEARCH_API_KEY is set, and even then it fires under two conditions, both
-// in `thin` below. The first is absolute: a question the corpus cannot answer at all gets the
-// no-answer sentence and the BA route behind it, never a web result. That route ends in the
-// documents being able to answer the question — external search answers the person asking;
-// the QA loop answers everyone who asks next, and a fallback that quietly filled the gap
-// would remove the only reason anybody files one.
+// Two switches, and neither is a heuristic. The instance needs SEARCH_API_KEY, and the reader
+// has to ask — a checkbox in the settings drawer, off by default, travelling with the question
+// the way the model pick does.
+//
+// One absolute remains: a question the corpus cannot answer *at all* gets the no-answer
+// sentence and the BA route behind it, never a web result, however the toggle is set. That
+// route ends in the documents being able to answer the question — external search answers the
+// person asking; the QA loop answers everyone who asks next, and a fallback that quietly
+// filled the gap would remove the only reason anybody files one.
 //
 // The provenance rules are the other half, and they are in the prompt: a web claim is [w1],
 // [w2]… in its own numbering with its own list under the answer, so a sentence from a search
@@ -119,57 +122,26 @@ func (c *searchClient) search(ctx context.Context, query string) []webHit {
 	return kept
 }
 
-// supplement is the whole decision, in one call, so Answer reads as intent and keeps its
-// branch count: what the public web adds to this answer, or nothing.
+// supplement is what the public web adds to this answer, or nothing.
 //
-// Nothing is the common case and every one of its reasons is deliberate — no key configured,
-// no window declared, a corpus that answered the question properly, or a search that failed.
-func (e *Engine) supplement(ctx context.Context, query, model string, r Recall) (string, []Citation) {
-	if !e.corpusRanOut(model, r) {
+// One condition, because the reader already made the decision: they ticked the box for this
+// question. `search` is nil unless the instance has a key, so the nil check is the other half
+// and both are cheap.
+//
+// This used to be an automatic judgement — "the corpus said less than the model could read" —
+// and it was deleted rather than tuned. Two versions of it were wrong in the same way, both
+// caught by measuring the real instance rather than by review: the first compared retrieved
+// characters against a fraction of the model's 128k window, which called almost every answer
+// thin; the second compared what retrieval returned against the candidate pool, and on a
+// 13-document corpus `maxPerDoc` caps that at 39 against a pool of 40, so it also fired on
+// everything. Both numbers were an accident of two unrelated constants, and a switch nobody
+// can see firing on every question is not a supplement, it is a default. The reader can answer
+// "do I want outside help with this one" directly, so nothing here needs to guess it.
+func (e *Engine) supplement(ctx context.Context, query string, want bool) (string, []Citation) {
+	if !want || e.search == nil {
 		return "", nil
 	}
 	return webContext(e.search.search(ctx, query))
-}
-
-// corpusRanOut reports whether retrieval came back with fewer sections than it asked for —
-// the corpus running out of things to say before retrieval ran out of room.
-//
-// One comparison, and it is the whole trigger. The first version measured the retrieved text
-// against a fraction of the model's context window, which was the wrong denominator twice
-// over: it made the decision depend on how big the model is rather than on how much the
-// documents had, and against a 128k window it called almost every answer thin. What matters is
-// whether the corpus was the limit, and `Offered` against what was asked is exactly that
-// question with no share, no threshold and nothing to tune.
-//
-// Zero offered is not thin, it is a gap — that is the no-answer sentence and the BA route, and
-// Answer returns before this is ever reached.
-//
-// The residual, worth knowing rather than hiding: `maxPerDoc` caps an answer at three sections
-// per document, so a corpus of few documents reports "ran out" even when each of them is long.
-// A small corpus therefore supplements most questions, which is honest — it does have little
-// to say — but it is a cost and a third party, so it is the fact to check before turning the
-// key on.
-func (e *Engine) corpusRanOut(model string, r Recall) bool {
-	return r.Offered > 0 && r.Offered < e.askFor(model)
-}
-
-// searchSig is what the cache signature carries about this feature.
-//
-// Whether an instance can reach the web is startup config — the same tier as the prompt and
-// the budget — so it belongs in the signature, and turning the key on invalidates every row
-// at once, which is right: those answers were produced under a rule the instance no longer
-// has. Nothing per-request joins the cache key, because nothing about this is per-request:
-// the trigger is derived from the corpus, the question and the budget, all of which the key
-// and the signature already carry between them.
-//
-// The limitation this leaves is worth stating rather than hiding: a cached answer that used
-// the web does not re-fetch it. Regenerate is how a reader asks for today's version, exactly
-// as it is for a document that changed between re-indexes.
-func (e *Engine) searchSig() string {
-	if e.search == nil {
-		return ""
-	}
-	return "w"
 }
 
 // webContext renders the results as their own block with their own numbering, appended after

@@ -194,3 +194,15 @@ it, so trust the table.
   which is gitignored.
 - A commit message follows [`.vscode/commit.instruction.md`](.vscode/commit.instruction.md) —
   the only place this repo's version lives.
+- **A user-visible change is not finished until it is in the release modal** (rule 29 in
+  [`CLAUDE.md`](CLAUDE.md)). The version badge in the app opens a list of what changed, and
+  that list is **generated from `git log`** by `make release V=vX.Y.Z` — `web/release.json`
+  carries a do-not-edit marker and `TestReleaseNotesAreGenerated` fails on a hand-written one.
+  So there is nothing to type into the modal; there are two things to get right:
+
+  1. **The commit subject is the line the user reads.** It is rendered verbatim, under its
+     scope, beside its sha. Write it for someone looking at the app, not for the diff.
+  2. **Cut the release** on a clean tree that is `make check-full` green. Skip it and the badge
+     keeps naming the previous version while the binary is something else — the modal then
+     describes work the running code no longer matches, which is the one screen a user has for
+     answering "what changed?".

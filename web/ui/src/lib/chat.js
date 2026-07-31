@@ -61,16 +61,17 @@
  * @param {string} question
  * @param {{ onToken?: (t: string) => void, onCitations?: (c: Citation[]) => void,
  *          onDone?: (info: Done) => void, fresh?: boolean,
- *          scope?: string, history?: Turn[], model?: string }} handlers
+ *          scope?: string, history?: Turn[], model?: string, websearch?: boolean }} handlers
  *   fresh skips the server's answer cache — what Regenerate means. scope narrows
  *   retrieval to one document or folder; "" is the whole corpus. history is the thread
  *   this question continues, oldest first — the server holds no session, so a follow-up
- *   that arrives without it is answered as a first question.
+ *   that arrives without it is answered as a first question. websearch asks for public sources
+ *   beside the documents; the server ands it with whether this instance can.
  * @returns {{ done: Promise<void>, stop: () => void }}
  */
-export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '', history = [], model = '' } = {}) {
+export function ask(question, { onToken, onCitations, onDone, fresh = false, scope = '', history = [], model = '', websearch = false } = {}) {
   const ctrl = new AbortController()
-  const done = run(question, { onToken, onCitations, onDone, fresh, scope, history, model }, ctrl.signal)
+  const done = run(question, { onToken, onCitations, onDone, fresh, scope, history, model, websearch }, ctrl.signal)
   return { done, stop: () => ctrl.abort() }
 }
 
@@ -88,6 +89,8 @@ async function run(question, handlers, signal) {
         // The reader's pick, and "" means the instance default — the server refuses anything
         // it does not offer, so this is a request rather than an instruction.
         model: handlers.model,
+        // The reader's own ask for outside sources, per question.
+        websearch: handlers.websearch,
       }),
       signal,
     })

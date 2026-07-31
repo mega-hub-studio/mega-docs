@@ -23,6 +23,9 @@ export function useRuntime() {
   const online = ref(true) // optimistic: the first check has not answered yet
   const writes = ref(false) // pessimistic: never offer a write surface we cannot prove
   const admin = ref(false) // same, and for the same reason: no surface until it is proven
+  // Whether this instance can look outside the documents. False until proven, like the two
+  // above: a switch offering something the server cannot do is worse than no switch.
+  const search = ref(false)
   const runtime = ref({
     model: '',
     window: 0,
@@ -42,6 +45,7 @@ export function useRuntime() {
     online.value = h.online
     writes.value = h.writes
     admin.value = h.admin
+    search.value = h.search
     runtime.value = {
       model: h.model,
       window: h.window,
@@ -82,5 +86,5 @@ export function useRuntime() {
     })
   }
 
-  return { online, writes, admin, runtime, check, watchNetwork }
+  return { online, writes, admin, search, runtime, check, watchNetwork }
 }

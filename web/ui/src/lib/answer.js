@@ -447,6 +447,21 @@ function option(item) {
   return { text, cites, recommended: item.checked === true }
 }
 
+/* An option a reader may pick has to be answerable from the documents, and this is the check
+   rather than a prompt rule because the prompt rule was written twice and ignored twice.
+
+   Measured, not guessed: with the public-web supplement on, a real answer came back offering
+   three readings of "what is a goroutine", every one of them cited [w1], [w2], [w3] — a
+   YouTube video and two blog posts. Picking one sends it back as the next question, where the
+   corpus cannot answer it, so the card was a menu of guaranteed misses.
+
+   An option carrying *no* citation is kept: the model does not always cite a reading, and
+   dropping those would empty most cards. What is refused is an option whose citations are all
+   web — that is a reading of somebody else's page, offered as a reading of ours. */
+function grounded(opt) {
+  return opt.cites.length === 0 || opt.cites.some(c => !c.startsWith('w'))
+}
+
 /**
  * Split a reply into the prose that renders and the pickable block inside it.
  *
@@ -490,10 +505,15 @@ function stripClarify(markdown) {
     return {
       kind,
       prompt: opening.replace(clarifyMark, '').trim() || LABEL[kind],
-      options: tokens[end].items.map(option),
+      options: tokens[end].items.map(option).filter(grounded),
     }
   }
-  const cards = found.map(read)
+  // A card with nothing left to pick is not a card. Dropping it here rather than rendering an
+  // empty fieldset means `dressAlerts` shows the model's own sentence as a panel instead, which
+  // is what a reader can actually act on.
+  const cards = found.map(read).filter(c => c.options.length > 0)
+  if (cards.length === 0)
+    return { rest: markdown, clarify: null }
   return {
     // A top-level token's `raw` is its own slice of the source, so dropping every block's own
     // tokens and joining the rest is how the answer around them survives being read. The range

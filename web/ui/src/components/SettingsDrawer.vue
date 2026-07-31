@@ -6,8 +6,8 @@ import { useTemplateRef } from 'vue'
    over nothing at all — the state belongs to the shell, because the model rides on every
    question `useConversation` sends.
 
-     props   models · picked · current · muted · lang · langs · admin · recall
-     emit    pick(name) · mute(bool) · setLang(code) · close
+     props   models · picked · current · muted · websearch · canSearch · lang · langs · admin · recall
+     emit    pick(name) · mute(bool) · web(bool) · setLang(code) · close
 
    ── why it is icons and not sentences ──
    The first version read as three paragraphs: "Rides on every question. This instance refuses
@@ -31,6 +31,11 @@ defineProps({
   // either means the operator never said, and then the row shows a dash rather than a zero.
   current: { type: Object, default: () => ({}) },
   muted: Boolean,
+  // Whether this reader wants public sources beside the documents, and whether this instance
+  // can offer them at all. The row is absent without the second: a switch that does nothing
+  // teaches a reader the app is broken, the same rule `admin` follows below.
+  websearch: Boolean,
+  canSearch: Boolean,
   lang: { type: String, required: true },
   langs: { type: Array, required: true },
   // Whether this instance has an admin surface at all. False leaves the row out entirely: a
@@ -52,7 +57,7 @@ defineProps({
   t: { type: Function, required: true },
 })
 
-defineEmits(['pick', 'mute', 'setLang', 'close'])
+defineEmits(['pick', 'mute', 'web', 'setLang', 'close'])
 
 // The shell owns the gear that opens this, so it needs a handle — and the handle is shaped
 // like the element's own API on purpose: `showModal()` and `close()`, nothing else. The
@@ -154,6 +159,20 @@ defineExpose({
           <input
             class="switch" type="checkbox" :checked="!muted"
             :aria-label="t('settings.sound')" @change="$emit('mute', !$event.target.checked)"
+          >
+        </label>
+
+        <!-- Public sources, off by default. `cloud`, not `globe` — that one already labels the
+             language row — and it reads as "outside this machine", which is what the switch
+             changes: *where* an answer may look, not how it looks. Only rendered when the
+             instance has a key — /api/health says so, because a static bundle cannot find out.
+             The title carries the cost, since that is the part a reader is agreeing to. -->
+        <label v-if="canSearch" class="set-row">
+          <nes-icon name="cloud" :title="t('settings.websearch')" />
+          <input
+            class="switch" type="checkbox" :checked="websearch"
+            :aria-label="t('settings.websearch')" :title="t('settings.websearchHint')"
+            @change="$emit('web', $event.target.checked)"
           >
         </label>
       </div>

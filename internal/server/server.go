@@ -179,7 +179,7 @@ func New(d Deps) http.Handler {
 		})
 	}
 
-	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers, d.Runtime.Models))
+	mux.HandleFunc("POST /api/chat", chatHandler(d.Answers, d.Runtime.Models, d.Runtime.Search))
 	mux.HandleFunc("GET /api/corpus", corpusHandler(d.Answers))
 	if d.Know != nil {
 		tickets(mux, d.Know, d.BAPass)

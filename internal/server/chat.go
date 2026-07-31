@@ -34,9 +34,9 @@ var errBadRequest = errors.New("bad request")
 //
 // The error arrives *in the stream* because the status line is already sent by the
 // time generation can fail — the client shows it on the turn either way.
-func chatHandler(answers Answerer, models []Model) http.HandlerFunc {
+func chatHandler(answers Answerer, models []Model, canSearch bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ask, err := readQuestion(r, models)
+		ask, err := readQuestion(r, models, canSearch)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -104,7 +104,7 @@ func chatHandler(answers Answerer, models []Model) http.HandlerFunc {
 // readQuestion parses the request into the engine's own Ask, minus the callback the
 // handler owns. `fresh` is Regenerate: the one case where a cached answer is the
 // wrong answer, because the user just told us it was.
-func readQuestion(r *http.Request, models []Model) (rag.Ask, error) {
+func readQuestion(r *http.Request, models []Model, canSearch bool) (rag.Ask, error) {
 	var body struct {
 		Question string `json:"question"`
 		Scope    string `json:"scope"` // a document or folder to answer from; "" = all
@@ -119,6 +119,12 @@ func readQuestion(r *http.Request, models []Model) (rag.Ask, error) {
 		// into the engine's own type, because a second spelling of a turn would be a
 		// second thing to keep in step with the wire.
 		History []rag.Turn `json:"history"`
+		// WebSearch is the reader ticking "look outside the documents too" for this one
+		// question. Anded with the instance's capability rather than refused the way an
+		// unknown model is: a stale tab asking for something this instance cannot do wants
+		// the answer it *can* give, and the reply names its sources either way. A 400 would
+		// break a reader whose browser remembers a tick from before the key was removed.
+		WebSearch bool `json:"websearch"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxAsk)).Decode(&body); err != nil {
 		return rag.Ask{}, errBadRequest
@@ -137,6 +143,7 @@ func readQuestion(r *http.Request, models []Model) (rag.Ask, error) {
 	}
 	return rag.Ask{
 		Question: q, Scope: body.Scope, Fresh: body.Fresh, History: body.History, Model: model,
+		WebSearch: body.WebSearch && canSearch,
 	}, nil
 }
 

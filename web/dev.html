@@ -551,7 +551,7 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
        The rules live in internal/rag/websearch.go; this is what a reader needs. -->
   <section id="external-search" data-feature="external-search"
            data-api="POST /api/chat" data-env="SEARCH_BASE_URL,SEARCH_API_KEY"
-           data-test="TestAMissReachesABANotTheWeb,TestACorpusThatDidNotRunOutIsNotSupplemented,TestWebResultsAreCitedInTheirOwnNumbering">
+           data-test="TestAMissReachesABANotTheWeb,TestTheWebIsNotReachedUnlessTheReaderAsks,TestWebResultsAreCitedInTheirOwnNumbering">
     <h2 lang="en">Supplementing a thin answer</h2>
     <h2 lang="vi">Bổ trợ khi câu trả lời mỏng</h2>
     <p class="lede" lang="en">Off unless <code>SEARCH_API_KEY</code> is set, and even then it
@@ -583,31 +583,39 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
     <div class="step">
       <span class="num">1</span>
       <div class="body">
-        <b lang="en">When it fires: the corpus ran out before retrieval did</b>
-        <b lang="vi">Khi nào nó chạy: corpus cạn trước khi truy xuất cạn</b>
-        <p lang="en">One comparison, and there is nothing to tune. Retrieval asks for a fixed
-          number of sections — the whole candidate pool when a window is declared,
-          <code>TOP_K</code> when one is not — and if fewer come back, the corpus was the limit
-          rather than the budget. That is the question worth asking, and it is the *only* thing
-          the trigger asks.</p>
-        <p lang="vi">Một phép so sánh, và không có gì để tinh chỉnh. Truy xuất hỏi một số
-          section cố định — cả candidate pool khi đã khai window, <code>TOP_K</code> khi chưa —
-          và nếu về ít hơn thì giới hạn nằm ở corpus chứ không ở ngân sách. Đó là câu hỏi đáng
-          hỏi, và là điều <i>duy nhất</i> trigger hỏi.</p>
-        <div class="callout warn">
-          <b lang="en">A small corpus supplements almost every question.</b>
-          <span lang="en"><code>maxPerDoc</code> caps an answer at three sections per document,
-            so a corpus of fewer than about fourteen documents reports "ran out" even when each
-            one is long. That is honest — it really does have little to say — but every firing
-            is a third-party call and a credit, so <b>check the document count before turning
-            the key on</b>. The status line prints sections-read of sections-weighed on every
-            answer, which is where to watch it.</span>
-          <b lang="vi">Corpus nhỏ sẽ bổ trợ gần như mọi câu hỏi.</b>
-          <span lang="vi"><code>maxPerDoc</code> giới hạn mỗi tài liệu ba section, nên corpus
-            dưới khoảng mười bốn tài liệu sẽ luôn báo "đã cạn" dù từng tài liệu rất dài. Điều đó
-            là thật — nó có ít thứ để nói — nhưng mỗi lần chạy là một lần gọi ra bên thứ ba và
-            một credit, nên <b>hãy xem số tài liệu trước khi bật key</b>. Status line in số
-            section đã đọc trên số đã cân nhắc ở mỗi câu trả lời, đó là chỗ để theo dõi.</span>
+        <b lang="en">When it fires: the reader asked, on this question</b>
+        <b lang="vi">Khi nào nó chạy: người đọc yêu cầu, ở câu hỏi này</b>
+        <p lang="en">A switch in the settings drawer, off by default, travelling with the
+          question the way the model pick does — and rendered only when
+          <code>SEARCH_API_KEY</code> is set, because a static bundle cannot discover that. Two
+          switches, then, and neither of them guesses: the operator decides whether this
+          instance <i>can</i>, the reader decides whether this question <i>should</i>.</p>
+        <p lang="vi">Một công tắc trong settings drawer, mặc định tắt, đi kèm câu hỏi giống như
+          lựa chọn model — và chỉ hiện khi đã đặt <code>SEARCH_API_KEY</code>, vì một bundle
+          tĩnh không tự biết được điều đó. Vậy là hai công tắc, và không cái nào đoán: người vận
+          hành quyết định instance <i>có thể</i> hay không, người đọc quyết định câu hỏi này
+          <i>có nên</i> hay không.</p>
+        <div class="callout memo">
+          <b lang="en">There was an automatic trigger here, and it was deleted rather than tuned.</b>
+          <span lang="en">Two versions of it tried to measure "the documents only partly answered
+            this", and both fired on essentially every question. The first compared retrieved
+            characters against a fraction of the model's context window — against 128k that is a
+            threshold of 128,000 characters, about fifty sections. The second compared what
+            retrieval returned against the candidate pool, and <code>maxPerDoc</code> caps a
+            13-document corpus at 39 sections against a pool of 40: a boundary that is an
+            accident of two unrelated constants. A supplement nobody can see firing is not a
+            supplement, it is a default — and the reader can answer "do I want outside help with
+            this one" directly, so nothing needs to guess it.</span>
+          <b lang="vi">Từng có một trigger tự động ở đây, và nó bị xoá thay vì đi tinh chỉnh.</b>
+          <span lang="vi">Hai phiên bản đều cố đo "tài liệu chỉ trả lời được một phần", và cả
+            hai đều chạy ở gần như mọi câu hỏi. Bản đầu so số ký tự lấy được với một phần
+            context window của model — với 128k thì ngưỡng đó là 128.000 ký tự, khoảng năm mươi
+            section. Bản sau so số section truy xuất trả về với candidate pool, mà
+            <code>maxPerDoc</code> giới hạn corpus 13 tài liệu ở 39 section so với pool 40: một
+            ranh giới hoàn toàn ngẫu nhiên giữa hai hằng số không liên quan. Một sự bổ trợ mà
+            không ai thấy nó chạy thì không phải bổ trợ, nó là mặc định — và người đọc trả lời
+            được trực tiếp câu "tôi có muốn trợ giúp từ ngoài cho câu này không", nên không cần
+            gì phải đoán.</span>
         </div>
       </div>
     </div>
@@ -635,25 +643,22 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
     <div class="step">
       <span class="num">3</span>
       <div class="body">
-        <b lang="en">The signature carries it; the key does not</b>
-        <b lang="vi">Signature mang nó; key thì không</b>
-        <p lang="en">Whether an instance can reach the web is startup config, the same tier as
-          the prompt and the budget, so it goes in the cache signature and switching the key on
-          invalidates every row at once — those answers were produced under a rule the instance
-          no longer has. Nothing per-request joins the key, because nothing here is
-          per-request: the trigger is derived from the corpus, the question and the budget,
-          which the key and the signature already carry between them. The limitation that
-          leaves is worth knowing: a cached answer that used the web does not re-fetch it.
-          <b>Regenerate</b> is how a reader asks for today's version, exactly as it is for a
-          document that changed between re-indexes.</p>
-        <p lang="vi">Việc một instance có ra được internet hay không là config lúc khởi động,
-          cùng tầng với prompt và ngân sách, nên nó nằm trong cache signature và bật key lên là
-          vô hiệu hoá mọi dòng cùng lúc — những câu trả lời đó được tạo dưới một quy tắc
-          instance không còn nữa. Không có gì theo từng request đi vào key, vì ở đây không có
-          gì là theo từng request: điều kiện kích hoạt suy ra từ corpus, câu hỏi và ngân sách,
-          mà key với signature đã mang đủ giữa hai bên. Hạn chế còn lại nên biết: một câu trả
-          lời đã cache có dùng web sẽ không lấy lại web. <b>Regenerate</b> là cách người đọc
-          xin bản hôm nay, giống hệt với một tài liệu đã đổi giữa hai lần index.</p>
+        <b lang="en">The key carries it; the signature does not</b>
+        <b lang="vi">Key mang nó; signature thì không</b>
+        <p lang="en">The switch is a reader's own choice, made per question, so it joins the
+          cache <b>key</b> beside the scope and the model — never the signature, which would
+          prune every no-web answer the moment one reader ticked the box. An answer built with
+          public sources can then never be served to somebody who asked without them. The
+          limitation that leaves is worth knowing: a cached answer that used the web does not
+          re-fetch it. <b>Regenerate</b> is how a reader asks for today's version, exactly as it
+          is for a document that changed between re-indexes.</p>
+        <p lang="vi">Công tắc là lựa chọn của chính người đọc, theo từng câu hỏi, nên nó vào
+          <b>key</b> của cache cạnh scope và model — không bao giờ vào signature, vì như thế là
+          xoá sạch mọi câu trả lời không-web ngay khi một người tick vào ô. Nhờ đó một câu trả
+          lời dựng kèm nguồn công khai không bao giờ được trả cho người hỏi mà không có nó. Hạn
+          chế còn lại nên biết: một câu trả lời đã cache có dùng web sẽ không lấy lại web.
+          <b>Regenerate</b> là cách người đọc xin bản hôm nay, giống hệt với một tài liệu đã đổi
+          giữa hai lần index.</p>
       </div>
     </div>
   </section>
