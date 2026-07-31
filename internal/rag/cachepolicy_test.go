@@ -20,6 +20,29 @@ func TestOnlyAWholeMissSkipsTheCache(t *testing.T) {
 		{"a partial answer that names what is missing", "Folders are kebab-case [1].\n\nLeave policy: " + NoAnswer, false},
 		{"an ordinary grounded answer", "Hybrid search fuses vectors and BM25 [1].", false},
 		{"empty", "", false}, // caller checks length; this must not be mistaken for a miss
+		// Both of these came back from a real provider, and under exact equality both were
+		// cached as answers: a gap with a pickable card over it, sources under "this is not in
+		// the documents", and nothing on screen saying Ask BA was the only move left. The
+		// prompt forbids the shape in two places and the model wrote it anyway, twice.
+		{
+			"a clarify block with the sentence appended, citing nothing",
+			"> [!QUESTION]\nWhat does \"Zylkanite\" mean?\n\n- [x] Not defined in the context.\n" +
+				"- [ ] What is the cache eviction strategy?\n\n" + NoAnswer,
+			true,
+		},
+		{
+			"the same, with only public sources cited — [wN] is not a document",
+			"> [!QUESTION]\nWhat does this mean?\n\n- [x] What is cache eviction? [w2]\n" +
+				"- [ ] Common strategies? [w1]\n\n" + NoAnswer,
+			true,
+		},
+		// The mirror of the two above, and the reason the citation half exists: real grounded
+		// content plus a public source, ending on the gap, is still a partial answer.
+		{
+			"a grounded answer with a web supplement, ending on the gap",
+			"Folders are kebab-case [1], which follows the usual convention [w1].\n\n" + NoAnswer,
+			false,
+		},
 	} {
 		if got := isMiss(c.reply); got != c.miss {
 			t.Errorf("%s: isMiss = %v, want %v", c.name, got, c.miss)

@@ -66,11 +66,35 @@ in code now — `grounded()` in `web/ui/src/lib/answer.js` drops an option whose
 citation is kept: the model does not always cite a reading, and refusing those would empty most
 cards.
 
-**Still open, and it needs a decision rather than a patch:** a model that writes a clarify block
-and then appends the no-answer sentence underneath produces a reply `isMiss` does not recognise
-— exact match, by decision — so a gap gets cached as an answer. The prompt now forbids the
-append in two places and a real model did it anyway. Fixing it properly means touching `isMiss`,
-which is invariant 3/5 territory.
+**And the other half of it, which the prompt could not fix either.** The same model, asked
+something the corpus did not cover, wrote a `[!QUESTION]` checklist and put the no-answer
+sentence *underneath* it — forbidden in two places in the prompt, written twice anyway. Under
+`isMiss`'s exact equality that reply is not a miss, so a **gap was cached as an answer**, with
+sources printed under "this is not in the documents" and Ask BA no longer the only move left.
+
+`isMiss` is now the sentence at the **end** plus **no `[n]` anywhere**:
+
+```go
+func isMiss(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.HasSuffix(s, NoAnswer) && !citeMarker.MatchString(s)
+}
+```
+
+Both halves are load-bearing, and `cachepolicy_test.go` had already pinned the case that proves
+it: `"Folders are kebab-case [1].\n\nLeave policy: " + NoAnswer` must stay cacheable. A bare
+`HasSuffix` breaks it, which is why exactness existed — the citation test is what keeps that
+protection while closing the hole. `[wN]` deliberately does not count: a reply whose only sources
+are public pages is precisely a question the documents did not answer.
+
+What settles the remaining doubt is the asymmetry, and it is worth writing down because it
+generalises: **a reply misread as a miss costs one completion the next time it is asked; a gap
+misread as an answer is cached until the corpus changes and hides itself from the loop that
+would have fixed it.** When a classifier has to be wrong somewhere, be wrong in the direction
+that costs money rather than the one that costs the corpus.
+
+Confirmed red first: under `s == NoAnswer` the two new cases report
+`isMiss = false, want true`.
 
 ### Why the model's window went in the signature and not the key
 

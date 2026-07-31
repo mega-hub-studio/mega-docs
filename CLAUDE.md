@@ -492,11 +492,19 @@ plan.
 
 ### Traps that have already cost time
 
-- **The `NoAnswer` sentinel is not a substring test.** A reply that *is* the sentence
-  is a miss and must not be cached; a partial answer that merely contains it (a model
-  naming the part the documents don't cover) is a real answer worth caching. That is
-  `isMiss`, and a prompt rule cannot replace it — models emit the sentence however
-  firmly the prompt reserves it.
+- **The `NoAnswer` sentinel is neither a substring test nor an equality test.** `isMiss` is
+  the sentence at the **end** *plus* **no `[n]` anywhere**, and both halves are load-bearing:
+  drop the suffix and every uncited answer is a miss, drop the citation test and the partial
+  answer — grounded content, then the gap named last — becomes one too, which is the case the
+  test was narrow to protect. `[wN]` deliberately does not count, because a reply whose only
+  sources are public pages is exactly a question the documents did not answer.
+  Equality was the first answer and a real model broke it: asked something uncovered, it wrote
+  a `[!QUESTION]` checklist and put the sentence *underneath*, so a gap was cached as an answer
+  with sources under "this is not in the documents". The prompt forbids that shape in two
+  places and the model wrote it twice — **a prompt rule cannot replace this check.** The
+  asymmetry settles the edge cases: a reply misread as a miss costs one completion, a gap misread
+  as an answer is cached until the corpus changes and hides itself from the loop that would
+  have fixed it.
 - **A Vue `computed` name that collides with a `data` key silently loses.** `data`
   wins and every field reads `undefined`, with no console error.
 - **`cp` over a running binary fails with `Text file busy`.** Install with `mv`.

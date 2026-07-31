@@ -226,23 +226,41 @@ func referencedWeb(all []Citation, answer string) []Citation {
 	return kept
 }
 
-// isMiss reports whether a reply *is* the no-answer, rather than merely containing
+// isMiss reports whether a reply *concludes* the no-answer, rather than merely containing
 // it.
 //
-// The distinction is the difference between two very different replies. A miss must
-// not be cached: it is what someone retries, and remembering it turns one gap into a
-// permanent one. But a partial answer — half the question answered, the other half
-// named as uncovered — is a real answer that cost a real completion, and models put
-// the sentence inside one however firmly the prompt reserves it. Matching on
-// "contains" threw those away, so the most expensive answers were the only ones
-// never cached. Caching them is safe: the signature includes the corpus, so the day
-// the missing document arrives, the answer is invalidated with everything else.
+// A miss must not be cached: it is what someone retries, and remembering it turns one gap
+// into a permanent one. But a partial answer — half the question answered from a document,
+// the other half named as uncovered — is a real answer that cost a real completion, and
+// models put the sentence inside one however firmly the prompt reserves it. Matching on
+// "contains" threw those away, so the most expensive answers were the only ones never
+// cached. Caching them is safe: the signature includes the corpus, so the day the missing
+// document arrives the answer is invalidated with everything else.
 //
-// The exactness cuts both ways, and that is what constrains the prompt: anything
-// appended to the sentence makes this false and caches the gap as an answer. The
-// [!NEXT] rule is the one that would have done it, which is why it says the sentence
-// stands alone — a new trailing block needs the same exception.
-func isMiss(s string) bool { return strings.TrimSpace(s) == NoAnswer }
+// Exact equality was the first answer to that and it was too narrow, in a way only a real
+// model showed. Asked something the corpus did not cover, one wrote a [!QUESTION] block with
+// a checklist and then put the sentence *underneath* it — which the prompt forbids in two
+// places and which no amount of prompt is going to stop. Under `==` that reply is not a miss,
+// so a gap was cached as an answer, with sources under "this is not in the documents", and
+// Ask BA stopped being the only thing left to do.
+//
+// So the test is the sentence at the *end* plus **no document citation anywhere**: nothing
+// above it came from the corpus, whatever else it contains. `[wN]` deliberately does not
+// count — citeMarker only matches a digit after the bracket — because a reply whose only
+// sources are public pages is precisely a question the documents did not answer.
+//
+// Both halves are load-bearing and each one alone is wrong. Without the suffix, an ordinary
+// uncited answer becomes a miss. Without the citation test, the partial answer pinned in
+// cachepolicy_test.go — grounded content, then the gap named at the end — becomes one too,
+// which is the case exactness existed to protect.
+//
+// The asymmetry is what settles the remaining doubt: a reply misread as a miss costs one
+// completion the next time it is asked, while a gap misread as an answer is cached until the
+// corpus changes and hides itself from the loop that would have fixed it.
+func isMiss(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.HasSuffix(s, NoAnswer) && !citeMarker.MatchString(s)
+}
 
 // systemPrompt is the whole of the model's brief. Every line is here because its
 // absence produced a wrong answer, not because it sounded prudent — a rule the model

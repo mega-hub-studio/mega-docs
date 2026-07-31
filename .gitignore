@@ -29,3 +29,9 @@ web/ui/node_modules/
 # dependencies. Ignored, not just deleted — it has been committed twice
 # (changelog/2026-07-29-conversation-memory.md).
 web/ui/pnpm-lock.yaml
+
+# The settings the harness writes per machine, and the temp files it writes beside them.
+# `git add -A` picked one of those up once — a tracked temp file is a credential-shaped
+# accident waiting to happen, and `make secrets` only scans what is tracked.
+.claude/settings.local.json
+.claude/settings.local.json.tmp.*
