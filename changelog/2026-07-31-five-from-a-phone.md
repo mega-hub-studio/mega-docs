@@ -47,6 +47,40 @@ keeps the rule the diagram bullet already states — a status the documents name
 replaced — while the column itself goes from a word to a character, which is what was asked
 for. An identifier is still never a glyph.
 
+### 1b · the same card, two reports later: the width it never used, and three kinds of ragged
+
+Reported as "tại sao không tận dụng WIDTH" and "tránh lệch so le". Four causes, and the first
+is the one that makes the card look wrong at every width above a phone.
+
+`.a > .clarify` sets `align-items: start`, which is correct for the ASK THIS button — the
+comment beside it says so, and measures the 70px it protects — and wrong for the option group,
+the one child that wants the whole card. Left to shrink-to-fit, the fieldset sized to its own
+max-content: **520px inside 901px of card** at a 1000px window, so the longest option decided
+the width and every shorter row trailed up to **263px** of dead space after its number.
+`align-self: stretch` on that one child fixes it without touching the parent's value.
+
+Then three separate kinds of ragged, which a reader sees as one mess:
+
+| what | measured before |
+|---|---|
+| `.check` is the library's `align-items: center` — right for one line, wrong when it wraps | the number sat 15 · 26 · 38px from the top of its own row |
+| the text has no `flex`, so everything after it started wherever the text stopped | right gaps 141 · 22 · 263 · 263 |
+| the star is optional, and it came *after* the number | a row without one ended 22px further right |
+
+`flex: 1` + `min-inline-size: 0` on the text, and `order: 1` on the number so the **number is
+the column** and the star floats inside the row where its absence costs nothing.
+
+The clamp is the rest: two lines, so every row is one height. Two and not one because at 390 a
+one-line clamp truncated **all four** options — and these are the choices a reader is picking
+between, while a `title` is a hover and a phone has none. Two truncated two of four and left
+every option readable enough to choose from. `title` carries the whole wording either way, set
+unconditionally: whether a row actually truncated is a measurement only the browser has, and a
+branch in the component is logic rule 11 keeps out.
+
+Measured after, at 390 · 1000: row heights uniform (46 · 24), the number column and the row's
+right edge agree to **0px** at both, one left edge for every label, ASK THIS still 70px, and
+`documentElement.scrollWidth === innerWidth`.
+
 ## 2 · ASK THIS asked the question that was already on screen
 
 `composeClarify` prefixed a `[!QUESTION]` pick with the card's own legend, so the new turn's

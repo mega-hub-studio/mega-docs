@@ -48,7 +48,12 @@ const picked = event => composeClarify(new FormData(event.target))
           :value="opt.text"
           :checked="opt.recommended"
         >
-        <span>{{ opt.text }}</span>
+        <!-- `title` carries the whole wording, because styles.css clamps this to two lines so
+             every row is one height. Set unconditionally: whether a row actually truncated is
+             a measurement only the browser has, and a branch here would be logic rule 11 keeps
+             out of a component. A tooltip repeating a short label costs nothing; a clamped
+             option with no way to read it costs the pick. -->
+        <span :title="opt.text">{{ opt.text }}</span>
         <!-- The same `.cite` recipe the prose above renders a marker with, so a citation looks
              like a citation wherever it appears — this row used to print "[2]" as characters
              beside a card full of chips.

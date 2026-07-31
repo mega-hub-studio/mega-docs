@@ -264,6 +264,42 @@ main .card > .head { margin-block-end: 0; }
   max-inline-size: none;
 }
 
+/* ── the option rows: one column, one edge, one height ──
+   `align-items: start` above is right for the button and wrong for the group of options, which
+   is the only child here that wants the card's whole width. Left to shrink-to-fit it sized to
+   its own max-content: measured at a 1000px window, **520px inside 901px of card**, so the
+   longest option decided the width and every shorter row carried up to 263px of dead space
+   after its number. `align-self` on the one child that needs it, rather than switching the
+   parent, because the parent's value is what keeps ASK THIS at its own 70px.
+
+   Then three things that were each a different kind of ragged, and a reader with an eye for
+   it sees all three at once:
+
+     · `.check` is the library's `align-items: center`, which is correct for one line of text
+       and wrong the moment it wraps — the number and the star drift to the middle of the
+       block, so a column of them measured 15 · 26 · 38px from the top of its own row.
+     · the text has no `flex`, so it sized to content and everything after it started wherever
+       that happened to end. `flex: 1` hands it the slack and pushes the trailing marks to the
+       edge; `min-inline-size: 0` is what lets a flex item actually shrink below its content.
+     · the star is optional, so with the number before it a row without one ended 22px further
+       right than a row with one. `order` puts the number last, so **the number is the column**
+       and the star floats inside the row where its absence costs nothing.
+
+   The clamp is what makes every row the same height, which is the rest of it. Two lines, not
+   one: at 390 a one-line clamp truncated **all four** options, and these are the choices a
+   reader is picking between — a `title` is a hover, and a phone has none. Two lines truncated
+   two of four and left every option readable enough to choose from. Measured at 390 · 1000
+   after: heights uniform (46 · 24), and the number column and the row's right edge agree to
+   0px at both. */
+.a > .clarify > .control-group { align-self: stretch; }
+.clarify .check { align-items: start; }
+.clarify .check > span:not(.cite) {
+  flex: 1; min-inline-size: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.clarify .check > .cite { order: 1; }
+
 /* Text keeps a reading measure while the shell does not, which is what let --col be 80rem
    safely — widening a column without this buys a wide table at the price of 160-character
    prose. The column is 52rem now, close enough to the measure that the two nearly agree.
