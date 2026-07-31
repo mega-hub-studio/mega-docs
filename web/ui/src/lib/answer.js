@@ -382,8 +382,27 @@ export function turnClarify(turn) {
  * @typedef {object} Clarify
  * @property {string} kind QUESTION when the reply is a question back, NEXT when it is an offer
  * @property {string} prompt the sentence sharing the marker's line
- * @property {{ text: string, recommended: boolean }[]} options one per checklist item
+ * @property {{ text: string, cites: number[], recommended: boolean }[]} options one per item
  */
+
+/* An option's [n] is a citation, not part of its wording, and it used to be treated as both:
+   rendered verbatim in the card — "Các biến và cách sử dụng [2]", bare brackets on a row whose
+   own prose above renders the same marker as a chip — and then stripped a second time inside
+   composeClarify before the pick went back as a question. Two copies of one rule, and the
+   reader got the raw one.
+
+   Split once, here. The label is what a reader reads, `cites` is what the card renders with the
+   library's `.cite` recipe, and composeClarify has nothing left to strip. */
+const citeIn = /\s*\[(\d+)\]/g
+
+/** One checklist item → a pickable option, with its citation numbers taken out of the wording. */
+function option(item) {
+  return {
+    text: item.text.replaceAll(citeIn, '').trim(),
+    cites: [...item.text.matchAll(citeIn)].map(m => Number(m[1])),
+    recommended: item.checked === true,
+  }
+}
 
 /**
  * Split a reply into the prose that renders and the pickable block inside it.
@@ -428,7 +447,7 @@ function stripClarify(markdown) {
     return {
       kind,
       prompt: opening.replace(clarifyMark, '').trim() || LABEL[kind],
-      options: tokens[end].items.map(i => ({ text: i.text, recommended: i.checked === true })),
+      options: tokens[end].items.map(option),
     }
   }
   const cards = found.map(read)
@@ -465,13 +484,9 @@ function stripClarify(markdown) {
  * @returns {string}
  */
 export function composeClarify(form) {
-  const picked = form
-    .getAll('reading')
-    // The [n] belongs to the option as *shown*, pointing at the source behind that reading.
-    // Asked back it would be a citation number in a question, which retrieval reads as text.
-    .map(text => text.replaceAll(/\[\d+\]/g, '').trim())
-    .filter(Boolean)
-  return picked.join(' ; ')
+  // No [n] to strip: `option` above took the citation out of the wording before the card ever
+  // rendered it, so what a checkbox carries is already the question's words.
+  return form.getAll('reading').map(text => text.trim()).filter(Boolean).join(' ; ')
 }
 
 /* Runs on the sanitized DOM, never on the markdown: injecting anchors before

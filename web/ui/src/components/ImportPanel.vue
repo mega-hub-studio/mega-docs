@@ -107,11 +107,19 @@ const {
         Indexing {{ progress.done + 1 > progress.total ? progress.total : progress.done + 1 }}
         of {{ progress.total }} — each file is embedded before it is searchable.
       </p>
+      <!-- Only when there is more than one file, because progress is counted per *file*: the
+           request carries the embedding, so nothing is known about a file until it lands. One
+           file therefore has no intermediate state at all — the bar would sit at 0% for the
+           whole import and reach 100% in the same tick that unmounts it, which is the "empty
+           bar" this whole block was reported for. A bar stuck at zero says "not started" while
+           the work is running, and that is the same lie as a bar that invents its position,
+           told from the other end. The spinner and the sentence are the honest signal there. -->
       <div
+        v-if="progress.total > 1"
         class="pbar" role="progressbar"
         :aria-valuenow="progress.done" aria-valuemin="0" :aria-valuemax="progress.total"
       >
-        <i :style="{ '--fill': `${progress.total ? progress.done / progress.total * 100 : 0}%` }" />
+        <i :style="{ '--fill': `${progress.done / progress.total * 100}%` }" />
       </div>
     </div>
 

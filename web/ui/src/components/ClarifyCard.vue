@@ -49,6 +49,15 @@ const picked = event => composeClarify(new FormData(event.target))
           :checked="opt.recommended"
         >
         <span>{{ opt.text }}</span>
+        <!-- The same `.cite` recipe the prose above renders a marker with, so a citation looks
+             like a citation wherever it appears — this row used to print "[2]" as characters
+             beside a card full of chips.
+
+             A <span>, not the <a> prose uses: the row is a <label>, so an anchor inside it
+             would tick the checkbox on the way to the source. The number is provenance here —
+             which section backs this reading — and the source list is already on screen a few
+             blocks below, under the card. -->
+        <span v-for="n in opt.cites" :key="n" class="cite">{{ n }}</span>
         <!-- Ticked already, so this only says why — the fastest path is one tap on ASK THIS,
              and the reader can still disagree with the pick.
 
