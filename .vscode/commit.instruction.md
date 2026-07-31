@@ -42,9 +42,7 @@ The commit subject is the **only** place the version lives — no VERSION file, 
 duplicate in `package.json`. Read the current one, then bump exactly one digit and
 reset every digit to its right:
 
-```bash
 git log -200 --format=%s | grep -oE '\[[0-9]+\.[0-9]+\.[0-9]+\]' | head -1
-```
 
 - **x** — engine-level: a public seam, an invariant, a DB migration that rewrites
   meaning, a layer rule, an API route's contract. `feat(db): …[2.0.0]` is legal when
@@ -63,13 +61,11 @@ not a file. Footers last: `BREAKING CHANGE: …`, `Refs: #123`.
 
 ## good
 
-```
 fix(rag): stop caching a whole miss, cache a partial answer [1.4.3]
 feat(ui): pick a scope from the corpus tree before asking [1.5.0]
 refactor(db): move the scope out of the cache signature into the key [2.0.0]
 docs(changelog): record why the DB stays derived until backup exists [1.5.1]
 build(deps): take 8bit-nes 0.7.3 and drop the workaround it replaces [1.5.2]
-```
 
 ## reject
 
