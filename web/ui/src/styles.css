@@ -262,6 +262,16 @@ main .card > .head { margin-block-end: 0; }
   display: flex; flex-direction: column; align-items: start;
   gap: var(--sp-3);
   max-inline-size: none;
+  /* 0.16.0 reserves a 40px gutter on the inline start for `.callout::before`, against 16px on
+     the end — so the card sat visibly off-centre and spent 24px of a 315px phone card on one
+     decorative character. That mark exists because a *prose* panel's kind is carried by hue
+     alone (WCAG 1.4.1, reported from here); this is not a prose panel. It is a <form> with a
+     <legend> naming the group and a column of checkboxes, so what kind of thing it is was never
+     in question, and the legend already says which of the two it is. The library documents this
+     exact opt-out in the recipe, both halves of it — dropping the glyph without reclaiming the
+     gutter would keep the asymmetry and lose the only thing paying for it. */
+  --mark: none;
+  padding-inline-start: var(--sp-4);
 }
 
 /* ── the option rows: one column, one edge, one height ──

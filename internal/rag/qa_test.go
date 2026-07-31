@@ -636,6 +636,16 @@ func TestAFollowUpIsRewrittenForRetrievalAndNeverCached(t *testing.T) {
 			t.Errorf("the answering call never saw %q", want)
 		}
 	}
+	// So is the *rewrite* call, and this is asserted separately because the two are separate
+	// bugs: a rewrite that cannot see the thread has nothing to resolve the pronoun against,
+	// and it fails silently — the fake provider's reply is content-independent, so the
+	// assertion above passes either way.
+	rewrite := prov.Messages()[len(prov.Messages())-2]
+	for _, want := range []string{"user: " + first, "assistant: " + answer} {
+		if !slices.Contains(rewrite, want) {
+			t.Errorf("the rewrite call never saw %q — it has nothing to resolve the pronoun against", want)
+		}
+	}
 
 	if reply.Cached {
 		t.Error("a follow-up was served from the cache — that row belongs to whichever conversation stored it")
@@ -865,6 +875,49 @@ func TestAnotherModelIsAnotherAnswerAndBothSurvive(t *testing.T) {
 	}
 	if got := len(prov.Chats()) - before; got != 0 {
 		t.Errorf("a cached answer bought %d completions", got)
+	}
+}
+
+// TestARewriteIsBilledEvenWhenRetrievalFindsNothing is a money test, and it went red the
+// moment the fake provider learned to report usage at all.
+//
+// A follow-up buys two completions: one to rewrite it into a standalone question, one to
+// answer it. Three returns sit between the rewrite and the point where its cost used to be
+// folded in — an embedding failure, a retrieval failure, and retrieval finding nothing, which
+// is not an error but an ordinary outcome. All three returned a zero Usage, so the status
+// line printed nothing for a completion the provider really billed.
+//
+// `CLAUDE.md` names that exact trap ("numbers the UI shows must be measured, not estimated"),
+// and the changelog claimed the rewrite's tokens were counted "once, before every return".
+// They were not, and nothing could tell: every fake completion reported zero, so zero was
+// indistinguishable from unbilled.
+func TestARewriteIsBilledEvenWhenRetrievalFindsNothing(t *testing.T) {
+	ctx := context.Background()
+	e, prov := engine(t, &aitest.Provider{Reply: "grounded [1]", TokensPerCall: 7})
+	if _, err := e.Ingest(ctx, "docs/retrieval.md", retrievalDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	// A scope no document lives under, so both retrievers are filtered to nothing and Answer
+	// takes the len(hits) == 0 path — after the rewrite has already been paid for.
+	reply, err := e.Answer(ctx, rag.Ask{
+		Question: "còn bước 2 thì sao?",
+		Scope:    "billing/enterprise",
+		History:  []rag.Turn{{Q: "how do I cancel a booking?", A: "Open the booking and press cancel [1]."}},
+		OnToken:  func(string) {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prov.Chats()) != 1 {
+		t.Fatalf("bought %d completions; this path is the rewrite alone", len(prov.Chats()))
+	}
+	if !reply.Usage.Reported() {
+		t.Error("a rewrite was billed and the reply reported no cost at all — an unmeasured\n" +
+			"cost and a cost of nothing are different facts, and this printed the wrong one")
+	}
+	if reply.Usage.PromptTokens != 7 || reply.Usage.CompletionTokens != 7 {
+		t.Errorf("usage = %+v; want the rewrite's own 7/7", reply.Usage)
 	}
 }
 

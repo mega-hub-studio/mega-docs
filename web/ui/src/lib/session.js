@@ -94,5 +94,11 @@ function settle(t) {
     error: t.error ?? '',
     ms: t.ms ?? 0,
     streaming: false,
+    // Kept, because the text is: a stopped answer is a partial one, and a restored thread that
+    // forgot which turns were cut would replay a half sentence to the model as a whole one.
+    // A turn still streaming when this ran never finished either — that is what a `pagehide`
+    // flush catches — so it settles as stopped for exactly the same reason. On an answer that
+    // completes normally the next save sees both flags false and writes them false.
+    stopped: t.stopped === true || t.streaming === true,
   }
 }

@@ -249,6 +249,11 @@ func TestChatRejectsBadRequests(t *testing.T) {
 		"empty question":  `{"question":""}`,
 		"blank question":  `{"question":"   "}`,
 		"wrong json type": `{"question":42}`,
+		// A thread longer than the client ever offers. The byte cap cannot catch this — a
+		// two-character turn is legal, so thousands fit under 256 KiB — and every one of them
+		// would buy two completions on a route that is open by design and never cached.
+		"more turns than the client offers": `{"question":"x","history":[` +
+			strings.Repeat(`{"q":"a","a":"b"},`, 13) + `{"q":"a","a":"b"}]}`,
 	} {
 		if code := do(t, h, "POST", "/api/chat", body, nil).Code; code != http.StatusBadRequest {
 			t.Errorf("%s: got %d, want 400", name, code)

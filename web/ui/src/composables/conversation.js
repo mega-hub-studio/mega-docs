@@ -24,9 +24,15 @@ let seq = 0
 const RECALL_TURNS = 12
 
 /**
- * The thread behind one turn, in the shape /api/chat takes: oldest first, and only turns
- * that actually have an answer. A question whose answer errored or was stopped would tell
- * the model that question went unanswered, which is not what happened.
+ * The thread behind one turn, in the shape /api/chat takes: oldest first, and only turns that
+ * actually have a whole answer.
+ *
+ * Three ways a turn has no answer worth replaying, and only two of them were caught. An empty
+ * `a` and an `error` are obvious. A turn the reader **stopped** is neither: `chat.js` resolves
+ * an AbortError quietly rather than throwing, so `error` stays empty while `a` holds however
+ * much arrived — often a sentence cut mid-word. Sent as a complete `{q, a}` pair, it tells the
+ * model the assistant said something it never finished saying, and the model then treats that
+ * fragment as an established fact of the conversation. `stopped` is what closes it.
  * @param {object[]} list every turn in the conversation
  * @param {object} turn the one being asked or regenerated — everything before it is history
  * @returns {{ q: string, a: string }[]}
@@ -34,7 +40,7 @@ const RECALL_TURNS = 12
 function threadBefore(list, turn) {
   return list
     .slice(0, list.indexOf(turn))
-    .filter(t => t.a && !t.error)
+    .filter(t => t.a && !t.error && !t.stopped)
     .slice(-RECALL_TURNS)
     .map(t => ({ q: t.q, a: t.a }))
 }
@@ -64,6 +70,10 @@ function newTurn(q, scope) {
     recall: { kept: 0, offered: 0 },
     // The same pair for the corpus: sections read, of sections retrieval weighed.
     retrieval: { sections: 0, candidates: 0 },
+    // Whether the reader cut this answer short. It stays with the turn because the text does
+    // too: what is on screen is half an answer, and half an answer must not be replayed to the
+    // model as a whole one. See threadBefore.
+    stopped: false,
     ticket: null, // the gap filed from this answer, once there is one
   }
 }
@@ -127,11 +137,17 @@ export function useConversation({ scope, model, websearch, prompt, scroll, toast
       in: 0,
       out: 0,
       recall: { kept: 0, offered: 0 },
+      stopped: false,
     })
     await stream(turn, { fresh: true })
   }
 
   function stop() {
+    // Marked before the abort lands, because the turn is the only record: `chat.js` resolves a
+    // stop quietly, so nothing downstream can tell a stopped answer from a finished one.
+    const turn = turns.value.at(-1)
+    if (turn?.streaming)
+      turn.stopped = true
     run?.stop()
   }
 

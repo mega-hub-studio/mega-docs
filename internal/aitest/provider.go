@@ -38,6 +38,13 @@ type Provider struct {
 	// with one call log answers that without wiring a second base URL through every helper.
 	SearchResults []SearchHit
 
+	// TokensPerCall is what every completion reports as its cost, in and out, on a trailing
+	// usage frame with no choices — the shape a real provider uses and `ai.Client` reads.
+	// Zero means the provider reports nothing, which is also real and is what `Usage.Reported`
+	// exists to tell apart. It is here because a cost the engine forgets to carry is invisible
+	// otherwise: every test saw zero, so no test could see a completion going unbilled.
+	TokensPerCall int
+
 	mu       sync.Mutex
 	embedded [][]string // every batch of inputs it was asked to embed
 	chats    []string   // every chat request's last user message
@@ -252,6 +259,12 @@ func (p *Provider) chat(w http.ResponseWriter, r *http.Request) {
 	if p.MidStreamError != "" {
 		frame(map[string]any{"error": map[string]string{"message": p.MidStreamError}})
 		return
+	}
+	if p.TokensPerCall > 0 {
+		frame(map[string]any{"usage": map[string]int{
+			"prompt_tokens":     p.TokensPerCall,
+			"completion_tokens": p.TokensPerCall,
+		}})
 	}
 	_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 }

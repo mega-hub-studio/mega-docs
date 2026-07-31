@@ -23,6 +23,17 @@ import (
 // window rather than against a byte cap.
 const maxAsk = 256 << 10 // 256 KiB
 
+// maxHistoryTurns caps the thread by *count*, because the byte cap above does not.
+//
+// A turn can be two characters, so 256 KiB is thousands of them — and every one of them makes
+// the request uncacheable (a follow-up never is) and buys two completions, on a route rule 2
+// keeps open. The comment above used to claim the byte cap "stops a client from deciding to
+// send a thousand"; it never did, and raising it to 256 KiB made that four times less true.
+//
+// Twelve, matching what the client offers, and refused rather than truncated: silently
+// dropping half a thread is the kind of quiet trim `Recall` exists to make visible.
+const maxHistoryTurns = 12
+
 var errBadRequest = errors.New("bad request")
 
 // chatHandler answers one question over SSE:
@@ -131,6 +142,9 @@ func readQuestion(r *http.Request, models []Model, canSearch bool) (rag.Ask, err
 	}
 	q := strings.TrimSpace(body.Question)
 	if q == "" {
+		return rag.Ask{}, errBadRequest
+	}
+	if len(body.History) > maxHistoryTurns {
 		return rag.Ask{}, errBadRequest
 	}
 	// The engine canonicalises the scope rather than the handler: it is part of the

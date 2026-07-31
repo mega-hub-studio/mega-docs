@@ -396,21 +396,41 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// provider: the reply is a constant, so storing it would spend a row to remember
 	// something that is already free. Before the rewrite too, so "cảm ơn" on the tenth
 	// message still costs nothing.
-	if reply, ok := smallTalk(question, len(turns) > 0); ok {
+	// Whether this question continues a thread, named once. It decides three things with two
+	// opposite polarities — a bare "how?" is not vague inside a thread, nothing about a
+	// follow-up may be cached, and a follow-up is what the rewrite below exists for — and
+	// deriving it twice from `len(turns)` is how two of them drift apart.
+	inThread := len(turns) > 0
+
+	if reply, ok := smallTalk(question, inThread); ok {
 		onToken(reply)
 		return Reply{}, nil
 	}
 
 	// What retrieval runs on, which is not always what was typed: a follow-up is rewritten
 	// against the thread first, because a pronoun embeds to nothing. See memory.go.
+	//
+	// `usage` starts at what that rewrite cost rather than being folded in at the end, and the
+	// difference is a bug this had: three returns sit between here and the fold, and all three
+	// reported a completion the provider really billed as zero. A cost is carried from the
+	// moment it is paid, so no later return can forget it.
 	query, spent := e.standalone(ctx, chat, question, turns)
+	usage := spent
 
 	// A signature we can't read means "don't cache", never "fail the question". A
 	// follow-up means the same, and in both directions: served from a row it answers
 	// another conversation, stored in one it answers the next. One name for it, because
 	// reading and writing must never disagree about what may be cached.
-	sig, sigErr := e.sig()
-	cacheable := sigErr == nil && len(turns) == 0
+	//
+	// Not read at all inside a thread, so not computed there either: Store.Sig() is an
+	// unindexed count over every chunk, by its own doc comment, and every second message of
+	// every conversation was paying for a number that could never be used.
+	var sig string
+	cacheable := false
+	if !inThread {
+		s, err := e.sig()
+		sig, cacheable = s, err == nil
+	}
 	// `Fresh` excludes only the read: Regenerate says the stored answer was wrong, not
 	// that the answer replacing it is not worth keeping.
 	if cacheable && !a.Fresh {
@@ -421,15 +441,15 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 
 	qv, err := e.ai.Embed(ctx, []string{query})
 	if err != nil {
-		return Reply{}, err
+		return Reply{Usage: usage}, err
 	}
 	hits, retrieval, err := e.retrieve(qv[0], query, model, scope)
 	if err != nil {
-		return Reply{}, err
+		return Reply{Usage: usage}, err
 	}
 	if len(hits) == 0 {
 		onToken(NoAnswer)
-		return Reply{}, nil
+		return Reply{Usage: usage, Retrieval: retrieval}, nil
 	}
 
 	var cb strings.Builder
@@ -457,15 +477,15 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// Accumulate what the user is already seeing: the cache stores the answer, and
 	// re-serialising it from the model would cost the tokens twice.
 	var full strings.Builder
-	usage, err := chat.ChatStream(ctx, msgs, func(tok string) {
+	streamed, err := chat.ChatStream(ctx, msgs, func(tok string) {
 		full.WriteString(tok)
 		onToken(tok)
 	})
-	// The rewrite was a real completion on a real provider. Folding its usage in here —
-	// once, before every return below — keeps the status line reporting what this turn
-	// actually cost rather than the part of it that produced text on screen.
-	usage.PromptTokens += spent.PromptTokens
-	usage.CompletionTokens += spent.CompletionTokens
+	// The answering completion adds to what the rewrite already cost, rather than replacing
+	// it. This used to be the other way round — the rewrite folded in here, at the end — and
+	// the three returns above it reported zero for a completion that was really billed.
+	usage.PromptTokens += streamed.PromptTokens
+	usage.CompletionTokens += streamed.CompletionTokens
 	if err != nil {
 		return Reply{Citations: cites, Usage: usage, Retrieval: retrieval}, err
 	}
