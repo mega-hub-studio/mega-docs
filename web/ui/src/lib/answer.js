@@ -278,12 +278,15 @@ const ALERTS = {
   ...PICK,
 }
 
-/* The glyph that says which kind, because the colour alone does not. `.callout` in 0.15.0 is a
-   border and a tint and nothing else, so WARNING and CAUTION are two oranges to a reader who
-   has not learned the palette — and every one of them looks identical to a colour-blind one.
-   One character in front of the first word is the whole affordance; the library has no icon
-   slot in this recipe and a `<b>` label would be a word to translate on every panel. */
-const GLYPH = { NOTE: '📝', TIP: '💡', IMPORTANT: '❗', WARNING: '⚠️', CAUTION: '🛑', GENERAL: '🌐', QUESTION: '❓', NEXT: '➡️' }
+/* No glyph is prepended here any more, and the deletion is the point. This file used to put one
+   emoji in front of the first word because `.callout` in 0.15.0 was a border and a tint and
+   nothing else — so WARNING and CAUTION were two oranges to a reader who had not learned the
+   palette, and one colour to a colour-blind one. That went upstream as WCAG 1.4.1 and 0.16.0
+   ships the recipe's own: `.callout::before { content: var(--mark) / "" }`, one ASCII character
+   per kind, in a reserved gutter, hidden from a screen reader. Keeping both would print two
+   marks on every panel, and the library's is the better of the two — a gutter holds for a panel
+   that opens with a list, where a character prepended into the first paragraph has no line to
+   join. `.explain` is this app's own kind, so styles.css gives it its own `--mark`. */
 
 const marker = kinds => new RegExp(`^\\[!(${Object.keys(kinds).join('|')})\\]\\s*`)
 const alertMark = marker(ALERTS)
@@ -346,11 +349,6 @@ function dressAlerts(html) {
     panel.className = `callout ${ALERTS[kind[1]]}`
     panel.append(...quote.childNodes)
     dropRepeats(panel)
-    // Into the first paragraph, not the panel: a text node prepended to the <div> would sit
-    // above a block element and give the glyph a line of its own. A panel opening with a list
-    // instead has no line to join, and there the glyph is a lead-in above it.
-    const head = panel.firstElementChild
-    ;(head?.tagName === 'P' ? head : panel).prepend(`${GLYPH[kind[1]]} `)
     quote.replaceWith(panel)
   }
   return tpl.innerHTML

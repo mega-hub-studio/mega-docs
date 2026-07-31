@@ -302,10 +302,8 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
        horizontal escape: `.table-wrap` scrolls itself. So the rule that saves a paragraph
        is what shreds a table, and `normal` here is not a relaxation of it — it is the same
        decision made where the escape exists.
-     · `vertical-align: middle` — the browser's default for a `td`, and wrong for a grid
-       that is read across. One row was a 303px cell beside a one-line cell floating in the
-       middle of it, so no two values in a row started at the same y. `top` is what makes a
-       row scan as a row.
+     · `vertical-align: middle` — the browser's default for a `td`. Reported and fixed: 0.16.0
+       sets `top` on both `th` and `td`, so nothing is needed here any more.
      · `inline-size: 100%` alone (the library's) is a *preferred* width, so the table
        squeezed to the 317px card instead of taking the width its content needs and
        scrolling. `max-content` asks for that width, `min-inline-size: 100%` keeps a narrow
@@ -322,7 +320,6 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
   min-inline-size: 100%;
 }
 .prose .table :is(th, td) {
-  vertical-align: top;
   overflow-wrap: normal;
   padding: var(--sp-2);
   max-inline-size: 16rem;
@@ -359,21 +356,11 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 }
 
 /* An answer's image opens in the diagram viewer, so it has to look like it does something.
-   No width here, and the reason is worth being precise about because the obvious reading is
-   wrong: the library DOES opt `img` out of `--prose-measure`, but only as a direct child of
-   `.prose`. Markdown wraps a standalone image in a `<p>`, and the paragraph is what carries the
-   measure — so the picture was inheriting a 72ch cap through its wrapper, not from any rule
-   about images. `dressImages` unwraps a lone-image paragraph so the library's own opt-out
-   applies; an image sharing a paragraph with text stays inside the measure, where it belongs.
-
-   And then the cap has to come back one level up, which is the whole mobile-first lesson in one
-   declaration. `max-inline-size: none` is right for everything else on that opt-out list — a
-   `<pre>`, a `.table-wrap`, a `nes-zoom` each scroll or pan *inside themselves*. An image has no
-   such escape: with the cap gone it renders at its intrinsic width, and a 1400px screenshot
-   measured **1404px inside a 1207px card** — which on a 390px phone is the page scrolling
-   sideways. Two different caps had been conflated: `--prose-measure` is a *reading* limit an
-   image should escape, `100%` is a *container* limit nothing may. */
-.prose > img { max-inline-size: 100%; }
+   No width here: `.prose > img` used to take the container cap back, and 0.16.0 ships
+   `&>:is(img, svg, video) { max-inline-size: 100%; block-size: auto }` — reported from here,
+   landed there, deleted here. `dressImages` still unwraps a lone-image paragraph, and that
+   half is this repo's for good: the library's opt-out only reaches a *direct* child of
+   `.prose`, so a markdown-wrapped image inherits the 72ch measure through its `<p>`. */
 .prose img { cursor: zoom-in; }
 
 /* ── citations: the row a marker jumps to ──
@@ -414,7 +401,11 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 
    The badge sits on the list's own line rather than above it: this is a label on a block, not
    a heading over a section, and a heading would make three sources look like a chapter. */
-.explain { --accent: var(--teal); }
+/* And its own mark, because 0.16.0's `.callout::before` aliases one ASCII character per kind it
+   ships (`!` warn · `X` gotcha · `i` info · `?` quest · `#` memo · `+` tip) and `.explain` is
+   not one of them — left alone it would take the base `*` and read as a generic note. `~` is
+   the kind in one character: approximately, not vouched for by a document. */
+.explain { --accent: var(--teal); --mark: "~"; }
 .web-sources { display: flex; flex-direction: column; gap: var(--sp-2); }
 .web-sources > .sources { margin-block: 0; }
 .web-sources > .badge { align-self: start; }

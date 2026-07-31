@@ -18,8 +18,8 @@
 # To upgrade: change the version here, run `make vendor` to fetch it, and copy the digest
 # it reports in. AGENTS.md quotes this version too, and a test fails when they disagree.
 
-8bit-nes@0.15.0/all.min.css                sha384-a8DK/khhbuldLVPGGJRPaNOx/V2tOoS9TpPw7CbJyqFwo8RsmEMeqeA4pOyK269R
-8bit-nes@0.15.0/elements.min.js            sha384-SfWC08i1nvFLoCQd9rUoNGTjMCXhZ97Cl7Hfx4EDrqj3Mkieuf/+q0Qwi6jeVItg
-8bit-nes@0.15.0/fonts/nes-sans-var.woff2   sha384-V0mBCb70drfj6c4nrXQZzeA1f3+dMf1SmGx8rFxjAyLv3r9v6cyavyflVS9k1zN1
-8bit-nes@0.15.0/fonts/nes-mono-400.woff2   sha384-p6Np4maYb/lk6CQKeJUmaBCU24D3gGT+8t2Ig3kAFL4HwjBSFHIYyG1jImIRtJ2W
-8bit-nes@0.15.0/fonts/nes-mono-700.woff2   sha384-q6VJNasxQDFenQMkrxT3J6d7JywnbOPPkoBNgSKGcHZg0lUWYtiV9XcXGKTe9Wa1
+8bit-nes@0.16.0/all.min.css                sha384-bnFVHVR0cb4DTlgB65iWy3avLsXlwZAz9CzgSZW8/U/+XnBxbko+ZgIiSs2kkSdi
+8bit-nes@0.16.0/elements.min.js            sha384-SfWC08i1nvFLoCQd9rUoNGTjMCXhZ97Cl7Hfx4EDrqj3Mkieuf/+q0Qwi6jeVItg
+8bit-nes@0.16.0/fonts/nes-sans-var.woff2   sha384-V0mBCb70drfj6c4nrXQZzeA1f3+dMf1SmGx8rFxjAyLv3r9v6cyavyflVS9k1zN1
+8bit-nes@0.16.0/fonts/nes-mono-400.woff2   sha384-p6Np4maYb/lk6CQKeJUmaBCU24D3gGT+8t2Ig3kAFL4HwjBSFHIYyG1jImIRtJ2W
+8bit-nes@0.16.0/fonts/nes-mono-700.woff2   sha384-q6VJNasxQDFenQMkrxT3J6d7JywnbOPPkoBNgSKGcHZg0lUWYtiV9XcXGKTe9Wa1

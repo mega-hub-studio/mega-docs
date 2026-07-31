@@ -51,15 +51,15 @@ is the chat app and nothing else. Do not add doc routes to it.
 
 The UI is built on **8bit-nes**, and the version this repo pins is:
 
-    8bit-nes@0.15.0
+    8bit-nes@0.16.0
 
 Read the docs **for that version**, not the latest:
 
 | | URL | Why |
 |---|---|---|
-| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
-| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/llms-full.txt> | same |
-| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.15.0/components.json> | same |
+| Pinned machine index | <https://cdn.jsdelivr.net/npm/8bit-nes@0.16.0/llms.txt> | ships in the package, so it matches the pinned bytes exactly |
+| Pinned full reference | <https://cdn.jsdelivr.net/npm/8bit-nes@0.16.0/llms-full.txt> | same |
+| Pinned component data | <https://cdn.jsdelivr.net/npm/8bit-nes@0.16.0/components.json> | same |
 | Human docs site | <https://tutranmvp.github.io/8bit-components/docs.html> | **always latest** — will describe components this repo does not have |
 
 That distinction matters. The docs *site* is unversioned, so reading it while this
@@ -105,28 +105,27 @@ it, so trust the table.
    how five pairs of blocks ended up touching at 0px on a phone. Add a container, declare
    its `gap`; never a margin on the child, and never nothing.
 3. **Every local override of the design system is named, and there are two kinds.** All of
-   them are in `web/ui/src/styles.css`, against **8bit-nes 0.15.0**, and each was re-verified
+   them are in `web/ui/src/styles.css`, against **8bit-nes 0.16.0**, and each was re-verified
    against that release's own CSS rather than its changelog, because "fixed upstream" is a
    claim about bytes.
 
-   **The first kind is empty.** All six overrides that were waiting on a release landed in
-   0.15.0, and each local rule was deleted rather than parked beside its replacement — the
-   sites keep one line saying what they fixed, so the loop reads as closed. On the bump
-   `all.min.css` and `elements.min.js` both changed digest; the three fonts came back
-   identical.
+   **The first kind is empty**, and has now been emptied twice. Everything this app was
+   patching around landed upstream, and each local rule was deleted rather than parked beside
+   its replacement — the sites keep one line saying what they fixed, so the loop reads as
+   closed. On the 0.16.0 bump only `all.min.css` changed digest; `elements.min.js` and all
+   three fonts came back byte-identical, which is what a CSS-only release should look like.
 
-   | landed in 0.15.0 | what the release does instead |
+   | landed in 0.16.0 | what the release does instead |
    |---|---|
-   | `.prose a.cite` recoloured, un-underlined | the prose-link rule is `& a:not(.cite)` now, so the two recipes stop colliding |
-   | `.prose a.cite` `padding-block-start: 0.1em` | `@supports (text-box-trim: trim-both)` trims the chip to cap height — and switches it to `display: inline-block`, because trim does nothing on an `inline-flex`, which the local patch never found |
-   | `.palette-list` un-capped | the `min(50vh, 340px)` cap is scoped `:is(dialog, .modal) .palette-list`, so a palette in the page is content-height |
-   | `.drawer[open]` `inset-inline-start: auto` | the recipe sets it itself, so a `<dialog>` and a plain box anchor the same way |
-   | `.prose nes-walkthrough` `max-inline-size: none` | `nes-walkthrough` is on `.prose`'s width opt-out list beside `nes-mermaid` |
-   | `.diagram-zoom .zoom-stage` `will-change: auto` | no static hint at all — `<nes-zoom>` sets it on pointerdown/wheel and drops it ~200ms after the gesture, which keeps a vector sharp *and* frees the layer |
+   | `.prose > img` `max-inline-size: 100%` | `&>:is(img, svg, video) { max-inline-size: 100%; block-size: auto }` — its own rule, not a later override, because `:is()` takes its most specific argument's weight and `.table-wrap` made the opt-out list (0,2,0) |
+   | `.prose .table :is(th, td)` `vertical-align: top` | `th` and `td` both ship `top`; the release comment measures the same failure this app did — first-line tops spread 57.8px across one row |
+   | the emoji prepended in `lib/answer.js`'s `dressAlerts` | `.callout::before { content: var(--mark) / "" }`, one ASCII character per kind in a reserved gutter, hidden from a screen reader. Better than what was here: a gutter holds for a panel opening with a list, where a character in the first paragraph has no line to join |
+   | *(nothing was patched)* `.pbar { --fill }` | `@property --fill` is `inherits: true` now, so setting it on the container works. This app sets it on the `<i>`, which is what the docs always showed, and stays there |
 
-   Six reported, six landed, six deleted here — that is what this rule is for, and the
-   `display: block` half of the walkthrough row is the counter-example worth remembering: it
-   had landed in **0.14.0** and sat here unnoticed for a release, because nobody re-measured.
+   The 0.15.0 round is not repeated here; it is in `changelog/upstream-8bit-nes-0.14.0.md`
+   with what each fix replaced. The counter-example worth keeping is from that round: the
+   `display: block` half of a `nes-walkthrough` override had landed in **0.14.0** and sat
+   here unnoticed for a release, because nobody re-measured. Re-measure on every bump.
 
    **This app using a recipe outside the context it was written for.** Nothing upstream to
    fix; each is permanent until the app's own use changes:
@@ -139,13 +138,20 @@ it, so trust the table.
    | `.empty .palette > .palette-empty` — start-aligned, at the rows' inset | centring is right for a state filling a blank list, wrong for a truncation notice under nine left-aligned rows |
    | `::selection` softened to a 32% `--primary` tint | the solid fill is ~11:1 on this dark page — correct contrast, and a flare when a long-press selects a word on a phone |
 
-   All five were re-measured against 0.15.0 and all five are still needed: the recipe still
+   All five were re-measured against 0.16.0 and all five are still needed: the recipe still
    underlines `.source-title` on hover, `.result` is still a control (`cursor: pointer`, a hover
    edge, `--pad-snug`), `.statusline` is still `inline-size: 100%` with `.sl-end` pushed,
-   `.palette-empty` is still centred, and `::selection` is still a solid fill (`base.css:137`).
+   `.palette-empty` is still centred, and `::selection` is still a solid fill. One of those
+   nearly went the other way on a careless grep — a three-line window around `.source-title`
+   missed its nested `&:hover` and read as "landed". Widen the window before deleting a rule;
+   a wrongly deleted override is a defect that ships looking like housekeeping.
 
-   The six requests that produced 0.15.0's fixes, and the prompt they were sent as, are in
-   `changelog/upstream-8bit-nes-0.14.0.md`.
+   `.explain` is a sixth, and the only one that is an *addition* rather than a correction: it
+   is this app's own callout kind, so 0.16.0 has no `--mark` for it and `styles.css` supplies
+   one (`~`) beside its `--teal`. A kind the library does not know about has to bring both.
+
+   The requests behind each round, and the prompts they were sent as, are in
+   `changelog/upstream-8bit-nes-0.14.0.md` and `changelog/upstream-8bit-nes-0.15.0.md`.
 
    `.prose` used to be a fourth. Its `72ch` sat on the container and so capped the tables and
    diagrams inside an answer as well as its text; 0.8.0 moved that measure onto the children

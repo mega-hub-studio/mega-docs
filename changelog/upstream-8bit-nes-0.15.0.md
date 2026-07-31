@@ -1,5 +1,14 @@
 # Upstream requests — 8bit-nes 0.15.0
 
+> **CLOSED — all four landed in 0.16.0.** Verified against the published bytes, not the
+> changelog: `&>:is(img, svg, video) { max-inline-size: 100%; block-size: auto }`,
+> `vertical-align: top` on both `th` and `td`, `.callout::before { content: var(--mark) / "" }`
+> with an ASCII mark per kind, and `@property --fill { inherits: true }`. Three local rules were
+> deleted in return — `.prose > img`, the table's `vertical-align`, and the emoji `dressAlerts`
+> prepended. The release quotes the measurements below in its own comments, so do not re-send
+> any of this; the prompt is kept for its shape, and because a closed loop is the evidence that
+> reporting upstream is cheaper than patching locally forever.
+
 Three findings from a consumer app, each measured against the pinned bytes of `0.15.0` rather
 than its changelog. Same format as the 0.14.0 round, and for the same reason: landing one
 upstream **removes** a rule from a consumer instead of adding one.

@@ -483,19 +483,16 @@ plan.
   numbered list with paragraphs it renders as uppercase columns four characters wide on a
   phone — which shipped. Numbered instructions on the docs pages are `.step` blocks;
   `make check-ui` fails on `main .steps > li`.
-- **`.pbar`'s `--fill` does not inherit, so it goes on the `<i>`, never on the bar.** 0.15.0
-  registers `@property --fill { syntax: "<percentage>"; inherits: false; initial-value: 0% }`,
-  while the recipe's own CSS writes `.pbar { --fill: 0% }` and the `<i>` reads
-  `inline-size: var(--fill)`. Follow the container and the child resolves the registered
-  *initial* instead — measured 0px against 1031.89px at the same 66.66%. The bar is empty at
-  every count, at every width, with no error anywhere and the right number in the sentence
-  beside it. A registered custom property is the one case where "set it on the parent" is not
-  a style preference; check for `@property` before assuming a variable reaches a child.
-  **The published docs already show `<span class="pbar"><i style="--fill:64%"></i></span>`, and
-  this repo read the recipe's CSS instead** — which is `AGENTS.md`'s pinned-docs rule earning its
-  keep, and the reason this trap is filed under ours rather than the library's. What the library
-  owes is one line: `.pbar { --fill: 0% }` cannot be read by anything and made the wrong reading
-  look like the API.
+- **A registered custom property may not reach the child that reads it — check for `@property`
+  before assuming it does.** 0.15.0 registered `--fill` with `inherits: false` while `.pbar`
+  set it on the container and its `<i>` read `inline-size: var(--fill)`, so the child resolved
+  the registration's *initial* and the import bar was empty at every count, at every width,
+  with no error anywhere and the right number in the sentence beside it — measured 0px against
+  1031.89px at the same 66.66%. **0.16.0 sets `inherits: true`, so both forms work now** and
+  this is here for the general shape rather than the instance. The instance is worth one line
+  of its own: the published docs always showed `<i style="--fill:64%">`, and this repo derived
+  the markup from the stylesheet instead. That is `AGENTS.md`'s pinned-docs rule earning its
+  keep — the app still binds the `<i>`, which was right the whole time.
 - **`nes-toc` sets `z-index: 20` on itself.** The sticky header has to sit above it or a
   popup opened from the header (the section finder) renders behind the index bar: visible,
   untappable, and no error anywhere. A popup's own z-index cannot help — it is inside the
