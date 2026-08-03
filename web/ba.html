@@ -473,6 +473,31 @@
       file là thứ duy nhất nói được. <b>New document</b> viết tay một tài liệu, điền đủ
       trường. Sau đó cả hai nằm chung một danh sách, và <b>Edit</b> vẫn là form đó.</p>
 
+    <div class="callout memo">
+      <b lang="en">Paste freely: what is stored is yours, what is indexed is tidied.</b>
+      <span lang="en">Text out of Confluence, Slack or Word carries things you cannot see — a
+        byte-order mark, non-breaking spaces, zero-width joiners, an exporter's front matter,
+        stray HTML comments. Those are stripped on the way into the index, because a
+        non-breaking space makes <i>hoàn tiền</i> a word no question will ever match, and a
+        section that opens with a generated comment spends part of itself saying nothing.
+        <b>Your document is not edited</b>: the body you saved is the body you will see when
+        you open it again, character for character. Only the retrievable copy is tidied — and
+        anything inside a fenced code block is left exactly as written, because there a
+        trailing space or an HTML comment is the thing being shown. Documents indexed before
+        this keep the sections they have until they are saved or re-imported.</span>
+      <b lang="vi">Cứ dán thoải mái: cái được lưu là của bạn, cái được index thì đã dọn.</b>
+      <span lang="vi">Chữ lấy từ Confluence, Slack hay Word mang theo những thứ mắt không
+        thấy — BOM, dấu cách không ngắt, ký tự rộng bằng không, front matter của công cụ
+        export, comment HTML thừa. Chúng bị bỏ trên đường vào index, vì một dấu cách không
+        ngắt biến <i>hoàn tiền</i> thành từ mà không câu hỏi nào khớp được, còn một mục mở đầu
+        bằng comment do máy sinh thì tốn một phần chính nó để không nói gì. <b>Tài liệu của
+        bạn không bị sửa</b>: phần thân bạn lưu vẫn là phần thân bạn thấy khi mở lại, đúng
+        từng ký tự. Chỉ bản dùng để truy xuất được dọn — và mọi thứ trong khối code có rào thì
+        giữ nguyên, vì ở đó một dấu cách cuối dòng hay một comment HTML chính là thứ đang được
+        trình bày. Tài liệu index từ trước vẫn giữ các mục cũ cho tới khi được lưu lại hoặc
+        import lại.</span>
+    </div>
+
     <!-- The attribute table is the point of the CRUD screen: retrieval reads the text, and
          these are what a person searches by six months later. -->
     <div class="table-wrap">
@@ -496,6 +521,28 @@
           <tr lang="vi"><th>Description</th><td>Một dòng: trong đó có gì, và khi nào cần tới. Hiện dưới tên trong danh sách</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">Two of those fill themselves in, from what you already typed.</b>
+      <span lang="en">Name a new document <code>refund-policy.md</code> and <b>Title</b>
+        offers <i>Refund policy</i>; file it under a folder the vocabulary already knows —
+        <code>spec</code>, <code>guide</code>, <code>decision</code>, <code>runbook</code>,
+        <code>api</code>, <code>qa</code> — and <b>Kind</b> offers that. Both are suggestions
+        into <i>empty</i> boxes: anything you have typed is never overwritten, and editing an
+        existing document fills in nothing, because a blank field there was a decision rather
+        than a gap. <b>Alias</b> and <b>Description</b> are deliberately left alone — an alias
+        is the word somebody else will search by, and a description a machine wrote is a claim
+        nobody vouched for.</span>
+      <b lang="vi">Hai trường tự điền, từ chính cái bạn vừa gõ.</b>
+      <span lang="vi">Đặt tên tài liệu mới là <code>refund-policy.md</code> thì <b>Title</b>
+        gợi ý <i>Refund policy</i>; để nó vào một folder mà từ vựng đã biết —
+        <code>spec</code>, <code>guide</code>, <code>decision</code>, <code>runbook</code>,
+        <code>api</code>, <code>qa</code> — thì <b>Kind</b> gợi ý đúng chữ đó. Cả hai chỉ điền
+        vào ô <i>đang trống</i>: thứ bạn đã gõ không bao giờ bị ghi đè, và khi sửa tài liệu có
+        sẵn thì không tự điền gì cả, vì ở đó một ô trống là một lựa chọn chứ không phải chỗ
+        thiếu. <b>Alias</b> và <b>Description</b> cố ý để nguyên — alias là từ người khác sẽ
+        dùng để tìm, còn description do máy viết là một khẳng định không ai bảo chứng.</span>
     </div>
 
     <div class="callout gotcha">
@@ -584,6 +631,28 @@
       </div>
     </div>
 
+    <div class="step">
+      <span class="num">6</span>
+      <div class="body">
+          <b lang="en">Clear out several at once</b>
+          <b lang="vi">Dọn nhiều tài liệu một lượt</b>
+          <p lang="en">Every row in <b>Library</b> carries a tick. Narrow with <b>Find</b> or
+            the <b>Folder</b> picker, then <b>Select all</b> — and read the number on it,
+            because the list is paged and the tick reaches every <i>match</i>, not just the
+            rows on screen. <b>REMOVE n</b> asks once, exactly as a single row does. They go
+            one at a time and the report says how many landed; anything refused stays ticked,
+            so a retry is one press. A refused password stops the run there rather than
+            repeating itself down the list.</p>
+          <p lang="vi">Mỗi dòng trong <b>Library</b> đều có ô tick. Thu hẹp bằng <b>Find</b>
+            hoặc ô chọn <b>Folder</b>, rồi bấm <b>Select all</b> — và nhớ đọc con số trên đó,
+            vì danh sách có phân trang còn ô tick thì lấy hết <i>kết quả khớp</i>, không phải
+            chỉ mấy dòng đang thấy. <b>REMOVE n</b> hỏi lại một lần, y như xoá một dòng. Chúng
+            được xoá lần lượt và báo cáo cho biết bao nhiêu cái đã xong; cái nào bị từ chối
+            thì vẫn còn tick, nên làm lại chỉ một lần bấm. Mật khẩu bị từ chối thì dừng luôn
+            tại đó, không lặp lại xuống hết danh sách.</p>
+      </div>
+    </div>
+
     <div class="callout warn">
       <b lang="en">Everyone who can reach the app can read everything in it.</b>
       <span lang="en">There are no per-document permissions. Anything you would not show
@@ -595,13 +664,62 @@
 
   </section>
 
-  <!-- ══ 6 · cost ══════════════════════════════════════════════════════════ -->
+  <!-- ══ 6 · recent ════════════════════════════════════════════════════════
+       A question about the library rather than about what is in it. Documented
+       beside the library because that is what it reads, and because the failure it
+       replaces was invisible: retrieval has no clock, so "recently" matched nothing
+       and the answer came back confident and arbitrary. -->
+  <section id="recent" data-feature="recent"
+           data-api="POST /api/chat"
+           data-test="TestARecencyQuestionIsAnsweredFromTheStore,TestARecencyQuestionIsNeverCached,TestARealQuestionIsNotMistakenForARecencyOne">
+    <h2 lang="en">6 · Ask what changed lately</h2>
+    <h2 lang="vi">6 · Hỏi xem gần đây có gì mới</h2>
+    <p class="lede" lang="en">Two questions are answered from the library itself rather
+      than from the documents in it: <i>“which documents were updated recently?”</i> and
+      <i>“which answers were confirmed recently?”</i> You get a table of paths and dates.</p>
+    <p class="lede" lang="vi">Hai câu hỏi được trả lời từ chính thư viện chứ không phải từ
+      nội dung tài liệu: <i>“tài liệu nào mới cập nhật?”</i> và <i>“các QA đã chốt gần
+      đây?”</i> Bạn nhận về một bảng gồm đường dẫn và ngày.</p>
+
+    <div class="callout memo">
+      <b lang="en">Retrieval has no clock, which is why this is not retrieval.</b>
+      <span lang="en">Search matches meaning and keywords — neither of which the word
+        “recently” has any of. Asked before this existed, the engine embedded the question,
+        found whatever happened to rank, and answered with citations: confident, and
+        arbitrary. So the two questions above are read straight off the library's own rows,
+        newest first. Nothing is embedded, no completion is bought, and the reply is never
+        cached — an answer about what is newest would be the one answer that goes stale by
+        sitting still.</span>
+      <b lang="vi">Truy xuất không có đồng hồ — nên cái này không phải truy xuất.</b>
+      <span lang="vi">Tìm kiếm khớp theo ngữ nghĩa và từ khoá, mà chữ “gần đây” thì không
+        mang cái nào cả. Trước khi có tính năng này, engine embed câu hỏi, lấy đại thứ gì
+        xếp hạng cao, rồi trả lời kèm dẫn nguồn đàng hoàng: tự tin, và tuỳ tiện. Nên hai câu
+        trên được đọc thẳng từ chính các dòng trong thư viện, mới nhất trước. Không embed,
+        không mua completion, và <b>không bao giờ cache</b> — một câu trả lời về “cái gì mới
+        nhất” chính là câu trả lời duy nhất mà nằm im là hỏng.</span>
+    </div>
+
+    <div class="callout tip">
+      <b lang="en">A real question with “recently” in it is still a real question.</b>
+      <span lang="en">Only those two phrasings are read this way, whole. <i>“has the refund
+        flow changed recently?”</i> is about the documents, so it goes to retrieval and comes
+        back cited, exactly as before. If you wanted the list and got an answer instead, ask
+        for the list in the words above.</span>
+      <b lang="vi">Câu hỏi thật có chữ “gần đây” thì vẫn là câu hỏi thật.</b>
+      <span lang="vi">Chỉ đúng hai cách hỏi trên được đọc theo kiểu này, và phải trọn câu.
+        <i>“quy trình hoàn tiền gần đây có đổi gì không?”</i> là hỏi về tài liệu, nên nó đi
+        vào truy xuất và trả về kèm dẫn nguồn như cũ. Nếu bạn muốn danh sách mà lại nhận được
+        câu trả lời, hãy hỏi đúng theo cách ở trên.</span>
+    </div>
+  </section>
+
+  <!-- ══ 7 · cost ══════════════════════════════════════════════════════════ -->
   <section id="cost" data-feature="cost"
            data-api="POST /api/chat,GET /api/history"
            data-env="CONTEXT_WINDOW,PRICE_IN,PRICE_OUT"
            data-test="TestChatStreamReadsTheUsageFrame,TestARepeatQuestionCostsNothing,TestHistoryCountsHitsSoTheSavingIsVisible">
-    <h2 lang="en">6 · What an answer cost</h2>
-    <h2 lang="vi">6 · Một câu trả lời tốn bao nhiêu</h2>
+    <h2 lang="en">7 · What an answer cost</h2>
+    <h2 lang="vi">7 · Một câu trả lời tốn bao nhiêu</h2>
     <p class="lede" lang="en">The strip along the bottom. Nothing on it is estimated: a
       number that was not measured is simply absent, because an unmeasured cost and a cost
       of nothing are different facts.</p>
@@ -656,12 +774,12 @@
     </div>
   </section>
 
-  <!-- ══ 7 · when it goes wrong ════════════════════════════════════════════ -->
+  <!-- ══ 8 · when it goes wrong ════════════════════════════════════════════ -->
   <section id="stuck" data-feature="health"
            data-api="GET /api/health"
            data-test="TestHealthAdvertisesWritesWhenConfigured,TestWithoutBAPassThereIsNoWriteSurfaceAtAll">
-    <h2 lang="en">7 · When something's wrong</h2>
-    <h2 lang="vi">7 · Khi có vấn đề</h2>
+    <h2 lang="en">8 · When something's wrong</h2>
+    <h2 lang="vi">8 · Khi có vấn đề</h2>
     <p class="lede" lang="en">Four symptoms you can tell apart yourself, and what each one
       actually is. None of them need a DEV.</p>
     <p class="lede" lang="vi">Bốn dấu hiệu bạn tự phân biệt được, và thực chất mỗi cái là

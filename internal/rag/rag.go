@@ -402,8 +402,11 @@ func (e *Engine) Answer(ctx context.Context, a Ask) (Reply, error) {
 	// deriving it twice from `len(turns)` is how two of them drift apart.
 	inThread := len(turns) > 0
 
-	if reply, ok := smallTalk(question, inThread); ok {
-		onToken(reply)
+	// Every turn whose reply is known before retrieval starts — see smalltalk.go. Above the
+	// cache as well as above the provider, which is the position doing the work: an answer
+	// about what is newest must never be served from a row written before the thing it
+	// describes existed.
+	if e.answeredEarly(question, inThread, onToken) {
 		return Reply{}, nil
 	}
 

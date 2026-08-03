@@ -37,7 +37,7 @@ const crumbSep = " > "
 // inline in the text, so the model still sees which sub-section said what and the
 // citation still names something a reader can find.
 func SplitMarkdown(md string) []Chunk {
-	lines := strings.Split(md, "\n")
+	lines := strings.Split(clean(md), "\n")
 	var (
 		out     []Chunk
 		pend    *Chunk   // an undersized section waiting for the next one
@@ -232,4 +232,107 @@ func nonEmpty(in []string) []string {
 		}
 	}
 	return out
+}
+
+// ── the noise a document arrives with ─────────────────────────────────────────
+//
+// A document is written in a browser or pasted out of Confluence, Slack or Word, and what
+// comes with it is invisible: a BOM, non-breaking spaces where spaces belong, zero-width
+// joiners, CRLF, an HTML comment nobody meant to keep, a front-matter block from whatever
+// exported it. None of it shows in the form and all of it reaches the embedder and the BM25
+// index — a no-break space makes "hoàn tiền" a token no query will match, and a section
+// opening with `<!-- generated -->` spends part of a chunk saying nothing.
+//
+// Two rules make this safe to do at all:
+//
+//  1. The body is never touched. This runs on the way to `chunks`, which are derived and
+//     rebuilt by any re-index. `documents.body` keeps exactly what the BA saved, because
+//     that is the text a person vouched for (invariant 1) and the text they see again on
+//     opening it. Cleaning it there would mean the library shows something nobody typed.
+//  2. A fenced block is left alone, apart from line endings. Trailing spaces are significant
+//     in code, a no-break space inside a snippet may be the very thing a reader is being
+//     warned about, and `<!-- -->` in a fence is an example rather than a comment. Whatever
+//     the document put in a fence, it meant.
+//
+// Everything already indexed keeps the chunks it has until it is written again or
+// re-ingested: this changes what indexing does, not what is already stored.
+func clean(md string) string {
+	md = strings.ReplaceAll(md, "\r\n", "\n")
+	md = strings.ReplaceAll(md, "\r", "\n")
+	md = strings.ReplaceAll(md, "\ufeff", "") // a BOM survives a copy-paste and is not a word
+
+	var (
+		b      strings.Builder
+		fenced bool
+		blanks int
+	)
+	for line := range strings.SplitSeq(stripFrontMatter(md), "\n") {
+		if isFence(line) {
+			fenced = !fenced
+		}
+		if !fenced && !isFence(line) {
+			line = stripComments(invisible.Replace(line))
+			line = strings.TrimRight(line, " \t")
+			// Three blank lines and thirty read the same to a chunker that splits on one, and
+			// the difference is chunk budget spent on nothing.
+			if line == "" {
+				if blanks++; blanks > 1 {
+					continue
+				}
+			} else {
+				blanks = 0
+			}
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// invisible maps the characters that look like a space and are not one. A non-breaking space
+// makes "hoàn tiền" a different token to every retriever this engine has.
+var invisible = strings.NewReplacer(
+	"\u00a0", " ", // no-break space
+	"\u202f", " ", // narrow no-break space
+	"\u2007", " ", // figure space
+	"\u200b", "", // zero-width space
+	"\u200c", "", // zero-width non-joiner
+	"\u200d", "", // zero-width joiner
+	"\u2060", "", // word joiner
+)
+
+func isFence(line string) bool {
+	t := strings.TrimSpace(line)
+	return strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~")
+}
+
+// stripFrontMatter drops a leading `---` block. Exporters write one and it is metadata about
+// the document rather than anything the document says, so it competes for a chunk and answers
+// nothing. Only at the very start, and only when it closes — a document that opens with a
+// horizontal rule keeps it.
+func stripFrontMatter(md string) string {
+	if !strings.HasPrefix(md, "---\n") {
+		return md
+	}
+	if _, rest, ok := strings.Cut(md[4:], "\n---\n"); ok {
+		return rest
+	}
+	return md
+}
+
+// stripComments removes single-line HTML comments. Deliberately not multi-line: a comment
+// that opens on one line and closes on another would need the state machine above to carry a
+// second mode, and the case that turns up in a pasted document is `<!-- -->` on its own line.
+func stripComments(line string) string {
+	for {
+		open := strings.Index(line, "<!--")
+		if open < 0 {
+			return line
+		}
+		shut := strings.Index(line[open:], "-->")
+		if shut < 0 {
+			return line
+		}
+		line = line[:open] + line[open+shut+3:]
+	}
 }

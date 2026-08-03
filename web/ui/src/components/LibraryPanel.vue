@@ -35,6 +35,7 @@ const emit = defineEmits(['changed', 'locked'])
 // array would list the library as it was one save ago.
 const {
   query,
+  folder,
   shown,
   kinds,
   folders,
@@ -51,6 +52,16 @@ const {
   cancel,
   save,
   drop,
+  selected,
+  count,
+  allShown,
+  armedAll,
+  armAll,
+  toggle,
+  toggleAll,
+  clearSelection,
+  dropSelected,
+  progress,
 } = useLibrary({
   documents: () => props.documents,
   toast,
@@ -90,6 +101,48 @@ const { page, pages, numbers, slice: shownPage, go } = usePaged(() => shown.valu
       <span class="hint">{{ shown.length }} of {{ documents.length }} match</span>
     </label>
 
+    <!-- Narrowing to a folder is a prefix on the path, not a word in the Find field: that
+         field reads five fields as substrings, so "api" there also matches a document whose
+         description mentions one. Selecting a folder is then "select all matches" — one idea
+         rather than a second selection mechanism to keep in step with the first. -->
+    <label v-if="folders.length" class="field">
+      <span class="label">Folder</span>
+      <select v-model="folder" class="select">
+        <option value="">All folders</option>
+        <option v-for="f in folders" :key="f" :value="f">{{ f }}</option>
+      </select>
+    </label>
+
+    <!-- The bar is always here for someone who can write, rather than appearing once a row
+         is ticked: "select all" that only exists after you have already selected something
+         is a control nobody finds. The destructive half is what appears with the selection. -->
+    <div v-if="writes && shown.length" class="lib-bulk">
+      <label class="lib-all">
+        <input
+          class="checkbox" type="checkbox" :checked="allShown" :disabled="busy"
+          :aria-label="`Select all ${shown.length} matching documents`" @change="toggleAll"
+        >
+        <!-- The count is the label, because the list is paged: a silent checkbox that reaches
+             across pages is a trap, and one that says how far it reaches is not. -->
+        <span>Select all {{ shown.length }}</span>
+      </label>
+      <template v-if="count">
+        <span class="hint">{{ count }} selected</span>
+        <button class="btn ghost xs" type="button" :disabled="busy" @click="clearSelection">
+          CLEAR
+        </button>
+        <button
+          class="btn xs" type="button" :disabled="busy" :data-accent="armedAll ? 'crit' : null"
+          :aria-label="armedAll ? `Confirm: remove ${count} documents` : `Remove ${count} documents`"
+          @click="armedAll ? dropSelected() : armAll()"
+        >
+          <template v-if="progress">REMOVING {{ progress.done }}/{{ progress.total }}</template>
+          <template v-else-if="armedAll">SURE? REMOVE {{ count }}</template>
+          <template v-else>REMOVE {{ count }}</template>
+        </button>
+      </template>
+    </div>
+
     <div v-if="!documents.length" class="empty">
       <span class="icon">◈</span>
       <span class="title">Nothing indexed yet</span>
@@ -103,6 +156,14 @@ const { page, pages, numbers, slice: shownPage, go } = usePaged(() => shown.valu
          not being scanned. -->
     <div v-else class="lib-rows">
       <div v-for="d in shownPage" :key="d.path" class="lib-row">
+        <!-- Outside `.result` rather than inside it: that recipe is a row of its own with an
+             icon, two lines and its badges, and a control dropped into it inherits the row's
+             pointer behaviour. The tick belongs to the list, not to the document. -->
+        <input
+          v-if="writes" class="checkbox" type="checkbox"
+          :checked="selected.has(d.path)" :disabled="busy"
+          :aria-label="`Select ${d.path}`" @change="toggle(d.path)"
+        >
         <div class="result" :title="docTip(d)">
           <nes-icon class="result-icon" name="file" />
           <span class="result-body">

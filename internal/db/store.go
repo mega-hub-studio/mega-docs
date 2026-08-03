@@ -543,6 +543,53 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	return c, rows.Err()
 }
 
+// RecentDocuments lists what changed last, newest first, optionally within one folder.
+//
+// Its own query rather than Corpus() plus a filter in Go, and the difference is not style:
+// Corpus caps at 200, so filtering "qa/" out of that page would quietly return three
+// confirmed answers on a corpus where the newest 200 documents happen to hold three. A
+// number that is short for a reason nobody can see is worse than no number.
+//
+// `prefix` is matched as a folder, so it carries its own separator: "qa" would also match
+// "qawhatever/x.md". Empty means the whole library. Retrieval cannot answer this at all —
+// it ranks by meaning and keywords, and "recently" carries neither — which is why the
+// engine reads rows here instead of embedding a question about time.
+func (s *Store) RecentDocuments(prefix string, limit int) ([]Document, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	like := "%"
+	if prefix != "" {
+		like = strings.TrimSuffix(prefix, "/") + "/%"
+	}
+	rows, err := s.db.Query(`
+		SELECT d.path, COALESCE(d.title, ''), COALESCE(d.alias, ''),
+		       COALESCE(d.kind, ''), COALESCE(d.description, ''), d.updated_at,
+		       COUNT(c.id),
+		       COALESCE(SUM(c.status = 'approved'), 0)
+		FROM documents d
+		LEFT JOIN chunks c ON c.document_id = d.id
+		WHERE d.deleted_at IS NULL AND d.path LIKE ?
+		GROUP BY d.id
+		ORDER BY d.updated_at DESC, d.path
+		LIMIT ?`, like, limit)
+	if err != nil {
+		return nil, fmt.Errorf("recent documents: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Document{}
+	for rows.Next() {
+		var d Document
+		if err := rows.Scan(&d.Path, &d.Title, &d.Alias, &d.Kind, &d.Description,
+			&d.UpdatedAt, &d.Chunks, &d.Approved); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // Document reads one document whole, body included — what the edit form needs and the list
 // deliberately does not carry. A removed document still reads, because that is the only way
 // back for one: the trash is a column now, not a directory.

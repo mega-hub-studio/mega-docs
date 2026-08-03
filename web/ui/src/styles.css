@@ -749,6 +749,20 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 .lib-row .result-hint { min-inline-size: 3.25rem; text-align: end; }
 .lib-acts { display: flex; gap: var(--sp-2); }
 
+/* ── the bulk bar ──
+   One row that grows rather than two rows that wait: the tick-all and its count are always
+   here for someone who can write, and the destructive half arrives with the selection. It
+   wraps, because at 390px "Select all 23", a count, CLEAR and REMOVE 23 do not fit on one
+   line and a bar that scrolls sideways would break the page's one absolute rule.
+   `margin-inline-start: auto` on the count is what packs the actions against the end, so the
+   tick keeps the same left edge as every row below it. */
+.lib-bulk {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  font-family: var(--font-mono); font-size: var(--fs-label);
+}
+.lib-all { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
+.lib-bulk > .hint { margin-inline-start: auto; }
+
 /* ── the form's rhythm ──
    Wider than the default, and the reason is the `.field` recipe: --sp-2 between a label, its
    control and its hint. The seam between two *fields* has to outrank that clearly or the

@@ -15,6 +15,19 @@ import { pass, setPass, WrongPass } from './qa.js'
 /** What the file picker offers, and what a drop is filtered against. */
 export const ACCEPT = '.md,.markdown,.txt'
 
+/**
+ * The kinds the form offers before the corpus has taught it any.
+ *
+ * `kind` is a filter in the library and a column a reader scans, so its value only earns its
+ * keep when everyone spells it the same way. Deriving the list from what is already indexed —
+ * which is what the form did — cannot start: the first document is filed under whatever its
+ * author typed, the second under a near-miss of that, and `spec` / `Spec` / `specification`
+ * become three kinds that mean one thing. Six words are enough to make the common case a pick
+ * rather than a guess, and the list is a suggestion: a datalist, never a closed set, so a team
+ * with its own vocabulary keeps it and it shows up here beside these.
+ */
+export const KINDS = ['spec', 'guide', 'decision', 'runbook', 'api', 'qa']
+
 const EXTS = ['.md', '.markdown', '.txt']
 
 /**
@@ -31,6 +44,21 @@ export function folders(documents = []) {
     for (let i = 1; i <= parts.length; i++) seen.add(parts.slice(0, i).join('/'))
   }
   return [...seen].sort()
+}
+
+/**
+ * A file name read back as a title: `refund-policy.md` → `Refund policy`.
+ *
+ * Only the first letter is raised. Title Case On Every Word would rewrite `ERR_PAY_402` and
+ * `api` into something nobody can search for, and an identifier is the one thing this app
+ * never translates.
+ *
+ * @param {string} name the file name, extension and all
+ * @returns {string} a title worth offering, or "" when the name says nothing
+ */
+export function titleFrom(name) {
+  const stem = String(name || '').replace(/\.(?:md|markdown|txt)$/i, '').replaceAll(/[-_]+/g, ' ').trim()
+  return stem ? stem[0].toUpperCase() + stem.slice(1) : ''
 }
 
 /** Split a drop into what can be sent and what cannot, so the UI can say both. */

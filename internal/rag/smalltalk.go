@@ -1,8 +1,11 @@
 package rag
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+
+	"knowledge-engine/internal/db"
 )
 
 // Conversational turns that are not questions about the documents.
@@ -220,4 +223,173 @@ func smallTalkReply(kind smallTalkKind, vi bool) string {
 		return ""
 	}
 	return ""
+}
+
+// ── a question about the library, rather than about what is in it ──────────────
+//
+// Same file as small talk because it is the same move: a turn recognised *before*
+// retrieval and answered without buying anything. It is not the same reply, though, and
+// the difference is the whole reason this exists. Small talk answers with a constant, so
+// it cannot be wrong. This answers from rows, so it cannot be *stale* — which matters,
+// because the one thing a constant could never say is what changed yesterday.
+//
+// The failure it replaces was silent. Retrieval ranks by meaning and keywords, and
+// "recently" carries neither, so "các QA đã chốt confirm gần đây" embedded to nothing in
+// particular, matched whatever happened to rank, and came back with citations under it.
+// Confident and arbitrary is the worst shape an answer can have here.
+//
+// This does not contradict the note above about not describing the corpus. That note is
+// about a sentence *invented* here disagreeing with the measured first screen. These rows
+// are that same measurement, read at the same moment — nothing is invented, so there is
+// nothing to disagree with.
+type corpusAsk int
+
+const (
+	notCorpusAsk corpusAsk = iota
+	recentDocs
+	recentQA
+)
+
+// recentLimit is how many rows a recency answer shows. Ten because the question is "what
+// changed", not "list the library" — the library screen already lists the library, and a
+// fiftieth-newest document answers nobody's question about what is new.
+const recentLimit = 10
+
+// Whole-string anchored, exactly like smallTalkPatterns above and for exactly that reason:
+// "quy trình hoàn tiền gần đây có đổi gì không" is a real question about the documents, and
+// a substring match on "gần đây" would swallow it and answer with a file listing.
+//
+// Diacritics are optional the same way they are up there — people type "tai lieu nao moi
+// cap nhat" — but nothing here is loosened past a whole utterance.
+var corpusAskPatterns = []struct {
+	ask corpusAsk
+	re  *regexp.Regexp
+}{
+	{recentQA, regexp.MustCompile(`^(c(a|á)c |nh(u|ữ)ng )?(qa|q&a|c(a|â)u h(o|ỏ)i|c(a|â)u tr(a|ả) l(o|ờ)i)( n(a|à)o)?( (d|đ)(a|ã)( (d|đ)ư(o|ợ)c)?)? (ch(o|ố)t|confirm(ed)?|duy(e|ệ)t)( confirm(ed)?)?( r(o|ồ)i)?( g(a|ầ)n (d|đ)(a|â)y| m(o|ớ)i nh(a|ấ)t| m(o|ớ)i)?$`)},
+	{recentQA, regexp.MustCompile(`^((recently |newly )?confirmed (qa|q&a|answers)|which (qa|answers) (were|was) confirmed( recently)?|what (qa|answers) (were|was) confirmed( recently)?)$`)},
+	{recentDocs, regexp.MustCompile(`^(c(a|á)c |nh(u|ữ)ng )?t(a|à)i li(e|ệ)u( n(a|à)o)?( (m(o|ớ)i|v(u|ừ)a))? (c(a|ậ)p nh(a|ậ)t|thay (d|đ)(o|ổ)i|s(u|ử)a)( g(a|ầ)n (d|đ)(a|â)y| m(o|ớ)i nh(a|ấ)t)?$`)},
+	{recentDocs, regexp.MustCompile(`^((g(a|ầ)n (d|đ)(a|â)y )?c(o|ó) t(a|à)i li(e|ệ)u n(a|à)o m(o|ớ)i( kh(o|ô)ng)?|t(a|à)i li(e|ệ)u n(a|à)o m(o|ớ)i nh(a|ấ)t)$`)},
+	{recentDocs, regexp.MustCompile(`^(which documents were updated( recently)?|what documents (changed|were updated)( recently)?|(recently )?updated documents|what'?s new( in the library)?|what is new( in the library)?)$`)},
+}
+
+// corpusAskOf reports which library question this is, on a string already lowercased and
+// stripped of trailing punctuation — the same input smallTalkKindOf takes, so the two
+// classifiers cannot disagree about what the question even was.
+func corpusAskOf(q string) corpusAsk {
+	for _, p := range corpusAskPatterns {
+		if p.re.MatchString(q) {
+			return p.ask
+		}
+	}
+	return notCorpusAsk
+}
+
+// answeredEarly is every turn whose reply is known before retrieval starts: a greeting, a
+// vague question asked back, and a question about the library. One door rather than two,
+// because they are one idea from Answer()'s side — nothing is bought, and the reply is
+// already here — and because Answer() is at gocyclo's ceiling, where a second branch would
+// cost the next feature its own.
+//
+// Both classifiers read the same normalised string, so they cannot disagree about what the
+// question even was.
+func (e *Engine) answeredEarly(question string, inThread bool, onToken func(string)) bool {
+	if reply, ok := smallTalk(question, inThread); ok {
+		onToken(reply)
+		return true
+	}
+	asked := strings.TrimRight(strings.ToLower(strings.TrimSpace(question)), " .!?…,;:")
+	return e.recent(asked, question, onToken)
+}
+
+// recent answers a question about the library from its rows, and reports whether this was
+// one.
+//
+// A store that will not read falls through to retrieval rather than failing the question.
+// Retrieval answers this badly — which is the entire reason this function exists — but badly
+// beats an error on the one screen somebody is looking at.
+func (e *Engine) recent(asked, question string, onToken func(string)) bool {
+	ask := corpusAskOf(asked)
+	if ask == notCorpusAsk {
+		return false
+	}
+	docs, err := e.store.RecentDocuments(ask.prefix(), recentLimit)
+	if err != nil {
+		return false
+	}
+	onToken(renderRecent(docs, ask, viLetters.MatchString(question)))
+	return true
+}
+
+// prefix is the folder a library question is about. A confirmed answer is a document under
+// qa/ and nothing else is, so the filter is the same string a citation prints — there is no
+// second place that records which documents came from the QA loop.
+func (a corpusAsk) prefix() string {
+	if a == recentQA {
+		return "qa"
+	}
+	return ""
+}
+
+// renderRecent writes the answer: a lead sentence, a table, and one line saying where the
+// numbers came from.
+//
+// That last line is not decoration. Every other answer on this screen carries [n] citations,
+// so an answer with none reads as ungrounded unless it says what it *is* — and "read from
+// the library" is a stronger provenance than a citation, not a weaker one.
+func renderRecent(docs []db.Document, ask corpusAsk, vi bool) string {
+	if len(docs) == 0 {
+		switch {
+		case ask == recentQA && vi:
+			return "Chưa có câu trả lời nào được chốt vào thư viện."
+		case ask == recentQA:
+			return "No answers have been confirmed into the library yet."
+		case vi:
+			return "Thư viện chưa có tài liệu nào."
+		default:
+			return "The library has no documents yet."
+		}
+	}
+
+	var b strings.Builder
+	switch {
+	case ask == recentQA && vi:
+		fmt.Fprintf(&b, "**%d câu trả lời được chốt gần nhất**\n\n", len(docs))
+	case ask == recentQA:
+		fmt.Fprintf(&b, "**The %d most recently confirmed answers**\n\n", len(docs))
+	case vi:
+		fmt.Fprintf(&b, "**%d tài liệu được cập nhật gần nhất**\n\n", len(docs))
+	default:
+		fmt.Fprintf(&b, "**The %d most recently updated documents**\n\n", len(docs))
+	}
+
+	if vi {
+		b.WriteString("| # | Tài liệu | Loại | Cập nhật |\n|---|---|---|---|\n")
+	} else {
+		b.WriteString("| # | Document | Kind | Updated |\n|---|---|---|---|\n")
+	}
+	for i, d := range docs {
+		kind := d.Kind
+		if kind == "" {
+			kind = "—"
+		}
+		fmt.Fprintf(&b, "| %d | `%s` | %s | %s |\n", i+1, d.Path, kind, when(d.UpdatedAt))
+	}
+
+	if vi {
+		b.WriteString("\nĐọc trực tiếp từ thư viện, mới nhất trước — không phải kết quả tìm kiếm, " +
+			"nên không có dẫn nguồn và cũng không được cache.")
+	} else {
+		b.WriteString("\nRead straight from the library, newest first — not a search result, so " +
+			"there are no citations and nothing here is cached.")
+	}
+	return b.String()
+}
+
+// when trims SQLite's `datetime('now')` to the minute. Seconds on a document's update time
+// is a precision nobody asked for and one more column's worth of width on a phone.
+func when(ts string) string {
+	if len(ts) >= 16 {
+		return ts[:16]
+	}
+	return ts
 }

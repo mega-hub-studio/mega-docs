@@ -646,3 +646,73 @@ func engineWithModels(t *testing.T, p *aitest.Provider, models []rag.Model) (*ra
 	})
 	return rag.New(store, client, rag.Options{TopK: 3, Models: models}), prov
 }
+
+// Retrieval ranks by meaning and keywords, and "recently" carries neither — so before this
+// existed, a question about what changed embedded to nothing in particular, matched whatever
+// happened to rank, and came back with citations under it. Confident and arbitrary.
+//
+// The assertion that matters is not the table, it is the two counters: a library question
+// buys no embedding and no completion, because it is answered from rows.
+func TestARecencyQuestionIsAnsweredFromTheStore(t *testing.T) {
+	e, prov := engine(t, nil)
+	wideCorpus(t, e)
+
+	ticket, err := e.OpenTicket("what is the deposit rule", rag.NoAnswer)
+	if err != nil {
+		t.Fatalf("open ticket: %v", err)
+	}
+	if _, err := e.Confirm(context.Background(), ticket.ID, "A deposit is held for 24h.", ""); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+
+	embeds, chats := len(prov.Embedded()), len(prov.Chats())
+
+	out, _, err := ask(t, e, "tài liệu nào mới cập nhật")
+	if err != nil {
+		t.Fatalf("recency ask: %v", err)
+	}
+	if !strings.Contains(out, "docs/booking.md") {
+		t.Errorf("the newest documents are missing from the reply:\n%s", out)
+	}
+	if len(prov.Embedded()) != embeds || len(prov.Chats()) != chats {
+		t.Errorf("a library question bought %d embeddings and %d completions — it must buy none",
+			len(prov.Embedded())-embeds, len(prov.Chats())-chats)
+	}
+
+	// The QA branch is the same query with the folder that a citation prints. Nothing else
+	// records which documents came out of the loop, so the prefix is the whole filter.
+	qa, _, err := ask(t, e, "các QA đã chốt gần đây")
+	if err != nil {
+		t.Fatalf("qa recency ask: %v", err)
+	}
+	if !strings.Contains(qa, "qa/") {
+		t.Errorf("the confirmed answer is missing from the QA reply:\n%s", qa)
+	}
+	if strings.Contains(qa, "docs/booking.md") {
+		t.Errorf("the QA reply leaked a document from outside qa/:\n%s", qa)
+	}
+}
+
+// The one answer that goes stale by sitting still. It is above the cache in Answer() rather
+// than flagged as uncacheable, so this cannot regress by someone forgetting a flag — but the
+// position is easy to move, and a recency answer served from a row written before the thing
+// it describes existed is exactly the bug this feature was built to remove.
+func TestARecencyQuestionIsNeverCached(t *testing.T) {
+	e, _ := engine(t, nil)
+	wideCorpus(t, e)
+
+	for range 2 {
+		if _, _, err := ask(t, e, "which documents were updated recently"); err != nil {
+			t.Fatalf("recency ask: %v", err)
+		}
+	}
+	rows, err := e.History(20)
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
+	for _, r := range rows {
+		if strings.Contains(strings.ToLower(r.Question), "updated recently") {
+			t.Fatalf("a recency answer was cached: %q", r.Question)
+		}
+	}
+}

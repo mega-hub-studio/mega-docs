@@ -56,8 +56,20 @@ export function docName(path) {
   return (path || '').replace(/^qa\//i, '')
 }
 
-/** WrongPass means the password was refused; anything else is a real failure. */
-export class WrongPass extends Error {}
+/**
+ * WrongPass means the password was refused; anything else is a real failure.
+ *
+ * The `name` is set explicitly because `class X extends Error {}` does not do it — an
+ * instance reports `name === "Error"`, so every `e.name === "WrongPass"` test reads false.
+ * Three of those had been sitting in `use/library.js` since it was written: a refused
+ * password while saving or removing put the server's sentence in the panel's error line
+ * instead of taking the screen back to the unlock form, and the BA was left looking at a
+ * write surface that could no longer write. Measured against the running product with a
+ * password changed underneath it.
+ */
+export class WrongPass extends Error {
+  name = 'WrongPass'
+}
 
 export const pass = () => sessionStorage.getItem(KEY) || ''
 export function setPass(v) {

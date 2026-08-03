@@ -169,3 +169,55 @@ func TestAShortRealQueryIsStillRetrieved(t *testing.T) {
 		}
 	}
 }
+
+// asked normalises exactly as Answer() does, so this test and the product classify the same
+// string — the two must not be able to drift.
+func asked(q string) string {
+	return strings.TrimRight(strings.ToLower(strings.TrimSpace(q)), " .!?…,;:")
+}
+
+// The half that decides whether this is an improvement or a regression, and it is the same
+// half as the greeting test above: a real question about the documents must never be read as
+// a question about the library. "quy trình hoàn tiền gần đây có đổi gì không" is about a
+// refund flow — answering it with a file listing is a worse bug than the one being fixed.
+func TestARealQuestionIsNotMistakenForARecencyOne(t *testing.T) {
+	for _, q := range []string{
+		"tài liệu nào mới cập nhật",
+		"Tài liệu nào mới cập nhật?",
+		"tai lieu nao moi cap nhat",
+		"tài liệu nào vừa thay đổi",
+		"có tài liệu nào mới không",
+		"which documents were updated recently",
+		"what's new in the library",
+	} {
+		if corpusAskOf(asked(q)) != recentDocs {
+			t.Errorf("%q should list the recently updated documents", q)
+		}
+	}
+	for _, q := range []string{
+		"các QA đã chốt gần đây",
+		"các QA đã chốt confirm gần đây",
+		"câu hỏi nào đã được duyệt gần đây",
+		"cac qa da chot gan day",
+		"recently confirmed answers",
+		"which answers were confirmed recently",
+	} {
+		if corpusAskOf(asked(q)) != recentQA {
+			t.Errorf("%q should list the recently confirmed answers", q)
+		}
+	}
+	for _, q := range []string{
+		"quy trình hoàn tiền gần đây có đổi gì không",
+		"has the refund flow changed recently",
+		"tài liệu nào nói về hoàn tiền",
+		"which document covers the deposit rule",
+		"cái nào mới nhất",         // no content word and no "tài liệu": vague, not a library question
+		"cập nhật booking thế nào", // "cập nhật" about a process, not about the library
+		"booking",
+		"what changed in the refund rules",
+	} {
+		if got := corpusAskOf(asked(q)); got != notCorpusAsk {
+			t.Errorf("%q was read as a library question (%d) instead of being retrieved", q, got)
+		}
+	}
+}

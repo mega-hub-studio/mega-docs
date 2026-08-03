@@ -31,8 +31,8 @@
    the list: the reason the form is not a modal is the reason it must not behave like one.
    What tells you where you are instead is the form's own head, which sticks.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { computed, nextTick, ref } from 'vue'
-import { read, remove, write } from '../lib/upload.js'
+import { computed, nextTick, ref, watch } from 'vue'
+import { KINDS, read, remove, titleFrom, write } from '../lib/upload.js'
 
 /** The empty form: a new document, in no folder, of no stated kind. */
 function blank() {
@@ -59,9 +59,21 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
   // sits in is a 40px target on a phone, beside EDIT. So the first press only arms, and the
   // button says SURE? until it acts. Arming another row moves it; a drop clears it.
   const armed = ref('')
-  const arm = (path) => {
-    armed.value = path
-  }
+  /* ── clearing out several documents at once ──────────────────────────────────
+     A library nobody prunes answers from dead documents, and pruning it was one row at a
+     time behind a two-press arm — forty presses to retire twenty specs, across a paged
+     list. So the rows carry a checkbox and the bar acts on all of them.
+
+     Selecting *a folder* is not a second mechanism: `folder` narrows the list, and "select
+     all matches" then means that folder. One idea instead of two, and it is the idea a
+     reader already has from the Find field. What it is NOT is the Find text — that matches
+     a substring across five fields, so typing "api" also picks up a document whose
+     description mentions an API. A folder has to be a prefix on the path, which is the
+     document's identity, or the selection quietly includes things nobody looked at. */
+  const folder = ref('')
+  const selected = ref(new Set())
+  const armedAll = ref(false)
+  const progress = ref(null) // {done, total} while a bulk removal runs
 
   // The <form> element, so opening it can bring it to the person who pressed the button.
   // Bound by the template as `ref="formEl"` — the same shape App.vue uses for the prompt.
@@ -88,22 +100,106 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     el.querySelector('.input')?.focus({ preventScroll: true })
   }
 
+  const folders = computed(() => [...new Set(documents()
+    .map(d => d.path.split('/').slice(0, -1).join('/'))
+    .filter(Boolean))].sort())
+
+  /* A folder that no longer exists cannot stay picked, and removing every document in one is
+     exactly how you get there — measured: emptying booking/ left ten rows gone, a list
+     reading "0 of 4 match", and a dropdown showing nothing selected, with no way back that
+     looked like one. Reading through this computed rather than resetting `folder` from a
+     watcher keeps it one fact: the filter *is* whichever of the folders still exists. */
+  const pickedFolder = computed({
+    get: () => (folders.value.includes(folder.value) ? folder.value : ''),
+    set: (v) => {
+      folder.value = v || ''
+    },
+  })
+
   // Search across everything a person might remember about a document — its path, what it
   // is called, the other names it goes by, and what it is for. A library is searched by
   // half-remembered words, which is exactly what an alias is for.
   const shown = computed(() => {
     const q = query.value.trim().toLowerCase()
-    const all = documents()
+    const dir = pickedFolder.value ? `${pickedFolder.value}/` : ''
+    let all = documents()
+    // The folder carries its own separator, or "qa" would also match "qawhatever/x.md" —
+    // the same rule the engine's own scope filter follows, for the same reason.
+    if (dir)
+      all = all.filter(d => (d.path || '').startsWith(dir))
     if (!q)
       return all
     return all.filter(d => [d.path, d.title, d.alias, d.kind, d.description]
       .some(v => (v || '').toLowerCase().includes(q)))
   })
 
-  const kinds = computed(() => [...new Set(documents().map(d => d.kind).filter(Boolean))].sort())
-  const folders = computed(() => [...new Set(documents()
-    .map(d => d.path.split('/').slice(0, -1).join('/'))
-    .filter(Boolean))].sort())
+  // The selection, intersected with what is actually in the library. A path removed in
+  // another tab would otherwise keep its place in the count, and the bar would offer to
+  // remove a document that is already gone.
+  const picked = computed(() => documents().filter(d => selected.value.has(d.path)))
+  const count = computed(() => picked.value.length)
+  const allShown = computed(() => shown.value.length > 0
+    && shown.value.every(d => selected.value.has(d.path)))
+
+  const arm = (path) => {
+    armed.value = path
+    armedAll.value = false // two SURE? on one screen is two questions and one answer
+  }
+
+  const armAll = () => {
+    armedAll.value = true
+    armed.value = ''
+  }
+
+  function toggle(path) {
+    if (!selected.value.delete(path))
+      selected.value.add(path)
+    armedAll.value = false // the set changed, so the number on the armed button is stale
+  }
+
+  /** Every match, not every visible row — the list is paged, and the label says which. */
+  function toggleAll() {
+    const all = allShown.value
+    for (const d of shown.value) {
+      if (all)
+        selected.value.delete(d.path)
+      else selected.value.add(d.path)
+    }
+    armedAll.value = false
+  }
+
+  function clearSelection() {
+    selected.value.clear()
+    armedAll.value = false
+  }
+
+  // The seeded list and whatever the corpus has taught it, as one set. Seeded alone would
+  // hide a team's own vocabulary; derived alone cannot start, because an empty corpus offers
+  // nothing and the first author invents a spelling everyone else then near-misses.
+  const kinds = computed(() => [...new Set([
+    ...KINDS,
+    ...documents().map(d => d.kind).filter(Boolean),
+  ])].sort())
+
+  /* ── what the path already said ──────────────────────────────────────────────
+     A BA filing into `runbook/` has told us the kind, and naming the file `refund-policy.md`
+     has told us the title — so asking for both again is asking someone to repeat themselves
+     into a form. Only those two: an alias is the half-remembered word someone else will
+     search by and a description is a claim about the document, and a machine-written claim is
+     a fact nobody vouched for, which is the one thing this library is built not to hold.
+
+     Empty fields only, so nothing a person typed is ever overwritten — and new documents
+     only. On an edit a blank title is a choice that was already made, not a gap. */
+  watch(() => [form.value.folder, form.value.name], () => {
+    if (editing.value)
+      return
+    const f = form.value
+    const leaf = (f.folder || '').split('/').findLast(Boolean)?.toLowerCase() ?? ''
+    if (!f.kind && KINDS.includes(leaf))
+      f.kind = leaf
+    if (!f.title && f.name)
+      f.title = titleFrom(f.name)
+  })
 
   /** Start a new document. The folder carries over: a BA filing three specs stays in specs/. */
   function create(folder = '') {
@@ -245,5 +341,68 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     }
   }
 
-  return { query, shown, kinds, folders, form, formEl, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop }
+  /**
+   * Take every selected document out of retrieval, one call at a time.
+   *
+   * Sequential rather than concurrent, and that is the cheap option here as well as the
+   * careful one: a removal is one SQL transaction with no embedding behind it, so twenty of
+   * them cost nothing worth parallelising — while a failure in the middle of twenty parallel
+   * requests leaves a set nobody can describe.
+   *
+   * Two failure shapes, handled differently on purpose. A document that is already gone is
+   * one line of a report; the loop keeps going. A rejected password is the *gate*, and every
+   * remaining call would be rejected too — so it stops on the first one and reports it once,
+   * because twenty toasts saying the same thing is not twenty times the information.
+   *
+   * What survives a partial run is the selection: the removed ones drop out, the failures
+   * stay ticked, so retrying is one press rather than finding them again.
+   */
+  async function dropSelected() {
+    const paths = picked.value.map(d => d.path)
+    if (!paths.length)
+      return
+    busy.value = true
+    error.value = ''
+    armedAll.value = false // it is acting now: the armed label must not survive the press
+    progress.value = { done: 0, total: paths.length }
+    let removed = 0
+    const failed = []
+    try {
+      for (const path of paths) {
+        try {
+          await remove(path)
+          selected.value.delete(path)
+          removed++
+          if (editing.value === path)
+            cancel()
+        }
+        catch (e) {
+          if (e.name === 'WrongPass') {
+            onLocked(e)
+            return
+          }
+          failed.push(path)
+        }
+        progress.value = { done: removed + failed.length, total: paths.length }
+      }
+      // Same sentence as a single removal, for the same reason: "deleted" would be a
+      // promise the soft delete does not make.
+      toast(
+        failed.length
+          ? `${failed.length} could not be removed and stay selected. The rest keep their text, with a removal date.`
+          : 'Their text stays in the library, with a removal date.',
+        {
+          title: `${removed} ${removed === 1 ? 'document' : 'documents'} no longer answer`,
+          accent: failed.length ? 'crit' : 'warn',
+        },
+      )
+    }
+    finally {
+      busy.value = false
+      progress.value = null
+      onChanged()
+    }
+  }
+
+  return { query, folder: pickedFolder, shown, kinds, folders, form, formEl, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop, selected, picked, count, allShown, armedAll, armAll, toggle, toggleAll, clearSelection, dropSelected, progress }
 }
