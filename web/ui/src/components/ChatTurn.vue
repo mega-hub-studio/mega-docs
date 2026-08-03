@@ -114,16 +114,31 @@ const clarify = computed(() => turnClarify(props.turn))
            in the prose above link down to. Both halves show a leaf and keep the whole
            value in `title`: .source-host is the recipe's short secondary label — dim, mono,
            --fs-label — so a full breadcrumb in it wrapped to a second line and lost the
-           indent under the filename. See lib/answer.js. -->
-      <ol v-if="docCites.length" class="sources">
-        <li v-for="c in docCites" :id="srcId(c.n)" :key="c.n" class="source">
-          <span class="source-n">{{ c.n }}</span>
-          <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
-          <span v-if="c.heading" class="source-host" :title="c.heading">{{
-            section(c.heading)
-          }}</span>
-        </li>
-      </ol>
+           indent under the filename. See lib/answer.js.
+
+           `<details>` and no `shown` ref, for the reason ReleaseModal states: the summary is
+           keyboard-reachable, the state is the element's, and a component holding it would be
+           logic rule 11 does not allow here. `:open` is read once — citations arrive in a
+           single SSE frame after the last token, so the count never crosses SRC_FOLD twice and
+           Vue never patches the attribute back over a reader's own tap.
+
+           Folding does not cost the citation link. A fragment navigation into a closed
+           `<details>` auto-expands it — measured at 390×844 in Chrome 144: tapping [9] with
+           the fold shut opened it, scrolled the row into view and left `:target` on it.
+           Firefox 139 and Safari 26.2 ship the same behaviour; older engines land on a
+           collapsed list, which is a missed scroll rather than a broken page. -->
+      <details v-if="docCites.length" class="src-fold" :open="docCites.length <= SRC_FOLD">
+        <summary class="eyebrow">{{ t('answer.sources', { n: docCites.length }) }}</summary>
+        <ol class="sources">
+          <li v-for="c in docCites" :id="srcId(c.n)" :key="c.n" class="source">
+            <span class="source-n">{{ c.n }}</span>
+            <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
+            <span v-if="c.heading" class="source-host" :title="c.heading">{{
+              section(c.heading)
+            }}</span>
+          </li>
+        </ol>
+      </details>
 
       <!-- The public web, in its own list and never mixed into the one above: a sentence
            from a search API and a sentence from a document somebody approved would otherwise
@@ -163,8 +178,12 @@ const clarify = computed(() => turnClarify(props.turn))
             <nes-icon name="help" /> ASK BA
           </button>
         </div>
+        <!-- The time, and no source count beside it. `N SRC` lived here until the fold above
+             started printing the same number 60px higher up — two counts of one fact, which is
+             what rule 17 calls a bug rather than a summary. It counted the public results too,
+             and that is the part worth saying out loud: those rows are never folded, so a
+             reader who has them is looking at them under the WEB badge rather than at a total. -->
         <div class="feedback-meta">
-          <span v-if="turn.citations.length">{{ turn.citations.length }} SRC</span>
           <span v-if="turn.ms">{{ turn.ms }} MS</span>
         </div>
       </div>

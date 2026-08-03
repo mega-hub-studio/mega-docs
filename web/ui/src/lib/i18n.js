@@ -56,6 +56,15 @@ export const messages = {
       settings: 'Settings',
     },
     answer: {
+      // The fold's own label, and the only thing on screen when it is shut — so it carries
+      // the count rather than a verb. Written in sentence case: `.eyebrow` shouts it in CSS,
+      // which is also what keeps the Vietnamese diacritics right.
+      //
+      // Label first, count second, because that is the one word order with no plural in it:
+      // an answer citing one section rendered "1 SOURCES", and the alternative is
+      // pluralisation machinery for a single string in a file where `{n} commits` has never
+      // needed it. Vietnamese does not inflect the noun at all, so the same shape serves both.
+      sources: 'sources · {n}',
       // The label on the second source list. Short and shouted, because it is a badge: what a
       // reader needs at a glance is that these rows are not their organisation's documents.
       webBadge: 'WEB',
@@ -153,6 +162,7 @@ export const messages = {
       settings: 'Cài đặt',
     },
     answer: {
+      sources: 'nguồn · {n}',
       webBadge: 'WEB',
       webHint: 'Kết quả tìm kiếm công khai — không phải tài liệu của tổ chức bạn',
     },

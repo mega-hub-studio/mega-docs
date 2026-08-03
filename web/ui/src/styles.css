@@ -200,11 +200,15 @@ main {
    as every other seam in the same card (--sp-4 + --sp-3 = 28px against 16px, which is what
    made the head look detached in `.ticket` before this).
 
+   Only `.feedback` needs giving back now. `.sources` was here too until the document list
+   moved inside `.src-fold`, and a dead selector in this file reads like a decision — the
+   recipe's margin is the fold's own seam there, and that rule says so where the fold is.
+
    `main` scopes it because a card on a screen is what this is about; the dialogs carry
    `.modal`/`.drawer` and size themselves. See rule 27 in CLAUDE.md. */
 main .card { display: flex; flex-direction: column; gap: var(--sp-4); }
 main .card > .head { margin-block-end: 0; }
-.a > .sources, .a > .feedback { margin-block-start: 0; }
+.a > .feedback { margin-block-start: 0; }
 
 /* The question. No message-bubble recipe exists, so this is the one piece of
    app-owned styling — a gold classifier bar mirroring .card's accent bar.
@@ -450,10 +454,29 @@ main.ba :is(p, dd) { max-inline-size: var(--prose-measure); }
 .web-sources > .sources { margin-block: 0; }
 .web-sources > .badge { align-self: start; }
 
+/* ── the document list, behind one tap once it is long ──
+   Two declarations, because the type is a recipe: the summary carries `.eyebrow`, so mono,
+   --fs-label, uppercase and --ls-chrome all arrive from the library and only the affordance
+   is written here. The library's own disclosures (`.code-collapse`, `.reasoning`) spell those
+   five out again per component; copying that here would be five facts with two homes.
+
+   `padding-block` matches `.rel-past > summary`, the app's other disclosure, and takes the
+   row to 31px — the same height as a `.source`, so a shut fold reads as one more row rather
+   than as chrome bolted above the list.
+
+   The seam is the container's (rule 27): `.sources` brings --sp-3 as the gap under a message
+   it follows, which is too much under a label that belongs to it. Set here rather than in
+   the card rule above, because `<details>` itself brings no spacing and a `gap` on it would
+   apply to the content box even shut — a phantom seam under a collapsed summary. */
+.src-fold > summary { cursor: pointer; padding-block: var(--sp-2); }
+.src-fold > .sources { margin-block-start: var(--sp-2); }
+
 /* What a marker click did: scroll, and say nothing. On a short answer the sources are
    already on screen, so the whole interaction was a scroll of zero pixels and no reply.
    The outline is that reply — and it is an outline rather than a border or a background so
-   the row it lands on does not move. */
+   the row it lands on does not move. It reaches a folded row too: a fragment navigation
+   auto-expands the `<details>` it lands in, so the outline is what says *which* row the
+   fold just opened for. */
 .source:target { outline: var(--bw-1) solid var(--cyan-d); outline-offset: var(--sp-1); }
 
 /* ── inside .empty: one rhythm, and stretch what must not be centred ──
