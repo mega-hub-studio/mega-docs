@@ -20,7 +20,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { toast } from '8bit-nes'
 import { useLibrary } from '../composables/library.js'
+import { usePaged } from '../composables/paged.js'
 import { docTip, docTitle, shortDate } from '../lib/library.js'
+import Pager from './Pager.vue'
 
 const props = defineProps({
   documents: { type: Array, default: () => [] },
@@ -55,6 +57,12 @@ const {
   onChanged: () => emit('changed'),
   onLocked: e => emit('locked', e),
 })
+
+// Pages what the Find field left, not the whole corpus: a filter is the fast way to a known
+// document and the pager is the way through an unknown one, so they have to compose. `shown`
+// is a getter here for the same reason usePaged asks for one — it is a fresh array on every
+// keystroke, and the page must follow the search rather than the array it was built from.
+const { page, pages, numbers, slice: shownPage, go } = usePaged(() => shown.value, 10)
 </script>
 
 <template>
@@ -77,7 +85,9 @@ const {
         v-model="query" class="input" type="search"
         placeholder="name, folder, alias, kind, or what it is about"
       >
-      <span class="hint">{{ shown.length }} of {{ documents.length }} shown</span>
+      <!-- "match", not "shown": the rows below are one page of these, and the two numbers
+           stopped being the same thing the moment the list was paged. -->
+      <span class="hint">{{ shown.length }} of {{ documents.length }} match</span>
     </label>
 
     <div v-if="!documents.length" class="empty">
@@ -92,7 +102,7 @@ const {
          the row's `title` because their job is being *searched* (the Find field reads them),
          not being scanned. -->
     <div v-else class="lib-rows">
-      <div v-for="d in shown" :key="d.path" class="lib-row">
+      <div v-for="d in shownPage" :key="d.path" class="lib-row">
         <div class="result" :title="docTip(d)">
           <nes-icon class="result-icon" name="file" />
           <span class="result-body">
@@ -141,6 +151,8 @@ const {
         </div>
       </div>
     </div>
+
+    <Pager :page="page" :pages="pages" :numbers="numbers" label="Library pages" @go="go" />
 
     <!-- ══ the form ═══════════════════════════════════════════════════════════
          Six fields and the text. Everything above the body is what makes a document

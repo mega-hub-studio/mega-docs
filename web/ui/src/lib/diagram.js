@@ -217,21 +217,29 @@ const RANGE = [0.5, 4]
 /* ── the bar under a diagram ────────────────────────────────────────────────────
    Three buttons, and only two of them have a listener.
 
-   `⤢` needs none: `useDiagrams.open` keys on `e.target.closest("nes-mermaid")`, so a click
+   Every glyph on them is one the design system's fonts actually carry. `−` (U+2212) and `⤢`
+   (U+2922) were not: both fall outside every `unicode-range` in `8bit-nes/tokens.css`, so the
+   browser drew them from a system font while `+` and `FULL SCREEN` beside them came from NES
+   Mono — two fonts inside one button, and nothing anywhere says so. Measured against a
+   sentinel fallback, since `document.fonts.check()` answers `true` for a glyph that fell back:
+   it reports the face as loaded, not the character as covered. `–` (U+2013) is in the mono
+   subset's U+2000-206F and `⇲` (U+21F2) in its U+2190-21FF.
+
+   `⇲` needs no listener: `useDiagrams.open` keys on `e.target.closest("nes-mermaid")`, so a click
    anywhere inside the host already opens the viewer — a real <button> inside it therefore
    *is* the keyboard door, and it replaced the `role="button"` + `tabindex` this function used
    to put on the host. That swap is the point: a host carrying `role="button"` with two
    focusable children inside it is a widget with interactive descendants, which is the one
    thing that role may not have. One `<button>` beats a div pretending to be one.
 
-   `−` and `+` stop propagating, or zooming in place would also open full screen. */
+   `–` and `+` stop propagating, or zooming in place would also open full screen. */
 function controls() {
   const bar = document.createElement('span')
   bar.className = 'zoom-hint'
   bar.append(
-    step('−', 'Zoom out', 1 / STEP),
+    step('–', 'Zoom out', 1 / STEP),
     step('+', 'Zoom in', STEP),
-    button('⤢ FULL SCREEN', 'Open this diagram full screen'),
+    button('⇲ FULL SCREEN', 'Open this diagram full screen'),
   )
   return bar
 }

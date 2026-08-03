@@ -74,6 +74,21 @@ export async function queue() {
   return json('/api/tickets')
 }
 
+/**
+ * How many tickets exist, which is not how many arrived.
+ *
+ * `db.Queue` counts the whole table for the four totals and then lists with `LIMIT 100`, so
+ * the payload already carries both numbers and nothing has to be guessed from the array's
+ * length. The screen needs the difference: paging what arrived is honest only while the
+ * reader can see that row 101 was never sent — a pager whose last page is not the last
+ * ticket is the same lie as no pager, told more convincingly.
+ * @param {{open: number, answered: number, confirmed: number, rejected: number}} q the payload
+ * @returns {number} every ticket in the table, listed or not
+ */
+export function queueTotal(q) {
+  return q.open + q.answered + q.confirmed + q.rejected
+}
+
 /** File a gap. `miss` is what the engine answered instead — the BA's evidence. */
 export async function file(question, miss) {
   return json('/api/tickets', { method: 'POST', body: { question, miss } })

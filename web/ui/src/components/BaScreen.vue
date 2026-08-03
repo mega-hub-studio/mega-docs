@@ -18,9 +18,12 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { toast } from '8bit-nes'
 import { useGate } from '../composables/gate.js'
+import { usePaged } from '../composables/paged.js'
 import { useTickets } from '../composables/tickets.js'
+import { queueTotal } from '../lib/qa.js'
 import ImportPanel from './ImportPanel.vue'
 import LibraryPanel from './LibraryPanel.vue'
+import Pager from './Pager.vue'
 import TicketCard from './TicketCard.vue'
 
 const props = defineProps({
@@ -41,6 +44,13 @@ const { drafts, names, working, editing, armed, arm, edit, cancel, move, remove 
   onMoved: ticket => emit('changed', ticket),
   onLocked: gate.fail,
 })
+
+// Ten tickets a page. The queue arrives sorted open → drafts → settled, so page one is the
+// work whatever the archive has grown to, and a settled ticket is a 31px row — ten of those
+// plus the two open cards above them is one phone screen and a bit, measured at 390×844.
+// Destructured, so the template names plain values and Vue unwraps them — `queuePage.slice.value`
+// in markup is the smell that the wiring has started keeping state of its own.
+const { page, pages, numbers, slice: shownTickets, go } = usePaged(() => props.queue.tickets, 10)
 
 // The importer is ImportPanel's own concern — it is the only thing that renders it, and
 // a composable belongs to whoever shows its state. What comes back here is what the
@@ -139,12 +149,22 @@ const importRefused = e => gate.fail(e, 'The server refused the password: ')
     </div>
 
     <TicketCard
-      v-for="t in queue.tickets" :key="t.id"
+      v-for="t in shownTickets" :key="t.id"
       :ticket="t" :unlocked="unlocked" :writes="writes" :working="working"
       :draft="drafts[t.id] ?? ''" :name="names[t.id] ?? ''" :editing="editing" :armed="armed"
       @update:draft="drafts[t.id] = $event" @update:name="names[t.id] = $event"
       @move="move(t, $event)"
       @edit="edit(t)" @cancel="cancel(t)" @arm="arm(t, $event)" @remove="remove(t)"
     />
+
+    <Pager :page="page" :pages="pages" :numbers="numbers" label="Ticket pages" @go="go" />
+
+    <!-- What the pager cannot reach. `db.Queue` lists with LIMIT 100 while counting the whole
+         table, so the payload knows both numbers — and a last page that is not the last ticket
+         has to say so, or paging an archive reads as having seen all of it. -->
+    <p v-if="queue.tickets.length < queueTotal(queue)" class="hint">
+      Showing the {{ queue.tickets.length }} most recently moved of
+      {{ queueTotal(queue) }} tickets. Older ones are not loaded.
+    </p>
   </main>
 </template>

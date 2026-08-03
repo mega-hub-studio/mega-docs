@@ -13,6 +13,8 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { toast } from '8bit-nes'
 import { useImporter } from '../composables/importer.js'
+import { usePaged } from '../composables/paged.js'
+import Pager from './Pager.vue'
 
 const props = defineProps({
   documents: { type: Array, default: () => [] },
@@ -41,6 +43,11 @@ const {
   onIndexed: () => emit('indexed'),
   onLocked: e => emit('locked', e),
 })
+
+// The remove drawer lists the whole corpus. Closed by default is what kept that survivable;
+// a pager is what makes it usable once it is open, because the way to a document in a list of
+// two hundred was scrolling past a hundred and ninety-nine REMOVE buttons.
+const { page, pages, numbers, slice: removable, go } = usePaged(() => props.documents, 10)
 </script>
 
 <template>
@@ -122,18 +129,35 @@ const {
       </div>
     </div>
 
-    <!-- Per file, both outcomes in one list: a batch where seven landed and one was a PDF
-         is the normal case, and the user needs to see which. -->
-    <dl v-if="imported" class="datalist">
-      <template v-for="d in imported.uploaded" :key="d.path">
-        <dt><span class="badge clear">INDEXED</span></dt>
-        <dd><code>{{ d.path }}</code> — {{ d.chunks }} sections</dd>
-      </template>
-      <template v-for="f in imported.failed" :key="f.name">
-        <dt><span class="badge crit">SKIPPED</span></dt>
-        <dd><code>{{ f.name }}</code> — {{ f.error }}</dd>
-      </template>
-    </dl>
+    <!-- Per file, both outcomes — but not with equal weight, which is what one flat list gave
+         them. A batch where seven landed and one was a PDF is the normal case and the eighth
+         is the only line anyone has to act on; importing a folder of 300 buried it under 300
+         INDEXED rows nobody reads. So the failures are the list, and the successes are a count
+         with the detail behind it.
+
+         The <details> is *not* a pager: a per-file report is read once and thrown away, so the
+         thing it needs is to stop being in the way, not a way to walk it. -->
+    <template v-if="imported">
+      <dl v-if="imported.failed.length" class="datalist">
+        <template v-for="f in imported.failed" :key="f.name">
+          <dt><span class="badge crit">SKIPPED</span></dt>
+          <dd><code>{{ f.name }}</code> — {{ f.error }}</dd>
+        </template>
+      </dl>
+      <details v-if="imported.uploaded.length" class="corpus">
+        <summary>
+          <span class="eyebrow">
+            {{ imported.uploaded.length }} indexed — {{ imported.chunks }} sections
+          </span>
+        </summary>
+        <dl class="datalist">
+          <template v-for="d in imported.uploaded" :key="d.path">
+            <dt><span class="badge clear">INDEXED</span></dt>
+            <dd><code>{{ d.path }}</code> — {{ d.chunks }} sections</dd>
+          </template>
+        </dl>
+      </details>
+    </template>
 
     <p class="hint">PDF or DOCX? Convert first!</p>
 
@@ -146,7 +170,7 @@ const {
         <span class="eyebrow">Remove a document — {{ documents.length }} indexed</span>
       </summary>
       <dl class="datalist">
-        <template v-for="d in documents" :key="d.path">
+        <template v-for="d in removable" :key="d.path">
           <dt><code>{{ d.path }}</code></dt>
           <dd>
             <button
@@ -158,6 +182,7 @@ const {
           </dd>
         </template>
       </dl>
+      <Pager :page="page" :pages="pages" :numbers="numbers" label="Document pages" @go="go" />
     </details>
 
     <!-- .perm is the library's own gate: one request, one decision, the target shown

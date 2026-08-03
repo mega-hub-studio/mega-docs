@@ -580,6 +580,44 @@ main.ba {
    stayed flush, so a 160px card had two left edges. One edge, and the gap does the spacing. */
 .ticket .q { margin-block-end: 0; border-inline-start: 0; padding-inline-start: 0; }
 
+/* ── a ticket is a row you open ──
+   The summary carries four things and only one of them is content: the id, the status badge
+   and the date are chrome, so they share the first line, and the question is a block element
+   and takes the next one. That is normal flow doing the whole layout, and it is deliberate —
+   `display: flex` on a `<summary>` was the first attempt and it silently deletes the
+   disclosure triangle, because the marker comes from `list-item` and a flex container is not
+   one. Ten rows with no affordance at all: measured, and nothing in the gate can see it.
+
+   `.rel-past` is the other summary in this app and it *does* take the marker off, on the
+   stated grounds that its badge is the affordance. That reasoning does not carry here — a
+   status badge says what a ticket is, never that the row opens — so this one keeps the
+   triangle and lets flow do what flex was being asked for.
+
+   Shut, the question clamps to two lines: enough to recognise which ticket it is, and a
+   ceiling, so one BA who pasted three paragraphs into a question cannot make a row six lines
+   tall. Open, the clamp is off — at that point the question is the thing being answered.
+
+   The seam belongs to `.tf-body` rather than to a `gap` on the `<details>`: a gap on the
+   element would also apply to its content box while shut, so a collapsed ticket would carry
+   --sp-3 of nothing under its own summary. Same trap as `.src-fold`, and the same fix — one
+   container declares the rhythm, and it is the container that only exists when open. */
+.ticket-fold > summary { cursor: pointer; padding-block: var(--sp-1); }
+.ticket-fold > summary > .tf-meta,
+.ticket-fold > summary > .badge { margin-inline-end: var(--sp-2); }
+.ticket-fold > summary > .q {
+  margin-block-start: var(--sp-1);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.ticket-fold[open] > summary > .q { -webkit-line-clamp: none; }
+.tf-meta {
+  font-family: var(--font-mono); font-size: var(--fs-label);
+  text-transform: uppercase; letter-spacing: var(--ls-chrome); color: var(--muted);
+}
+.tf-body {
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  margin-block-start: var(--sp-3);
+}
+
 /* ── the way back out of `confirmed` ──
    Three verbs that un-answer a question, on a card a BA scrolls past on a phone. The
    disclosure is the whole affordance: one deliberate tap to see them, and until then no
@@ -600,7 +638,11 @@ main.ba {
 }
 .ticket-undo > summary { color: var(--muted); }
 .ticket-undo .control-group { flex-wrap: wrap; margin-block-start: var(--sp-3); }
+/* `main.ba > .hint` is the third: the line under the pager saying how many tickets the
+   server did not send. Same trap, same fix — it is a footnote to a list, and at body weight
+   it read as another callout. */
 .ticket-undo > .hint,
+main.ba > .hint,
 .ticket > .hint { font-size: var(--fs-chip); color: var(--muted); }
 /* Only the drawer needs the margin: it is not a flex container, so nothing else spaces it.
    On the card itself the gap does (see "every card is a column with a gap"). */
