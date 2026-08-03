@@ -11,7 +11,7 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
-import { isDiagram } from './diagram.js'
+import { isDiagram, repair } from './diagram.js'
 import { language } from './highlight.js'
 
 let configured = false
@@ -599,7 +599,12 @@ function split(text, { docs, web, srcId, webSrcId }) {
 /* Runs after DOMPurify, never before: <nes-mermaid> is a custom element and the
    sanitizer would strip it. The diagram source is the code block's own text, so it
    was already sanitized as text — and the element reads its textContent, which is
-   why this survives being serialized back to a string. */
+   why this survives being serialized back to a string.
+
+   `repair` is on the way in rather than inside the element for the same reason: the
+   element reads its text once, at upgrade, so the only moment the source can be fixed
+   is the one where it is handed over. diagram.js says what it fixes and why a prompt
+   cannot. */
 function asDiagrams(html) {
   const tpl = document.createElement('template')
   tpl.innerHTML = html
@@ -612,7 +617,7 @@ function asDiagrams(html) {
     if (!labelled && !(lang === undefined && isDiagram(code.textContent)))
       continue
     const el = document.createElement('nes-mermaid')
-    el.textContent = code.textContent
+    el.textContent = repair(code.textContent)
     const pre = code.parentElement
     const walk = walkAfter(pre)
     pre.replaceWith(el)

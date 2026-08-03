@@ -46,6 +46,15 @@ const html = () => turnHtml(props.turn, props.diagramsReady, srcId, webSrcId)
 const docCites = computed(() => props.turn.citations.filter(c => c.kind !== 'web'))
 const webCites = computed(() => props.turn.citations.filter(c => c.kind === 'web'))
 
+// Above this many document rows the list arrives folded. Retrieval is as wide as the model
+// can read rather than as wide as `TOP_K` (see internal/config), so an instance that
+// declared a context window cites what the window fits — 26 rows measured, which is 916px of
+// list at 390×844 and an answer whose COPY / ASK BA row is two screens below its own prose.
+// Six because both numbers land there: it is the last count whose whole card still fits one
+// phone screen (462px against 844, measured), and it is `TOP_K`'s default — so an instance
+// that never widened its window never meets a fold at all.
+const SRC_FOLD = 6
+
 // A computed, unlike `html` above, and not to save the work: it has to be the *same object*
 // until this turn changes. A fresh one on every parent render — asking a new question is one —
 // re-applies :checked on the card's boxes, so a reader part-way through picking would have

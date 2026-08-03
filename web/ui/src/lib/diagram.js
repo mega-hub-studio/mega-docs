@@ -20,8 +20,11 @@
    decides whether to fetch the renderer, and the one that decides which block to
    replace. If they disagree, the answer either loads 3.4 MB for nothing or shows a
    fence it could have drawn. */
+/* `.*` and not `[^}]*` for the directive: an init block nests its own braces
+   (`%%{init: {"theme":"dark"}}%%`), and a class that stops at the first `}` left the
+   whole diagram unrecognised — a fence, for a block whose second line said `flowchart`. */
 const KIND
-  = /^\s*(?:%%\{[^}]*\}%%\s*)?(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4Context|sankey-beta|xychart-beta|block-beta)\b/i
+  = /^\s*(?:%%\{.*\}%%\s*)*(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4Context|sankey-beta|xychart-beta|block-beta)\b/i
 
 /**
  * Is this code block a diagram?
@@ -57,6 +60,115 @@ export function hasDiagram(markdown) {
       return true
   }
   return false
+}
+
+/* ── the quotes a model did not write ──────────────────────────────────────────
+   A flowchart label is only free text inside quotes. Bare, the grammar reads its own
+   punctuation, and `" ( ) { } [ ] @ |` are each a parse error inside `[…]` — measured
+   against the pinned mermaid 11.16, one character at a time.
+
+   The failure that follows is silent and reads as a broken renderer: <nes-mermaid>
+   catches the parse error and calls its `_raw()`, which puts the source back on the
+   page — with the walkthrough already folded on top of it, because that fold happens
+   at render time and cannot know what the draw will do. So the reported symptom was a
+   stepper attached to source code, stepping through nodes that were never drawn.
+
+   The answer that reported it had `B[FORK (platform UI)]` and
+   `I[api/{client,generated} · packages/@aha/calendar]`: ordinary prose about a
+   codebase, every one of those characters grammar. Asking the prompt for quotes cannot
+   be the fix, for the reason already written above `isDiagram` and again at the
+   NoAnswer sentinel — an invariant the code depends on does not survive in a prompt.
+   So the quotes are put on here, where a miss is not possible, and only where they
+   change nothing: a label the grammar can already read is left exactly as written.
+
+   `graph`/`flowchart` only. A classDiagram's braces hold its members and a
+   sequenceDiagram's message text is free already, so quoting either would be this
+   function inventing the error it exists to remove. */
+const FLOW = /^\s*(?:%%\{.*\}%%\s*)*(?:graph|flowchart)\b/i
+const CLAIMED = /["(){}[\]@|]/
+const SHUTS = { '[': ']', '(': ')', '{': '}' }
+/* A shape is spelled with the marks on both sides of its text — `([x])`, `[(x)]`,
+   `[/x/]` — so whatever the opener put on the left is given back on the right before
+   the text is quoted, or a stadium becomes a rounded box holding a stray `]`. */
+const MIRROR = { '[': ']', '(': ')', '{': '}', '/': '/\\', '\\': '/\\' }
+const ID = /\w/
+
+/**
+ * Quote every label a flowchart left bare, so ordinary prose in one still draws.
+ *
+ * A no-op for any other kind of diagram, and for a label that is already quoted or
+ * holds nothing the grammar wants — which is nearly all of them.
+ *
+ * @param {string} source the diagram as the model wrote it
+ * @returns {string} the same diagram, with the labels the parser would have rejected
+ *   in quotes
+ */
+export function repair(source) {
+  const src = String(source || '')
+  if (!FLOW.test(src))
+    return src
+  let out = ''
+  for (let i = 0; i < src.length; i++) {
+    const found = label(src, i)
+    if (!found) {
+      out += src[i]
+      continue
+    }
+    out += found.open + quote(found.body) + found.shut
+    i = found.end - 1
+  }
+  return out
+}
+
+/**
+ * Read one label and the shape around it, or decide there is none here.
+ *
+ * A node label starts where a bracket follows an id; an edge label is the text between
+ * two pipes. Its end is found by counting the shape's own bracket rather than by taking
+ * the first closer, because `[FORK (platform UI)]` ends at the `]` and `[a[0] b]` at the
+ * second one — both of them labels a model writes.
+ *
+ * @param {string} src the whole diagram
+ * @param {number} i where to look
+ * @returns {{ open: string, body: string, shut: string, end: number } | null} null when
+ *   there is no label here, or when its brackets do not close on the line — a guess there
+ *   would corrupt a diagram that draws
+ */
+function label(src, i) {
+  if (src[i] === '|') {
+    const k = src.indexOf('|', i + 1)
+    const body = k < 0 ? '' : src.slice(i + 1, k)
+    return body.includes('\n') || k < 0 ? null : { open: '|', body, shut: '|', end: k + 1 }
+  }
+  const bracket = src[i]
+  const shut = SHUTS[bracket]
+  if (!shut || !ID.test(src[i - 1] ?? ''))
+    return null
+  let j = i
+  while ('([{/\\'.includes(src[j]))
+    j++
+  let depth = [...src.slice(i, j)].filter(c => c === bracket).length
+  let k = j
+  for (; k < src.length && src[k] !== '\n'; k++) {
+    if (src[k] === bracket)
+      depth++
+    else if (src[k] === shut && --depth === 0)
+      break
+  }
+  if (depth !== 0)
+    return null
+  let body = src.slice(j, k)
+  for (let n = j - i - 1; n > 0 && MIRROR[src[i + n]].includes(body.at(-1)); n--)
+    body = body.slice(0, -1)
+  return { open: src.slice(i, j), body, shut: src.slice(j + body.length, k + 1), end: k + 1 }
+}
+
+/** Quotes a label only if the grammar would trip over it, since `"` is itself claimed. */
+function quote(body) {
+  const t = body.trim()
+  if (!CLAIMED.test(body) || (t.length > 1 && t.startsWith('"') && t.endsWith('"')))
+    return body
+  return `"${body.split('"').join('#quot;')}"`
 }
 
 /* ── reading a diagram on a phone ──────────────────────────────────────────────

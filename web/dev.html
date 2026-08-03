@@ -756,6 +756,14 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
       first line instead, and one predicate serves both callers (whether to fetch the
       3.4 MB renderer, and which block to replace) so they cannot disagree. The renderer
       is lazy and integrity-checked; if it never arrives the fence stays, which reads.
+      A <b>label the model left bare is quoted on the way in</b>, for the same reason and
+      by the same file: inside <code>[…]</code> the characters
+      <code>" ( ) { } [ ] @ |</code> are grammar, so <code>B[FORK (platform UI)]</code> is a
+      parse error — and that error is silent, because the element catches it and puts the
+      source back with the walkthrough already folded on top of it. What the reader gets is
+      a stepper attached to source code, which reads as a broken renderer. So the quotes are
+      put on by <code>repair()</code>, which touches only a label the parser would have
+      rejected and leaves the diagram byte-identical otherwise.
       In the answer the drawing is left at its natural size and the frame scrolls, because
       a diagram fitted to a phone is a picture of unreadable text — one whose natural size
       is 938×64 was squeezed into 289px and drew 20px tall, six labels at about 4px. The
@@ -786,7 +794,13 @@ CORPUS_DIR=docs      # ingest reads it; nothing writes there</span></div>
       các loại sơ đồ ở dòng đầu của block, và một hàm phán đoán duy nhất dùng cho cả hai
       chỗ (có tải renderer 3.4 MB không, và thay block nào) để chúng không lệch nhau.
       Renderer tải lười và có kiểm tra integrity; nếu không tải được thì vẫn là fence,
-      vẫn đọc được. Trong câu trả lời sơ đồ giữ nguyên kích thước tự nhiên và khung tự cuộn,
+      vẫn đọc được. <b>Label model viết thiếu ngoặc kép sẽ được thêm vào ngay lúc dựng</b>,
+      cùng lý do và cùng file: trong <code>[…]</code> các ký tự
+      <code>" ( ) { } [ ] @ |</code> đều là cú pháp, nên <code>B[FORK (platform UI)]</code>
+      là lỗi parse — và lỗi đó im lặng, vì element bắt lấy rồi trả source ra lại, trong khi
+      walkthrough đã fold lên trên nó rồi. Người đọc nhận được một stepper gắn vào đoạn
+      source, trông y như renderer hỏng. Nên ngoặc kép do <code>repair()</code> thêm, chỉ
+      chạm vào label mà parser sẽ từ chối, còn lại giữ nguyên từng byte. Trong câu trả lời sơ đồ giữ nguyên kích thước tự nhiên và khung tự cuộn,
       vì sơ đồ bị thu vừa màn hình điện thoại là một bức ảnh chữ không đọc được — một sơ đồ
       938×64 bị nén vào 289px vẽ ra cao 20px, sáu label còn khoảng 4px. Chiều rộng lấy từ
       <code>max-width</code> inline của chính mermaid chứ không phải từ một con số trong repo
