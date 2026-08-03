@@ -239,7 +239,35 @@ main .card > .head { margin-block-end: 0; }
 /* A pasted identifier, path or URL must wrap, never widen the page — the one
    thing a 390px viewport is unforgiving about. */
 .q, .prose, .source { overflow-wrap: anywhere; }
-.source { flex-wrap: wrap; }        /* long doc name + heading stack instead of overflowing */
+
+/* ── a citation row is two columns, and only two ──
+   `.source` is the library's flex row of [n] · title · heading, and this used to answer a
+   long document name with `flex-wrap: wrap`. That stops the overflow and produces something
+   worse: the three spans are three flex items, so each one drops to a line of its own at the
+   *row's* left edge. The chip sits alone on line 1, the name starts back at x=22 on line 2,
+   and the heading is a third line — a list where nothing lines up with anything, and every
+   long row costs 97px instead of 23.
+
+   Two columns fixes it because that is what the row actually is: a fixed chip, and text.
+   `.source-body` is the second column, and it is a wrapper in the markup rather than a grid
+   trick because the title and the heading have to flow as *one* run of inline text — side by
+   side while they fit, wrapping together when they do not. `.result-body` in the same library
+   is the same construction for the same reason, so this is the recipe's own idiom rather than
+   a local invention.
+
+   Measured at 390 against the six-row list that was reported: 434px → 276px, every chip at
+   x=22 and every first line at x=50, and a wrapped name hangs under itself instead of under
+   its number. `min-inline-size: 0` is the load-bearing half — a flex item will not shrink
+   below min-content without it, and `overflow-wrap: anywhere` above is what makes min-content
+   one character rather than the longest unbreakable path segment. */
+.source { flex-wrap: nowrap; }
+.source-body { flex: 1 1 auto; min-inline-size: 0; }
+/* The seam the flex `gap` used to provide, now that the name and the section are inline
+   siblings instead of flex items. It has to be a declaration: Vue's template compiler
+   condenses a whitespace-only text node that contains a newline, so the space between two
+   spans on two source lines does not survive the build and `generated.md` rendered welded to
+   its section name. Set on the container, one rule, for however many children it grows. */
+.source-body > * + * { margin-inline-start: var(--sp-2); }
 
 .a .head { justify-content: space-between; }
 

@@ -130,12 +130,17 @@ const clarify = computed(() => turnClarify(props.turn))
       <details v-if="docCites.length" class="src-fold" :open="docCites.length <= SRC_FOLD">
         <summary class="eyebrow">{{ t('answer.sources', { n: docCites.length }) }}</summary>
         <ol class="sources">
+          <!-- `.source-body` is the row's second column, and it is markup rather than CSS
+               because the name and the section have to wrap as one run of text — see the
+               two-column note in styles.css for the 434px → 276px this is. -->
           <li v-for="c in docCites" :id="srcId(c.n)" :key="c.n" class="source">
             <span class="source-n">{{ c.n }}</span>
-            <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
-            <span v-if="c.heading" class="source-host" :title="c.heading">{{
-              section(c.heading)
-            }}</span>
+            <span class="source-body">
+              <span class="source-title" :title="c.doc">{{ fileName(c.doc) }}</span>
+              <span v-if="c.heading" class="source-host" :title="c.heading">{{
+                section(c.heading)
+              }}</span>
+            </span>
           </li>
         </ol>
       </details>
@@ -148,9 +153,13 @@ const clarify = computed(() => turnClarify(props.turn))
       <div v-if="webCites.length" class="callout explain web-sources">
         <span class="badge" :title="t('answer.webHint')">{{ t('answer.webBadge') }}</span>
         <ol class="sources">
+          <!-- Same second column, and it earns it here twice over: a result's title is a
+               sentence somebody else wrote, so it is the longest text in either list. -->
           <li v-for="c in webCites" :id="webSrcId(c.n)" :key="c.n" class="source">
             <span class="source-n">w{{ c.n }}</span>
-            <a class="source-title" :href="c.url" target="_blank" rel="noopener noreferrer" :title="c.url">{{ c.title || c.url }}</a>
+            <span class="source-body">
+              <a class="source-title" :href="c.url" target="_blank" rel="noopener noreferrer" :title="c.url">{{ c.title || c.url }}</a>
+            </span>
           </li>
         </ol>
       </div>
