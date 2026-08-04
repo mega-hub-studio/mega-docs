@@ -164,9 +164,16 @@ func (s *Store) InsertChunk(docID int64, heading, content string, ord int, emb [
 	}
 	defer tx.Rollback()
 
+	// `ident` is read off the document rather than passed in, because the row is already
+	// written by the time any chunk is: `ingest` upserts the document and then inserts its
+	// chunks. A parameter would be a second copy of what the row already says, and the first
+	// caller to forget it would leave a document findable by its text and not by its name.
 	res, err := tx.Exec(
-		`INSERT INTO chunks(document_id,heading,content,ord) VALUES(?,?,?,?)`,
-		docID, heading, content, ord)
+		`INSERT INTO chunks(document_id,heading,content,ord,ident)
+		 VALUES(?,?,?,?, (SELECT path || ' ' || COALESCE(title,'') || ' ' ||
+		                         COALESCE(alias,'') || ' ' || COALESCE(kind,'')
+		                  FROM documents WHERE id=?))`,
+		docID, heading, content, ord, docID)
 	if err != nil {
 		return err
 	}

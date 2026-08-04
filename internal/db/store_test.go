@@ -286,3 +286,62 @@ func TestScopeTreatsWildcardsAsCharacters(t *testing.T) {
 		t.Errorf("hits = %+v; want only q_1/spec.md", hits)
 	}
 }
+
+// What a document is *called* has to be findable, not only what it says.
+//
+// The keyword half of retrieval indexed content and heading and nothing else, so the four
+// things a person files a document under were invisible to it. Measured on a 52-document
+// corpus before this: "có bao nhiêu decision" returned a table of unrelated notes and named
+// none of the seven decisions — the notes won because their bodies happened to contain
+// "quyết định", while every decision carried the word only in its name.
+//
+// The document here is deliberately hostile to the old index: its text is about cookies and
+// never uses "decision" or "auth", so a hit can only come from the identity column.
+func TestADocumentIsFoundByWhatItIsCalled(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "ident.db"), 4)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer s.Close()
+
+	wanted, err := s.UpsertDocument(Doc{
+		Path: "decision-4-auth.md", Title: "decision 4 auth",
+		Alias: "đăng nhập", Kind: "decision",
+	})
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if err := s.InsertChunk(wanted, "Xác thực",
+		"Phiên đăng nhập lưu ở cookie HttpOnly, không dùng token trong localStorage.", 0,
+		vec(0, 0, 0, 1)); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	// A decoy whose *text* is what a naive keyword search would rank first.
+	noise, err := s.UpsertDocument(Doc{Path: "notes/topic.md", Title: "note"})
+	if err != nil {
+		t.Fatalf("upsert noise: %v", err)
+	}
+	if err := s.InsertChunk(noise, "Ghi chú",
+		"Một quyết định kỹ thuật của hệ thống, ghi lại lý do và ràng buộc.", 0,
+		vec(1, 0, 0, 0)); err != nil {
+		t.Fatalf("insert noise: %v", err)
+	}
+
+	// Each of the four identity fields, on a query whose vector points at the decoy — so
+	// anything that comes back for the right document came back on the keyword leg.
+	for _, q := range []string{"decision", "decision-4-auth.md", "đăng nhập", "auth"} {
+		hits, err := s.Search(vec(1, 0, 0, 0), q, 5, "", false)
+		if err != nil {
+			t.Fatalf("search %q: %v", q, err)
+		}
+		found := false
+		for _, h := range hits {
+			if h.DocPath == "decision-4-auth.md" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%q found nothing called that — identity is not in the index", q)
+		}
+	}
+}

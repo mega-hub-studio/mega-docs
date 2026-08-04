@@ -130,6 +130,70 @@ var migrations = []migration{
 			WHERE body IS NULL;
 		`,
 	},
+	{
+		id:  3,
+		why: "keyword search could not see what a document is called, only what it says",
+		// The half of retrieval that is keyword matching indexed a chunk's content and its
+		// heading, and nothing else — so the four things a person files a document under were
+		// invisible to it. A document called `decision-4-auth.md`, titled "decision 4 auth",
+		// filed under kind `decision`, whose text says "Phiên đăng nhập lưu ở cookie HttpOnly"
+		// and never uses the word "decision", could not be found by that word at all.
+		//
+		// Measured before this: on a 52-document corpus, "có bao nhiêu decision" came back with
+		// a table of unrelated notes and named none of the seven decisions — the notes won
+		// because their *bodies* happened to contain "quyết định". The count is answered from
+		// the rows now (see rag/smalltalk.go), but every other question about a document by its
+		// name was answered the same wrong way and had no such escape.
+		//
+		// The fix is in the index rather than in ranking, and that is the whole point: with the
+		// identity in a column, BM25 scores it like any other text and RRF fuses two legs
+		// exactly as it did. No third candidate source, no hand-tuned boost, and
+		// `toFTSQuery` needs no change because it never scoped a term to a column.
+		//
+		// Cost is a rebuild of the keyword index, which is pure SQL — no embedding is touched,
+		// so this costs nothing with a provider and needs no re-ingest. Triggers go first so
+		// the backfill does not fire the old ones once per chunk.
+		//
+		// `ident` repeats per chunk, which is the price of an external-content FTS: the
+		// alternative is a standalone table holding a second copy of every chunk's *text*.
+		// A path and three short attributes against six hundred characters of content.
+		sql: `
+			DROP TRIGGER IF EXISTS chunks_ai;
+			DROP TRIGGER IF EXISTS chunks_ad;
+			DROP TRIGGER IF EXISTS chunks_au;
+
+			ALTER TABLE chunks ADD COLUMN ident TEXT;
+			UPDATE chunks SET ident = (
+			  SELECT d.path || ' ' || COALESCE(d.title,'') || ' ' ||
+			         COALESCE(d.alias,'') || ' ' || COALESCE(d.kind,'')
+			  FROM documents d WHERE d.id = chunks.document_id);
+
+			DROP TABLE IF EXISTS fts_chunks;
+			CREATE VIRTUAL TABLE fts_chunks USING fts5(
+			  content,
+			  heading,
+			  ident,
+			  content='chunks',
+			  content_rowid='id',
+			  tokenize='unicode61 remove_diacritics 2'
+			);
+			CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+			  INSERT INTO fts_chunks(rowid, content, heading, ident)
+			  VALUES (new.id, new.content, new.heading, new.ident);
+			END;
+			CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN
+			  INSERT INTO fts_chunks(fts_chunks, rowid, content, heading, ident)
+			  VALUES('delete', old.id, old.content, old.heading, old.ident);
+			END;
+			CREATE TRIGGER chunks_au AFTER UPDATE ON chunks BEGIN
+			  INSERT INTO fts_chunks(fts_chunks, rowid, content, heading, ident)
+			  VALUES('delete', old.id, old.content, old.heading, old.ident);
+			  INSERT INTO fts_chunks(rowid, content, heading, ident)
+			  VALUES (new.id, new.content, new.heading, new.ident);
+			END;
+			INSERT INTO fts_chunks(fts_chunks) VALUES('rebuild');
+		`,
+	},
 }
 
 // migrateVersioned applies whatever has not run yet, and reports how many it applied.
