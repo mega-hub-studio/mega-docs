@@ -248,6 +248,7 @@ const (
 	notCorpusAsk corpusAsk = iota
 	recentDocs
 	recentQA
+	countDocs // "how many X are there" — X is a category, answered from rows
 )
 
 // recentLimit is how many rows a recency answer shows. Ten because the question is "what
@@ -272,16 +273,49 @@ var corpusAskPatterns = []struct {
 	{recentDocs, regexp.MustCompile(`^(which documents were updated( recently)?|what documents (changed|were updated)( recently)?|(recently )?updated documents|what'?s new( in the library)?|what is new( in the library)?)$`)},
 }
 
-// corpusAskOf reports which library question this is, on a string already lowercased and
-// stripped of trailing punctuation — the same input smallTalkKindOf takes, so the two
-// classifiers cannot disagree about what the question even was.
-func corpusAskOf(q string) corpusAsk {
+// countPattern pulls the category out of a counting question, as a named group — the term is
+// read by name and not by position, because every diacritic alternation in here is a capture
+// group of its own and reading "the last one" picked up an optional suffix instead. Measured:
+// "có bao nhiêu decision" came back counting the whole library.
+//
+// Capped at three words on purpose: that cap is the first thing keeping a *content* question
+// out. "có bao nhiêu ngày để hoàn tiền" is five words about a refund window and belongs in
+// retrieval; "có bao nhiêu decision" is one word naming a category and belongs in the rows.
+// The cap is not the real guard though — `count` is, because a term matching no document is
+// not a category whatever its shape.
+var countPattern = regexp.MustCompile(
+	`^(?:c(?:o|ó) )?(?:bao nhi(?:e|ê)u|li(?:e|ệ)t k(?:e|ê)(?: t(?:a|ấ)t c(?:a|ả))?|how many|list (?:all |every )?|what are (?:all )?(?:the )?)` +
+		`\s*(?P<term>[\p{L}\d][\p{L}\d_.\-]*(?:\s+[\p{L}\d][\p{L}\d_.\-]*){0,2}?)` +
+		`(?:\s+(?:trong|(?:c(?:o|ó) )?trong|(?:o|ở))\s+(?:h(?:e|ệ) th(?:o|ố)ng|kho|th(?:u|ư) vi(?:e|ệ)n|corpus|the (?:library|system|corpus)))?$`)
+
+var termAt = countPattern.SubexpIndex("term")
+
+// The words that name the library itself rather than a category in it: "how many documents"
+// asks about everything, so the term is emptied and the count covers the whole corpus.
+var everything = map[string]bool{
+	"tài liệu": true, "tai lieu": true, "tài liệu nào": true,
+	"documents": true, "document": true, "docs": true, "doc": true,
+	"files": true, "file": true,
+}
+
+// corpusAskOf reports which library question this is, and for a counting question the category
+// it is about, on a string already lowercased and stripped of trailing punctuation — the same
+// input smallTalkKindOf takes, so the two classifiers cannot disagree about what the question
+// even was.
+func corpusAskOf(q string) (corpusAsk, string) {
 	for _, p := range corpusAskPatterns {
 		if p.re.MatchString(q) {
-			return p.ask
+			return p.ask, ""
 		}
 	}
-	return notCorpusAsk
+	if m := countPattern.FindStringSubmatch(q); m != nil {
+		term := strings.TrimSpace(m[termAt])
+		if everything[term] {
+			return countDocs, "" // an empty term counts the whole library
+		}
+		return countDocs, term
+	}
+	return notCorpusAsk, ""
 }
 
 // answeredEarly is every turn whose reply is known before retrieval starts: a greeting, a
@@ -308,15 +342,37 @@ func (e *Engine) answeredEarly(question string, inThread bool, onToken func(stri
 // Retrieval answers this badly — which is the entire reason this function exists — but badly
 // beats an error on the one screen somebody is looking at.
 func (e *Engine) recent(asked, question string, onToken func(string)) bool {
-	ask := corpusAskOf(asked)
-	if ask == notCorpusAsk {
+	ask, term := corpusAskOf(asked)
+	vi := viLetters.MatchString(question)
+	switch ask {
+	case notCorpusAsk:
+		return false
+	case countDocs:
+		return e.count(term, vi, onToken)
+	case recentDocs, recentQA:
+		docs, err := e.store.RecentDocuments(ask.prefix(), recentLimit)
+		if err != nil {
+			return false
+		}
+		onToken(renderRecent(docs, ask, vi))
+		return true
+	}
+	return false
+}
+
+// count answers "how many X are there" from the rows, and reports whether it could.
+//
+// The guard that keeps this out of retrieval's way is the *data*, not the wording: a term
+// matching no document is not a category, whatever shape the question had, so it falls
+// through and gets retrieved like any other question. That is what stops "có bao nhiêu ngày
+// để hoàn tiền" being answered with a file listing — nothing in the library is called "ngày
+// để hoàn tiền", so nothing here claims it is a category.
+func (e *Engine) count(term string, vi bool, onToken func(string)) bool {
+	total, docs, err := e.store.DocumentsMatching(term, recentLimit*2)
+	if err != nil || (total == 0 && term != "") {
 		return false
 	}
-	docs, err := e.store.RecentDocuments(ask.prefix(), recentLimit)
-	if err != nil {
-		return false
-	}
-	onToken(renderRecent(docs, ask, viLetters.MatchString(question)))
+	onToken(renderCount(term, total, docs, vi))
 	return true
 }
 
@@ -392,4 +448,57 @@ func when(ts string) string {
 		return ts[:16]
 	}
 	return ts
+}
+
+// renderCount writes the total first and the list second, and says plainly when the list is
+// shorter than the total.
+//
+// The total is the answer; the table is evidence for it. Reversing that is how the failure
+// this replaces read on screen — a table of whatever ranked, with "3 quyết định" underneath,
+// counted from the sample rather than from the library.
+func renderCount(term string, total int, docs []db.Document, vi bool) string {
+	var b strings.Builder
+	what := term
+	if what == "" {
+		if vi {
+			what = "tài liệu"
+		} else {
+			what = "documents"
+		}
+	}
+	if vi {
+		fmt.Fprintf(&b, "**Thư viện có %d %s.**\n\n", total, what)
+	} else {
+		fmt.Fprintf(&b, "**The library holds %d %s.**\n\n", total, what)
+	}
+
+	if vi {
+		b.WriteString("| # | Tài liệu | Loại | Cập nhật |\n|---|---|---|---|\n")
+	} else {
+		b.WriteString("| # | Document | Kind | Updated |\n|---|---|---|---|\n")
+	}
+	for i, d := range docs {
+		kind := d.Kind
+		if kind == "" {
+			kind = "—"
+		}
+		fmt.Fprintf(&b, "| %d | `%s` | %s | %s |\n", i+1, d.Path, kind, when(d.UpdatedAt))
+	}
+
+	// A count that quietly showed the first twenty would be the same lie in a smaller size.
+	if len(docs) < total {
+		if vi {
+			fmt.Fprintf(&b, "\nĐang hiện %d trong %d — hỏi hẹp hơn để thấy phần còn lại.", len(docs), total)
+		} else {
+			fmt.Fprintf(&b, "\nShowing %d of %d — narrow the question to see the rest.", len(docs), total)
+		}
+	}
+	if vi {
+		b.WriteString("\n\nĐếm trực tiếp trên thư viện theo tên, tiêu đề, bí danh và loại — " +
+			"không phải kết quả tìm kiếm, nên đây là **tổng thật**, không phải phần khớp nhất.")
+	} else {
+		b.WriteString("\n\nCounted directly from the library by name, title, alias and kind — not a " +
+			"search result, so this is the **real total** rather than the best-matching part of it.")
+	}
+	return b.String()
 }

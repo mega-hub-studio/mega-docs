@@ -190,7 +190,7 @@ func TestARealQuestionIsNotMistakenForARecencyOne(t *testing.T) {
 		"which documents were updated recently",
 		"what's new in the library",
 	} {
-		if corpusAskOf(asked(q)) != recentDocs {
+		if ask, _ := corpusAskOf(asked(q)); ask != recentDocs {
 			t.Errorf("%q should list the recently updated documents", q)
 		}
 	}
@@ -202,8 +202,31 @@ func TestARealQuestionIsNotMistakenForARecencyOne(t *testing.T) {
 		"recently confirmed answers",
 		"which answers were confirmed recently",
 	} {
-		if corpusAskOf(asked(q)) != recentQA {
+		if ask, _ := corpusAskOf(asked(q)); ask != recentQA {
 			t.Errorf("%q should list the recently confirmed answers", q)
+		}
+	}
+	for _, q := range []string{
+		"có bao nhiêu decision",
+		"how many decision",
+		"liệt kê tất cả decision",
+		"có bao nhiêu tài liệu",
+	} {
+		if ask, _ := corpusAskOf(asked(q)); ask != countDocs {
+			t.Errorf("%q should be counted from the library, not retrieved", q)
+		}
+	}
+	// Two guards, and this half tests the first: a category is at most three words, so a
+	// question that counts something *inside* the documents never reaches the store at all.
+	// The second guard is the data, and it is in the pipeline test — a term matching no
+	// document is not a category whatever its shape.
+	for _, q := range []string{
+		"có bao nhiêu ngày để hoàn tiền",
+		"bao nhiêu ngày sau khi huỷ thì được hoàn tiền",
+		"how many days before a deposit is forfeited",
+	} {
+		if ask, _ := corpusAskOf(asked(q)); ask == countDocs {
+			t.Errorf("%q counts something inside the documents and must be retrieved, not listed", q)
 		}
 	}
 	for _, q := range []string{
@@ -216,7 +239,7 @@ func TestARealQuestionIsNotMistakenForARecencyOne(t *testing.T) {
 		"booking",
 		"what changed in the refund rules",
 	} {
-		if got := corpusAskOf(asked(q)); got != notCorpusAsk {
+		if got, _ := corpusAskOf(asked(q)); got != notCorpusAsk {
 			t.Errorf("%q was read as a library question (%d) instead of being retrieved", q, got)
 		}
 	}

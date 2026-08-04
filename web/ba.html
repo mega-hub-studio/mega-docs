@@ -724,15 +724,17 @@
        and the answer came back confident and arbitrary. -->
   <section id="recent" data-feature="recent"
            data-api="POST /api/chat"
-           data-test="TestARecencyQuestionIsAnsweredFromTheStore,TestARecencyQuestionIsNeverCached,TestARealQuestionIsNotMistakenForARecencyOne">
-    <h2 lang="en">6 · Ask what changed lately</h2>
-    <h2 lang="vi">6 · Hỏi xem gần đây có gì mới</h2>
-    <p class="lede" lang="en">Two questions are answered from the library itself rather
-      than from the documents in it: <i>“which documents were updated recently?”</i> and
-      <i>“which answers were confirmed recently?”</i> You get a table of paths and dates.</p>
-    <p class="lede" lang="vi">Hai câu hỏi được trả lời từ chính thư viện chứ không phải từ
-      nội dung tài liệu: <i>“tài liệu nào mới cập nhật?”</i> và <i>“các QA đã chốt gần
-      đây?”</i> Bạn nhận về một bảng gồm đường dẫn và ngày.</p>
+           data-test="TestARecencyQuestionIsAnsweredFromTheStore,TestARecencyQuestionIsNeverCached,TestARealQuestionIsNotMistakenForARecencyOne,TestACountingQuestionIsAnsweredFromTheLibraryNotFromRanking">
+    <h2 lang="en">6 · Ask about the library itself</h2>
+    <h2 lang="vi">6 · Hỏi về chính thư viện</h2>
+    <p class="lede" lang="en">Some questions are about the library rather than about what is
+      written in it — <i>“which documents were updated recently?”</i>, <i>“which answers were
+      confirmed recently?”</i>, <i>“how many decisions are there?”</i> — and those are read off
+      the library's own rows. You get a total and a table, not a search result.</p>
+    <p class="lede" lang="vi">Có những câu hỏi là về chính thư viện chứ không phải về nội
+      dung trong đó — <i>“tài liệu nào mới cập nhật?”</i>, <i>“các QA đã chốt gần đây?”</i>,
+      <i>“có bao nhiêu decision?”</i> — và chúng được đọc thẳng từ các dòng của thư viện. Bạn
+      nhận về một tổng số và một bảng, không phải kết quả tìm kiếm.</p>
 
     <div class="callout memo">
       <b lang="en">Retrieval has no clock, which is why this is not retrieval.</b>
@@ -750,6 +752,29 @@
         trên được đọc thẳng từ chính các dòng trong thư viện, mới nhất trước. Không embed,
         không mua completion, và <b>không bao giờ cache</b> — một câu trả lời về “cái gì mới
         nhất” chính là câu trả lời duy nhất mà nằm im là hỏng.</span>
+    </div>
+
+    <div class="callout warn">
+      <b lang="en">A count is a total, and retrieval cannot produce one.</b>
+      <span lang="en">Asked <i>“how many decisions are there?”</i>, search does the only thing
+        it can: it ranks sections by how well they match, keeps what fits, and the answer
+        counts what it was handed. On a 52-document corpus that came back with three, then
+        with a table of unrelated notes and not one of the seven decisions — because ranking
+        is not counting, and because a document called <code>decision-4-auth.md</code> whose
+        text never uses the word “decision” cannot be found by that word at all: the index
+        covers what a document <i>says</i>, not what it is <i>called</i>. So a count is read
+        off the rows, matching name, title, alias and kind. When the list is shorter than the
+        total, it says so rather than showing twenty and calling it all of them.</span>
+      <b lang="vi">Đếm là một tổng số, mà truy xuất thì không tạo ra tổng số được.</b>
+      <span lang="vi">Hỏi <i>“có bao nhiêu decision?”</i>, tìm kiếm chỉ làm được đúng việc của
+        nó: xếp hạng các mục theo độ khớp, giữ lại phần vừa khung, rồi câu trả lời đếm đúng
+        cái nó được đưa. Trên corpus 52 tài liệu, kết quả là ba — rồi là một bảng toàn ghi chú
+        không liên quan, không có nổi một trong bảy decision — vì xếp hạng không phải là đếm,
+        và vì một tài liệu tên <code>decision-4-auth.md</code> mà thân bài không hề có chữ
+        “decision” thì không thể tìm ra bằng chữ đó: index bao phủ cái tài liệu <i>nói</i>,
+        không phải cái nó <i>được gọi</i>. Nên phép đếm được đọc thẳng từ các dòng, khớp theo
+        tên, tiêu đề, bí danh và loại. Khi danh sách ngắn hơn tổng, nó nói ra, chứ không hiện
+        hai mươi rồi gọi đó là tất cả.</span>
     </div>
 
     <div class="callout tip">

@@ -543,6 +543,58 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	return c, rows.Err()
 }
 
+// DocumentsMatching counts every live document whose *identity* mentions the term, and
+// returns the first `limit` of them. The total is separate from the slice on purpose: a
+// count that only counts what it can show is the bug this exists to fix.
+//
+// Identity, not text: path, title, alias and kind — the four things a person files a document
+// under. Retrieval cannot answer "how many X are there" and never could, for two reasons that
+// are both structural. It ranks and truncates, so a total is not a thing it produces; and
+// `fts_chunks` indexes a chunk's content and heading, so a document called
+// `decision-4-auth.md` whose text never says "decision" is invisible to that word. Measured:
+// on a 52-document corpus, "có bao nhiêu decision" answered with a table of unrelated notes
+// and named none of the seven decisions.
+//
+// LIKE with no index behind it, deliberately. This runs once per *library* question, never on
+// the retrieval path, and a corpus that makes a scan of four short columns slow is one that
+// outgrew the 200-document list on the screen long before it outgrew this.
+func (s *Store) DocumentsMatching(term string, limit int) (int, []Document, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	like := "%" + strings.ToLower(term) + "%"
+	where := `FROM documents d WHERE d.deleted_at IS NULL AND (
+		    lower(d.path) LIKE ? OR lower(COALESCE(d.title,'')) LIKE ?
+		 OR lower(COALESCE(d.alias,'')) LIKE ? OR lower(COALESCE(d.kind,'')) LIKE ?)`
+	args := []any{like, like, like, like}
+
+	var total int
+	if err := s.db.QueryRow(`SELECT COUNT(*) `+where, args...).Scan(&total); err != nil {
+		return 0, nil, fmt.Errorf("counting %q: %w", term, err)
+	}
+	rows, err := s.db.Query(`
+		SELECT d.path, COALESCE(d.title,''), COALESCE(d.alias,''), COALESCE(d.kind,''),
+		       COALESCE(d.description,''), d.updated_at,
+		       (SELECT COUNT(*) FROM chunks c WHERE c.document_id = d.id),
+		       (SELECT COALESCE(SUM(c.status='approved'),0) FROM chunks c WHERE c.document_id = d.id)
+		`+where+` ORDER BY d.path LIMIT ?`, append(args, limit)...)
+	if err != nil {
+		return 0, nil, fmt.Errorf("listing %q: %w", term, err)
+	}
+	defer rows.Close()
+
+	out := []Document{}
+	for rows.Next() {
+		var d Document
+		if err := rows.Scan(&d.Path, &d.Title, &d.Alias, &d.Kind, &d.Description,
+			&d.UpdatedAt, &d.Chunks, &d.Approved); err != nil {
+			return 0, nil, err
+		}
+		out = append(out, d)
+	}
+	return total, out, rows.Err()
+}
+
 // PathWithBody finds a live document holding exactly this text at some other path, so a
 // second copy of one fact can be refused at the door it arrives through.
 //

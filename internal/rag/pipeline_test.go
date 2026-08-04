@@ -2,6 +2,7 @@ package rag_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -748,5 +749,58 @@ func TestTheSameTextImportedUnderASecondNameIsRefused(t *testing.T) {
 
 	if _, err := e.Update(context.Background(), "booking/refund.md", "booking/refund-policy.md", body, rag.Attrs{}); err != nil {
 		t.Errorf("a rename must not read as a duplicate: %v", err)
+	}
+}
+
+// The failure this replaces, measured on a 52-document corpus: "có bao nhiêu decision"
+// answered with a table of unrelated notes and named none of the seven decisions. Two
+// structural reasons, and neither is fixable by a bigger TOP_K or a firmer prompt.
+//
+// Retrieval ranks and truncates, so a *total* is not a thing it produces — it can only report
+// what it was shown. And `fts_chunks` indexes a chunk's content and heading, so a document
+// called `decision-4-auth.md` whose text never says "decision" cannot be found by that word
+// at all. The count is read off the rows instead, by the identity a person files under.
+func TestACountingQuestionIsAnsweredFromTheLibraryNotFromRanking(t *testing.T) {
+	e, prov := engine(t, nil)
+	// Seven decisions whose *text* mostly does not say "decision", and filler that does.
+	for i, body := range []string{
+		"# Chọn Postgres\n\nCần transaction và JSONB.",
+		"# Hàng đợi nền\n\nMột worker, không broker ngoài.",
+		"# Xác thực\n\nCookie HttpOnly, không token trong localStorage.",
+		"# Bộ nhớ đệm\n\nTheo chữ ký corpus.",
+		"# Sơ đồ\n\nRender lúc build.",
+		"# Giới hạn\n\nMỗi phút một trăm.",
+		"# Nhật ký\n\nGhi ra stdout.",
+	} {
+		if _, err := e.Upload(context.Background(), fmt.Sprintf("decision-%d.md", i), body, rag.Attrs{}); err != nil {
+			t.Fatalf("seed decision %d: %v", i, err)
+		}
+	}
+	for i := range 12 {
+		body := fmt.Sprintf("# Ghi chú %d\n\nMột quyết định kỹ thuật của hệ thống, số %d.", i, i)
+		if _, err := e.Upload(context.Background(), fmt.Sprintf("notes/topic-%d.md", i), body, rag.Attrs{}); err != nil {
+			t.Fatalf("seed note %d: %v", i, err)
+		}
+	}
+
+	embeds, chats := len(prov.Embedded()), len(prov.Chats())
+	out, _, err := ask(t, e, "có bao nhiêu decision")
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if !strings.Contains(out, "7") {
+		t.Errorf("the total must be the library's, not the sample's:\n%s", out)
+	}
+	for i := range 7 {
+		if !strings.Contains(out, fmt.Sprintf("decision-%d.md", i)) {
+			t.Errorf("decision-%d.md is missing — a count that lists only what ranked is the bug:\n%s", i, out)
+		}
+	}
+	if strings.Contains(out, "notes/topic-") {
+		t.Errorf("a note ranked its way into a count of decisions:\n%s", out)
+	}
+	if len(prov.Embedded()) != embeds || len(prov.Chats()) != chats {
+		t.Errorf("counting bought %d embeddings and %d completions — it reads rows",
+			len(prov.Embedded())-embeds, len(prov.Chats())-chats)
 	}
 }
