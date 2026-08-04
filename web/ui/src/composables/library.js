@@ -32,6 +32,7 @@
    What tells you where you are instead is the form's own head, which sticks.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { computed, nextTick, ref, watch } from 'vue'
+import { groupOf, prefixes } from '../lib/library.js'
 import { KINDS, read, remove, titleFrom, write } from '../lib/upload.js'
 
 /** The empty form: a new document, in no folder, of no stated kind. */
@@ -149,12 +150,12 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
      see — and paging the groups keeps a folder whole on one page, which is what makes the
      header's count true rather than "true of the part you can see". */
   const groups = computed(() => {
+    const family = prefixes(shown.value)
     const by = new Map()
     for (const d of shown.value) {
-      const cut = (d.path || '').lastIndexOf('/')
-      const dir = cut < 0 ? '' : d.path.slice(0, cut)
+      const dir = groupOf(d.path, family)
       if (!by.has(dir))
-        by.set(dir, { folder: dir, docs: [], chunks: 0 })
+        by.set(dir, { folder: dir, real: dir !== '' && d.path.startsWith(`${dir}/`), docs: [], chunks: 0 })
       const g = by.get(dir)
       g.docs.push(d)
       g.chunks += d.chunks || 0

@@ -88,6 +88,7 @@ function answerHtml(markdown, { cites = [], srcId, webSrcId, diagrams = false, c
   html = dressTaskLists(html)
   html = dressAlerts(html)
   html = dressImages(html)
+  html = dressPaths(html)
   if (cites.length && srcId)
     html = linkCites(html, cites, srcId, webSrcId)
   if (diagrams)
@@ -143,6 +144,45 @@ function dressImages(html) {
     if (alone)
       p.replaceWith(img)
   }
+  return tpl.innerHTML
+}
+
+/* ── a document name the model left in brackets ─────────────────────────────────
+   Reported from a source column that read `[types.convention.md]` with a cite chip beside it.
+   That is markdown's *reference link* — `[text][ref]` — written by a model meaning "this
+   document, cited as 8". With no `[8]: url` definition anywhere, `marked` renders the whole
+   thing literally, `linkCites` turns the `[8]` half into its chip, and the brackets around
+   the file name are left sitting there looking like a broken link.
+
+   Fixed here rather than in the prompt, and the reason is arithmetic rather than taste: the
+   prompt's hash is inside the cache signature, so one word changed there re-buys every cached
+   answer in the database — while a render rule costs nothing and also cleans the answers
+   already stored, because they are re-rendered from their markdown on every read.
+
+   Narrow on purpose. Only a bracket pair whose whole content is one document-shaped word, and
+   never inside code, a fence or a real link — where brackets are the subject rather than
+   punctuation the model added. */
+const DOC_IN_BRACKETS = /\[([^\s|[\]]+\.(?:md|markdown|txt))\]/i
+const DOC_IN_BRACKETS_ALL = new RegExp(DOC_IN_BRACKETS, 'gi')
+
+function dressPaths(html) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  const walk = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT)
+  const hits = []
+  while (walk.nextNode()) {
+    const n = walk.currentNode
+    // The same guard linkCites uses, for the same reason: inside a snippet the brackets are
+    // what is being shown.
+    if (n.parentElement?.closest('code, pre, a'))
+      continue
+    // Tested with the non-global twin: a shared /g regex carries lastIndex between calls, so
+    // every other text node would report no match. answer.js has had that bug once already.
+    if (DOC_IN_BRACKETS.test(n.nodeValue))
+      hits.push(n)
+  }
+  for (const n of hits)
+    n.nodeValue = n.nodeValue.replaceAll(DOC_IN_BRACKETS_ALL, '$1')
   return tpl.innerHTML
 }
 

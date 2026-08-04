@@ -137,3 +137,70 @@ export function plural(n, word) {
 export function folderCount(docs, sections) {
   return `${plural(docs, 'doc')} · ${plural(sections, 'section')}`
 }
+
+/* ── the grouping a flat corpus already has in its names ────────────────────────
+   Reported with 95 documents and not one folder: `m-rules.md`, `m-calendar-polish.md`,
+   `m-client-integration.md`, `cr-effort-changelog-v2-3-6-26.md`. Grouping by folder gives one
+   group of ninety-five, which is the flat list again with a header on it.
+
+   But that corpus is not unstructured — the structure is in the names, written by whoever
+   filed them. `m-` is a module family the same way `booking/` is a folder, and reading it
+   costs nothing: no column, no migration, no guess about meaning. So a top-level document is
+   grouped by the word before its first `-`.
+
+   Only when at least two documents share it. One document called `changelog-v2-3-8-26.md` is
+   not a family of one — it is a document, and giving it a header of its own would trade one
+   long list for forty short ones.
+
+   What this is NOT is a folder. `family` groups are labelled with a trailing `-` and cannot be
+   scoped to, because a scope is a path prefix the *engine* filters on and no such path exists.
+   Moving these into real folders is the thing that would make them scopable; this only stops
+   the screen pretending they have no shape at all. */
+const FAMILY = /^([\p{L}\d]+)-/u
+
+/** The name families worth grouping by: the prefixes at least two top-level documents share. */
+export function prefixes(docs) {
+  const seen = new Map()
+  for (const d of docs || []) {
+    const path = d.path || ''
+    if (path.includes('/'))
+      continue
+    const m = FAMILY.exec(path)
+    if (m)
+      seen.set(m[1], (seen.get(m[1]) || 0) + 1)
+  }
+  return new Set([...seen].filter(([, n]) => n > 1).map(([p]) => p))
+}
+
+/**
+ * Which group a document belongs to: its folder, or its name family, or the top level.
+ *
+ * @param {string} path the document's identity
+ * @param {Set<string>} family the prefixes `prefixes()` found worth grouping by
+ * @returns {string} the group key — a folder path, a `prefix-` family, or ""
+ */
+export function groupOf(path, family) {
+  const p = path || ''
+  const cut = p.lastIndexOf('/')
+  if (cut >= 0)
+    return p.slice(0, cut)
+  const m = FAMILY.exec(p)
+  return m && family.has(m[1]) ? `${m[1]}-` : ''
+}
+
+/**
+ * What a group header calls itself: a folder keeps its slash, a name family keeps its dash and
+ * gains an ellipsis, and the documents belonging to neither say so.
+ *
+ * The three read differently on purpose — `booking/` is somewhere a document lives and can be
+ * scoped to, `m-…` is only what a set of names have in common, and confusing the two would
+ * offer a scope the engine cannot filter on.
+ *
+ * @param {{folder: string, real: boolean}} g a group from `useLibrary().groups`
+ * @returns {string} the header's name
+ */
+export function groupLabel(g) {
+  if (g.real)
+    return `${g.folder}/`
+  return g.folder ? `${g.folder}…` : 'top level'
+}

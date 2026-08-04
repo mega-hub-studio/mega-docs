@@ -21,7 +21,7 @@
 import { toast } from '8bit-nes'
 import { useLibrary } from '../composables/library.js'
 import { usePaged } from '../composables/paged.js'
-import { docTip, docTitle, folderCount, shortDate } from '../lib/library.js'
+import { docTip, docTitle, folderCount, groupLabel, shortDate } from '../lib/library.js'
 import Pager from './Pager.vue'
 
 const props = defineProps({
@@ -173,13 +173,13 @@ const { page, pages, numbers, slice: shownGroups, go } = usePaged(() => groups.v
           <input
             v-if="writes" class="checkbox" type="checkbox"
             :checked="groupAll(g)" :disabled="busy"
-            :aria-label="`Select every document in ${g.folder || 'the top level'}`"
+            :aria-label="`Select every document in ${groupLabel(g)}`"
             @change="toggleGroup(g)"
           >
           <button
             class="lib-fold" type="button"
             :aria-expanded="!collapsed.has(g.folder)"
-            :aria-label="`${collapsed.has(g.folder) ? 'Expand' : 'Collapse'} ${g.folder || 'the top level'}`"
+            :aria-label="`${collapsed.has(g.folder) ? 'Expand' : 'Collapse'} ${groupLabel(g)}`"
             @click="toggleFolder(g.folder)"
           >
             {{ collapsed.has(g.folder) ? '▸' : '▾' }}
@@ -187,11 +187,11 @@ const { page, pages, numbers, slice: shownGroups, go } = usePaged(() => groups.v
           <!-- The name narrows the screen to that folder, which is the same string the ASK
                screen scopes a question to. One fact, two verbs. -->
           <button
-            class="lib-dir" type="button" :disabled="!g.folder"
-            :aria-label="g.folder ? `Show only ${g.folder}` : 'Documents at the top level'"
+            class="lib-dir" type="button" :disabled="!g.real"
+            :aria-label="g.real ? `Show only ${g.folder}` : `${groupLabel(g)} — a shared name, not a folder`"
             @click="folder = g.folder"
           >
-            {{ g.folder ? `${g.folder}/` : 'top level' }}
+            {{ groupLabel(g) }}
           </button>
           <span class="hint">{{ folderCount(g.docs.length, g.chunks) }}</span>
         </div>
