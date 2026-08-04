@@ -133,6 +133,57 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
       .some(v => (v || '').toLowerCase().includes(q)))
   })
 
+  /* ── the shape the corpus already has ────────────────────────────────────────
+     The library was a flat list under a pager, so a corpus of two hundred documents read as
+     two hundred documents — the folders were in every path and visible in none of them. The
+     ASK screen has had a tree since it shipped; this is the same fact on the screen where a
+     BA files and prunes.
+
+     Nothing is stored to make this work and nothing could be: the folder *is* the path
+     (invariant 5), so a group is a `split('/')` and a header count is a sum. A `domain` or
+     `module` column would be a second home for a fact the path already holds, and the first
+     rename would put the two out of step.
+
+     Groups are what gets paged, not documents. A collapsed folder and a pager over rows
+     disagree the moment anything is collapsed — the pager would still count rows nobody can
+     see — and paging the groups keeps a folder whole on one page, which is what makes the
+     header's count true rather than "true of the part you can see". */
+  const groups = computed(() => {
+    const by = new Map()
+    for (const d of shown.value) {
+      const cut = (d.path || '').lastIndexOf('/')
+      const dir = cut < 0 ? '' : d.path.slice(0, cut)
+      if (!by.has(dir))
+        by.set(dir, { folder: dir, docs: [], chunks: 0 })
+      const g = by.get(dir)
+      g.docs.push(d)
+      g.chunks += d.chunks || 0
+    }
+    // Top-level documents first, then folders in path order — the order the tree shows and
+    // the order a path sorts in, so the two screens cannot disagree about what comes first.
+    return [...by.values()].sort((a, b) => a.folder.localeCompare(b.folder))
+  })
+
+  const collapsed = ref(new Set())
+  function toggleFolder(dir) {
+    if (!collapsed.value.delete(dir))
+      collapsed.value.add(dir)
+  }
+
+  /** Is every document in this group ticked? The header checkbox reads this. */
+  const groupAll = g => g.docs.length > 0 && g.docs.every(d => selected.value.has(d.path))
+
+  /** Tick or untick a whole folder at once — the reason the header is a control. */
+  function toggleGroup(g) {
+    const all = groupAll(g)
+    for (const d of g.docs) {
+      if (all)
+        selected.value.delete(d.path)
+      else selected.value.add(d.path)
+    }
+    armedAll.value = false
+  }
+
   // The selection, intersected with what is actually in the library. A path removed in
   // another tab would otherwise keep its place in the count, and the bar would offer to
   // remove a document that is already gone.
@@ -404,5 +455,5 @@ export function useLibrary({ documents, toast, onChanged, onLocked }) {
     }
   }
 
-  return { query, folder: pickedFolder, shown, kinds, folders, form, formEl, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop, selected, picked, count, allShown, armedAll, armAll, toggle, toggleAll, clearSelection, dropSelected, progress }
+  return { query, folder: pickedFolder, shown, groups, collapsed, toggleFolder, groupAll, toggleGroup, kinds, folders, form, formEl, editing, open, busy, error, armed, arm, create, edit, cancel, save, drop, selected, picked, count, allShown, armedAll, armAll, toggle, toggleAll, clearSelection, dropSelected, progress }
 }

@@ -749,6 +749,28 @@ main.ba .datalist code { overflow-wrap: anywhere; }
 .lib-row .result-hint { min-inline-size: 3.25rem; text-align: end; }
 .lib-acts { display: flex; gap: var(--sp-2); }
 
+/* ── the folder a row belongs to ──
+   A header row, not a container: the documents under it stay siblings in `.lib-rows`, so the
+   flex column that gives every row its seam keeps giving it, and folding a group is rendering
+   fewer siblings rather than collapsing a box. `.lib-dir` takes the slack so the counts pack
+   against the end and hold a column down the page — the same reason `.result-body` does.
+   The top border is what separates one folder from the last document of the one above; a row
+   already carries its own, so this is one line and not two. */
+.lib-group {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  padding-block: var(--sp-2);
+  border-block-start: var(--bw-2) solid var(--line-hi);
+  font-family: var(--font-mono); font-size: var(--fs-label);
+}
+.lib-fold { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0; font: inherit; }
+.lib-dir {
+  flex: 1; min-inline-size: 0; text-align: start;
+  background: none; border: 0; padding: 0; font: inherit; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lib-dir:not(:disabled) { cursor: pointer; }
+.lib-dir:not(:disabled):hover { color: var(--primary); }
+
 /* ── the bulk bar ──
    One row that grows rather than two rows that wait: the tick-all and its count are always
    here for someone who can write, and the destructive half arrives with the selection. It

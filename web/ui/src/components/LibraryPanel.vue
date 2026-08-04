@@ -21,7 +21,7 @@
 import { toast } from '8bit-nes'
 import { useLibrary } from '../composables/library.js'
 import { usePaged } from '../composables/paged.js'
-import { docTip, docTitle, shortDate } from '../lib/library.js'
+import { docTip, docTitle, folderCount, shortDate } from '../lib/library.js'
 import Pager from './Pager.vue'
 
 const props = defineProps({
@@ -62,6 +62,11 @@ const {
   clearSelection,
   dropSelected,
   progress,
+  groups,
+  collapsed,
+  toggleFolder,
+  groupAll,
+  toggleGroup,
 } = useLibrary({
   documents: () => props.documents,
   toast,
@@ -69,11 +74,16 @@ const {
   onLocked: e => emit('locked', e),
 })
 
-// Pages what the Find field left, not the whole corpus: a filter is the fast way to a known
-// document and the pager is the way through an unknown one, so they have to compose. `shown`
-// is a getter here for the same reason usePaged asks for one — it is a fresh array on every
-// keystroke, and the page must follow the search rather than the array it was built from.
-const { page, pages, numbers, slice: shownPage, go } = usePaged(() => shown.value, 10)
+// Pages the *folders* the Find field left, not the whole corpus and not the rows. A filter is
+// the fast way to a known document and the pager is the way through an unknown one, so they
+// have to compose — and `groups` is a getter here for the same reason usePaged asks for one:
+// it is a fresh array on every keystroke, and the page must follow the search rather than the
+// array it was built from.
+//
+// Groups rather than rows because a collapsed folder and a row pager disagree the moment
+// anything is collapsed: the pager would go on counting rows nobody can see. Four is what fits
+// a phone once the folders are open — the header, its documents, and the next header.
+const { page, pages, numbers, slice: shownGroups, go } = usePaged(() => groups.value, 4)
 </script>
 
 <template>
@@ -155,65 +165,99 @@ const { page, pages, numbers, slice: shownPage, go } = usePaged(() => shown.valu
          the row's `title` because their job is being *searched* (the Find field reads them),
          not being scanned. -->
     <div v-else class="lib-rows">
-      <div v-for="d in shownPage" :key="d.path" class="lib-row">
-        <!-- Outside `.result` rather than inside it: that recipe is a row of its own with an
+      <!-- The folder, as a header that is three controls: tick the whole group, fold it away,
+           and narrow the screen to it. The counts are the group's own totals, not the part
+           visible — which is only true because the pager pages groups and never splits one. -->
+      <template v-for="g in shownGroups" :key="g.folder">
+        <div class="lib-group">
+          <input
+            v-if="writes" class="checkbox" type="checkbox"
+            :checked="groupAll(g)" :disabled="busy"
+            :aria-label="`Select every document in ${g.folder || 'the top level'}`"
+            @change="toggleGroup(g)"
+          >
+          <button
+            class="lib-fold" type="button"
+            :aria-expanded="!collapsed.has(g.folder)"
+            :aria-label="`${collapsed.has(g.folder) ? 'Expand' : 'Collapse'} ${g.folder || 'the top level'}`"
+            @click="toggleFolder(g.folder)"
+          >
+            {{ collapsed.has(g.folder) ? '▸' : '▾' }}
+          </button>
+          <!-- The name narrows the screen to that folder, which is the same string the ASK
+               screen scopes a question to. One fact, two verbs. -->
+          <button
+            class="lib-dir" type="button" :disabled="!g.folder"
+            :aria-label="g.folder ? `Show only ${g.folder}` : 'Documents at the top level'"
+            @click="folder = g.folder"
+          >
+            {{ g.folder ? `${g.folder}/` : 'top level' }}
+          </button>
+          <span class="hint">{{ folderCount(g.docs.length, g.chunks) }}</span>
+        </div>
+        <div
+          v-for="d in (collapsed.has(g.folder) ? [] : g.docs)" :key="d.path"
+          class="lib-row"
+        >
+          <!-- Outside `.result` rather than inside it: that recipe is a row of its own with an
              icon, two lines and its badges, and a control dropped into it inherits the row's
              pointer behaviour. The tick belongs to the list, not to the document. -->
-        <input
-          v-if="writes" class="checkbox" type="checkbox"
-          :checked="selected.has(d.path)" :disabled="busy"
-          :aria-label="`Select ${d.path}`" @change="toggle(d.path)"
-        >
-        <div class="result" :title="docTip(d)">
-          <nes-icon class="result-icon" name="file" />
-          <span class="result-body">
-            <!-- `docTitle` takes the document, not its path: given a string it read
+          <input
+            v-if="writes" class="checkbox" type="checkbox"
+            :checked="selected.has(d.path)" :disabled="busy"
+            :aria-label="`Select ${d.path}`" @change="toggle(d.path)"
+          >
+          <div class="result" :title="docTip(d)">
+            <nes-icon class="result-icon" name="file" />
+            <span class="result-body">
+              <!-- `docTitle` takes the document, not its path: given a string it read
                  `.title` off it, found nothing, and returned "" — so a document with no title
                  of its own had an empty row. It already falls back to the file name. -->
-            <span class="result-title">{{ docTitle(d) }}</span>
-            <span class="result-path">{{ d.path }}</span>
-          </span>
-          <!-- Plain .badge, not .clear: in this design system `clear` is the *good/green*
+              <span class="result-title">{{ docTitle(d) }}</span>
+              <span class="result-path">{{ d.path }}</span>
+            </span>
+            <!-- Plain .badge, not .clear: in this design system `clear` is the *good/green*
                status fill, so a kind and a section count were claiming a pass state — and on
                the count it also outscored the data-accent beside it. -->
-          <span v-if="d.kind" class="badge">{{ d.kind }}</span>
-          <span
-            class="badge" :data-accent="d.approved ? 'good' : 'blue'"
-            :title="`${d.chunks} retrievable sections, ${d.approved} confirmed by a BA`"
-          >{{ d.chunks }}</span>
-          <span class="result-hint">{{ shortDate(d.updated_at) }}</span>
-        </div>
-        <!-- Icons, so both actions fit on the row instead of adding a second line to every
+            <span v-if="d.kind" class="badge">{{ d.kind }}</span>
+            <span
+              class="badge" :data-accent="d.approved ? 'good' : 'blue'"
+              :title="`${d.chunks} retrievable sections, ${d.approved} confirmed by a BA`"
+            >{{ d.chunks }}</span>
+            <span class="result-hint">{{ shortDate(d.updated_at) }}</span>
+          </div>
+          <!-- Icons, so both actions fit on the row instead of adding a second line to every
              document — `edit` and `trash` are both in the pinned icons.d.ts, which is the only
              way to know: a name the release does not have renders an empty box and says
              nothing. The label a screen reader gets is on the button. -->
-        <div v-if="writes" class="lib-acts">
-          <button
-            class="btn ghost xs icon" type="button" :disabled="busy"
-            aria-label="Edit this document" @click="edit(d.path)"
-          >
-            <nes-icon name="edit" />
-          </button>
-          <!-- Two presses, and the label is what says so. `drop` removes on the press it
+          <div v-if="writes" class="lib-acts">
+            <button
+              class="btn ghost xs icon" type="button" :disabled="busy"
+              aria-label="Edit this document" @click="edit(d.path)"
+            >
+              <nes-icon name="edit" />
+            </button>
+            <!-- Two presses, and the label is what says so. `drop` removes on the press it
                receives, so the arming has to be in front of it or a mis-tap on a phone takes
                a document out of the knowledge base — this button used to carry the library's
                `.perm` class, which is a confirmation *block* recipe (a bordered card with its
                own actions), not a modifier: it made the button a full-width panel and confirmed
                nothing. -->
-          <button
-            class="btn xs" :class="armed === d.path ? '' : 'ghost icon'" type="button"
-            :disabled="busy" :data-accent="armed === d.path ? 'crit' : null"
-            :aria-label="armed === d.path ? 'Confirm: remove this document' : 'Remove this document'"
-            @click="armed === d.path ? drop(d.path) : arm(d.path)"
-          >
-            <nes-icon v-if="armed !== d.path" name="trash" />
-            <template v-else>SURE?</template>
-          </button>
+            <button
+              class="btn xs" :class="armed === d.path ? '' : 'ghost icon'" type="button"
+              :disabled="busy" :data-accent="armed === d.path ? 'crit' : null"
+              :aria-label="armed === d.path ? 'Confirm: remove this document' : 'Remove this document'"
+              @click="armed === d.path ? drop(d.path) : arm(d.path)"
+            >
+              <nes-icon v-if="armed !== d.path" name="trash" />
+              <template v-else>SURE?</template>
+            </button>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
-    <Pager :page="page" :pages="pages" :numbers="numbers" label="Library pages" @go="go" />
+    <Pager :page="page" :pages="pages" :numbers="numbers" label="Library folders" @go="go" />
 
     <!-- ══ the form ═══════════════════════════════════════════════════════════
          Six fields and the text. Everything above the body is what makes a document

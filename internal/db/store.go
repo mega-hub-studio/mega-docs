@@ -543,6 +543,30 @@ func (s *Store) Corpus(limit int) (Corpus, error) {
 	return c, rows.Err()
 }
 
+// PathWithBody finds a live document holding exactly this text at some other path, so a
+// second copy of one fact can be refused at the door it arrives through.
+//
+// Raw bodies, compared as stored. That is what makes it free: the case it exists for is the
+// same file imported twice — byte-identical — and matching *near*-identical text would mean
+// a hash column, a migration, a backfill, and a judgement about how near is near. A document
+// edited by one character is a different document, and the person who edited it knows that.
+//
+// `except` is the path being written, so re-importing a document over itself is an update
+// rather than its own twin.
+func (s *Store) PathWithBody(body, except string) (string, bool, error) {
+	var p string
+	err := s.db.QueryRow(
+		`SELECT path FROM documents
+		 WHERE deleted_at IS NULL AND body = ? AND path <> ? LIMIT 1`, body, except).Scan(&p)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("looking for a duplicate of %s: %w", except, err)
+	}
+	return p, true, nil
+}
+
 // RecentDocuments lists what changed last, newest first, optionally within one folder.
 //
 // Its own query rather than Corpus() plus a filter in Go, and the difference is not style:

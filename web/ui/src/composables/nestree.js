@@ -9,6 +9,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { onMounted, watch } from 'vue'
+import { plural } from '../lib/library.js'
 
 /** @typedef {{ path: string, title: string, chunks: number }} Doc */
 
@@ -49,14 +50,29 @@ function treeNodes(documents, scope = '') {
   }
 
   const onScopePath = value => scope === value || scope.startsWith(`${value}/`)
-  const out = (node, level) =>
-    [...node.children.values()].map((n) => {
-      const kids = out(n, level + 1)
+  // A folder carries how many documents are under it, its own subfolders included. Without it
+  // a collapsed branch says nothing about what scoping to it would reach, so picking one was a
+  // guess — and the number the reader needs before narrowing is exactly "how much is in there".
+  // The word is on the folder and not on the leaf because the two are different counts: a
+  // document's bare number is its retrievable sections, and two bare numbers meaning different
+  // things in one tree is worse than one extra word.
+  const out = (node, level) => {
+    let docs = 0
+    const nodes = [...node.children.values()].map((n) => {
+      const [kids, under] = n.children.size ? out(n, level + 1) : [[], 1]
+      docs += under
       return kids.length
-        ? { label: n.label, value: n.value, expanded: level === 1 || onScopePath(n.value), children: kids }
+        ? {
+            label: `${n.label} · ${plural(under, 'doc')}`,
+            value: n.value,
+            expanded: level === 1 || onScopePath(n.value),
+            children: kids,
+          }
         : { label: `${n.label} · ${n.chunks ?? 0}`, value: n.value }
     })
-  return out(root, 1)
+    return [nodes, docs]
+  }
+  return out(root, 1)[0]
 }
 
 /**

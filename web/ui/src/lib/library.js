@@ -113,3 +113,27 @@ export function shortDate(iso) {
   const d = new Date((iso || '').replace(' ', 'T') + (iso?.endsWith('Z') ? '' : 'Z'))
   return Number.isNaN(+d) ? '' : SHORT_DATE.format(d)
 }
+
+/**
+ * "1 doc", "3 docs". Here rather than in the two places that count folders, because
+ * "1 docs" is the kind of wrong that makes a screen look unfinished — and it appeared in
+ * both the library's headers and the ASK screen's tree, which is a fact wanting one home.
+ *
+ * @param {number} n how many
+ * @param {string} word the singular
+ * @returns {string} the number and the word, agreeing
+ */
+export function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
+/**
+ * What a folder header counts, written the way a person reads it.
+ *
+ * @param {number} docs how many documents are under the folder
+ * @param {number} sections how many retrievable sections they add up to
+ * @returns {string} e.g. "3 docs · 12 sections", or "1 doc · 1 section"
+ */
+export function folderCount(docs, sections) {
+  return `${plural(docs, 'doc')} · ${plural(sections, 'section')}`
+}

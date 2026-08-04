@@ -170,6 +170,21 @@
       câu trả lời sau đó chỉ dựng từ thư mục ấy — dẫn nguồn trong đó, không lấy gì bên
       ngoài.</p>
 
+    <div class="callout tip">
+      <b lang="en">Every folder says how much is under it.</b>
+      <span lang="en">A folder in that tree carries its document count, subfolders included,
+        so you can see what scoping to it would reach before you pick it — a collapsed branch
+        used to say nothing at all, which made narrowing a guess. The bare number beside a
+        <i>document</i> is a different count: its retrievable sections, and a zero there is a
+        failed import worth knowing about before you ask it anything.</span>
+      <b lang="vi">Mỗi thư mục cho biết bên dưới có bao nhiêu.</b>
+      <span lang="vi">Thư mục trong cây mang theo số tài liệu bên dưới, tính cả thư mục con,
+        nên bạn thấy được thu hẹp vào đó sẽ chạm tới bao nhiêu <i>trước khi</i> chọn — trước
+        đây một nhánh đang gập lại không nói gì cả, nên chọn là đoán. Con số trần bên cạnh một
+        <i>tài liệu</i> là chuyện khác: đó là số mục truy xuất được, và số 0 ở đó nghĩa là
+        import hỏng — đáng biết trước khi hỏi nó bất cứ điều gì.</span>
+    </div>
+
     <!-- The control, drawn with the same recipes the app uses, so the page shows the
          thing rather than describing it. -->
     <div class="card" data-accent="gold">
@@ -629,6 +644,44 @@
             hai là có chủ ý, vì các đường dẫn trong danh sách chỉ khác nhau một chữ, mà hệ quả
             thì không cục bộ — mọi câu trả lời sau đó thôi dẫn nguồn tới nó.</p>
       </div>
+    </div>
+
+    <div class="callout memo">
+      <b lang="en">The library groups itself by folder — nothing configures that.</b>
+      <span lang="en">A folder is not a field anyone fills in: it is the front of the path,
+        which is also what a citation prints and what a question is scoped to. So the list
+        groups by it, each header carrying how many documents and how many retrievable
+        sections are under it. The header is three controls in one row — tick the whole
+        folder, fold it away, or tap its name to narrow the screen to it. Pages count
+        <i>folders</i>, not rows, so a folder is never split across two of them and the count
+        in its header is always its real total.</span>
+      <b lang="vi">Thư viện tự gôm nhóm theo folder — không có gì phải cấu hình.</b>
+      <span lang="vi">Folder không phải một ô ai đó điền vào: nó là phần đầu của đường dẫn, mà
+        đường dẫn cũng chính là thứ dẫn nguồn in ra và là phạm vi để thu hẹp câu hỏi. Nên danh
+        sách gôm theo nó, mỗi header ghi rõ có bao nhiêu tài liệu và bao nhiêu mục truy xuất
+        được bên dưới. Header là ba nút trên một hàng — tick cả folder, gập nó lại, hoặc bấm
+        vào tên để thu màn hình về đúng folder đó. Phân trang đếm theo <i>folder</i> chứ không
+        theo dòng, nên một folder không bao giờ bị cắt làm đôi và con số trên header luôn là
+        tổng thật của nó.</span>
+    </div>
+
+    <div class="callout warn">
+      <b lang="en">The same text twice is refused, and the refusal says where it already is.</b>
+      <span lang="en">Importing a file whose text is already in the library — byte for byte,
+        under any other name — is turned away with the address that holds it. Two copies of
+        one fact is not redundancy you can ignore: retrieval returns both, an answer cites
+        both, and correcting one leaves the other still answering with a citation under it.
+        Only a person can say which of the two addresses the document should keep, so nothing
+        is merged or moved for you. Importing over the <i>same</i> path is untouched — that is
+        an update, and it is how you correct a document.</span>
+      <b lang="vi">Cùng một nội dung lần thứ hai sẽ bị từ chối, kèm chỗ nó đang nằm.</b>
+      <span lang="vi">Import một file mà nội dung đã có sẵn trong thư viện — giống từng byte,
+        dù tên gì — sẽ bị trả lại kèm đường dẫn đang giữ nội dung đó. Hai bản của cùng một sự
+        thật không phải thứ dư thừa vô hại: truy xuất trả về cả hai, câu trả lời dẫn nguồn cả
+        hai, và sửa một bản thì bản kia vẫn trả lời, vẫn có dẫn nguồn đàng hoàng. Chỉ con
+        người mới biết nên giữ địa chỉ nào, nên không có gì bị gộp hay bị di chuyển hộ bạn.
+        Import đè lên <i>đúng</i> đường dẫn cũ thì vẫn như trước — đó là cập nhật, và đó là
+        cách bạn sửa một tài liệu.</span>
     </div>
 
     <div class="step">

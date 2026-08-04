@@ -716,3 +716,37 @@ func TestARecencyQuestionIsNeverCached(t *testing.T) {
 		}
 	}
 }
+
+// The same file imported twice under two names is two copies of one fact: retrieval returns
+// both, an answer cites both, and correcting one leaves the other still answering — with a
+// citation under it, so it reads as vouched for. Refused at the door it arrives through, and
+// the message names the address that already holds it, because only a person can say which
+// of the two the document should keep.
+//
+// The two traps are the rest of this test. Re-importing a document over *itself* is an update
+// and must still work; and a rename writes the new address before dropping the old, so both
+// exist for an instant — a duplicate check on that door would refuse every move.
+func TestTheSameTextImportedUnderASecondNameIsRefused(t *testing.T) {
+	e, _ := engine(t, nil)
+	body := "# Refund\n\nA refund is issued within 24 hours of a cancellation, without exception."
+
+	if _, err := e.Upload(context.Background(), "booking/refund.md", body, rag.Attrs{}); err != nil {
+		t.Fatalf("first import: %v", err)
+	}
+
+	_, err := e.Upload(context.Background(), "specs/refund-copy.md", body, rag.Attrs{})
+	if err == nil {
+		t.Fatal("a second copy of one document was accepted")
+	}
+	if !strings.Contains(err.Error(), "booking/refund.md") {
+		t.Errorf("the refusal must name the document that already holds the text: %v", err)
+	}
+
+	if _, err := e.Upload(context.Background(), "booking/refund.md", body, rag.Attrs{}); err != nil {
+		t.Errorf("re-importing a document over itself is an update, not a twin: %v", err)
+	}
+
+	if _, err := e.Update(context.Background(), "booking/refund.md", "booking/refund-policy.md", body, rag.Attrs{}); err != nil {
+		t.Errorf("a rename must not read as a duplicate: %v", err)
+	}
+}

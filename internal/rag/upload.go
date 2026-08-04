@@ -73,6 +73,18 @@ func (e *Engine) Upload(ctx context.Context, name, content string, a Attrs) (Upl
 	if err != nil {
 		return Uploaded{}, err
 	}
+	// The same *path* twice is an update, handled above. The same *text* at another path is
+	// a second copy of one fact: retrieval returns both, an answer cites both, and correcting
+	// one leaves the other still answering — with a citation, so it reads as vouched for.
+	//
+	// Refused rather than merged or replaced, because only a person knows which address the
+	// document should keep, and the message names the one that already holds it so that
+	// decision is one click away. Import is the only door this guards: a rename writes the new
+	// address before dropping the old, so both exist for an instant and a check here would
+	// refuse every move; and a BA typing into the form is not importing anything by accident.
+	if twin, ok, err := e.store.PathWithBody(content, rel); err == nil && ok {
+		return Uploaded{}, fmt.Errorf("%s is already in the library as %s", rel, twin)
+	}
 	return e.save(ctx, rel, content, a)
 }
 
