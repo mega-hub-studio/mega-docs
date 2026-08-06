@@ -60,9 +60,11 @@ const CandidatePool = 40
 // maxPerDoc caps how many chunks one document may contribute to an answer.
 //
 // Without it the whole budget can go to a single file — six near-identical sections of one
-// spec, which reads as a thorough answer and is a narrow one. The cap costs nothing: the
-// slots freed go to the next-best chunk of some other document, so the answer is the same
-// size and covers more of the corpus.
+// spec, which reads as a thorough answer and is a narrow one. The cap costs nothing *while
+// there is somewhere for the freed slots to go*: they fall to the next-best chunk of some
+// other document, so the answer is the same size and covers more of the corpus. That
+// condition is the cap's whole justification, so capPerDoc checks it rather than assuming
+// it.
 const maxPerDoc = 3
 
 // Open opens (or creates) the SQLite DB and runs migrations.
@@ -348,8 +350,22 @@ func (s *Store) hits(score map[int]float64, k int) ([]Hit, error) {
 // capPerDoc drops the chunks past maxPerDoc from any one document. Score order in, score
 // order out — it keeps each document's best and lets the freed slots fall to the next
 // document, so k still decides the size and this decides the spread.
+//
+// One document in the ranked set is the case where that trade has nothing on the other
+// side: there is no next document, so the freed slots go nowhere and the cap deletes recall
+// instead of spreading it. A scope narrowed to a single file is exactly that, and it read
+// three sections of a forty-three-section document — seven per cent — while k was 40 and
+// the model's budget held the whole file eight times over. Neither of them could bind,
+// because this ran first and left three.
 func capPerDoc(hits []Hit) []Hit {
 	seen := map[string]int{}
+	for _, h := range hits {
+		seen[h.DocPath]++
+	}
+	if len(seen) < 2 {
+		return hits
+	}
+	clear(seen)
 	kept := hits[:0] // in place: the write index never overtakes the read index
 	for _, h := range hits {
 		if seen[h.DocPath] >= maxPerDoc {

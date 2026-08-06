@@ -91,6 +91,13 @@ var retiredClaims = []struct{ phrase, why string }{
 	// nightly copy now (scripts/backup.sh, the Deploy page's Back up the database).
 	{"no backup", "there is one now: scripts/backup.sh, nightly — say what it does, not that it is missing"},
 	{"không có backup", "there is one now: scripts/backup.sh, nightly"},
+	// The per-document cap was published as unconditional, and the condition it silently
+	// assumed — that a freed slot has some other document to reach — is false in a scope
+	// holding one file. Production read three sections of forty-three under this sentence.
+	{"capped at three per document so one file cannot fill the answer",
+		"the cap needs a second document to spread to; a single-file scope lifts it"},
+	{"tối đa ba đoạn mỗi tài liệu để một file không lấp hết câu trả lời",
+		"the cap needs a second document to spread to; a single-file scope lifts it"},
 	{"moves to <code>.trash", "removal is a deleted_at column, not a directory"},
 	{"written as a file", "a confirmed answer is a row; internal/rag touches no disk"},
 	// The Dev page described the zoom viewer that `diagram.fit`/`zoomInto` used to be —

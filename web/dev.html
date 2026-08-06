@@ -210,16 +210,23 @@ view.scrollToEnd();                            // viewport.js</span></div>
           than score, so a vector distance and a BM25 weight never have to be compared on
           the same scale. Then the budget decides how many survive: as many as
           <code>CONTEXT_SHARE</code> of the model's window holds, capped at three per document
-          so one file cannot fill the answer, and each one read together with the chunks either
-          side of it. This is the step that decides quality, because a section that does not
-          get here cannot be cited.</p>
+          <i>whenever another document is there to take the freed slot</i>, so one file cannot
+          fill an answer the corpus could have spread — and each one read together with the
+          chunks either side of it. A scope narrowed to a single file has no such document, so
+          the cap lifts there: it was reading three sections of a forty-three-section document
+          while neither <code>TOP_K</code> nor the window's budget could bind, because the cap
+          ran ahead of both. This is the step that decides quality, because a section that does
+          not get here cannot be cited.</p>
         <p lang="vi">Hai bảng xếp hạng thành một danh sách: RRF lấy <i>thứ hạng</i> chứ
           không lấy điểm, nên khoảng cách vector và trọng số BM25 không phải so trên cùng
           một thang. Rồi ngân sách quyết định bao nhiêu đoạn đi tiếp: nhiều bằng phần
-          <code>CONTEXT_SHARE</code> của window model chứa được, tối đa ba đoạn mỗi tài liệu để
-          một file không lấp hết câu trả lời, và mỗi đoạn được đọc kèm hai đoạn liền kề. Đây là
-          bước quyết định chất lượng, vì đoạn không tới được đây thì không thể được dẫn
-          nguồn.</p>
+          <code>CONTEXT_SHARE</code> của window model chứa được, tối đa ba đoạn mỗi tài liệu
+          <i>khi còn tài liệu khác để nhận chỗ vừa nhường ra</i>, nên một file không lấp hết câu
+          trả lời mà lẽ ra corpus trải rộng được — và mỗi đoạn được đọc kèm hai đoạn liền kề.
+          Scope thu về đúng một file thì không có tài liệu nào như vậy, nên giới hạn đó được bỏ:
+          nó đang đọc ba đoạn của một tài liệu bốn mươi ba đoạn, trong khi cả <code>TOP_K</code>
+          lẫn ngân sách window đều không kịp có tác dụng, vì nó chạy trước cả hai. Đây là bước
+          quyết định chất lượng, vì đoạn không tới được đây thì không thể được dẫn nguồn.</p>
       </div>
       <div data-title="4 · prompt + context" data-title-vi="4 · prompt + ngữ cảnh" data-focus="prompt + context">
         <p lang="en">Those sections go in as the <i>only</i> allowed source, with the

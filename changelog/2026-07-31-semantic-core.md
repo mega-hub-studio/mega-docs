@@ -9,7 +9,7 @@ every other limitation followed from nobody having a number to compare against.
 | | before | now |
 |---|---|---|
 | sections per answer | `TOP_K`, fixed at 6 | as many as `CONTEXT_SHARE` (0.5) of the picked model's window holds. `TOP_K` is the floor, and the whole rule when no window is declared |
-| breadth | six chunks could be six chunks of one file | `maxPerDoc = 3`, always on, cost-neutral |
+| breadth | six chunks could be six chunks of one file | `maxPerDoc = 3`, cost-neutral. *"Always on" was wrong and shipped that way — see `2026-08-06-single-doc-scope.md`* |
 | depth | the 2400-char cut that happened to rank | that chunk plus its `ord` neighbours, when a budget exists |
 | outside knowledge | forbidden — *"Answer ONLY from the CONTEXT"* | three tiers: `[n]` documents, `[wN]` public search, one `[!GENERAL]` panel |
 | thread | 3 turns, client-side | 12 offered, server trims to `THREAD_SHARE` of the real window |
@@ -154,7 +154,9 @@ eval. Same reasoning that kept the history hash out of the cache key.
   `kept/offered` to the status line, so a trim is visible rather than silent, and one extra
   completion per long turn is a cost nobody has measured.
 - **No `SEARCH_MAX_RESULTS`.** `webTopK = 3`, a constant. Rule 20 — nobody has asked.
-- **No per-document cap knob.** `maxPerDoc = 3`, same reason.
+- **No per-document cap knob.** `maxPerDoc = 3`, same reason. Still true, and the cap's
+  *condition* turned out to be the thing that needed writing down rather than a knob —
+  `2026-08-06-single-doc-scope.md`.
 - **`web/retrieval.mmd` unchanged**, for the reason `2026-07-29-conversation-memory.md`
   already gave: the diagram is deliberately shallow so a spotlit node fits a phone viewport.
   The budget, the cap and the stitch are in the section's own prose and its `datalist`.

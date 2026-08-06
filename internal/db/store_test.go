@@ -233,6 +233,19 @@ func TestOneDocumentCannotFillTheAnswer(t *testing.T) {
 		t.Errorf("every hit came from %v — the cap exists so the freed slots go somewhere", per)
 	}
 
+	// The other side of the same trade, and the one that shipped wrong: scope the question to
+	// a single file and there is no "somewhere" left, so the cap stops spreading the answer
+	// and starts deleting it. Production read three sections of a forty-three-section document
+	// while k was 40 — k could not bind, because the cap ran first and left three.
+	scoped, err := s.Search(vec(1, 0, 0, 0), "refund policy", 10, "specs/loud.md", false)
+	if err != nil {
+		t.Fatalf("scoped search: %v", err)
+	}
+	if len(scoped) <= maxPerDoc {
+		t.Errorf("a scope holding one document read %d of its 10 sections; k was 10 and nothing "+
+			"else could bind, so the cap was the only thing that cut it", len(scoped))
+	}
+
 	stitched, err := s.Search(vec(1, 0, 0, 0), "refund policy", 10, "", true)
 	if err != nil {
 		t.Fatalf("stitched search: %v", err)
